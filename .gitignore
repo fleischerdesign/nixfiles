@@ -1,0 +1,10 @@
+result
+log
+.envrc
+*.lock
+*.drv
+*.o
+*.docbook
+*.out
+.#*
+*.swp
