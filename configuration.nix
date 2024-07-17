@@ -111,6 +111,7 @@
     godot_4
     openssl
     git
+    gh
   ];
 
   programs.steam = {
