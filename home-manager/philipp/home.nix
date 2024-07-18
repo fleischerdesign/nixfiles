@@ -29,6 +29,7 @@
     pkgs.gimp
   ];
 
+  programs.bash.enable = true;
   programs.starship = {
     enable = true;
     settings = {
