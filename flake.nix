@@ -15,11 +15,11 @@
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, home-manager-unstable, ... }@inputs:
     {
       nixosConfigurations = {
-        yorke = nixpkgs.lib.nixosSystem {
+        yorke = nixpkgs-unstable.lib.nixosSystem {
           system = "x86_64-linux";
           modules = [
             ./hosts/yorke/configuration.nix
-            home-manager.nixosModules.home-manager
+            home-manager-unstable.nixosModules.home-manager
             { _module.args = { inherit inputs; }; }
           ];
         };
