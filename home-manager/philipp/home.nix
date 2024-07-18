@@ -22,14 +22,11 @@
   home.packages = [
     pkgs.warp-terminal
     pkgs.google-chrome
-    pkgs.vscodium
     pkgs.spotify
-    pkgs.vlc
     pkgs.gnomeExtensions.blur-my-shell
     pkgs.gnomeExtensions.gsconnect
     pkgs.gnomeExtensions.caffeine
     pkgs.gnomeExtensions.dash-to-dock
-    pkgs.lmstudio
     pkgs.gimp
   ];
 
