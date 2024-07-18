@@ -12,7 +12,7 @@
     home-manager-unstable.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, home-manager-unstable, sops-nix, ... }@inputs:
+  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, home-manager-unstable, ... }@inputs:
     {
       nixosConfigurations = {
         yorke = nixpkgs.lib.nixosSystem {
@@ -20,14 +20,16 @@
           modules = [
             ./hosts/yorke/configuration.nix
             home-manager.nixosModules.home-manager
+            { _module.args = { inherit inputs; }; }
           ];
         };
 
-        jello = nixpkgs.lib.nixosSystem {
+        jello = nixpkgs-unstable.lib.nixosSystem {
           system = "x86_64-linux";
           modules = [
             ./hosts/jello/configuration.nix
-            home-manager.nixosModules.home-manager
+            home-manager-unstable.nixosModules.home-manager
+            { _module.args = { inherit inputs; }; }
           ];
         };
       };
@@ -35,9 +37,11 @@
       hmModules = {
         philipp = {
           imports = [ ./home-manager/philipp/home.nix ];
+          _module.args = { inherit inputs; };
         };
         server-admin = {
           imports = [ ./home-manager/server-admin/home.nix ];
+          _module.args = { inherit inputs; };
         };
       };
     };
