@@ -94,9 +94,6 @@
     isNormalUser = true;
     description = "Philipp Fleischer";
     extraGroups = [ "networkmanager" "wheel" ];
-    packages = with pkgs; [
-    #  thunderbird
-    ];
   };
 
   # Allow unfree packages
