@@ -24,7 +24,6 @@
     pkgs.google-chrome
     pkgs.vscodium
     pkgs.spotify
-    pkgs.freecad
     pkgs.vlc
     pkgs.gnomeExtensions.blur-my-shell
     pkgs.gnomeExtensions.gsconnect
