@@ -29,7 +29,11 @@
     pkgs.gimp
   ];
 
-  programs.bash.enable = true;
+  programs.bash = {
+    enable = true;
+    enableCompletion = true;
+  };
+
   programs.starship = {
     enable = true;
     settings = {
