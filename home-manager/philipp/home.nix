@@ -20,7 +20,6 @@
   programs.home-manager.enable = true;
 
   home.packages = [
-    pkgs.warp-terminal
     pkgs.google-chrome
     pkgs.spotify
     pkgs.gnomeExtensions.blur-my-shell
@@ -29,6 +28,10 @@
     pkgs.gnomeExtensions.dash-to-dock
     pkgs.gimp
   ];
+
+  programs.starship = {
+    enable = true;
+  };
 
   dconf = {
     enable = true;
