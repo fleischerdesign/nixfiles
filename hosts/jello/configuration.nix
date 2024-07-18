@@ -85,7 +85,7 @@
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
-  home-manager-unstable.users = { inherit (inputs.self.hmModules) philipp; };
+  home-manager.users.philipp = inputs.self.hmModules.philipp;
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.philipp = {
     isNormalUser = true;
