@@ -27,6 +27,7 @@
     pkgs.gnomeExtensions.caffeine
     pkgs.gnomeExtensions.dash-to-dock
     pkgs.gimp
+    pkgs.blackbox-terminal
   ];
 
   programs.bash = {
@@ -72,7 +73,11 @@
     vimdiffAlias = true;
     plugins = [
       pkgs.vimPlugins.onedarkpro-nvim
+      pkgs.vimPlugins.nvim-treesitter
     ];
+    extraConfig = ''
+      colorscheme onedark
+    '';
   };
 
 }
