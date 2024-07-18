@@ -70,6 +70,9 @@
     viAlias = true;
     vimAlias = true;
     vimdiffAlias = true;
+    plugins = [
+      pkgs.vimPlugins.onedarkpro-nvim
+    ];
   };
 
 }
