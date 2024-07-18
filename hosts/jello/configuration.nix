@@ -85,6 +85,9 @@
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
 
+  home-manager.useGlobalPkgs = true;
+  home-manager.useUserPackages = true;
+
   home-manager.users.philipp = inputs.self.hmModules.philipp;
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.philipp = {
@@ -97,7 +100,7 @@
   };
 
   # Allow unfree packages
-  nixpkgs-unstable.config.allowUnfree = true;
+  nixpkgs.config.allowUnfree = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
