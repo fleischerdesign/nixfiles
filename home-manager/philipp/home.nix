@@ -28,6 +28,7 @@
     pkgs.gnomeExtensions.dash-to-dock
     pkgs.gimp
     pkgs.blackbox-terminal
+    pkgs.logseq
   ];
 
   programs.bash = {
