@@ -108,6 +108,7 @@
     openssl
     git
     gh
+    nodejs
   ];
 
   environment.gnome.excludePackages = (with pkgs; [
