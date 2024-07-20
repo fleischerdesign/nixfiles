@@ -93,11 +93,13 @@
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Fleischer";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "adbusers"];
   };
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
+
+  programs.adb.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
