@@ -28,7 +28,6 @@
     pkgs.gnomeExtensions.dash-to-dock
     pkgs.gimp
     pkgs.blackbox-terminal
-    pkgs.codeium
   ];
 
   programs.bash = {
