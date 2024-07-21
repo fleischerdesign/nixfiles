@@ -68,6 +68,7 @@
   programs.vscode = {
   enable = true;
   package = pkgs.vscodium;
+  mutableExtensionsDir = false;
   extensions = with pkgs.open-vsx; [
     codeium.codeium
     bbenoist.nix
