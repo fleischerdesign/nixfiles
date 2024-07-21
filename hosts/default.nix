@@ -22,17 +22,17 @@ in
 
   # Internationalization settings
   i18n.defaultLocale = deLocale;
-  i18n.extraLocaleSettings = pkgs.lib.mkAttrs([
-    "LC_ADDRESS" deLocale
-    "LC_IDENTIFICATION" deLocale
-    "LC_MEASUREMENT" deLocale
-    "LC_MONETARY" deLocale
-    "LC_NAME" deLocale
-    "LC_NUMERIC" deLocale
-    "LC_PAPER" deLocale
-    "LC_TELEPHONE" deLocale
-    "LC_TIME" deLocale
-  ]);
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = deLocale;
+    LC_IDENTIFICATION = deLocale;
+    LC_MEASUREMENT = deLocale;
+    LC_MONETARY = deLocale;
+    LC_NAME = deLocale;
+    LC_NUMERIC = deLocale;
+    LC_PAPER = deLocale;
+    LC_TELEPHONE = deLocale;
+    LC_TIME = deLocale;
+  };
   console.keyMap = "de";
 
   # Allow unfree packages
