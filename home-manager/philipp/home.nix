@@ -73,6 +73,8 @@
     bbenoist.nix
     prisma.prisma
     svelte.svelte-vscode
+    my-python.python
+    vue.volar
   ];
 };
 
