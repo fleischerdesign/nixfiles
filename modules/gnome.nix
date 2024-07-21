@@ -1,3 +1,4 @@
+{ pkgs, ... }:
 {
 # Exclude unnecessary GNOME packages, maintain essential ones
   environment.gnome.excludePackages = (with pkgs; [
