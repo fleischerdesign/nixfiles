@@ -72,7 +72,6 @@
     codeium.codeium
     bbenoist.nix
     prisma.prisma
-    svelte.svelte-vscode
     ms-python.python
     vue.volar
   ];
