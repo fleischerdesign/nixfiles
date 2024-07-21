@@ -90,8 +90,6 @@
 
   home-manager.users.philipp = inputs.self.hmModules.philipp;
 
-  programs.adb.enable = true;
-
   # Define a user account. Don't forget to set a password with ‘passwd’.
   
   programs.adb.enable = true;
