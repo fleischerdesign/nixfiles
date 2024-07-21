@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, nix-vscode-extensions, ... }:
 
 {
   # Home Manager needs a bit of information about you and the
@@ -65,19 +65,15 @@
     };
   };
 
-  programs.neovim = {
-    enable = true;
-    defaultEditor = true;
-    viAlias = true;
-    vimAlias = true;
-    vimdiffAlias = true;
-    plugins = [
-      pkgs.vimPlugins.onedarkpro-nvim
-      pkgs.vimPlugins.nvim-treesitter
-    ];
-    extraConfig = ''
-      colorscheme onedark
-    '';
-  };
+  programs.vscode = {
+  enable = true;
+  package = pkgs.vscodium;
+  extensions = with pkgs.open-vsx; [
+    codeium.codeium
+    bbenoist.nix
+    prisma.prisma
+    svelte.svelte-vscode
+  ];
+};
 
 }
