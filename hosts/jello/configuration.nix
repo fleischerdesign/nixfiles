@@ -89,11 +89,14 @@
   home-manager.useUserPackages = true;
 
   home-manager.users.philipp = inputs.self.hmModules.philipp;
+
+  programs.adb.enable = true;
+
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Fleischer";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "adbusers" ];
     packages = with pkgs; [
     #  thunderbird
     ];
