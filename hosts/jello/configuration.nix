@@ -93,6 +93,9 @@
   programs.adb.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
+  
+  programs.adb.enable = true;
+
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Fleischer";
