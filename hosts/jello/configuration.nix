@@ -6,6 +6,7 @@
       ../default.nix
       ../../modules/audio.nix
       ../../modules/gnome.nix
+      ../../modules/steam.nix
     ];
 
   # Define the hosstname
@@ -28,12 +29,6 @@
 
   # Enable ADB and Steam with firewall settings
   programs.adb.enable = true;
-  programs.steam = {
-    enable = true;
-    remotePlay.openFirewall = true;
-    dedicatedServer.openFirewall = true;
-    localNetworkGameTransfers.openFirewall = true;
-  };
 
   # State version setting
   system.stateVersion = "24.05"; # Keep this to match your initial install
