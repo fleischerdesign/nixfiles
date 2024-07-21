@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, inputs, ... }:
+{ config, pkgs, inputs, nix-vscode-extensions, ... }:
 
 {
   imports =
@@ -11,6 +11,8 @@
     ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  nixpkgs.overlays = [ inputs.nix-vscode-extensions.overlays.default ];
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
@@ -91,7 +93,7 @@
   home-manager.users.philipp = inputs.self.hmModules.philipp;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
-  
+
   programs.adb.enable = true;
 
   users.users.philipp = {
