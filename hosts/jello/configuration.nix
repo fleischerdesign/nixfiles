@@ -113,7 +113,6 @@
     wget
     lutris
     winetricks
-    zed-editor
     glxinfo
     pciutils
     godot_4
