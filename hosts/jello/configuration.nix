@@ -4,6 +4,7 @@
   imports =
     [ ./hardware-configuration.nix
       ../default.nix
+      ../../modules/audio.nix
     ];
 
   # Define the hosstname
@@ -21,18 +22,6 @@
   services.xserver.xkb.layout = "de";
   # Enable CUPS to print documents
   services.printing.enable = true;
-
-  # Enable sound with pipewire.
-  hardware.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-    # Uncomment below for JACK applications
-    # jack.enable = true;
-  };
 
   # Home Manager settings
   home-manager.useGlobalPkgs = true;
