@@ -28,6 +28,7 @@
     pkgs.gnomeExtensions.dash-to-dock
     pkgs.gimp
     pkgs.blackbox-terminal
+    pkgs.codeium
   ];
 
   programs.bash = {
@@ -70,7 +71,7 @@
   package = pkgs.vscodium;
   mutableExtensionsDir = false;
   extensions = with pkgs.open-vsx; [
-    codeium.codeium
+    continue.continue
     bbenoist.nix
     prisma.prisma
     ms-python.python
