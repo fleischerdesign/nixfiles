@@ -30,7 +30,7 @@
     pkgs.blackbox-terminal
     pkgs.figma-linux
     pkgs.figma-agent
-    pkgs.logseq
+    pkgs.obsidian
   ];
 
   programs.bash = {
