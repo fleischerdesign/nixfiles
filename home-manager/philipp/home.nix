@@ -28,6 +28,9 @@
     pkgs.gnomeExtensions.dash-to-dock
     pkgs.gimp
     pkgs.blackbox-terminal
+    pkgs.figma-linux
+    pkgs.figma-agent
+    pkgs.logseq
   ];
 
   programs.bash = {
