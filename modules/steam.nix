@@ -11,5 +11,6 @@ environment.systemPackages = with pkgs; [
     steamtinkerlaunch
     winetricks
     wine
+    jq
   ];
 }
