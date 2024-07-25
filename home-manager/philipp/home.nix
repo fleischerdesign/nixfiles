@@ -31,6 +31,7 @@
     pkgs.figma-linux
     pkgs.figma-agent
     pkgs.obsidian
+    pkgs.deskreen
   ];
 
   programs.bash = {
