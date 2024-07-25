@@ -52,8 +52,6 @@
         };
   };
 
-  programs.weylus.enable = true;
-
   dconf = {
     enable = true;
 
