@@ -40,7 +40,8 @@
   hardware.bluetooth.powerOnBoot = true; # powers up the default Bluetooth controller on boot
 
   # Enable VAAPI
-  hardware.graphics.extraPackages = with pkgs; [ intel-vaapi-driver libvdpau-va-gl ];
+  hardware.graphics.extraPackages = with pkgs; [ intel-vaapi-driver libvdpau-va-gl intel-media-driver ];
+  environment.sessionVariables = { LIBVA_DRIVER_NAME = "iHD"; };
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
