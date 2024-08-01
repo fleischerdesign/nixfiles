@@ -4,7 +4,7 @@
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "philipp";
-  home.homeDirectory = "/home/philipp";
+  home.homeDirectory = "/home/philipp"; 
 
   # This value determines the Home Manager release that your
   # configuration is compatible with. This helps avoid breakage
@@ -31,6 +31,8 @@
     pkgs.figma-linux
     pkgs.figma-agent
     pkgs.obsidian
+    (pkgs.callPackage ../../packages/lychee-slicer {})
+
   ];
 
   programs.bash = {
