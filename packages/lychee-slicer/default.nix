@@ -11,7 +11,7 @@ let
   version = "6.0.2";
   appImage = fetchurl {
     url = "https://mango-lychee.nyc3.cdn.digitaloceanspaces.com/LycheeSlicer-${version}.AppImage";
-    sha256 = "sha256-qi5YXWYIZf3Nf6zXEudzhgWdhchQfD66yAEb5P5WXEQ=";
+    sha256 = "sha256-UY4EbBqiEDc9iokqWXc30ywxF9sAytfXQrtPrvWwMXY=";
   };
 in
 appimageTools.wrapType2 {
