@@ -41,6 +41,9 @@ in
   # Enable adb
   programs.adb.enable = true;
 
+  # Enable Docker
+  virtualisation.docker.enable = true;
+  users.users.philipp.extraGroups = [ "docker" ];
   # System packages to be installed
   environment.systemPackages = with pkgs; [
     wget
@@ -48,6 +51,5 @@ in
     git
     gh
     nodejs
-    docker
   ];
 }
