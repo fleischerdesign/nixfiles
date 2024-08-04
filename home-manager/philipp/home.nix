@@ -31,6 +31,7 @@
     pkgs.figma-linux
     pkgs.figma-agent
     pkgs.obsidian
+    pkgs.telegram-desktop
     (pkgs.callPackage ../../packages/lychee-slicer {})
 
   ];
