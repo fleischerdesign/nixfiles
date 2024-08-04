@@ -48,5 +48,6 @@ in
     git
     gh
     nodejs
+    python3
   ];
 }
