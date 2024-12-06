@@ -11,6 +11,9 @@
   # Configure keymap in X11
   services.xserver.xkb.layout = "de";
 
+  services.gnome.gnome-keyring.enable = true;
+  services.gnome.gnome-online-accounts.enable = true;
+
 # Exclude unnecessary GNOME packages, maintain essential ones
   environment.gnome.excludePackages = (with pkgs; [
     gnome-photos
