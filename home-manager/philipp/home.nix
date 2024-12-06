@@ -81,6 +81,7 @@
     prisma.prisma
     ms-python.python
     vue.volar
+    mkhl.direnv
   ];
 };
 
