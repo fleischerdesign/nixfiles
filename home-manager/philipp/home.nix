@@ -76,7 +76,7 @@
   mutableExtensionsDir = false;
   extensions = with pkgs.open-vsx; [
     continue.continue
-    #bbenoist.nix
+    jnoortheen.nix-ide
     prisma.prisma
     ms-python.python
     vue.volar
