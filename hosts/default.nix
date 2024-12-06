@@ -50,6 +50,5 @@ in
     openssl
     git
     gh
-    nodejs
   ];
 }
