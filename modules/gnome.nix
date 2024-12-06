@@ -24,12 +24,11 @@
     geary
     totem
     gnome-calendar
-  ]) ++ (with pkgs.gnome; [
     gnome-music
-    tali # poker game
-    iagno # go game
-    hitori # sudoku game
-    atomix # puzzle game
+    tali
+    iagno
+    hitori
+    atomix
     gnome-weather
     gnome-maps
     gnome-clocks
