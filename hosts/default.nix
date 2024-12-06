@@ -51,5 +51,6 @@ in
     git
     gh
     btop
+    direnv
   ];
 }
