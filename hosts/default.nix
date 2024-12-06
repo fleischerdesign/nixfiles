@@ -50,5 +50,6 @@ in
     openssl
     git
     gh
+    btop
   ];
 }
