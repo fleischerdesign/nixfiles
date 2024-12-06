@@ -41,6 +41,12 @@ in
   # Enable adb
   programs.adb.enable = true;
 
+  programs.direnv = {
+    enable = true;
+    enableBashIntegration = true; # see note on other shells below
+    nix-direnv.enable = true;
+  };
+
   # Enable Docker
   virtualisation.docker.enable = true;
   users.users.philipp.extraGroups = [ "docker" ];
@@ -51,6 +57,5 @@ in
     git
     gh
     btop
-    direnv
   ];
 }
