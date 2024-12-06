@@ -41,6 +41,7 @@ in
   # Enable adb
   programs.adb.enable = true;
 
+  services.lorri.enable = true;
   programs.direnv = {
     enable = true;
     enableBashIntegration = true; # see note on other shells below
