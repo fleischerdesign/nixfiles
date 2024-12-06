@@ -39,10 +39,4 @@
   # Enable KDE Connect with GSConnect package
     programs.kdeconnect.enable = true;
     programs.kdeconnect.package = pkgs.gnomeExtensions.gsconnect;
-
-  # Enable Weylus screenshare
-  programs.weylus = {
-    enable = true;
-    openFirewall = true;
-  };
 }
