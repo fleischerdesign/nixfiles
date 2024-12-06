@@ -29,9 +29,8 @@
     pkgs.gimp
     pkgs.blackbox-terminal
     pkgs.figma-linux
-    pkgs.figma-agent
+    #pkgs.figma-agent
     pkgs.obsidian
-    pkgs.telegram-desktop
     (pkgs.callPackage ../../packages/lychee-slicer {})
 
   ];
@@ -77,7 +76,7 @@
   mutableExtensionsDir = false;
   extensions = with pkgs.open-vsx; [
     continue.continue
-    bbenoist.nix
+    #bbenoist.nix
     prisma.prisma
     ms-python.python
     vue.volar
