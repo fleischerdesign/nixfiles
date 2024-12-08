@@ -1,4 +1,4 @@
-{ config, pkgs, inputs, nix-vscode-extensions, ... }:
+{ config, pkgs, inputs, ... }:
 
 let
   # Define common locale settings for better readability
@@ -7,9 +7,6 @@ in
 {
   # Enable experimental features
     nix.settings.experimental-features = [ "nix-command" "flakes" ];
-
-  # Use overlays for VSCode extensions
-    nixpkgs.overlays = [ inputs.nix-vscode-extensions.overlays.default ];
 
   # Boot loader configuration
     boot.loader.systemd-boot.enable = true;

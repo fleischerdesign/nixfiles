@@ -1,4 +1,4 @@
-{ config, pkgs, nix-vscode-extensions, ... }:
+{ config, pkgs, ... }:
 
 {
   # Home Manager needs a bit of information about you and the
@@ -75,14 +75,14 @@
   enable = true;
   package = pkgs.vscodium;
   mutableExtensionsDir = false;
-  extensions = with pkgs.open-vsx; [
+  extensions = with pkgs.vscode-extensions; [
     continue.continue
     jnoortheen.nix-ide
     prisma.prisma
     ms-python.python
     vue.volar
     mkhl.direnv
-    llvm-vs-code-extensions.vscode-clangd
+    ms-vscode.cpptools
   ];
 };
 
