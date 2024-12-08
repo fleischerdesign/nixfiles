@@ -82,6 +82,7 @@
     ms-python.python
     vue.volar
     mkhl.direnv
+    llvm-vs-code-extensions.clangd
   ];
 };
 
