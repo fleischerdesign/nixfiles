@@ -90,7 +90,7 @@
     "git.autofetch" = true;
     "terminal.integrated.fontFamily" = "nerd-font-symbols";
     "terminal.integrated.fontWeight" = "normal";
-  }
+  };
 };
 
 }
