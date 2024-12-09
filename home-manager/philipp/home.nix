@@ -84,6 +84,12 @@
     mkhl.direnv
     ms-vscode.cpptools
   ];
+  userSettings = {
+    "git.confirmSync": false,
+    "git.autofetch": true,
+    "terminal.integrated.fontFamily": "nerd-font-symbols",
+    "terminal.integrated.fontWeight": "normal"
+  }
 };
 
 }
