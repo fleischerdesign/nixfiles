@@ -86,10 +86,10 @@
     ms-vscode.makefile-tools
   ];
   userSettings = {
-    "git.confirmSync": false,
-    "git.autofetch": true,
-    "terminal.integrated.fontFamily": "nerd-font-symbols",
-    "terminal.integrated.fontWeight": "normal"
+    "git.confirmSync" = false;
+    "git.autofetch" = true;
+    "terminal.integrated.fontFamily" = "nerd-font-symbols";
+    "terminal.integrated.fontWeight" = "normal";
   }
 };
 
