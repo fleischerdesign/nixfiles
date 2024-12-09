@@ -1,4 +1,4 @@
-{ config, pkgs, inputs, ... }:
+{ lib, config, pkgs, inputs, ... }:
 
 {
   # Home Manager needs a bit of information about you and the
@@ -18,7 +18,7 @@
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
-
+  systemd.user.startServices = "sd-switch";
   home.packages = [
     pkgs.google-chrome
     pkgs.spotify
@@ -72,7 +72,12 @@
 
   age.secrets.codestral.file = ../../secrets/codestral.age;
   age.secrets.openai.file = ../../secrets/openai.age;
+  age.secretsDir = "${config.home.homeDirectory}/.agenix";
 
+  home.sessionVariables = {
+    EDITOR = "nano -L";
+  };
+  
   programs.vscode = {
     enable = true;
     package = pkgs.vscodium;
@@ -108,7 +113,7 @@
           "model" = "gpt-4o-mini";
           "title" = "GPT-4o Mini";
           "systemMessage" = "You are an expert software developer. You give helpful and concise responses.";
-          "apiKey" = builtins.readFile config.age.secrets.openai.file.path;
+          "apiKey" = builtins.readFile config.age.secrets.openai.path;
           "provider" = "openai";
         }
       ];
@@ -116,7 +121,7 @@
         "title" = "Codestral";
         "provider" = "mistral";
         "model" = "codestral-latest";
-        "apiKey" = "${config.age.secrets.codestral.file.path}";
+        "apiKey" = builtins.readFile config.age.secrets.codestral.path;
       };
     };
   };
