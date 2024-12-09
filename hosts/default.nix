@@ -55,6 +55,5 @@ in
     git
     gh
     btop
-    inputs.agenix.packages."${system}".default
   ];
 }

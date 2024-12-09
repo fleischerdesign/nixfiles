@@ -18,7 +18,7 @@
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
-  systemd.user.startServices = "sd-switch";
+
   home.packages = [
     pkgs.google-chrome
     pkgs.spotify
@@ -70,12 +70,8 @@
     };
   };
 
-  age.secrets.codestral.file = ../../secrets/codestral.age;
-  age.secrets.openai.file = ../../secrets/openai.age;
-  age.secretsDir = "${config.home.homeDirectory}/.agenix";
-
   home.sessionVariables = {
-    EDITOR = "nano -L";
+    EDITOR = "codium";
   };
   
   programs.vscode = {
@@ -113,7 +109,7 @@
           "model" = "gpt-4o-mini";
           "title" = "GPT-4o Mini";
           "systemMessage" = "You are an expert software developer. You give helpful and concise responses.";
-          "apiKey" = builtins.readFile config.age.secrets.openai.path;
+          "apiKey" = "";
           "provider" = "openai";
         }
       ];
@@ -121,7 +117,7 @@
         "title" = "Codestral";
         "provider" = "mistral";
         "model" = "codestral-latest";
-        "apiKey" = builtins.readFile config.age.secrets.codestral.path;
+        "apiKey" = "";
       };
     };
   };
