@@ -108,7 +108,7 @@
           "model" = "gpt-4o-mini";
           "title" = "GPT-4o Mini";
           "systemMessage" = "You are an expert software developer. You give helpful and concise responses.";
-          "apiKey" = "${config.age.secrets.openai.file}";
+          "apiKey" = builtins.readFile config.age.secrets.openai.file.path;
           "provider" = "openai";
         }
       ];
@@ -116,7 +116,7 @@
         "title" = "Codestral";
         "provider" = "mistral";
         "model" = "codestral-latest";
-        "apiKey" = "${config.age.secrets.codestral.file}";
+        "apiKey" = "${config.age.secrets.codestral.file.path}";
       };
     };
   };
