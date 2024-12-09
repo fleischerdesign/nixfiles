@@ -83,6 +83,7 @@
     vue.volar
     mkhl.direnv
     ms-vscode.cpptools
+    ms-vscode.makefile-tools
   ];
 };
 
