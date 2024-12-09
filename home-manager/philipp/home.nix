@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
 
 {
   # Home Manager needs a bit of information about you and the
@@ -33,7 +33,6 @@
     pkgs.obsidian
     pkgs.orca-slicer
     (pkgs.callPackage ../../packages/lychee-slicer {})
-
   ];
 
   programs.bash = {
@@ -71,28 +70,54 @@
     };
   };
 
+  age.secrets.codestral.file = ../../secrets/codestral.age;
+  age.secrets.openai.file = ../../secrets/openai.age;
+
   programs.vscode = {
-  enable = true;
-  package = pkgs.vscodium;
-  mutableExtensionsDir = false;
-  extensions = with pkgs.vscode-extensions; [
-    continue.continue
-    jnoortheen.nix-ide
-    prisma.prisma
-    ms-python.python
-    vue.volar
-    mkhl.direnv
-    ms-vscode.cpptools
-    ms-vscode.makefile-tools
-  ];
-  userSettings = {
-    "git.confirmSync" = false;
-    "git.autofetch" = true;
-    "terminal.integrated.fontFamily" = "nerd-font-symbols";
-    "terminal.integrated.fontWeight" = "normal";
+    enable = true;
+    package = pkgs.vscodium;
+    mutableExtensionsDir = false;
+    extensions = with pkgs.vscode-extensions; [
+      continue.continue
+      jnoortheen.nix-ide
+      prisma.prisma
+      ms-python.python
+      vue.volar
+      mkhl.direnv
+      ms-vscode.cpptools
+      ms-vscode.makefile-tools
+    ];
+    userSettings = {
+      "git.confirmSync" = false;
+      "git.autofetch" = true;
+      "terminal.integrated.fontFamily" = "nerd-font-symbols";
+      "terminal.integrated.fontWeight" = "normal";
 
-    "C_Cpp.default.compilerPath" = "gcc";
+      "window.titleBarStyle" = "custom";
+      "window.customTitleBarVisibility" = "auto";
+
+      "C_Cpp.default.compilerPath" = "gcc";
+
+      "direnv.restart.automatic" = true;
+    };
   };
-};
-
+  home.file = {
+    ".continue/config.json".text = builtins.toJSON {
+      "models" = [
+        {
+          "model" = "gpt-4o-mini";
+          "title" = "GPT-4o Mini";
+          "systemMessage" = "You are an expert software developer. You give helpful and concise responses.";
+          "apiKey" = "${config.age.secrets.openai.file}";
+          "provider" = "openai";
+        }
+      ];
+      "tabAutocompleteModel" = {
+        "title" = "Codestral";
+        "provider" = "mistral";
+        "model" = "codestral-latest";
+        "apiKey" = "${config.age.secrets.codestral.file}";
+      };
+    };
+  };
 }
