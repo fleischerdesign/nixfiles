@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ lib, config, pkgs, ... }:
 
 {
   # Home Manager needs a bit of information about you and the
@@ -68,17 +68,51 @@
 
   dconf = {
     enable = true;
+    settings = {
+      "org/gnome/desktop/interface" = {
+        color-scheme = "prefer-dark";
+        accent-color = "green";
+        enable-hot-corners = true;
+      };
 
-    settings."org/gnome/desktop/interface".color-scheme = "prefer-dark";
+      "org/gnome/shell" = {
+        disable-user-extensions = false;
+        enabled-extensions = with pkgs.gnomeExtensions; [
+          blur-my-shell.extensionUuid
+          gsconnect.extensionUuid
+          caffeine.extensionUuid
+          dash-to-dock.extensionUuid
+        ];
+        favorite-apps = [ "org.gnome.Nautilus.desktop" "codium.desktop" "spotify.desktop" "obsidian.desktop" "google-chrome.desktop" "com.raggesilver.BlackBox.desktop" ];
+      };
+        #blur dash-to-dock shell
+        "org/gnome/shell/extensions/blur-my-shell/dash-to-dock" = {
+          blur = true;
+        };
 
-    settings."org/gnome/shell" = {
-      disable-user-extensions = false;
-      enabled-extensions = with pkgs.gnomeExtensions; [
-        blur-my-shell.extensionUuid
-        gsconnect.extensionUuid
-        caffeine.extensionUuid
-        dash-to-dock.extensionUuid
-      ];
+        "org/gnome/shell/extensions/dash-to-dock" = {
+            apply-custom-theme = true;
+        };
+
+      "com/raggesilver/BlackBox" = { 
+        command-as-login-shell = true;
+        context-aware-header-bar = true;
+        delay-before-showing-floating-controls = 200;
+        easy-copy-paste = true;
+        fill-tabs = true;
+        floating-controls = true;
+        floating-controls-hover-area = 20;
+        notify-process-complition = false;
+        opacity = 1;
+        show-headerbar = false;
+        terminal-padding = with lib.hm.gvariant; mkTuple
+          [
+            (mkUint32 15)
+            (mkUint32 15)
+            (mkUint32 15)
+            (mkUint32 15) 
+          ];
+      };
     };
   };
 
@@ -119,6 +153,7 @@
       "nix.formatterPath" = "nixpkgs-fmt";
     };
   };
+  
   home.file = {
     ".continue/config.json".text = builtins.toJSON {
       "models" = [
