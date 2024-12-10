@@ -19,6 +19,15 @@
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
 
+    sops = {
+    age.keyFile = "/home/philipp/.config/sops/age/key.txt"; # must have no password!
+    # It's also possible to use a ssh key, but only when it has no password:
+    #age.sshKeyPaths = [ "/home/user/path-to-ssh-key" ];
+    defaultSopsFile = ../../secrets/example.yaml;
+    secrets.openai = { };
+    secrets.codestral = { };
+    };
+
   home.packages = [
     pkgs.google-chrome
     pkgs.spotify
@@ -109,7 +118,7 @@
           "model" = "gpt-4o-mini";
           "title" = "GPT-4o Mini";
           "systemMessage" = "You are an expert software developer. You give helpful and concise responses.";
-          "apiKey" = "";
+          "apiKey" = builtins.readFile config.sops.secrets.openai.path;
           "provider" = "openai";
         }
       ];
@@ -117,7 +126,7 @@
         "title" = "Codestral";
         "provider" = "mistral";
         "model" = "codestral-latest";
-        "apiKey" = "";
+        "apiKey" = builtins.readFile config.sops.secrets.codestral.path;
       };
     };
   };
