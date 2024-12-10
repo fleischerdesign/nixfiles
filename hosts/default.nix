@@ -38,10 +38,14 @@ in
   # Enable adb
   programs.adb.enable = true;
 
+  # Enable Fish shell
+  programs.fish.enable = true;
+  users.defaultUserShell = pkgs.fish;
+
   services.lorri.enable = true;
   programs.direnv = {
     enable = true;
-    enableBashIntegration = true; # see note on other shells below
+    enableFishIntegration = true; # see note on other shells below
     nix-direnv.enable = true;
   };
 
