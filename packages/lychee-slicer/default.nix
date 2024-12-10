@@ -1,7 +1,4 @@
-{ lib
-, stdenv
-, pkgs
-, appimageTools
+{ appimageTools
 , gsettings-desktop-schemas
 , gtk3
 , fetchurl

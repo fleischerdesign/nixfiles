@@ -1,10 +1,10 @@
-{ lib, config, pkgs, inputs, ... }:
+{ config, pkgs, ... }:
 
 {
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "philipp";
-  home.homeDirectory = "/home/philipp"; 
+  home.homeDirectory = "/home/philipp";
 
   # This value determines the Home Manager release that your
   # configuration is compatible with. This helps avoid breakage
@@ -17,16 +17,17 @@
   home.stateVersion = "24.05";
 
   # Let Home Manager install and manage itself.
+  systemd.user.startServices = "sd-switch";
   programs.home-manager.enable = true;
 
-    sops = {
+  sops = {
     age.keyFile = "/home/philipp/.config/sops/age/key.txt"; # must have no password!
     # It's also possible to use a ssh key, but only when it has no password:
     #age.sshKeyPaths = [ "/home/user/path-to-ssh-key" ];
     defaultSopsFile = ../../secrets/main.yaml;
     secrets.openai = { };
     secrets.codestral = { };
-    };
+  };
 
   home.packages = [
     pkgs.google-chrome
@@ -41,7 +42,9 @@
     #pkgs.figma-agent
     pkgs.obsidian
     pkgs.orca-slicer
-    (pkgs.callPackage ../../packages/lychee-slicer {})
+    pkgs.nixd
+    pkgs.nixpkgs-fmt
+    (pkgs.callPackage ../../packages/lychee-slicer { })
   ];
 
   programs.bash = {
@@ -52,15 +55,15 @@
   programs.starship = {
     enable = true;
     settings = {
-          # add_newline = false;
+      # add_newline = false;
 
-          # character = {
-          #   success_symbol = "[➜](bold green)";
-          #   error_symbol = "[➜](bold red)";
-          # };
+      # character = {
+      #   success_symbol = "[➜](bold green)";
+      #   error_symbol = "[➜](bold red)";
+      # };
 
-          # package.disabled = true;
-        };
+      # package.disabled = true;
+    };
   };
 
   dconf = {
@@ -82,7 +85,7 @@
   home.sessionVariables = {
     EDITOR = "codium";
   };
-  
+
   programs.vscode = {
     enable = true;
     package = pkgs.vscodium;
@@ -96,6 +99,7 @@
       mkhl.direnv
       ms-vscode.cpptools
       ms-vscode.makefile-tools
+      jnoortheen.nix-ide
     ];
     userSettings = {
       "git.confirmSync" = false;
@@ -109,6 +113,10 @@
       "C_Cpp.default.compilerPath" = "gcc";
 
       "direnv.restart.automatic" = true;
+
+      "nix.enableLanguageServer" = true;
+      "nix.serverPath" = "nixd";
+      "nix.formatterPath" = "nixpkgs-fmt";
     };
   };
   home.file = {
