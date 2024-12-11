@@ -43,7 +43,8 @@
     pkgs.obsidian
     pkgs.orca-slicer
     pkgs.nixd
-    pkgs.nixpkgs-fmt
+    pkgs.nixfmt-rfc-style
+    pkgs.element-desktop
     (pkgs.callPackage ../../packages/lychee-slicer { })
   ];
 
@@ -136,7 +137,7 @@
 
       "nix.enableLanguageServer" = true;
       "nix.serverPath" = "nixd";
-      "nix.formatterPath" = "nixpkgs-fmt";
+      "nix.formatterPath" = "nixfmt";
     };
   };
   
