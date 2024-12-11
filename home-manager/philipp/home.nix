@@ -49,7 +49,6 @@
     pkgs.nixd
     pkgs.nixfmt-rfc-style
     pkgs.endeavour
-    pkgs.sysprof
     (pkgs.callPackage ../../packages/lychee-slicer { })
   ];
 
