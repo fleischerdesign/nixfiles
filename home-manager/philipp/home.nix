@@ -90,13 +90,13 @@
       "com/raggesilver/BlackBox" = {
         command-as-login-shell = true;
         context-aware-header-bar = true;
-        delay-before-showing-floating-controls = 200;
+        delay-before-showing-floating-controls = lib.mkUint32 200;
         easy-copy-paste = true;
         fill-tabs = true;
         floating-controls = true;
-        floating-controls-hover-area = 20;
+        floating-controls-hover-area = lib.mkUint32 20;
         notify-process-complition = false;
-        opacity = 1;
+        opacity = lib.mkUint32 100;
         show-headerbar = false;
         terminal-padding =
           with lib.hm.gvariant;
