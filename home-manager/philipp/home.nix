@@ -87,19 +87,19 @@
         apply-custom-theme = true;
       };
 
-      "com/raggesilver/BlackBox" = {
+      "com/raggesilver/BlackBox" = with lib.hm.gvariant; {
         command-as-login-shell = true;
         context-aware-header-bar = true;
-        delay-before-showing-floating-controls = lib.mkUint32 200;
+        delay-before-showing-floating-controls = mkUint32 200;
         easy-copy-paste = true;
         fill-tabs = true;
         floating-controls = true;
-        floating-controls-hover-area = lib.mkUint32 20;
+        floating-controls-hover-area = mkUint32 20;
         notify-process-complition = false;
-        opacity = lib.mkUint32 100;
+        opacity = mkUint32 100;
         show-headerbar = false;
+        pretty = false;
         terminal-padding =
-          with lib.hm.gvariant;
           mkTuple [
             (mkUint32 15)
             (mkUint32 15)
