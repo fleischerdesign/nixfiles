@@ -6,14 +6,17 @@ let
 in
 {
   # Enable experimental features
-    nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   # Boot loader configuration
-    boot.loader.systemd-boot.enable = true;
-    boot.loader.efi.canTouchEfiVariables = true;
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
 
   # Network manager configuration
-    networking.networkmanager.enable = true;
+  networking.networkmanager.enable = true;
   # Set the timezone
   time.timeZone = "Europe/Berlin";
 

@@ -14,7 +14,16 @@
     home-manager-unstable.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, home-manager-unstable, sops-nix, ... }@inputs:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      nixpkgs-unstable,
+      home-manager,
+      home-manager-unstable,
+      sops-nix,
+      ...
+    }@inputs:
     {
       nixosConfigurations = {
         yorke = nixpkgs-unstable.lib.nixosSystem {
@@ -39,7 +48,10 @@
 
       hmModules = {
         philipp = {
-          imports = [ ./home-manager/philipp/home.nix inputs.sops-nix.homeManagerModules.sops ];
+          imports = [
+            ./home-manager/philipp/home.nix
+            inputs.sops-nix.homeManagerModules.sops
+          ];
           _module.args = { inherit inputs; };
         };
         server-admin = {

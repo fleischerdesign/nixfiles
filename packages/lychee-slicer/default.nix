@@ -1,8 +1,9 @@
-{ appimageTools
-, gsettings-desktop-schemas
-, gtk3
-, fetchurl
-, ...
+{
+  appimageTools,
+  gsettings-desktop-schemas,
+  gtk3,
+  fetchurl,
+  ...
 }:
 let
   version = "7.1.3";
@@ -22,8 +23,14 @@ appimageTools.wrapType2 {
     export XDG_DATA_DIRS="${gsettings-desktop-schemas}/share/gsettings-schemas/${gsettings-desktop-schemas.name}:${gtk3}/share/gsettings-schemas/${gtk3.name}:$XDG_DATA_DIRS"
   '';
 
-  extraPkgs = pkgs: (appimageTools.defaultFhsEnvArgs.multiPkgs pkgs) ++ (with pkgs; [
-    # fixes "unexpected error"
-    gsettings-desktop-schemas glib gtk3 adwaita-icon-theme
-  ]);
+  extraPkgs =
+    pkgs:
+    (appimageTools.defaultFhsEnvArgs.multiPkgs pkgs)
+    ++ (with pkgs; [
+      # fixes "unexpected error"
+      gsettings-desktop-schemas
+      glib
+      gtk3
+      adwaita-icon-theme
+    ]);
 }

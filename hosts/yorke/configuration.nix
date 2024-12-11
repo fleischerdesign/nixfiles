@@ -1,12 +1,12 @@
 { inputs, ... }:
 
 {
-  imports =
-    [ ./hardware-configuration.nix
-      ../default.nix
-      ../../modules/audio.nix
-      ../../modules/gnome.nix
-    ];
+  imports = [
+    ./hardware-configuration.nix
+    ../default.nix
+    ../../modules/audio.nix
+    ../../modules/gnome.nix
+  ];
 
   # Define the hosstname
   networking.hostName = "yorke";
@@ -23,10 +23,13 @@
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Fleischer";
-    extraGroups = [ "networkmanager" "wheel" "adbusers"];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+      "adbusers"
+    ];
   };
 
   # State version setting
   system.stateVersion = "24.05"; # Keep this to match your initial install
 }
-

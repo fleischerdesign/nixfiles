@@ -1,13 +1,13 @@
 { inputs, ... }:
 
 {
-  imports =
-    [ ./hardware-configuration.nix
-      ../default.nix
-      ../../modules/audio.nix
-      ../../modules/gnome.nix
-      ../../modules/steam.nix
-    ];
+  imports = [
+    ./hardware-configuration.nix
+    ../default.nix
+    ../../modules/audio.nix
+    ../../modules/gnome.nix
+    ../../modules/steam.nix
+  ];
 
   # Define the hosstname
   networking.hostName = "jello";
@@ -24,7 +24,11 @@
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Fleischer";
-    extraGroups = [ "networkmanager" "wheel" "adbusers" ];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+      "adbusers"
+    ];
   };
 
   # Enable ADB and Steam with firewall settings

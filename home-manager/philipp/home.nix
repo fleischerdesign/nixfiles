@@ -1,4 +1,9 @@
-{ lib, config, pkgs, ... }:
+{
+  lib,
+  config,
+  pkgs,
+  ...
+}:
 
 {
   # Home Manager needs a bit of information about you and the
@@ -70,18 +75,25 @@
           caffeine.extensionUuid
           dash-to-dock.extensionUuid
         ];
-        favorite-apps = [ "org.gnome.Nautilus.desktop" "codium.desktop" "spotify.desktop" "obsidian.desktop" "google-chrome.desktop" "com.raggesilver.BlackBox.desktop" ];
+        favorite-apps = [
+          "org.gnome.Nautilus.desktop"
+          "codium.desktop"
+          "spotify.desktop"
+          "obsidian.desktop"
+          "google-chrome.desktop"
+          "com.raggesilver.BlackBox.desktop"
+        ];
       };
-        #blur dash-to-dock shell
-        "org/gnome/shell/extensions/blur-my-shell/dash-to-dock" = {
-          blur = true;
-        };
+      #blur dash-to-dock shell
+      "org/gnome/shell/extensions/blur-my-shell/dash-to-dock" = {
+        blur = true;
+      };
 
-        "org/gnome/shell/extensions/dash-to-dock" = {
-            apply-custom-theme = true;
-        };
+      "org/gnome/shell/extensions/dash-to-dock" = {
+        apply-custom-theme = true;
+      };
 
-      "com/raggesilver/BlackBox" = { 
+      "com/raggesilver/BlackBox" = {
         command-as-login-shell = true;
         context-aware-header-bar = true;
         delay-before-showing-floating-controls = 200;
@@ -92,12 +104,13 @@
         notify-process-complition = false;
         opacity = 1;
         show-headerbar = false;
-        terminal-padding = with lib.hm.gvariant; mkTuple
-          [
+        terminal-padding =
+          with lib.hm.gvariant;
+          mkTuple [
             (mkUint32 15)
             (mkUint32 15)
             (mkUint32 15)
-            (mkUint32 15) 
+            (mkUint32 15)
           ];
       };
     };
@@ -140,7 +153,7 @@
       "nix.formatterPath" = "nixfmt";
     };
   };
-  
+
   home.file = {
     ".continue/config.json".text = builtins.toJSON {
       "models" = [

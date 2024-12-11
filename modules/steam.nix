@@ -1,4 +1,4 @@
-{ pkgs, ...}:
+{ pkgs, ... }:
 {
   programs.steam = {
     enable = true;
@@ -12,7 +12,7 @@
     autoStart = true;
     capSysAdmin = true;
     openFirewall = true;
-    
+
   };
 
   environment.systemPackages = with pkgs; [
