@@ -95,17 +95,16 @@
         fill-tabs = true;
         floating-controls = true;
         floating-controls-hover-area = mkUint32 20;
-        notify-process-complition = false;
+        notify-process-completion = false;
         opacity = mkUint32 100;
         show-headerbar = false;
         pretty = false;
-        terminal-padding =
-          mkTuple [
-            (mkUint32 15)
-            (mkUint32 15)
-            (mkUint32 15)
-            (mkUint32 15)
-          ];
+        terminal-padding = mkTuple [
+          (mkUint32 15)
+          (mkUint32 15)
+          (mkUint32 15)
+          (mkUint32 15)
+        ];
       };
     };
   };
@@ -132,12 +131,13 @@
     userSettings = {
       "git.confirmSync" = false;
       "git.autofetch" = true;
-      "terminal.integrated.fontFamily" = "nerd-font-symbols";
       "terminal.integrated.fontWeight" = "normal";
 
       "window.titleBarStyle" = "custom";
       "window.customTitleBarVisibility" = "auto";
 
+      "security.workspace.trust.enabled" = true;
+      
       "C_Cpp.default.compilerPath" = "gcc";
 
       "direnv.restart.automatic" = true;
