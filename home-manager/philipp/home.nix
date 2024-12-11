@@ -44,11 +44,15 @@
     pkgs.gimp
     pkgs.blackbox-terminal
     pkgs.figma-linux
-    #pkgs.figma-agent
     pkgs.obsidian
     pkgs.orca-slicer
     pkgs.nixd
     pkgs.nixfmt-rfc-style
+    pkgs.endeavour
+    pkgs.wike
+    pkgs.authenticator
+    pkgs.warp
+    pkgs.sysprof
     (pkgs.callPackage ../../packages/lychee-slicer { })
   ];
 
