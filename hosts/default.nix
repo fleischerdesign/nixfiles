@@ -55,8 +55,6 @@ in
   programs.fish.enable = true;
   users.defaultUserShell = pkgs.fish;
 
-  services.lorri.enable = true;
-
   # Enable Docker
   virtualisation.docker.enable = true;
   users.users.philipp.extraGroups = [ "docker" ];
