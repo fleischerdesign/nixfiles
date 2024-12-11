@@ -49,9 +49,6 @@
     pkgs.nixd
     pkgs.nixfmt-rfc-style
     pkgs.endeavour
-    pkgs.wike
-    pkgs.authenticator
-    pkgs.warp
     pkgs.sysprof
     (pkgs.callPackage ../../packages/lychee-slicer { })
   ];
