@@ -52,11 +52,6 @@
     (pkgs.callPackage ../../packages/lychee-slicer { })
   ];
 
-  programs.bash = {
-    enable = true;
-    enableCompletion = true;
-  };
-
   dconf = {
     enable = true;
     settings = {
