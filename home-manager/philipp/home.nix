@@ -49,7 +49,6 @@
     pkgs.orca-slicer
     pkgs.nixd
     pkgs.nixfmt-rfc-style
-    pkgs.element-desktop
     (pkgs.callPackage ../../packages/lychee-slicer { })
   ];
 
