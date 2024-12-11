@@ -23,7 +23,17 @@
 
   # Let Home Manager install and manage itself.
   systemd.user.startServices = "sd-switch";
-  programs.home-manager.enable = true;
+  programs = {
+    home-manager.enable = true;
+
+    direnv = {
+      enable = true;
+      enableFishIntegration = true; # see note on other shells below
+      nix-direnv.enable = true;
+    };
+
+    fish.enable = true; # see note on other shells below
+  };
 
   sops = {
     age.keyFile = "/home/philipp/.config/sops/age/key.txt"; # must have no password!

@@ -43,16 +43,19 @@ in
   # Enable adb
   programs.adb.enable = true;
 
+  # Enable Nh cli helper
+  programs.nh = {
+    enable = true;
+    clean.enable = true;
+    clean.extraArgs = "--keep-since 4d --keep 3";
+    flake = "/etc/nixos";
+  };
+
   # Enable Fish shell
   programs.fish.enable = true;
   users.defaultUserShell = pkgs.fish;
 
   services.lorri.enable = true;
-  programs.direnv = {
-    enable = true;
-    enableFishIntegration = true; # see note on other shells below
-    nix-direnv.enable = true;
-  };
 
   # Enable Docker
   virtualisation.docker.enable = true;
