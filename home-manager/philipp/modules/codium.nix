@@ -10,7 +10,6 @@
     mutableExtensionsDir = false;
     extensions = with pkgs.vscode-extensions; [
       continue.continue
-      jnoortheen.nix-ide
       prisma.prisma
       ms-python.python
       vue.volar
