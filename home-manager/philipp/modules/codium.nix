@@ -10,7 +10,6 @@
     mutableExtensionsDir = false;
     extensions = with pkgs.vscode-extensions; [
       continue.continue
-      jnoortheen.nix-ide
       prisma.prisma
       ms-python.python
       vue.volar
@@ -43,8 +42,8 @@
     ".continue/config.json".text = builtins.toJSON {
       "models" = [
         {
-          "model" = "gpt-4o-mini";
-          "title" = "GPT-4o Mini";
+          "model" = "o1-mini";
+          "title" = "o1 Mini";
           "systemMessage" = "You are an expert software developer. You give helpful and concise responses.";
           "apiKey" = builtins.readFile config.sops.secrets.openai.path;
           "provider" = "openai";
