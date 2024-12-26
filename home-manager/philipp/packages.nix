@@ -16,6 +16,6 @@
     pkgs.nixfmt-rfc-style
     pkgs.endeavour
     (pkgs.callPackage ../../packages/lychee-slicer { })
-    (pkgs.callPackage ../../packages/smm { })
+    (pkgs.callPackage ../../packages/ficsit { })
   ];
 }

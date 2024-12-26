@@ -1,6 +1,6 @@
 {
   stdenv,
-  fetchurl,
+  fetchurl
 }:
 
 let
@@ -9,16 +9,16 @@ let
 
   src = fetchurl {
     url = "https://github.com/satisfactorymodding/ficsit-cli/releases/download/v${version}/ficsit_linux_amd64";
-    sha256 = "sha256-PN9IqGZSLgug6YgAgNKMmSX0VlgBGc/Aj1YqkPHqLRY=";
+    sha256 = "sha256-7YYllR3zKaEi8WDGQrijUMR3lMebjBpF/go9/1LK/P0=";
   };
 
 in
-stdenv.mkDerivation rec {
+stdenv.mkDerivation{
   inherit version pname src;
 
-  sourceRoot = ".";
+  phases = [ "installPhase" ];
 
   installPhase = ''
-    install -m755 -D ficsit_linux_amd64 $out/bin/ficsit
+    install -D $src $out/bin/${pname}
   '';
 }
