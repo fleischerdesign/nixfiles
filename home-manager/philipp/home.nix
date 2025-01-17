@@ -36,4 +36,9 @@
 
     fish.enable = true; # see note on other shells below
   };
+
+  stylix = {
+    enable = true;
+    image = ./media/wallpaper.jpg;
+  };
 }
