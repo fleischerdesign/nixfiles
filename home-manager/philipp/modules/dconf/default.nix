@@ -8,6 +8,13 @@
         color-scheme = "prefer-dark";
       };
 
+    "org/gnome/desktop/background" = let
+      bg = ../../../../media/wallpaper.jpg;
+    in {
+      picture-uri = "file://${bg}";
+      picture-uri-dark = "file://${bg}";
+    };
+
       "org/gnome/shell" = {
         disable-user-extensions = false;
         enabled-extensions = with pkgs.gnomeExtensions; [
