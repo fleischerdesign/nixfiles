@@ -4,9 +4,8 @@
     enable = true;
     settings = {
       "org/gnome/desktop/interface" = {
-        color-scheme = "prefer-dark";
-        accent-color = "green";
         enable-hot-corners = true;
+        color-scheme = "prefer-dark";
       };
 
       "org/gnome/shell" = {

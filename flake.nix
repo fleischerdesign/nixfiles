@@ -7,8 +7,6 @@
 
     sops-nix.url = "github:Mic92/sops-nix";
 
-    stylix.url = "github:danth/stylix";
-
     home-manager.url = "github:nix-community/home-manager?ref=release-24.11";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -24,7 +22,6 @@
       home-manager,
       home-manager-unstable,
       sops-nix,
-      stylix,
       ...
     }@inputs:
     {
@@ -33,7 +30,6 @@
           system = "x86_64-linux";
           modules = [
             ./hosts/yorke/configuration.nix
-            stylix.nixosModules.stylix
             home-manager-unstable.nixosModules.home-manager
             { _module.args = { inherit inputs; }; }
           ];
@@ -43,7 +39,6 @@
           system = "x86_64-linux";
           modules = [
             ./hosts/jello/configuration.nix
-            stylix.nixosModules.stylix
             home-manager-unstable.nixosModules.home-manager
             { _module.args = { inherit inputs; }; }
           ];
