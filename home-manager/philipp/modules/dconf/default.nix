@@ -4,10 +4,16 @@
     enable = true;
     settings = {
       "org/gnome/desktop/interface" = {
-        color-scheme = "prefer-dark";
-        accent-color = "green";
         enable-hot-corners = true;
+        color-scheme = "prefer-dark";
       };
+
+    "org/gnome/desktop/background" = let
+      bg = ../../../../media/wallpaper.jpg;
+    in {
+      picture-uri = "file://${bg}";
+      picture-uri-dark = "file://${bg}";
+    };
 
       "org/gnome/shell" = {
         disable-user-extensions = false;

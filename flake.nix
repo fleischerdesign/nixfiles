@@ -30,7 +30,6 @@
           system = "x86_64-linux";
           modules = [
             ./hosts/yorke/configuration.nix
-            sops-nix.nixosModules.sops
             home-manager-unstable.nixosModules.home-manager
             { _module.args = { inherit inputs; }; }
           ];
