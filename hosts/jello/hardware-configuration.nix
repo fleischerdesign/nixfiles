@@ -25,6 +25,7 @@
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
   boot.kernelPackages = pkgs.linuxPackages_testing;
+  boot.kernelParams = [ "intel_idle.max_cstate=1" ]; #fix freezes?
   boot.extraModulePackages = [ ];
 
   fileSystems."/" = {
