@@ -19,5 +19,6 @@
     winetricks
     wine
     lutris
+    umu-launcher
   ];
 }
