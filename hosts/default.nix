@@ -54,6 +54,7 @@ in
   # Enable Fish shell
   programs.fish.enable = true;
   users.defaultUserShell = pkgs.fish;
+  documentation.man.generateCaches = false; # Disable man cache generation
 
   # Enable Docker
   virtualisation.docker.enable = true;
