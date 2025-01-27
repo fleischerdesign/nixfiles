@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 {
   home.packages = [
     (pkgs.google-chrome.override {
@@ -10,7 +10,6 @@
     pkgs.gnomeExtensions.caffeine
     pkgs.gnomeExtensions.dash-to-dock
     pkgs.gimp
-    pkgs.blackbox-terminal
     pkgs.figma-linux
     pkgs.obsidian
     #pkgs.orca-slicer
@@ -18,7 +17,17 @@
     pkgs.nixfmt-rfc-style
     pkgs.endeavour
     pkgs.resources
+    pkgs.tuba
+    pkgs.bitwarden
+    pkgs.bitwarden-cli
+    pkgs.moonlight-qt
+    pkgs.firefox-beta
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
+
+  programs.ghostty = {
+    enable = true;
+    enableFishIntegration = true;
+  };
 }
