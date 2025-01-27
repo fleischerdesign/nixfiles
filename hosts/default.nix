@@ -43,6 +43,9 @@ in
   # Enable adb
   programs.adb.enable = true;
 
+  # Enable polkit for bitwarden
+  security.polkit.enable = true;
+
   # Enable Nh cli helper
   programs.nh = {
     enable = true;
