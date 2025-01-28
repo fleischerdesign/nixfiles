@@ -12,8 +12,6 @@
 
     home-manager-unstable.url = "github:nix-community/home-manager";
     home-manager-unstable.inputs.nixpkgs.follows = "nixpkgs-unstable";
-
-    zen-browser.url = "github:0xc000022070/zen-browser-flake";
   };
 
   outputs =
@@ -24,7 +22,6 @@
       home-manager,
       home-manager-unstable,
       sops-nix,
-      zen-browser,
       ...
     }@inputs:
     {
