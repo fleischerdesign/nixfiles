@@ -29,7 +29,7 @@
           "spotify.desktop"
           "obsidian.desktop"
           "firefox-beta.desktop"
-          "com.raggesilver.BlackBox.desktop"
+          "ghostty.desktop"
         ];
       };
       #blur dash-to-dock shell
