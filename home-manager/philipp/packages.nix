@@ -2,7 +2,9 @@
 {
   home.packages = [
     (pkgs.google-chrome.override {
-      commandLineArgs = [ "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoEncoder,Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,VaapiIgnoreDriverChecks,VaapiVideoDecoder,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo" ];
+      commandLineArgs = [
+        "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoEncoder,Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,VaapiIgnoreDriverChecks,VaapiVideoDecoder,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo"
+      ];
     })
     pkgs.spotify
     pkgs.gnomeExtensions.blur-my-shell
@@ -22,6 +24,7 @@
     pkgs.bitwarden-cli
     pkgs.moonlight-qt
     pkgs.firefox-beta
+    pkgs.libreoffice-fresh
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
