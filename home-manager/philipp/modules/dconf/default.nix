@@ -28,7 +28,7 @@
           "codium.desktop"
           "spotify.desktop"
           "obsidian.desktop"
-          "google-chrome.desktop"
+          "firefox-beta.desktop"
           "com.raggesilver.BlackBox.desktop"
         ];
       };
@@ -39,26 +39,6 @@
 
       "org/gnome/shell/extensions/dash-to-dock" = {
         apply-custom-theme = true;
-      };
-
-      "com/raggesilver/BlackBox" = with lib.hm.gvariant; {
-        command-as-login-shell = true;
-        context-aware-header-bar = true;
-        delay-before-showing-floating-controls = mkUint32 200;
-        easy-copy-paste = true;
-        fill-tabs = true;
-        floating-controls = true;
-        floating-controls-hover-area = mkUint32 20;
-        notify-process-completion = false;
-        opacity = mkUint32 100;
-        show-headerbar = false;
-        pretty = false;
-        terminal-padding = mkTuple [
-          (mkUint32 15)
-          (mkUint32 15)
-          (mkUint32 15)
-          (mkUint32 15)
-        ];
       };
     };
   };
