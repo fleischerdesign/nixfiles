@@ -29,7 +29,7 @@
           "spotify.desktop"
           "obsidian.desktop"
           "firefox-beta.desktop"
-          "ghostty.desktop"
+          "com.mitchellh.ghostty.desktop"
         ];
       };
       #blur dash-to-dock shell
