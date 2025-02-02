@@ -22,6 +22,7 @@
     pkgs.bitwarden-cli
     pkgs.moonlight-qt
     pkgs.firefox-beta
+    pkgs.libreoffice-fresh
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
