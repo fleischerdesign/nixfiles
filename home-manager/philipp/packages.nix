@@ -19,11 +19,8 @@
     pkgs.nixfmt-rfc-style
     pkgs.endeavour
     pkgs.resources
-    pkgs.tuba
-    pkgs.bitwarden
-    pkgs.bitwarden-cli
     pkgs.moonlight-qt
-    pkgs.firefox-beta
+    pkgs.google-chrome
     pkgs.libreoffice-fresh
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
