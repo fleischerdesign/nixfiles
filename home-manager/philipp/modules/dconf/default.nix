@@ -28,7 +28,7 @@
           "codium.desktop"
           "spotify.desktop"
           "obsidian.desktop"
-          "firefox-beta.desktop"
+          "google-chrome.desktop"
           "com.mitchellh.ghostty.desktop"
         ];
       };

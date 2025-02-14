@@ -20,7 +20,6 @@
     pkgs.endeavour
     pkgs.resources
     pkgs.moonlight-qt
-    pkgs.google-chrome
     pkgs.libreoffice-fresh
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
