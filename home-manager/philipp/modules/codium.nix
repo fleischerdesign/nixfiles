@@ -4,37 +4,40 @@
     EDITOR = "codium";
   };
 
+
+
   programs.vscode = {
     enable = true;
     package = pkgs.vscodium;
     mutableExtensionsDir = false;
-    extensions = with pkgs.vscode-extensions; [
-      continue.continue
-      prisma.prisma
-      ms-python.python
-      vue.volar
-      mkhl.direnv
-      ms-vscode.cpptools
-      ms-vscode.makefile-tools
-      jnoortheen.nix-ide
-    ];
-    userSettings = {
-      "git.confirmSync" = false;
-      "git.autofetch" = true;
-      "terminal.integrated.fontWeight" = "normal";
+    profiles.default = {
+      extensions = with pkgs.vscode-extensions; [
+        continue.continue
+        prisma.prisma
+        vue.volar
+        mkhl.direnv
+        ms-vscode.cpptools
+        ms-vscode.makefile-tools
+        jnoortheen.nix-ide
+      ];
+      userSettings = {
+        "git.confirmSync" = false;
+        "git.autofetch" = true;
+        "terminal.integrated.fontWeight" = "normal";
 
-      "window.titleBarStyle" = "custom";
-      "window.customTitleBarVisibility" = "auto";
+        "window.titleBarStyle" = "custom";
+        "window.customTitleBarVisibility" = "auto";
 
-      "security.workspace.trust.enabled" = true;
+        "security.workspace.trust.enabled" = true;
       
-      "C_Cpp.default.compilerPath" = "gcc";
+        "C_Cpp.default.compilerPath" = "gcc";
 
-      "direnv.restart.automatic" = true;
+        "direnv.restart.automatic" = true;
 
-      "nix.enableLanguageServer" = true;
-      "nix.serverPath" = "nixd";
-      "nix.formatterPath" = "nixfmt";
+        "nix.enableLanguageServer" = true;
+        "nix.serverPath" = "nixd";
+        "nix.formatterPath" = "nixfmt";
+      };
     };
   };
 
