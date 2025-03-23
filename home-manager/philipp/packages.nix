@@ -20,7 +20,7 @@
     pkgs.endeavour
     pkgs.resources
     pkgs.moonlight-qt
-    pkgs.libreoffice-fresh
+    pkgs.rquickshare
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
