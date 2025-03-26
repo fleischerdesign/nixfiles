@@ -59,6 +59,10 @@ in
   users.defaultUserShell = pkgs.fish;
   documentation.man.generateCaches = false; # Disable man cache generation
 
+  # Enable CUPS to print documents
+  services.printing.enable = true;
+  services.printing.drivers = [ pkgs.hplip ];
+
   # Enable Docker
   virtualisation.docker.enable = true;
   users.users.philipp.extraGroups = [ "docker" ];
