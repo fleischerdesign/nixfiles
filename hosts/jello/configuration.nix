@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ pkgs, inputs, ... }:
 
 {
   imports = [
@@ -14,6 +14,7 @@
 
   # Enable CUPS to print documents
   services.printing.enable = true;
+  services.printing.drivers = [ pkgs.hplip ];
 
   # Home Manager settings
   home-manager.useGlobalPkgs = true;
