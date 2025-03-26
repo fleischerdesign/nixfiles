@@ -14,7 +14,7 @@
     pkgs.gimp
     pkgs.figma-linux
     pkgs.obsidian
-    #pkgs.orca-slicer
+    pkgs.orca-slicer
     pkgs.nixd
     pkgs.nixfmt-rfc-style
     pkgs.endeavour
