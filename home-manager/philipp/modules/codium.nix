@@ -1,4 +1,4 @@
-{config, pkgs, ...}:
+{pkgs, ...}:
 {
     home.sessionVariables = {
     EDITOR = "codium";
@@ -12,7 +12,7 @@
     mutableExtensionsDir = false;
     profiles.default = {
       extensions = with pkgs.vscode-extensions; [
-        continue.continue
+        rooveterinaryinc.roo-cline
         prisma.prisma
         vue.volar
         mkhl.direnv
@@ -37,26 +37,6 @@
         "nix.enableLanguageServer" = true;
         "nix.serverPath" = "nixd";
         "nix.formatterPath" = "nixfmt";
-      };
-    };
-  };
-
-  home.file = {
-    ".continue/config.json".text = builtins.toJSON {
-      "models" = [
-        {
-          "model" = "o1-mini";
-          "title" = "o1 Mini";
-          "systemMessage" = "You are an expert software developer. You give helpful and concise responses.";
-          "apiKey" = builtins.readFile config.sops.secrets.openai.path;
-          "provider" = "openai";
-        }
-      ];
-      "tabAutocompleteModel" = {
-        "title" = "Codestral";
-        "provider" = "mistral";
-        "model" = "codestral-latest";
-        "apiKey" = builtins.readFile config.sops.secrets.codestral.path;
       };
     };
   };
