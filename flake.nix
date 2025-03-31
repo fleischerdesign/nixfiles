@@ -12,6 +12,9 @@
 
     home-manager-unstable.url = "github:nix-community/home-manager";
     home-manager-unstable.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
+    figma-linux.url = "github:HelloWorld017/figma-linux-nixos";
+    figma-linux.inputs.nixpkgs.follows = "nixpkgs-unstable";
   };
 
   outputs =
@@ -22,6 +25,7 @@
       home-manager,
       home-manager-unstable,
       sops-nix,
+      figma-linux,
       ...
     }@inputs:
     {
