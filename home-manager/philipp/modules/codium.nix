@@ -19,6 +19,8 @@
         ms-vscode.cpptools
         ms-vscode.makefile-tools
         jnoortheen.nix-ide
+        dart-code.flutter
+        dart-code.dart-code
       ];
       userSettings = {
         "git.confirmSync" = false;
