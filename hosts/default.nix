@@ -37,9 +37,6 @@ in
   };
   console.keyMap = "de";
 
-  # Allow unfree packages
-  nixpkgs.config.allowUnfree = true;
-
   # Enable adb
   programs.adb.enable = true;
 
@@ -73,5 +70,6 @@ in
     git
     gh
     btop
+    android-studio
   ];
 }
