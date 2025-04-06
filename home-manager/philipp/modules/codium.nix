@@ -39,6 +39,8 @@
         "nix.enableLanguageServer" = true;
         "nix.serverPath" = "nixd";
         "nix.formatterPath" = "nixfmt";
+        "dart.renameFilesWithClasses" = "prompt";
+        "dart.previewFlutterUiGuides" = true;
       };
     };
   };
