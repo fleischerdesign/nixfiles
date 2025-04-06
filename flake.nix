@@ -41,7 +41,7 @@
           specialArgs = { inherit inputs; };
           modules = [
             # Inline-Modul zum Setzen von nixpkgs Konfigurationen
-            ({ config, pkgs, inputs, ... }: {
+            ({ ... }: {
               nixpkgs = {
                 # Dein Overlay von vorher
                 overlays = [ nix4vscode.overlays.forVscode ];
