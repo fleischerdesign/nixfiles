@@ -22,9 +22,6 @@
     pkgs.moonlight-qt
     pkgs.rquickshare
     pkgs.freecad-wayland
-    (pkgs.plex-desktop.override {
-  extraEnv = { QT_QPA_PLATFORM="wayland"; QT_WAYLAND_DISABLE_WINDOWDECORATION="1"; };
-})
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
