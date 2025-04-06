@@ -70,6 +70,5 @@ in
     git
     gh
     btop
-    android-studio
   ];
 }
