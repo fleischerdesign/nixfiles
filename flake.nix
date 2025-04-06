@@ -15,6 +15,10 @@
 
     figma-linux.url = "github:HelloWorld017/figma-linux-nixos";
     figma-linux.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
+    nix4vscode.url = "github:nix-community/nix4vscode";
+    nix4vscode.inputs.nixpkgs.follows = "nixpkgs";
+
   };
 
   outputs =
@@ -26,27 +30,39 @@
       home-manager-unstable,
       sops-nix,
       figma-linux,
+      nix4vscode,
       ...
     }@inputs:
+    let
+      mkSystem = system: hostname: extraModules:
+        inputs.nixpkgs-unstable.lib.nixosSystem {
+          inherit system;
+          # Inputs übergeben
+          specialArgs = { inherit inputs; };
+          modules = [
+            # Inline-Modul zum Setzen von nixpkgs Konfigurationen
+            ({ config, pkgs, inputs, ... }: {
+              nixpkgs = {
+                # Dein Overlay von vorher
+                overlays = [ nix4vscode.overlays.forVscode ];
+
+                # Hier die Konfiguration für allowUnfree hinzufügen:
+                config = {
+                  allowUnfree = true;
+                };
+              };
+            })
+
+            # Deine bestehenden Module
+            ./hosts/${hostname}/configuration.nix
+            inputs.home-manager-unstable.nixosModules.home-manager
+          ] ++ extraModules;
+        };
+    in
     {
       nixosConfigurations = {
-        yorke = nixpkgs-unstable.lib.nixosSystem {
-          system = "x86_64-linux";
-          modules = [
-            ./hosts/yorke/configuration.nix
-            home-manager-unstable.nixosModules.home-manager
-            { _module.args = { inherit inputs; }; }
-          ];
-        };
-
-        jello = nixpkgs-unstable.lib.nixosSystem {
-          system = "x86_64-linux";
-          modules = [
-            ./hosts/jello/configuration.nix
-            home-manager-unstable.nixosModules.home-manager
-            { _module.args = { inherit inputs; }; }
-          ];
-        };
+        yorke = mkSystem "x86_64-linux" "yorke" [ ];
+        jello = mkSystem "x86_64-linux" "jello" [ ];
       };
 
       hmModules = {
