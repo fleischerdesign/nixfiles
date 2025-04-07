@@ -21,7 +21,7 @@
     pkgs.resources
     pkgs.moonlight-qt
     pkgs.rquickshare
-    pkgs.freecad-wayland
+    pkgs.openscad-unstable
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
