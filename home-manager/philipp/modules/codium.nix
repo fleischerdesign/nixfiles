@@ -20,6 +20,7 @@
         "jnoortheen.nix-ide"
         "dart-code.flutter"
         "dart-code.dart-code"
+        "antyos.openscad"
       ];
       userSettings = {
         "git.confirmSync" = false;
