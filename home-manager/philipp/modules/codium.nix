@@ -11,16 +11,14 @@
     package = pkgs.vscodium;
     mutableExtensionsDir = false;
     profiles.default = {
-      extensions = pkgs.nix4vscode.forVscode [
-        "google.geminicodeassist"
-        "prisma.prisma"
-        "vue.volar"
-        "mkhl.direnv"
-        "ms-vscode.cpptools"
-        "jnoortheen.nix-ide"
-        "dart-code.flutter"
-        "dart-code.dart-code"
-        "antyos.openscad"
+      extensions = with pkgs.vscode-extensions; [
+        prisma.prisma
+        vue.volar
+        mkhl.direnv
+        ms-vscode.cpptools
+        jnoortheen.nix-ide
+        dart-code.flutter
+        dart-code.dart-code
       ];
       userSettings = {
         "git.confirmSync" = false;
