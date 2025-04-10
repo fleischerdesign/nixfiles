@@ -22,6 +22,7 @@
     pkgs.moonlight-qt
     pkgs.rquickshare
     pkgs.freecad-wayland
+    pkgs.cartero
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
