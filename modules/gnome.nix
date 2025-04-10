@@ -18,7 +18,7 @@
   environment.gnome.excludePackages = (
     with pkgs;
     [
-      gnome-photos
+      #gnome-photos
       gnome-tour
       cheese
       gnome-terminal
@@ -28,7 +28,7 @@
       epiphany
       geary
       totem
-      gnome-calendar
+      #gnome-calendar
       gnome-music
       tali
       iagno
