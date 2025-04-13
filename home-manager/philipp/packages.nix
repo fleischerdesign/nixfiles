@@ -23,7 +23,7 @@
     pkgs.rquickshare
     pkgs.freecad-wayland
     pkgs.cartero
-    pkgs.penpot
+    pkgs.penpot-desktop
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
