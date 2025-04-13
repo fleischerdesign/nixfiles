@@ -19,6 +19,8 @@
         jnoortheen.nix-ide
         dart-code.flutter
         dart-code.dart-code
+        github.copilot
+        github.copilot-chat
       ];
       userSettings = {
         "git.confirmSync" = false;
@@ -39,6 +41,8 @@
         "nix.formatterPath" = "nixfmt";
         "dart.renameFilesWithClasses" = "prompt";
         "dart.previewFlutterUiGuides" = true;
+
+        "chat.agent.enabled" = true;
       };
     };
   };
