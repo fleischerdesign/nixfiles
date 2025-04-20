@@ -22,7 +22,7 @@
     pkgs.moonlight-qt
     pkgs.rquickshare
     pkgs.freecad-wayland
-    pkgs.cartero
+    pkgs.yaak
     pkgs.penpot-desktop
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
