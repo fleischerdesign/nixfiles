@@ -2,19 +2,23 @@
 
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-24.11";
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    sops-nix.url = "github:Mic92/sops-nix";
+    home-manager = {
+      url = "github:nix-community/home-manager/release-24.11";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
-    home-manager.url = "github:nix-community/home-manager?ref=release-24.11";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    home-manager-unstable = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
 
-    home-manager-unstable.url = "github:nix-community/home-manager";
-    home-manager-unstable.inputs.nixpkgs.follows = "nixpkgs-unstable";
-
-    figma-linux.url = "github:HelloWorld017/figma-linux-nixos";
-    figma-linux.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    figma-linux = {
+      url = "github:HelloWorld017/figma-linux-nixos";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
   };
 
   outputs =
@@ -24,57 +28,24 @@
       nixpkgs-unstable,
       home-manager,
       home-manager-unstable,
-      sops-nix,
       figma-linux,
       ...
     }@inputs:
     let
-      mkSystem =
-        system: hostname: extraModules:
-        inputs.nixpkgs-unstable.lib.nixosSystem {
-          inherit system;
-          # Inputs übergeben
-          specialArgs = { inherit inputs; };
-          modules = [
-            # Inline-Modul zum Setzen von nixpkgs Konfigurationen
-            (
-              { ... }:
-              {
-                nixpkgs = {
-                  # Dein Overlay von vorher
-                  overlays = [ ];
-
-                  # Hier die Konfiguration für allowUnfree hinzufügen:
-                  config = {
-                    allowUnfree = true;
-                  };
-                };
-              }
-            )
-
-            # Deine bestehenden Module
-            ./hosts/${hostname}/configuration.nix
-            inputs.home-manager-unstable.nixosModules.home-manager
-          ] ++ extraModules;
-        };
+      helpers = import ./lib/helper.nix {
+        pkgs-unstable = nixpkgs-unstable;
+        home-manager-unstable = home-manager-unstable;
+      };
     in
     {
       nixosConfigurations = {
-        yorke = mkSystem "x86_64-linux" "yorke" [ ];
-        jello = mkSystem "x86_64-linux" "jello" [ ];
-      };
-
-      hmModules = {
-        philipp = {
-          imports = [
-            ./home-manager/philipp/home.nix
-            inputs.sops-nix.homeManagerModules.sops
+        yorke = helpers.mkSystem {
+          system = "x86_64-linux";
+          hostname = "yorke";
+          inputs = inputs;
+          users = [
+            { name = "philipp"; }
           ];
-          _module.args = { inherit inputs; };
-        };
-        server-admin = {
-          imports = [ ./home-manager/server-admin/home.nix ];
-          _module.args = { inherit inputs; };
         };
       };
     };
