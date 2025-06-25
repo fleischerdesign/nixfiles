@@ -79,7 +79,7 @@ let
     system,              
     hostname,            
     inputs,              
-    users ? []           
+    users ? []      
   }:
   let
     hostsDir = toString ../hosts;
@@ -88,7 +88,11 @@ let
     
     homeManagerUsers = lib.listToAttrs (map (user: {
       name = user.name;
-      value = import (homeManagerDir + "/${user.name}/home.nix");
+      value = {
+        imports = [
+          (import (homeManagerDir + "/${user.name}/home.nix"))
+        ] ++ (user.homeModules or []);
+      };
     }) users);
 
     moduleSet = mkModuleSet {

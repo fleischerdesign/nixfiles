@@ -5,11 +5,11 @@
   config = lib.mkIf config.my.nixos.desktop.gnome.enable {
     # Enable the X11 windowing system and desktop environment
     services.xserver.enable = true;
-    services.xserver.displayManager.gdm = {
+    services.displayManager.gdm = {
       enable = true;
       wayland = true;
     };
-    services.xserver.desktopManager.gnome.enable = true;
+    services.desktopManager.gnome.enable = true;
 
     # Configure keymap in X11
     services.xserver.xkb.layout = "de";

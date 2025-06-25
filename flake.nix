@@ -19,6 +19,10 @@
       url = "github:HelloWorld017/figma-linux-nixos";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+
+    nixcord = {
+      url = "github:kaylorben/nixcord";
+    };
   };
 
   outputs =
@@ -44,7 +48,10 @@
           hostname = "yorke";
           inputs = inputs;
           users = [
-            { name = "philipp"; }
+            {
+              name = "philipp";
+              homeModules = [ inputs.nixcord.homeModules.nixcord ];
+            }
           ];
         };
       };

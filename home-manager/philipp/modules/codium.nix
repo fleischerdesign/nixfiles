@@ -19,8 +19,7 @@
         jnoortheen.nix-ide
         dart-code.flutter
         dart-code.dart-code
-        github.copilot
-        github.copilot-chat
+        rooveterinaryinc.roo-cline
       ];
       userSettings = {
         "git.confirmSync" = false;

@@ -28,6 +28,12 @@
     (pkgs.callPackage ../../packages/ficsit { })
   ];
 
+  programs.nixcord = {
+    enable = true;
+    discord.enable = false;   
+    vesktop.enable = true;
+  };
+
   programs.ghostty = {
     enable = true;
     enableFishIntegration = true;
