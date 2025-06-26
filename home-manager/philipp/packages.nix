@@ -20,7 +20,7 @@
     pkgs.endeavour
     pkgs.resources
     pkgs.moonlight-qt
-    pkgs.rquickshare
+    pkgs.packet
     pkgs.freecad-wayland
     pkgs.yaak
     pkgs.penpot-desktop
@@ -30,8 +30,11 @@
 
   programs.nixcord = {
     enable = true;
-    discord.enable = false;   
+    discord.enable = false;
     vesktop.enable = true;
+    config = {
+      frameless = true;
+    };
   };
 
   programs.ghostty = {

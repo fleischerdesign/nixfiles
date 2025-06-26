@@ -25,6 +25,7 @@
 
   # Let Home Manager install and manage itself.
   systemd.user.startServices = "sd-switch";
+  
   programs = {
     home-manager.enable = true;
 

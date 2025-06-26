@@ -13,6 +13,7 @@ in
 
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
+
   # Boot loader configuration
   my.nixos = {
     boot.enable = true;
