@@ -32,8 +32,21 @@
     enable = true;
     discord.enable = false;
     vesktop.enable = true;
+    quickCss =  "@import url('https://croissantdunord.github.io/discord-adblock/adblock.css');";
+    vesktopConfig = {
+      customTitleBar = true;
+    };
     config = {
+      useQuickCss = true;
+      transparent = true;
       frameless = true;
+      themeLinks = [        # or use an online theme
+        "https://raw.githubusercontent.com/ricewind012/discord-gnome-theme/master/gnome.theme.css"
+      ];
+      plugins = {
+        fakeNitro.enable = true;    # Enable a Vencord plugin
+        themeAttributes.enable = true;
+      };
     };
   };
 
