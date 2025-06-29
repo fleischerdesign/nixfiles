@@ -8,11 +8,6 @@
   # Define the hosstname
   networking.hostName = "jello";
 
-  # Home Manager settings
-  home-manager.useGlobalPkgs = true;
-  home-manager.useUserPackages = true;
-  home-manager.users.philipp = inputs.self.hmModules.philipp;
-
   # Define the user account
   users.users.philipp = {
     isNormalUser = true;
@@ -29,7 +24,7 @@
   my.nixos = {
     audio.pipewire.enable = true;
     desktop.gnome.enable = true;
-    gaming.enable = true;
+    gaming.gaming.enable = true;
   };
 
   # State version setting

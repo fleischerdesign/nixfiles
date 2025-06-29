@@ -54,6 +54,17 @@
             }
           ];
         };
+        jello = helpers.mkSystem {
+          system = "x86_64-linux";
+          hostname = "jello";
+          inputs = inputs;
+          users = [
+            {
+              name = "philipp";
+              homeModules = [ inputs.nixcord.homeModules.nixcord ];
+            }
+          ];
+        };
       };
     };
 }

@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 {
   options.my.nixos.audio.pipewire.enable = lib.mkEnableOption "PipeWire audio";
 
@@ -11,5 +11,8 @@
       alsa.support32Bit = true;
       pulse.enable = true;
     };
+  environment.systemPackages = with pkgs; [
+    easyeffects
+  ];
   };
 }
