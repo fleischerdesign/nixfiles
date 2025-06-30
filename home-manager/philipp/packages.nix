@@ -6,6 +6,7 @@
         "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoEncoder,Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,VaapiIgnoreDriverChecks,VaapiVideoDecoder,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo"
       ];
     })
+    pkgs.gemini-cli
     pkgs.spotify
     pkgs.gnomeExtensions.blur-my-shell
     pkgs.gnomeExtensions.gsconnect
