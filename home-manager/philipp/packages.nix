@@ -7,7 +7,6 @@
       ];
     })
     pkgs.libreoffice
-    pkgs.aider-chat-full
     pkgs.spotify
     pkgs.gnomeExtensions.blur-my-shell
     pkgs.gnomeExtensions.gsconnect
