@@ -25,6 +25,7 @@
     pkgs.freecad-wayland
     pkgs.yaak
     pkgs.penpot-desktop
+    pkgs.gemini-cli
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];

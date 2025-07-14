@@ -20,6 +20,11 @@
         dart-code.flutter
         dart-code.dart-code
         rooveterinaryinc.roo-cline
+        redhat.java
+        vscjava.vscode-java-debug
+        vscjava.vscode-java-test
+        vscjava.vscode-java-dependency
+        visualstudioexptteam.vscodeintellicode
       ];
       userSettings = {
         "git.confirmSync" = false;
@@ -42,6 +47,8 @@
         "dart.previewFlutterUiGuides" = true;
 
         "chat.agent.enabled" = true;
+
+        "redhat.telemetry.enabled" = false;
       };
     };
   };
