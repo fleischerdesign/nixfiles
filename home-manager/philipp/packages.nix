@@ -12,7 +12,7 @@
     pkgs.gnomeExtensions.gsconnect
     pkgs.gnomeExtensions.caffeine
     pkgs.gnomeExtensions.dash-to-dock
-    pkgs.gimp
+    # pkgs.gimp
     inputs.figma-linux.packages."x86_64-linux".default
     pkgs.obsidian
     pkgs.orca-slicer

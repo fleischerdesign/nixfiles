@@ -1,15 +1,14 @@
-{pkgs, ...}:
+{ pkgs, ... }:
 {
-    home.sessionVariables = {
+  home.sessionVariables = {
     EDITOR = "codium";
   };
-
-
 
   programs.vscode = {
     enable = true;
     package = pkgs.vscodium;
     mutableExtensionsDir = false;
+
     profiles.default = {
       extensions = with pkgs.vscode-extensions; [
         prisma.prisma
@@ -35,7 +34,7 @@
         "window.customTitleBarVisibility" = "auto";
 
         "security.workspace.trust.enabled" = true;
-      
+
         "C_Cpp.default.compilerPath" = "gcc";
 
         "direnv.restart.automatic" = true;
