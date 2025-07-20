@@ -60,7 +60,7 @@ in
 
   # Enable CUPS to print documents
   services.printing.enable = true;
-  services.printing.drivers = [ pkgs.hplip ];
+  services.printing.drivers = [ pkgs.hplipWithPlugin ];
 
   # Enable Docker
   virtualisation.docker.enable = true;
