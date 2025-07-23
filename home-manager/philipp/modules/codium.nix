@@ -24,6 +24,7 @@
         vscjava.vscode-java-test
         vscjava.vscode-java-dependency
         visualstudioexptteam.vscodeintellicode
+        dbaeumer.vscode-eslint
       ];
       userSettings = {
         "git.confirmSync" = false;
