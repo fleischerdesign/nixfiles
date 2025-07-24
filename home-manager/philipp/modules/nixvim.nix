@@ -35,5 +35,13 @@
       gitsigns.enable = true;
       neo-tree.enable = true;
     };
+    
+    globals.mapleader = " ";
+    keymaps = [
+      {
+        key = "<leader>e";
+        action = "<cmd>Neotree toggle<cr>";
+      }
+    ];
   };
 }
