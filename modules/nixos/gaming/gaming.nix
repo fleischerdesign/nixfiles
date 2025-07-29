@@ -20,7 +20,13 @@
     environment.systemPackages = with pkgs; [
       winetricks
       wine
-      lutris
+      (lutris.override {
+        # Adding libadwaita and gtk4 as extra libraries, so that winetricks will launch without errors inside lutris
+        extraLibraries = pkgs: with pkgs; [
+          libadwaita
+          gtk4
+        ];
+      })
       umu-launcher
     ];
   };
