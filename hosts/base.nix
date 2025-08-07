@@ -13,12 +13,6 @@ in
 
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
-  #TODO: remove Orca-slicer temporary libsoup fix when upstream is fixed
-  nixpkgs.config.permittedInsecurePackages = [
-    "libsoup-2.74.3"
-  ];
-
-
   # Boot loader configuration
   my.nixos = {
     boot.enable = true;
