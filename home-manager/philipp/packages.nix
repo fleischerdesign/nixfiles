@@ -27,6 +27,7 @@
     pkgs.penpot-desktop
     pkgs.gemini-cli
     pkgs.deskflow
+    pkgs.delfin
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
