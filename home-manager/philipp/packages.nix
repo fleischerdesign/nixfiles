@@ -28,6 +28,7 @@
     pkgs.gemini-cli
     pkgs.deskflow
     pkgs.delfin
+    pkgs.inkscape
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
   ];
