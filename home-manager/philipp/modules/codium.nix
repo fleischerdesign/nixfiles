@@ -12,6 +12,7 @@
     profiles.default = {
       extensions = with pkgs.vscode-extensions; [
         prisma.prisma
+        bradlc.vscode-tailwindcss
         vue.volar
         mkhl.direnv
         ms-vscode.cpptools
