@@ -13,6 +13,7 @@
       pkgs.gnomeExtensions.gsconnect
       pkgs.gnomeExtensions.caffeine
       pkgs.gnomeExtensions.dash-to-dock
+      pkgs.gnomeExtensions.pip-on-top
       # pkgs.gimp
       inputs.figma-linux.packages."x86_64-linux".default
       pkgs.obsidian

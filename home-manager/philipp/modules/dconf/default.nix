@@ -23,6 +23,7 @@
             gsconnect.extensionUuid
             caffeine.extensionUuid
             dash-to-dock.extensionUuid
+            pip-on-top.extensionUuid
           ];
           favorite-apps = [
             "org.gnome.Nautilus.desktop"
