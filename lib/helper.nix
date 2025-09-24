@@ -13,7 +13,7 @@ let
           getNixFilesRecursive path
         else if type == "regular"
              && lib.hasSuffix ".nix" name
-             && name != "default.nix" then
+             && name != "home.nix" then
           [ path ]
         else [];
     in lib.flatten (lib.mapAttrsToList processEntry entries);
@@ -21,9 +21,12 @@ let
   pathToAttrPath = baseDir: filePath:
     let
       relativePath = lib.removePrefix (toString baseDir + "/") (toString filePath);
-      cleanedPath = lib.removeSuffix ".nix" relativePath;
+      pathWithoutNix = lib.removeSuffix ".nix" relativePath;
+      pathWithoutDefault = if lib.hasSuffix "/default" pathWithoutNix
+                         then lib.removeSuffix "/default" pathWithoutNix
+                         else pathWithoutNix;
     in
-    lib.splitString "/" cleanedPath;
+    lib.splitString "/" pathWithoutDefault;
   
   buildOptionTree = paths:
     lib.foldl' (acc: path:
@@ -41,42 +44,23 @@ let
         acc // { ${head} = (acc.${head} or {}) // newVal; }
     ) {} paths;
 
-  # Wrapper-Funktion, die ein Modul bedingt macht
-  makeConditionalModule = { modulePath, optionPath }:
-    { config, lib, pkgs, ... }:
-    let
-      isEnabled = lib.getAttrFromPath optionPath config;
-      originalModule = import modulePath;
-      moduleContent = if builtins.isFunction originalModule
-                      then originalModule { inherit config lib pkgs; }
-                      else originalModule;
-    in {
-      config = lib.mkIf isEnabled (moduleContent.config or moduleContent);
-    };
-
-  mkModuleSet = { baseDir, optionPath ? ["my" "modules"] }:
+  mkModuleSet = { baseDir, optionPath ? [ "my" "modules" ] }:
     let
       files = getNixFilesRecursive baseDir;
       attrPaths = map (pathToAttrPath baseDir) files;
       options = buildOptionTree attrPaths;
       
-      # Erstelle das Optionen-Modul
+      # Module that defines all the 'enable' options
       optionsModule = { config, lib, ... }: {
         options = lib.setAttrByPath optionPath options;
       };
       
-      # Erstelle bedingte Module für jede Datei
-      conditionalModules = lib.zipListsWith (attrPath: file: 
-        makeConditionalModule {
-          modulePath = file;
-          optionPath = optionPath ++ attrPath ++ ["enable"];
-        }
-      ) attrPaths files;
+      # List of unconditional imports
+      unconditionalModules = map (file: import file) files;
       
-    in [ optionsModule ] ++ conditionalModules;
+    in [ optionsModule ] ++ unconditionalModules; # Return options + all modules
 
-  mkSystem = { 
-    system,              
+  mkSystem = {    system,              
     hostname,            
     inputs,              
     users ? []      
@@ -86,16 +70,45 @@ let
     modulesDir = toString ../modules/nixos;
     homeManagerDir = toString ../home-manager;
     
-    homeManagerUsers = lib.listToAttrs (map (user: {
-      name = user.name;
-      value = {
-        imports = [
-          (import (homeManagerDir + "/${user.name}/home.nix"))
-        ] ++ (user.homeModules or []);
-      };
-    }) users);
+    homeManagerUsers = lib.listToAttrs (map (user:
+      let
+        # Define the paths for the two layers
+        globalModulesDir = homeManagerDir + "/default";
+        userModulesDir = homeManagerDir + "/${user.name}";
 
-    moduleSet = mkModuleSet {
+        # Find files in both directories, handling non-existent paths
+        globalFiles = if builtins.pathExists globalModulesDir then getNixFilesRecursive globalModulesDir else [];
+        userFiles = if builtins.pathExists userModulesDir then getNixFilesRecursive userModulesDir else [];
+
+        # Generate attribute paths for each layer separately
+        globalAttrPaths = map (pathToAttrPath globalModulesDir) globalFiles;
+        userAttrPaths = map (pathToAttrPath userModulesDir) userFiles;
+
+        # Combine attribute paths, taking only unique paths to avoid duplicate option errors
+        allAttrPaths = lib.unique (globalAttrPaths ++ userAttrPaths);
+
+        # Build ONE options tree from all unique attribute paths
+        options = buildOptionTree allAttrPaths;
+        optionsModule = {
+          options = lib.setAttrByPath ["my" "homeManager"] options;
+        };
+
+        # Import all modules unconditionally. Order matters for overrides.
+        globalModules = map (file: import file) globalFiles;
+        userModules = map (file: import file) userFiles;
+
+      in
+      {
+        name = user.name;
+        value = {
+          # User modules come last to win the merge priority.
+          imports = [ optionsModule ] ++ globalModules ++ userModules ++ [
+            (import (userModulesDir + "/home.nix"))
+          ] ++ (user.homeModules or []);
+        };
+      }) users);
+
+    nixosModuleSet = mkModuleSet {
       baseDir = modulesDir;
       optionPath = ["my" "nixos"];
     };
@@ -114,7 +127,7 @@ let
       
       # Base-Config for all Systems
       (import (hostsDir + "/base.nix"))
-    ] ++ moduleSet ++ [
+    ] ++ nixosModuleSet ++ [
       # Host-spezifische Konfiguration
       (import (hostsDir + "/${hostname}/configuration.nix"))
       

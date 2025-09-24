@@ -1,13 +1,19 @@
 {
+  config, # Added config to the function arguments
   ...
 }:
 
 {
-  imports = [
-    ./packages.nix
-    ./modules/dconf/default.nix
-    ./modules/codium.nix
-  ];
+  # imports = [
+  #   ./packages.nix
+  #   ./modules/dconf/default.nix
+  #   ./modules/codium.nix
+  # ];
+
+  # Enable modules dynamically
+  my.homeManager.packages.enable = true;
+  my.homeManager.modules.dconf.enable = true;
+  my.homeManager.modules.codium.enable = true;
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "philipp";

@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 {
-  options.my.nixos.gaming.gaming.enable = lib.mkEnableOption "Gaming packages and services";
+  # options.my.nixos.gaming.gaming.enable = lib.mkEnableOption "Gaming packages and services";
 
   config = lib.mkIf config.my.nixos.gaming.gaming.enable {
     programs.steam = {

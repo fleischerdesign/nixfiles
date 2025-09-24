@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 {
-  options.my.nixos.audio.pipewire.enable = lib.mkEnableOption "PipeWire audio";
+  # options.my.nixos.audio.pipewire.enable = lib.mkEnableOption "PipeWire audio";
 
   config = lib.mkIf config.my.nixos.audio.pipewire.enable {
     services.pulseaudio.enable = false;

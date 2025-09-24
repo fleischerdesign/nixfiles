@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 {
-  options.my.nixos.desktop.gnome.enable = lib.mkEnableOption "GNOME desktop environment";
+  # options.my.nixos.desktop.gnome.enable = lib.mkEnableOption "GNOME desktop environment";
 
   config = lib.mkIf config.my.nixos.desktop.gnome.enable {
     # Enable the X11 windowing system and desktop environment
