@@ -15,11 +15,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    figma-linux = {
-      url = "github:HelloWorld017/figma-linux-nixos";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
     nixcord = {
       url = "github:kaylorben/nixcord";
     };
@@ -37,7 +32,6 @@
       nixpkgs-unstable,
       home-manager,
       home-manager-unstable,
-      figma-linux,
       nixvim,
       ...
     }@inputs:
