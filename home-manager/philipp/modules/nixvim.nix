@@ -7,8 +7,25 @@ in
   config = lib.mkIf cfg.enable {
     programs.nixvim = {
       enable = true;
-      opts.number = true;
-      opts.relativenumber = true;
+      defaultEditor = true;
+      viAlias = true;
+      vimAlias = true;
+
+      opts = {
+	updatetime = 100;
+	relativenumber = true;
+	number = true;
+	hidden = true;
+	undofile = true;
+	scrolloff = 8;
+	wrap = false;
+
+	tabstop = 4;
+	shiftwidth = 4;
+	expandtab = true;
+	autoindent = true;
+      };
+
     };
   };
 }

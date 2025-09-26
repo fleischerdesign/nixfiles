@@ -1,10 +1,6 @@
 { config, lib, pkgs, ... }:
 {
   config = lib.mkIf config.my.homeManager.modules.codium.enable {
-    home.sessionVariables = {
-      EDITOR = "codium";
-    };
-
     programs.vscode = {
       enable = true;
       package = pkgs.vscodium;
