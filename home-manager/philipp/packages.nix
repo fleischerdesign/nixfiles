@@ -33,6 +33,7 @@
       pkgs.inkscape
       (pkgs.callPackage ../../packages/lychee-slicer { })
       (pkgs.callPackage ../../packages/ficsit { })
+      (pkgs.callPackage ../../packages/karere { })
     ];
 
     programs.ghostty = {
