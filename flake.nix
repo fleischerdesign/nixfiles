@@ -47,6 +47,7 @@
           system = "x86_64-linux";
           hostname = "yorke";
           inputs = inputs;
+          overlays = [ (import ./overlays/pip-on-top) ];
           users = [
             {
               name = "philipp";
@@ -58,6 +59,7 @@
           system = "x86_64-linux";
           hostname = "jello";
           inputs = inputs;
+          overlays = [ (import ./overlays/pip-on-top) ];
           users = [
             {
               name = "philipp";

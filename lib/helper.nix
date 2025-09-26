@@ -63,7 +63,8 @@ let
   mkSystem = {    system,              
     hostname,            
     inputs,              
-    users ? []      
+    users ? [],
+    overlays ? []      
   }:
   let
     hostsDir = toString ../hosts;
@@ -120,7 +121,7 @@ let
     modules = [
       {
         nixpkgs = {
-          overlays = []; 
+          overlays = overlays; 
           config.allowUnfree = true;
         };
       }
