@@ -17,7 +17,7 @@
       # pkgs.gimp
       pkgs.obsidian
       pkgs.orca-slicer
-      pkgs.nixd
+      pkgs.nil
       pkgs.nixfmt-rfc-style
       pkgs.endeavour
       pkgs.resources

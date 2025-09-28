@@ -16,7 +16,6 @@
           jnoortheen.nix-ide
           dart-code.flutter
           dart-code.dart-code
-          rooveterinaryinc.roo-cline
           redhat.java
           vscjava.vscode-java-debug
           vscjava.vscode-java-test
@@ -39,7 +38,7 @@
           "direnv.restart.automatic" = true;
 
           "nix.enableLanguageServer" = true;
-          "nix.serverPath" = "nixd";
+          "nix.serverPath" = "nil";
           "nix.formatterPath" = "nixfmt";
           "dart.renameFilesWithClasses" = "prompt";
           "dart.previewFlutterUiGuides" = true;
