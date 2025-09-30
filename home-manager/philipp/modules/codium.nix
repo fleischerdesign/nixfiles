@@ -28,6 +28,8 @@
           "git.autofetch" = true;
           "terminal.integrated.fontWeight" = "normal";
 
+          "update.mode" = "none";
+
           "window.titleBarStyle" = "custom";
           "window.customTitleBarVisibility" = "auto";
 
@@ -46,6 +48,8 @@
           "chat.agent.enabled" = true;
 
           "redhat.telemetry.enabled" = false;
+
+          "editor.formatOnSave" = true;
         };
       };
     };
