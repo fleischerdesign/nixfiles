@@ -14,15 +14,12 @@
   my.homeManager.packages.enable = true;
   my.homeManager.modules.dconf.enable = true;
   my.homeManager.modules.codium.enable = true;
+  my.homeManager.modules.nixvim.enable = true;
 
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
   home.username = "philipp";
   home.homeDirectory = "/home/philipp";
-
-  home.sessionVariables = {
-    EDITOR = "codium --wait";
-  };
 
   # This value determines the Home Manager release that your
   # configuration is compatible with. This helps avoid breakage

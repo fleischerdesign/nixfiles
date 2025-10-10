@@ -19,6 +19,11 @@
       url = "github:kaylorben/nixcord";
     };
 
+    nixvim = {
+      url = "github:nix-community/nixvim";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
 
   };
 
@@ -29,6 +34,7 @@
       nixpkgs-unstable,
       home-manager-stable,
       home-manager-unstable,
+      nixvim,
       ...
     }@inputs:
     let
@@ -47,7 +53,7 @@
           users = [
             {
               name = "philipp";
-              homeModules = [ inputs.nixcord.homeModules.nixcord ];
+              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeManagerModules.nixvim ];
             }
           ];
         };
@@ -59,7 +65,7 @@
           users = [
             {
               name = "philipp";
-              homeModules = [ inputs.nixcord.homeModules.nixcord ];
+              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeManagerModules.nixvim ];
             }
           ];
         };

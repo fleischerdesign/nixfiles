@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   config = lib.mkIf config.my.homeManager.modules.codium.enable {
     programs.vscode = {
@@ -24,9 +29,12 @@
           dbaeumer.vscode-eslint
         ];
         userSettings = {
+          "extensions.autoUpdate" = false;
           "git.confirmSync" = false;
           "git.autofetch" = true;
           "terminal.integrated.fontWeight" = "normal";
+
+          "terminal.integrated.persistentSessionReviveProcess" = "never";
 
           "update.mode" = "none";
 
