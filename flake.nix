@@ -53,7 +53,7 @@
           users = [
             {
               name = "philipp";
-              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeManagerModules.nixvim ];
+              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeModules.nixvim ];
             }
           ];
         };
@@ -65,7 +65,7 @@
           users = [
             {
               name = "philipp";
-              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeManagerModules.nixvim ];
+              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeModules.nixvim ];
             }
           ];
         };
