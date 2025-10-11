@@ -9,6 +9,14 @@
 
     globals.mapleader = " ";
 
+    opts = {
+          updatetime = 100;
+          number = true;
+          relativenumber = true;
+	  shiftwidth = 2;
+
+    };
+
     # Nixvim plugins
     plugins = {
       # Which-key shows available keybindings
