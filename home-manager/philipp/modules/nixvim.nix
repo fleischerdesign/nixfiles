@@ -39,7 +39,26 @@
       lualine.enable = true;
 
       # Telescope for fuzzy finding
-      telescope.enable = true;
+      telescope = {
+	enable = true;
+	settings = {
+
+	defaults = {
+        mappings = {
+          # Mappings für den Einfügemodus (während du tippst)
+          i = {
+            "<C-j>" = "move_selection_next";
+            "<C-k>" = "move_selection_previous";
+          };
+          # (Optional, aber nützlich) Mappings für den Normalmodus (wenn du Esc drückst)
+          n = {
+            "j" = "move_selection_next";
+            "k" = "move_selection_previous";
+          };
+        };
+	};
+      };
+      };
 
       # Treesitter for syntax highlighting
       treesitter.enable = true;
@@ -141,6 +160,11 @@
     action = "<cmd>lua vim.lsp.buf.rename()<cr>";
     options.desc = "Rename";
   }
+      { mode = ["n" "v" "o"]; key = "ö"; action = "["; }
+      { mode = ["n" "v" "o"]; key = "ä"; action = "]"; }
+      { mode = ["n" "v" "o"]; key = "ü"; action = "{"; }
+      # Man könnte auch ß für } nehmen, wenn gewünscht
+      { mode = ["n" "v" "o"]; key = "ß"; action = "}"; }
     ];
   };
 }
