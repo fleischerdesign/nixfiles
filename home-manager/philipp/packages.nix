@@ -14,6 +14,7 @@
       pkgs.gnomeExtensions.caffeine
       pkgs.gnomeExtensions.dash-to-dock
       pkgs.gnomeExtensions.pip-on-top
+      pkgs.gnomeExtensions.tiling-shell
       # pkgs.gimp
       pkgs.obsidian
       pkgs.orca-slicer

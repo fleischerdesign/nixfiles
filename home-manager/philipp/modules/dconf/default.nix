@@ -24,6 +24,7 @@
             caffeine.extensionUuid
             dash-to-dock.extensionUuid
             pip-on-top.extensionUuid
+            tiling-shell.extensionUuid
           ];
           favorite-apps = [
             "org.gnome.Nautilus.desktop"
