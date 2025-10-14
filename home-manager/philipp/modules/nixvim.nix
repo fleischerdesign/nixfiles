@@ -42,8 +42,12 @@ lib.mkIf config.my.homeManager.modules.nixvim.enable {
       # Icons for file types
       web-devicons.enable = true;
 
-      # Lualine for a nice statusline
-      lualine.enable = true;
+      lualine = {
+	enable = true;
+	settings = {
+	  extensions = [ "nvim-tree" ];
+	};
+      };
 
       # Telescope for fuzzy finding
       telescope = {
