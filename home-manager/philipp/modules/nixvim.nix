@@ -1,7 +1,11 @@
 # SPDX-License-Identifier: MIT
-{ config, lib, pkgs, ... }:
-lib.mkIf config.my.homeManager.modules.nixvim.enable 
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+lib.mkIf config.my.homeManager.modules.nixvim.enable {
   programs.nixvim = {
     enable = true;
     defaultEditor = true; # Sets vim as the default editor
@@ -28,6 +32,8 @@ lib.mkIf config.my.homeManager.modules.nixvim.enable
 
     # Nixvim plugins
     plugins = {
+      nvim-tree.enable = true;
+
       fugitive.enable = true;
 
       # Which-key shows available keybindings
@@ -206,6 +212,19 @@ lib.mkIf config.my.homeManager.modules.nixvim.enable
         ];
         key = "ß";
         action = "}";
+      }
+      {
+        key = "<leader>e";
+        action = "<cmd>NvimTreeToggle<cr>";
+        options.desc = "Toggle file explorer";
+      }
+
+      # Öffnet den Dateibaum und hebt die aktuell geöffnete Datei hervor.
+      # Sehr nützlich, um zu sehen, wo eine Datei im Projekt liegt.
+      {
+        key = "<leader>f"; # 'f' für 'find'
+        action = "<cmd>NvimTreeFindFile<cr>";
+        options.desc = "Find current file in explorer";
       }
     ];
   };
