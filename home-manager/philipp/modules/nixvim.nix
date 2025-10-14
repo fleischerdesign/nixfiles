@@ -239,6 +239,16 @@ lib.mkIf config.my.homeManager.modules.nixvim.enable {
         action = "<cmd>NvimTreeFindFile<cr>";
         options.desc = "Find current file in explorer";
       }
+
+      #Remap search commands
+      {
+	key = "-";
+	action = "/";
+      }
+      {
+	key = "_";
+	action = "?";
+      }
     ];
   };
 }
