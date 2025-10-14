@@ -16,19 +16,28 @@ lib.mkIf config.my.homeManager.modules.nixvim.enable {
       mapleader = " ";
     };
 
+    highlight = {
+      Normal = {
+	bg = "NONE";
+	ctermbg = "NONE";
+      };
+
+      NonText = {
+	bg = "NONE";
+	ctermbg = "NONE";
+      };
+    };
+
     opts = {
       updatetime = 100;
       number = true;
       relativenumber = true;
       shiftwidth = 2;
       cmdheight = 0;
+      fillchars = {
+	eob = " ";
+      };
     };
-
-    extraConfigVim = ''
-      set termguicolors
-      highlight Normal guibg=NONE ctermbg=NONE
-      highlight NonText guibg=NONE ctermbg=NONE
-    '';
 
     # Nixvim plugins
     plugins = {
