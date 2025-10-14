@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
-{ pkgs, ... }:
+{ config, lib, pkgs, ... }:
+lib.mkIf config.my.homeManager.modules.nixvim.enable 
 {
   programs.nixvim = {
     enable = true;
