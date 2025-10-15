@@ -73,5 +73,6 @@ in
     gh
     btop
     tree
+    ripgrep
   ];
 }
