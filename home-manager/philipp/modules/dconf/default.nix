@@ -43,6 +43,13 @@
         "org/gnome/shell/extensions/dash-to-dock" = {
           apply-custom-theme = true;
         };
+
+	"org/gnome/shell/extensions/paperwm" = {
+	  show-focus-mode-icon = false;
+	  show-open-position-icon = false;
+	  show-window-position-bar = false;
+	  show-workspace-indicator = false;
+	};
       };
     };
   };
