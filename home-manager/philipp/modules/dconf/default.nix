@@ -42,6 +42,7 @@
 
         "org/gnome/shell/extensions/dash-to-dock" = {
           apply-custom-theme = true;
+	  intellihide-mode = "ALL_WINDOWS";
         };
 
 	"org/gnome/shell/extensions/paperwm" = {
