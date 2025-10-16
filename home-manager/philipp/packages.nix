@@ -2,7 +2,6 @@
 {
   config = lib.mkIf config.my.homeManager.packages.enable {
     home.packages = [
-      pkgs.nerd-fonts.jetbrains-mono
       (pkgs.google-chrome.override {
         commandLineArgs = [
           "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoEncoder,Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,VaapiIgnoreDriverChecks,VaapiVideoDecoder,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo"
@@ -42,7 +41,6 @@
       enableFishIntegration = true;
       settings = {
         theme = "Adwaita Dark";
-        font-family = "JetBrainsMono Nerd Font";
         font-size = 10;
         keybind = [
           "ctrl+h=goto_split:left"
