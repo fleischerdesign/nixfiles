@@ -7,6 +7,7 @@
           "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoEncoder,Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,VaapiIgnoreDriverChecks,VaapiVideoDecoder,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo"
         ];
       })
+      pkgs.nerd-fonts.jetbrains-mono
       pkgs.libreoffice
       pkgs.spotify
       pkgs.gnomeExtensions.blur-my-shell
@@ -41,6 +42,7 @@
       enableFishIntegration = true;
       settings = {
         theme = "Adwaita Dark";
+	font-family = "JetBrainsMono Nerd Font";
         font-size = 10;
         keybind = [
           "ctrl+h=goto_split:left"
