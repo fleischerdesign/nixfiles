@@ -33,7 +33,16 @@
 
   # Let Home Manager install and manage itself.
   systemd.user.startServices = "sd-switch";
-  
+
+  xdg.configFile."pipewire/pipewire.conf.d/10-zeroconf-discover.conf".text = ''
+    context.modules [
+      {
+	name = libpipewire-module-zeroconf-discover
+	args = {}
+      }
+    ]
+  '';
+
   programs = {
     home-manager.enable = true;
 
