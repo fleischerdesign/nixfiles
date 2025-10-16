@@ -24,7 +24,7 @@
   my.nixos = {
     audio.pipewire.enable = true;
     desktop.gnome.enable = true;
-    gaming.gaming.enable = true;
+    gaming.enable = true;
   };
 
   # State version setting
