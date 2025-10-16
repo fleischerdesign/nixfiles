@@ -62,6 +62,30 @@ in
   services.printing.enable = true;
   services.printing.drivers = [ pkgs.hplipWithPlugin ];
 
+  # Enable Avahi for service discovery (mDNS)
+  services.avahi = {
+    enable = true;
+    nssmdns = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      domain = true;
+      hinfo = true;
+      userServices = true;
+      workstation = true;
+    };
+  };
+
+  # Open firewall for Avahi and PipeWire ROC
+  networking.firewall.allowedUDPPorts = [ 5353 ]; # mDNS
+  networking.firewall.allowedTCPPorts = [ 5353 ]; # mDNS
+  networking.firewall.allowedTCPPortRanges = [
+    { from = 40010; to = 40020; } # For PipeWire ROC
+  ];
+  networking.firewall.allowedUDPPortRanges = [
+    { from = 40010; to = 40020; } # For PipeWire ROC
+  ];
+
   # Enable Docker
   virtualisation.docker.enable = true;
   users.users.philipp.extraGroups = [ "docker" ];

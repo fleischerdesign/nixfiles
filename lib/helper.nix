@@ -127,7 +127,7 @@ let
       }
       
       # Base-Config for all Systems
-      (import (hostsDir + "/base.nix"))
+      (import (hostsDir + "/default.nix"))
     ] ++ nixosModuleSet ++ [
       # Host-spezifische Konfiguration
       (import (hostsDir + "/${hostname}/configuration.nix"))
