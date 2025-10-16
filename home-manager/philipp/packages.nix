@@ -19,8 +19,6 @@
       # pkgs.gimp
       pkgs.obsidian
       pkgs.orca-slicer
-      pkgs.nil
-      pkgs.nixfmt-rfc-style
       pkgs.endeavour
       pkgs.resources
       pkgs.moonlight-qt

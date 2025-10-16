@@ -4,13 +4,7 @@
 }:
 
 {
-  # imports = [
-  #   ./packages.nix
-  #   ./modules/dconf/default.nix
-  #   ./modules/codium.nix
-  # ];
-
-  # Enable modules dynamically
+  # Enable user-specific modules dynamically
   my.homeManager.packages.enable = true;
   my.homeManager.modules.dconf.enable = true;
   my.homeManager.modules.codium.enable = true;
@@ -36,17 +30,5 @@
 
   programs = {
     home-manager.enable = true;
-
-    direnv = {
-      enable = true;
-      nix-direnv.enable = true;
-    };
-
-    fish = {
-      enable = true; # see note on other shells below
-      shellAliases = {
-        c = "codium";
-      };
-    };
   };
 }

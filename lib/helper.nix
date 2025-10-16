@@ -87,30 +87,28 @@ let
         globalModulesDir = homeManagerDir + "/default";
         userModulesDir = homeManagerDir + "/${user.name}";
 
+        # Global modules are always imported, without 'enable' flags
         globalFiles = safeGetNixFiles globalModulesDir;
-        userFiles = safeGetNixFiles userModulesDir;
-
-        globalAttrPaths = map (pathToAttrPath globalModulesDir) globalFiles;
-        userAttrPaths = map (pathToAttrPath userModulesDir) userFiles;
-
-        # Combine attribute paths, taking only unique paths to avoid duplicate option errors
-        allAttrPaths = lib.unique (globalAttrPaths ++ userAttrPaths);
-
-        # Build options tree
-        options = buildOptionTree allAttrPaths;
-        optionsModule = mkModuleOptions {
-          baseDir = globalModulesDir; # Dummy, we build options manually
-          optionPath = ["my" "homeManager"];
-        } // { options = lib.setAttrByPath ["my" "homeManager"] options; };
-
-        # Import all modules: global first, then user-specific (so user overrides global)
         globalModules = map (file: import file) globalFiles;
+
+        # User modules get 'enable' flags under 'my.homeManager'
+        userFiles = safeGetNixFiles userModulesDir;
+        userAttrPaths = map (pathToAttrPath userModulesDir) userFiles;
+        userOptions = buildOptionTree userAttrPaths;
+        userOptionsModule = { options = lib.setAttrByPath ["my" "homeManager"] userOptions; };
         userModules = map (file: import file) userFiles;
       in
       {
         name = user.name;
         value = {
-          imports = [ optionsModule ] ++ globalModules ++ userModules ++ [
+          imports = [
+            # Only create 'enable' options for user-specific modules
+            userOptionsModule
+          ]
+          # Global modules are always imported unconditionally
+          ++ globalModules
+          # User modules are also imported, but are guarded by the 'enable' flags inside their files
+          ++ userModules ++ [
             (import (userModulesDir + "/home.nix"))
           ] ++ (user.homeModules or []);
         };
