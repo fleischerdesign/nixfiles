@@ -15,7 +15,7 @@ let
              && lib.hasSuffix ".nix" name
              && name != "home.nix" then
           [ path ]
-        else [];
+        else[];
     in lib.flatten (lib.mapAttrsToList processEntry entries);
   
   pathToAttrPath = baseDir: filePath:
@@ -44,23 +44,33 @@ let
         acc // { ${head} = (acc.${head} or {}) // newVal; }
     ) {} paths;
 
-  mkModuleSet = { baseDir, optionPath ? [ "my" "modules" ] }:
+  # Safely read .nix files, handling non-existent directories
+  safeGetNixFiles = dir:
+    if builtins.pathExists dir then getNixFilesRecursive dir else [];
+
+  # Generate enable options for a given base directory
+  # Used for both NixOS and Home Manager modules
+  mkModuleOptions = { baseDir, optionPath }:
     let
-      files = getNixFilesRecursive baseDir;
+      files = safeGetNixFiles baseDir;
       attrPaths = map (pathToAttrPath baseDir) files;
       options = buildOptionTree attrPaths;
-      
-      # Module that defines all the 'enable' options
-      optionsModule = { config, lib, ... }: {
-        options = lib.setAttrByPath optionPath options;
-      };
-      
-      # List of unconditional imports
-      unconditionalModules = map (file: import file) files;
-      
-    in [ optionsModule ] ++ unconditionalModules; # Return options + all modules
+    in
+    {
+      options = lib.setAttrByPath optionPath options;
+    };
 
-  mkSystem = {    system,              
+  # Create a modular set for a given directory
+  # Automatically discovers and imports all .nix files
+  mkNixosModuleSet = { baseDir }:
+    let
+      files = safeGetNixFiles baseDir;
+      unconditionalModules = map (file: import file) files;
+    in
+    [ (mkModuleOptions { inherit baseDir; optionPath = ["my" "nixos"]; }) ] ++ unconditionalModules;
+
+  mkSystem = {    
+    system,              
     hostname,            
     inputs,              
     users ? [],
@@ -71,48 +81,43 @@ let
     modulesDir = toString ../modules/nixos;
     homeManagerDir = toString ../home-manager;
     
-    homeManagerUsers = lib.listToAttrs (map (user:
+    # Helper to create Home Manager user configuration
+    mkHomeManagerUserConfig = user:
       let
-        # Define the paths for the two layers
         globalModulesDir = homeManagerDir + "/default";
         userModulesDir = homeManagerDir + "/${user.name}";
 
-        # Find files in both directories, handling non-existent paths
-        globalFiles = if builtins.pathExists globalModulesDir then getNixFilesRecursive globalModulesDir else [];
-        userFiles = if builtins.pathExists userModulesDir then getNixFilesRecursive userModulesDir else [];
+        globalFiles = safeGetNixFiles globalModulesDir;
+        userFiles = safeGetNixFiles userModulesDir;
 
-        # Generate attribute paths for each layer separately
         globalAttrPaths = map (pathToAttrPath globalModulesDir) globalFiles;
         userAttrPaths = map (pathToAttrPath userModulesDir) userFiles;
 
         # Combine attribute paths, taking only unique paths to avoid duplicate option errors
         allAttrPaths = lib.unique (globalAttrPaths ++ userAttrPaths);
 
-        # Build ONE options tree from all unique attribute paths
+        # Build options tree
         options = buildOptionTree allAttrPaths;
-        optionsModule = {
-          options = lib.setAttrByPath ["my" "homeManager"] options;
-        };
+        optionsModule = mkModuleOptions {
+          baseDir = globalModulesDir; # Dummy, we build options manually
+          optionPath = ["my" "homeManager"];
+        } // { options = lib.setAttrByPath ["my" "homeManager"] options; };
 
-        # Import all modules unconditionally. Order matters for overrides.
+        # Import all modules: global first, then user-specific (so user overrides global)
         globalModules = map (file: import file) globalFiles;
         userModules = map (file: import file) userFiles;
-
       in
       {
         name = user.name;
         value = {
-          # User modules come last to win the merge priority.
           imports = [ optionsModule ] ++ globalModules ++ userModules ++ [
             (import (userModulesDir + "/home.nix"))
           ] ++ (user.homeModules or []);
         };
-      }) users);
+      };
 
-    nixosModuleSet = mkModuleSet {
-      baseDir = modulesDir;
-      optionPath = ["my" "nixos"];
-    };
+    homeManagerUsers = lib.listToAttrs (map mkHomeManagerUserConfig users);
+    nixosModuleSet = mkNixosModuleSet { baseDir = modulesDir; };
 
   in
   pkgs-unstable.lib.nixosSystem {
@@ -144,5 +149,5 @@ let
     ];
   };
 in {
-  inherit mkModuleSet mkSystem;
+  inherit mkModuleOptions mkNixosModuleSet mkSystem;
 }
