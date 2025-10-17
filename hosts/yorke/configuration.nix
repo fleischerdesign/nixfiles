@@ -1,5 +1,5 @@
 # /etc/nixos/hosts/yorke/configuration.nix
-{ inputs, config, lib, pkgs, ... }: # Füge pkgs und lib hinzu, um sicherzustellen, dass sie da sind
+{ inputs, config, lib, pkgs, ... }:
 {
   imports = [
     ./hardware-configuration.nix
