@@ -4,31 +4,35 @@ This repository contains my personal configuration for NixOS and Home Manager, m
 
 ## Structure
 
-The configuration is structured as follows:
+The configuration is highly modular and automated, with the following directory structure:
 
--   `flake.nix`: The main entry point. Defines the outputs (e.g., NixOS systems, Home Manager configurations) and inputs (dependencies like nixpkgs).
--   `hosts/`: Contains the specific configurations for each machine.
-    -   `hostname/`: Directory for a specific host.
-        -   `configuration.nix`: The main NixOS configuration for this host.
-        -   `hardware-configuration.nix`: Hardware-specific settings (often generated).
--   `home-manager/`: Contains Home Manager configurations, structured per-user.
-    -   `user/`: Directory for a specific user.
-        - `home.nix`: The main Home Manager entrypoint for the user.
-        - `packages.nix`: A list of packages to be installed for the user.
-        - `modules/`: User-specific modules for configuring applications like `nixvim` or `codium`.
--   `modules/`: Reusable NixOS modules that can be imported into different host configurations.
--   `packages/`: Contains custom package definitions that are not in nixpkgs.
--   `secrets/`: Contains encrypted secrets managed with `sops-nix`.
-    -   `main.yaml`: (As provided by you) Encrypted API keys (OpenAI, Codestral) and other sensitive data.
-    -   `.sops.yaml` (optional, can also be configured directly in `flake.nix`): Configuration for `sops`, e.g., which keys are used.
+-   `flake.nix`: The main entry point. It defines the NixOS systems (`yorke` and `jello`) and pulls in all necessary inputs like `nixpkgs`, `home-manager`, and other dependencies.
+
+-   `lib/helper.nix`: The core of the automation. It contains helper functions to build systems, discover modules, and generate configuration options dynamically.
+
+-   `hosts/`: Contains the machine-specific configurations.
+    -   `base.nix`: A foundational configuration that is applied to all hosts. It sets up things like flakes, timezone, and basic system packages.
+    -   `yorke/`, `jello/`: Directories for specific hosts, each containing a `configuration.nix` to define host-specific settings and enable desired modules.
+
+-   `home-manager/`: Contains Home Manager configurations, structured in a layered approach.
+    -   `default/`: Contains modules with default settings and packages (`direnv`, `fish`, `nil`) that apply to all users.
+    -   `philipp/`: A user-specific directory containing personal configurations for packages, `codium`, `nixvim`, and GNOME settings via `dconf`.
+
+-   `modules/nixos/`: A collection of reusable NixOS modules that can be enabled on a per-host basis. This includes modules for `boot`, `audio` (Pipewire), `desktop` (GNOME), and `gaming`.
+
+-   `overlays/`: Contains Nixpkgs overlays. For example, `pip-on-top/` patches the `pip-on-top` GNOME extension for German localization.
+
+-   `packages/`: Contains custom package definitions for applications not found in `nixpkgs`, such as `ficsit`, `karere`, and `lychee-slicer`.
 
 ## Automation with `helper.nix`
 
-The `lib/helper.nix` file contains functions that automate the management of modules for both NixOS and Home Manager.
+The `lib/helper.nix` file is central to this configuration and provides several key functions:
 
--   **Automatic Module Discovery:** All `.nix` files within the `modules/nixos` and `home-manager/` directories are automatically discovered and imported.
--   **Dynamic `enable` Options:** For each discovered module, a corresponding `enable` option is automatically generated. For example, a module at `modules/nixos/desktop/gnome.nix` creates an option `my.nixos.desktop.gnome.enable`. This allows for easy activation and deactivation of modules within the main configuration.
--   **Layered Home Manager Configuration:** Home Manager modules are structured in two layers: a `default` directory for settings that apply to all users, and a user-specific directory (e.g., `philipp/`) for individual settings. User-specific modules override the default ones.
+-   **`mkSystem`:** This function builds a complete NixOS system. It takes the system's architecture, hostname, inputs, user configurations, and overlays as arguments, and assembles the final system configuration from the various parts (`base.nix`, host-specific configuration, and modules).
+
+-   **Automatic Module Discovery:** The helper automatically scans the `modules/nixos/` directory and generates a corresponding `enable` option for each `.nix` file. For example, a module at `modules/nixos/desktop/gnome.nix` creates an option `my.nixos.desktop.gnome.enable`. This allows for easy activation and deactivation of modules within a host's `configuration.nix`.
+
+-   **Layered Home Manager Configuration:** The `mkSystem` function also manages Home Manager configurations. It combines a `default` profile (from `home-manager/default`) with user-specific profiles (e.g., `home-manager/philipp`). User-specific modules in `home-manager/<user>/modules/` also get dynamic `enable` options under the `my.homeManager` attribute set.
 
 ## Installation / Usage
 
@@ -39,46 +43,29 @@ The `lib/helper.nix` file contains functions that automate the management of mod
     ```
 
 2.  **Apply the configuration:**
-    Ensure Nix is installed with Flakes enabled. Then run the following command to apply the configuration for a specific host (replace `hostname` with your system's name as defined in `flake.nix`):
+    Ensure Nix is installed with Flakes enabled. Then run the following command to apply the configuration for a specific host (e.g., `yorke` or `jello`):
 
     ```bash
     # Apply system configuration and switch to the new system
-    sudo nixos-rebuild switch --flake .#hostname
+    sudo nixos-rebuild switch --flake .#yorke
 
-    # Only build and test, without switching
-    # nixos-rebuild build --flake .#hostname
-
-    # Apply Home Manager configuration (if defined separately)
-    # home-manager switch --flake .#user@hostname
+    # Only build and test the configuration without switching
+    nixos-rebuild dry-build --flake .#jello
     ```
 
-## Secrets Management (sops-nix)
-
-Secrets are encrypted using [sops](https://github.com/mozilla/sops) and integrated into the NixOS configuration via [sops-nix](https://github.com/Mic92/sops-nix).
-
--   The secrets are stored encrypted in the `secrets/` directory. The file `secrets/main.yaml` uses `age` for encryption.
--   The recipient's public `age` key is declared within the `secrets/main.yaml` file itself (under `sops.age[].recipient`) or potentially in a separate `.sops.yaml` file in the root directory.
--   To edit the secrets, use the `sops` command:
-    ```bash
-    sops secrets/main.yaml
-    ```
-    This opens the decrypted file in your default editor (`$EDITOR`). Upon saving, the file is automatically re-encrypted.
--   The required private `age` key must be accessible, typically located at `~/.config/sops/age/keys.txt`.
--   `sops-nix` ensures that the decrypted secrets are securely passed to the appropriate services or configuration files at build time. Permissions for the decrypted files in the Nix store are also managed by `sops-nix`. Currently, secrets for `openai` and `codestral` are managed in `secrets/main.yaml`.
+    Home Manager configurations are automatically applied as part of the system build, so a separate `home-manager switch` is not necessary.
 
 ## Highlights
 
-This configuration includes:
-
-*   **Desktop:** GNOME as the primary desktop environment.
-*   **Audio:** Pipewire for modern audio handling.
-*   **Development:**
-    *   Pre-configured editors like NixVim and VS Codium.
-    *   NixVim is set as the default editor.
-*   **Gaming:** A dedicated gaming setup to install and manage games.
-*   **Custom Packages:** Several applications are packaged manually:
-    *   `ficsit`: A Satisfactory mod manager.
-    *   `karere`: A GTK4 wrapper for WhatsApp Web.
-    *   `lychee-slicer`: A slicer for resin 3D printers.
-
----
+-   **Systems:** The configuration manages two systems: `yorke` (AMD) and `jello` (Intel).
+-   **Desktop Environment:** A customized GNOME desktop with several extensions like `blur-my-shell`, `gsconnect`, `dash-to-dock`, and `paperwm`.
+-   **Development:** A pre-configured development environment including:
+    -   **NixVim:** Set as the default editor with plugins for LSP, fuzzy finding (Telescope), and more.
+    -   **VS Codium:** Configured with a set of extensions for web development, Nix, Java, and more.
+-   **Gaming:** A dedicated gaming setup with Steam, Lutris, and Sunshine for game streaming.
+-   **Shell:** Fish is the default shell, integrated with `direnv` for automatic environment loading.
+-   **Custom Packages:** Several applications are packaged manually:
+    -   `ficsit`: A Satisfactory mod manager.
+    -   `karere`: A GTK4 wrapper for WhatsApp Web.
+    -   `lychee-slicer`: A slicer for resin 3D printers.
+-   **Overlays:** Includes an overlay to patch the `pip-on-top` GNOME extension for German localization.
