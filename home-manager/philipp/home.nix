@@ -10,6 +10,7 @@
   my.homeManager.modules.codium.enable = true;
   my.homeManager.modules.nixvim.enable = true;
   my.homeManager.modules.niri.enable = true;
+  my.homeManager.modules.sherlock.enable = true;
 
   # Home Manager needs a bit of information about you and the
   # paths it should manage.

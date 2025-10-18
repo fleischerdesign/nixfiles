@@ -2,7 +2,7 @@
 
 {
   config = lib.mkIf config.my.homeManager.modules.niri.enable {
-    home.packages = [ pkgs.fuzzel pkgs.adwaita-icon-theme ];
+    home.packages = [ pkgs.adwaita-icon-theme ];
 
     programs.niri.settings = with config.lib.niri.actions; {
       cursor = {
@@ -23,8 +23,8 @@
       binds = {
         # --- User-defined Apps ---
         "Mod+Return".action = spawn "ghostty";
-        "Mod+D".action = spawn "fuzzel";
-        "Mod+Space".action = spawn "fuzzel"; # User preference
+        "Mod+D".action = spawn "sherlock";
+        "Mod+Space".action = spawn "sherlock"; # User preference
 
         # --- Defaults based on the definitive action list ---
         "Mod+Shift+Slash".action = show-hotkey-overlay;
