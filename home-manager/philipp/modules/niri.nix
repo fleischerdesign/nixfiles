@@ -1,10 +1,25 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hostname, ... }:
 
 {
   config = lib.mkIf config.my.homeManager.modules.niri.enable {
-    home.packages = [ pkgs.fuzzel ];
+    home.packages = [ pkgs.fuzzel pkgs.adwaita-icon-theme ];
 
     programs.niri.settings = with config.lib.niri.actions; {
+      cursor = {
+        theme = "Adwaita";
+        size = 24;
+      };
+
+      outputs = lib.mkIf (hostname == "jello") {
+        "DP-1" = {
+          position = { x = 320; y = 0; };
+        };
+        "HDMI-A-2" = {
+          position = { x = 0; y = 1080; };
+          focus-at-startup = true;
+        };
+      };
+
       binds = {
         # --- User-defined Apps ---
         "Mod+Return".action = spawn "ghostty";

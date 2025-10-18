@@ -5,5 +5,6 @@
   config = lib.mkIf config.my.nixos.boot.enable {
     boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;
+    boot.kernelParams = [ "quiet" ];
   };
 }
