@@ -29,6 +29,10 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    spicetify-nix = {
+      url = "github:Gerg-L/spicetify-nix";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
 
   };
 
@@ -40,6 +44,7 @@
       home-manager-stable,
       home-manager-unstable,
       nixvim,
+      spicetify-nix,
       ...
     }@inputs:
     let
@@ -58,7 +63,7 @@
           users = [
             {
               name = "philipp";
-              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeModules.nixvim ];
+              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeModules.nixvim inputs.spicetify-nix.homeManagerModules.default ];
             }
           ];
         };
@@ -70,7 +75,7 @@
           users = [
             {
               name = "philipp";
-              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeModules.nixvim ];
+              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeModules.nixvim inputs.spicetify-nix.homeManagerModules.default ];
             }
           ];
         };
