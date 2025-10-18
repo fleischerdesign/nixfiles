@@ -24,6 +24,11 @@ in
   # Set the timezone
   time.timeZone = "Europe/Berlin";
 
+  # Set keyboard layout for graphical environments
+  services.xserver = {
+    xkb.layout = "de";
+  };
+
   # Internationalization settings
   i18n.defaultLocale = deLocale;
   i18n.extraLocaleSettings = {

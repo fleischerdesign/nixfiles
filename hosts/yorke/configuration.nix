@@ -18,6 +18,7 @@
 
   my.nixos = {
     audio.pipewire.enable = true;
-    desktop.gnome.enable = true;
+    desktop.gnome.enable = false;
+    desktop.niri.enable = true;
   };
 }
