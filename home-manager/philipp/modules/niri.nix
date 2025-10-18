@@ -10,6 +10,21 @@
         size = 24;
       };
 
+      prefer-no-csd = true;
+
+      window-rules = [
+        {
+          matches = [ ];
+          geometry-corner-radius = {
+            top-left = 10.0;
+            top-right = 10.0;
+            bottom-left = 10.0;
+            bottom-right = 10.0;
+          };
+          clip-to-geometry = true;
+        }
+      ];
+
       outputs = lib.mkIf (hostname == "jello") {
         "DP-1" = {
           position = { x = 320; y = 0; };

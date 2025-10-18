@@ -7,7 +7,7 @@ in
     programs.spicetify = {
       enable = true;
       wayland = true;
-      theme = spicePkgs.themes.catppuccin;
+      theme = spicePkgs.themes.dribbblishDynamic;
     };
   };
 }
