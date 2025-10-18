@@ -2,7 +2,7 @@
 
 {
   config = lib.mkIf config.my.homeManager.modules.niri.enable {
-    home.packages = [ pkgs.adwaita-icon-theme ];
+    home.packages = [ pkgs.adwaita-icon-theme pkgs.swww ];
 
     programs.niri.settings = with config.lib.niri.actions; {
       cursor = {
@@ -23,6 +23,11 @@
           };
           clip-to-geometry = true;
         }
+      ];
+
+      spawn-at-startup = [
+        { argv = [ "swww-daemon" ]; }
+        { argv = [ "swww" "img" "/etc/nixos/media/wallpaper.jpg" ]; }
       ];
 
       outputs = lib.mkIf (hostname == "jello") {
