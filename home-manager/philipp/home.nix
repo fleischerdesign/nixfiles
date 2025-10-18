@@ -6,7 +6,6 @@
 {
   # Enable user-specific modules dynamically
   my.homeManager.packages.enable = true;
-  my.homeManager.modules.dconf.enable = true;
   my.homeManager.modules.codium.enable = true;
   my.homeManager.modules.nixvim.enable = true;
   my.homeManager.modules.niri.enable = true;

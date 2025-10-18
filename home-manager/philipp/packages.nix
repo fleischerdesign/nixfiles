@@ -10,12 +10,6 @@
       pkgs.nerd-fonts.jetbrains-mono
       pkgs.libreoffice
       pkgs.spotify
-      pkgs.gnomeExtensions.blur-my-shell
-      pkgs.gnomeExtensions.gsconnect
-      pkgs.gnomeExtensions.caffeine
-      pkgs.gnomeExtensions.dash-to-dock
-      pkgs.gnomeExtensions.pip-on-top
-      pkgs.gnomeExtensions.paperwm
       # pkgs.gimp
       pkgs.obsidian
       pkgs.orca-slicer
