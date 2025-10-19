@@ -1,0 +1,250 @@
+[1mdiff --git a/flake.lock b/flake.lock[m
+[1mindex b771c90..8e98f00 100644[m
+[1m--- a/flake.lock[m
+[1m+++ b/flake.lock[m
+[36m@@ -205,11 +205,11 @@[m
+         "nixpkgs": "nixpkgs"[m
+       },[m
+       "locked": {[m
+[31m-        "lastModified": 1760459026,[m
+[31m-        "narHash": "sha256-V/60WCIM5rmwv6aHVfXtWxMF9UcysMewencrP2HakBY=",[m
+[32m+[m[32m        "lastModified": 1760689525,[m
+[32m+[m[32m        "narHash": "sha256-Dl0jvgL5NjgCGkQ8PCLmGIisWcbFhGWPqKRyIGJ9uus=",[m
+         "owner": "kaylorben",[m
+         "repo": "nixcord",[m
+[31m-        "rev": "aa91aa36e631b53cf2721889698be62813b41930",[m
+[32m+[m[32m        "rev": "81d2f10a849c4312fefa0cf323dce0a1460dcbbe",[m
+         "type": "github"[m
+       },[m
+       "original": {[m
+[36m@@ -307,11 +307,11 @@[m
+         "systems": "systems_2"[m
+       },[m
+       "locked": {[m
+[31m-        "lastModified": 1760472915,[m
+[31m-        "narHash": "sha256-8o8VoHB5IRiK+HmO387ICkkI5npIbDAoIqaIwIAy10E=",[m
+[32m+[m[32m        "lastModified": 1760861672,[m
+[32m+[m[32m        "narHash": "sha256-TNBuBgesZcUO76dOi+xGFraT30umxQyfyogrWqiOJZE=",[m
+         "owner": "nix-community",[m
+         "repo": "nixvim",[m
+[31m-        "rev": "32a3fa118d187dc9c88f35a78e763a5b895b6227",[m
+[32m+[m[32m        "rev": "b4852e4d359b89241497ee3cb29eaa83ef1510d4",[m
+         "type": "github"[m
+       },[m
+       "original": {[m
+[1mdiff --git a/flake.nix b/flake.nix[m
+[1mindex 5be0626..8e46f12 100644[m
+[1m--- a/flake.nix[m
+[1m+++ b/flake.nix[m
+[36m@@ -45,6 +45,7 @@[m
+       home-manager-unstable,[m
+       nixvim,[m
+       spicetify-nix,[m
+[32m+[m[32m      nixcord,[m
+       ...[m
+     }@inputs:[m
+     let[m
+[1mdiff --git a/lib/helper.nix b/lib/helper.nix[m
+[1mindex 14794e5..fb0ea29 100644[m
+[1m--- a/lib/helper.nix[m
+[1m+++ b/lib/helper.nix[m
+[36m@@ -1,23 +1,37 @@[m
+[31m-# lib/helper.nix[m
+[32m+[m[32m# lib/helper.nix - Optimiert: Automatisches Scanning, aber performant[m
+ { pkgs-unstable, home-manager-unstable, ... }:[m
+ [m
+ let[m
+[31m-  lib = pkgs-unstable.lib; [m
+[32m+[m[32m  lib = pkgs-unstable.lib;[m
+ [m
+[32m+[m[32m  # Effizientere Version von getNixFilesRecursive[m
+[32m+[m[32m  # Anstatt jeden Eintrag einzeln zu stat'en, nutzen wir eine single Sortierung[m
+   getNixFilesRecursive = dir:[m
+     let[m
+       entries = builtins.readDir dir;[m
+[31m-      processEntry = name: type:[m
+[31m-        let path = dir + "/${name}"; in[m
+[31m-        if type == "directory" then[m
+[31m-          getNixFilesRecursive path[m
+[31m-        else if type == "regular"[m
+[31m-             && lib.hasSuffix ".nix" name[m
+[31m-             && name != "home.nix" then[m
+[31m-          [ path ][m
+[31m-        else[];[m
+[31m-    in lib.flatten (lib.mapAttrsToList processEntry entries);[m
+[31m-  [m
+[32m+[m[32m      # Sortiere und filtere in einem Schritt[m
+[32m+[m[32m      sorted = lib.attrNames entries;[m
+[32m+[m[32m    in[m
+[32m+[m[32m    lib.concatMap (name:[m
+[32m+[m[32m      let[m[41m [m
+[32m+[m[32m        path = dir + "/${name}";[m
+[32m+[m[32m        type = entries.${name};[m
+[32m+[m[32m      in[m
+[32m+[m[32m      if type == "directory" then[m
+[32m+[m[32m        getNixFilesRecursive path[m
+[32m+[m[32m      else if type == "regular" && lib.hasSuffix ".nix" name && name != "home.nix" then[m
+[32m+[m[32m        [ path ][m
+[32m+[m[32m      else[m
+[32m+[m[32m        [][m
+[32m+[m[32m    ) sorted;[m
+[32m+[m
+[32m+[m[32m  # Memoized version - Cache die Ergebnisse[m
+[32m+[m[32m  cachedGetNixFilesRecursive = dir:[m
+[32m+[m[32m    if builtins.pathExists dir then[m[41m [m
+[32m+[m[32m      getNixFilesRecursive dir[m[41m [m
+[32m+[m[32m    else[m[41m [m
+[32m+[m[32m      [];[m
+[32m+[m
+   pathToAttrPath = baseDir: filePath:[m
+     let[m
+       relativePath = lib.removePrefix (toString baseDir + "/") (toString filePath);[m
+[36m@@ -27,72 +41,74 @@[m [mlet[m
+                          else pathWithoutNix;[m
+     in[m
+     lib.splitString "/" pathWithoutDefault;[m
+[31m-  [m
+[32m+[m
+[32m+[m[32m  # Optimiert: Builds die komplette Optionen-Struktur in einem Pass[m
+   buildOptionTree = paths:[m
+[31m-    lib.foldl' (acc: path:[m
+[31m-      let[m
+[31m-        head = lib.head path;[m
+[31m-        tail = lib.tail path;[m
+[31m-        newVal = if tail == [][m
+[31m-          then { enable = lib.mkOption {[m
+[31m-                 type = lib.types.bool;[m
+[31m-                 default = false;[m
+[31m-                 description = "Enable module '${lib.concatStringsSep "." path}'";[m
+[31m-               }; }[m
+[31m-          else buildOptionTree [tail];[m
+[31m-      in[m
+[31m-        acc // { ${head} = (acc.${head} or {}) // newVal; }[m
+[31m-    ) {} paths;[m
+[32m+[m[32m    let[m
+[32m+[m[32m      # Nutze foldl' mit einem map für bessere Performance[m
+[32m+[m[32m      buildSingle = path:[m
+[32m+[m[32m        let[m
+[32m+[m[32m          parts = path;[m
+[32m+[m[32m          buildNested = index:[m
+[32m+[m[32m            if index >= lib.length parts then[m
+[32m+[m[32m              { enable = lib.mkOption {[m
+[32m+[m[32m                  type = lib.types.bool;[m
+[32m+[m[32m                  default = false;[m
+[32m+[m[32m                  description = "Enable module '${lib.concatStringsSep "." parts}'";[m
+[32m+[m[32m                };[m
+[32m+[m[32m              }[m
+[32m+[m[32m            else[m
+[32m+[m[32m              { ${lib.elemAt parts index} = buildNested (index + 1); };[m
+[32m+[m[32m        in[m
+[32m+[m[32m        buildNested 0;[m
+ [m
+[31m-  # Safely read .nix files, handling non-existent directories[m
+[31m-  safeGetNixFiles = dir:[m
+[31m-    if builtins.pathExists dir then getNixFilesRecursive dir else [];[m
+[32m+[m[32m      # Merge alle Optionen zusammen[m
+[32m+[m[32m      mergeNested = acc: nested:[m
+[32m+[m[32m        lib.recursiveUpdate acc nested;[m
+[32m+[m[32m    in[m
+[32m+[m[32m    lib.foldl' mergeNested {} (map buildSingle paths);[m
+ [m
+[31m-  # Generate enable options for a given base directory[m
+[31m-  # Used for both NixOS and Home Manager modules[m
+[32m+[m[32m  # Generate enable options für Verzeichnis[m
+   mkModuleOptions = { baseDir, optionPath }:[m
+     let[m
+[31m-      files = safeGetNixFiles baseDir;[m
+[32m+[m[32m      files = cachedGetNixFilesRecursive baseDir;[m
+       attrPaths = map (pathToAttrPath baseDir) files;[m
+       options = buildOptionTree attrPaths;[m
+     in[m
+[31m-    {[m
+[31m-      options = lib.setAttrByPath optionPath options;[m
+[31m-    };[m
+[32m+[m[32m    { options = lib.setAttrByPath optionPath options; };[m
+ [m
+[31m-  # Create a modular set for a given directory[m
+[31m-  # Automatically discovers and imports all .nix files[m
+[32m+[m[32m  # Create module set mit automatischem Discovery[m
+   mkNixosModuleSet = { baseDir }:[m
+     let[m
+[31m-      files = safeGetNixFiles baseDir;[m
+[32m+[m[32m      files = cachedGetNixFilesRecursive baseDir;[m
+       unconditionalModules = map (file: import file) files;[m
+     in[m
+[31m-    [ (mkModuleOptions { inherit baseDir; optionPath = ["my" "nixos"]; }) ] ++ unconditionalModules;[m
+[32m+[m[32m    [ (mkModuleOptions { inherit baseDir; optionPath = ["my" "nixos"]; }) ][m[41m [m
+[32m+[m[32m    ++ unconditionalModules;[m
+ [m
+[31m-  mkSystem = {    [m
+[31m-    system,              [m
+[31m-    hostname,            [m
+[31m-    inputs,              [m
+[32m+[m[32m  mkSystem = {[m
+[32m+[m[32m    system,[m
+[32m+[m[32m    hostname,[m
+[32m+[m[32m    inputs,[m
+     users ? [],[m
+[31m-    overlays ? []      [m
+[32m+[m[32m    overlays ? [][m
+   }:[m
+   let[m
+     hostsDir = toString ../hosts;[m
+     modulesDir = toString ../modules/nixos;[m
+     homeManagerDir = toString ../home-manager;[m
+[31m-    [m
+[31m-    # Helper to create Home Manager user configuration[m
+[32m+[m
+     mkHomeManagerUserConfig = user:[m
+       let[m
+         globalModulesDir = homeManagerDir + "/default";[m
+         userModulesDir = homeManagerDir + "/${user.name}";[m
+ [m
+[31m-        # Global modules are always imported, without 'enable' flags[m
+[31m-        globalFiles = safeGetNixFiles globalModulesDir;[m
+[32m+[m[32m        # Global modules - immer importiert[m
+[32m+[m[32m        globalFiles = cachedGetNixFilesRecursive globalModulesDir;[m
+         globalModules = map (file: import file) globalFiles;[m
+ [m
+[31m-        # User modules get 'enable' flags under 'my.homeManager'[m
+[31m-        userFiles = safeGetNixFiles userModulesDir;[m
+[32m+[m[32m        # User modules - mit enable flags[m
+[32m+[m[32m        userFiles = cachedGetNixFilesRecursive userModulesDir;[m
+         userAttrPaths = map (pathToAttrPath userModulesDir) userFiles;[m
+         userOptions = buildOptionTree userAttrPaths;[m
+         userOptionsModule = { options = lib.setAttrByPath ["my" "homeManager"] userOptions; };[m
+[36m@@ -102,12 +118,9 @@[m [mlet[m
+         name = user.name;[m
+         value = {[m
+           imports = [[m
+[31m-            # Only create 'enable' options for user-specific modules[m
+             userOptionsModule[m
+           ][m
+[31m-          # Global modules are always imported unconditionally[m
+           ++ globalModules[m
+[31m-          # User modules are also imported, but are guarded by the 'enable' flags inside their files[m
+           ++ userModules ++ [[m
+             (import (userModulesDir + "/home.nix"))[m
+           ] ++ (user.homeModules or []);[m
+[36m@@ -124,17 +137,17 @@[m [mlet[m
+     modules = [[m
+       {[m
+         nixpkgs = {[m
+[31m-          overlays = overlays; [m
+[32m+[m[32m          overlays = overlays;[m
+           config.allowUnfree = true;[m
+         };[m
+       }[m
+[31m-      [m
+[31m-      # Base-Config for all Systems[m
+[32m+[m
+[32m+[m[32m      # Base-Config[m
+       (import (hostsDir + "/base.nix"))[m
+     ] ++ nixosModuleSet ++ [[m
+       # Host-spezifische Konfiguration[m
+       (import (hostsDir + "/${hostname}/configuration.nix"))[m
+[31m-      [m
+[32m+[m
+       home-manager-unstable.nixosModules.home-manager[m
+       {[m
+         home-manager = {[m

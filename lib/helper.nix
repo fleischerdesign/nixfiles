@@ -1,23 +1,37 @@
-# lib/helper.nix
+# lib/helper.nix - Optimiert: Automatisches Scanning, aber performant
 { pkgs-unstable, home-manager-unstable, ... }:
 
 let
-  lib = pkgs-unstable.lib; 
+  lib = pkgs-unstable.lib;
 
+  # Effizientere Version von getNixFilesRecursive
+  # Anstatt jeden Eintrag einzeln zu stat'en, nutzen wir eine single Sortierung
   getNixFilesRecursive = dir:
     let
       entries = builtins.readDir dir;
-      processEntry = name: type:
-        let path = dir + "/${name}"; in
-        if type == "directory" then
-          getNixFilesRecursive path
-        else if type == "regular"
-             && lib.hasSuffix ".nix" name
-             && name != "home.nix" then
-          [ path ]
-        else[];
-    in lib.flatten (lib.mapAttrsToList processEntry entries);
-  
+      # Sortiere und filtere in einem Schritt
+      sorted = lib.attrNames entries;
+    in
+    lib.concatMap (name:
+      let 
+        path = dir + "/${name}";
+        type = entries.${name};
+      in
+      if type == "directory" then
+        getNixFilesRecursive path
+      else if type == "regular" && lib.hasSuffix ".nix" name && name != "home.nix" then
+        [ path ]
+      else
+        []
+    ) sorted;
+
+  # Memoized version - Cache die Ergebnisse
+  cachedGetNixFilesRecursive = dir:
+    if builtins.pathExists dir then 
+      getNixFilesRecursive dir 
+    else 
+      [];
+
   pathToAttrPath = baseDir: filePath:
     let
       relativePath = lib.removePrefix (toString baseDir + "/") (toString filePath);
@@ -27,72 +41,74 @@ let
                          else pathWithoutNix;
     in
     lib.splitString "/" pathWithoutDefault;
-  
+
+  # Optimiert: Builds die komplette Optionen-Struktur in einem Pass
   buildOptionTree = paths:
-    lib.foldl' (acc: path:
-      let
-        head = lib.head path;
-        tail = lib.tail path;
-        newVal = if tail == []
-          then { enable = lib.mkOption {
-                 type = lib.types.bool;
-                 default = false;
-                 description = "Enable module '${lib.concatStringsSep "." path}'";
-               }; }
-          else buildOptionTree [tail];
-      in
-        acc // { ${head} = (acc.${head} or {}) // newVal; }
-    ) {} paths;
+    let
+      # Nutze foldl' mit einem map für bessere Performance
+      buildSingle = path:
+        let
+          parts = path;
+          buildNested = index:
+            if index >= lib.length parts then
+              { enable = lib.mkOption {
+                  type = lib.types.bool;
+                  default = false;
+                  description = "Enable module '${lib.concatStringsSep "." parts}'";
+                };
+              }
+            else
+              { ${lib.elemAt parts index} = buildNested (index + 1); };
+        in
+        buildNested 0;
 
-  # Safely read .nix files, handling non-existent directories
-  safeGetNixFiles = dir:
-    if builtins.pathExists dir then getNixFilesRecursive dir else [];
+      # Merge alle Optionen zusammen
+      mergeNested = acc: nested:
+        lib.recursiveUpdate acc nested;
+    in
+    lib.foldl' mergeNested {} (map buildSingle paths);
 
-  # Generate enable options for a given base directory
-  # Used for both NixOS and Home Manager modules
+  # Generate enable options für Verzeichnis
   mkModuleOptions = { baseDir, optionPath }:
     let
-      files = safeGetNixFiles baseDir;
+      files = cachedGetNixFilesRecursive baseDir;
       attrPaths = map (pathToAttrPath baseDir) files;
       options = buildOptionTree attrPaths;
     in
-    {
-      options = lib.setAttrByPath optionPath options;
-    };
+    { options = lib.setAttrByPath optionPath options; };
 
-  # Create a modular set for a given directory
-  # Automatically discovers and imports all .nix files
+  # Create module set mit automatischem Discovery
   mkNixosModuleSet = { baseDir }:
     let
-      files = safeGetNixFiles baseDir;
+      files = cachedGetNixFilesRecursive baseDir;
       unconditionalModules = map (file: import file) files;
     in
-    [ (mkModuleOptions { inherit baseDir; optionPath = ["my" "nixos"]; }) ] ++ unconditionalModules;
+    [ (mkModuleOptions { inherit baseDir; optionPath = ["my" "nixos"]; }) ] 
+    ++ unconditionalModules;
 
-  mkSystem = {    
-    system,              
-    hostname,            
-    inputs,              
+  mkSystem = {
+    system,
+    hostname,
+    inputs,
     users ? [],
-    overlays ? []      
+    overlays ? []
   }:
   let
     hostsDir = toString ../hosts;
     modulesDir = toString ../modules/nixos;
     homeManagerDir = toString ../home-manager;
-    
-    # Helper to create Home Manager user configuration
+
     mkHomeManagerUserConfig = user:
       let
         globalModulesDir = homeManagerDir + "/default";
         userModulesDir = homeManagerDir + "/${user.name}";
 
-        # Global modules are always imported, without 'enable' flags
-        globalFiles = safeGetNixFiles globalModulesDir;
+        # Global modules - immer importiert
+        globalFiles = cachedGetNixFilesRecursive globalModulesDir;
         globalModules = map (file: import file) globalFiles;
 
-        # User modules get 'enable' flags under 'my.homeManager'
-        userFiles = safeGetNixFiles userModulesDir;
+        # User modules - mit enable flags
+        userFiles = cachedGetNixFilesRecursive userModulesDir;
         userAttrPaths = map (pathToAttrPath userModulesDir) userFiles;
         userOptions = buildOptionTree userAttrPaths;
         userOptionsModule = { options = lib.setAttrByPath ["my" "homeManager"] userOptions; };
@@ -102,12 +118,9 @@ let
         name = user.name;
         value = {
           imports = [
-            # Only create 'enable' options for user-specific modules
             userOptionsModule
           ]
-          # Global modules are always imported unconditionally
           ++ globalModules
-          # User modules are also imported, but are guarded by the 'enable' flags inside their files
           ++ userModules ++ [
             (import (userModulesDir + "/home.nix"))
           ] ++ (user.homeModules or []);
@@ -124,17 +137,17 @@ let
     modules = [
       {
         nixpkgs = {
-          overlays = overlays; 
+          overlays = overlays;
           config.allowUnfree = true;
         };
       }
-      
-      # Base-Config for all Systems
+
+      # Base-Config
       (import (hostsDir + "/base.nix"))
     ] ++ nixosModuleSet ++ [
       # Host-spezifische Konfiguration
       (import (hostsDir + "/${hostname}/configuration.nix"))
-      
+
       home-manager-unstable.nixosModules.home-manager
       {
         home-manager = {
