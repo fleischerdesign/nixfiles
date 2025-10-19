@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
   config = lib.mkIf config.my.homeManager.modules.sherlock.enable {
@@ -7,6 +12,12 @@
     programs.sherlock = {
       enable = true;
       systemd.enable = true;
+
+      style = ''
+        window {
+          border-radius: 12px;
+        }
+      '';
 
       launchers = [
         # --- Widgets & Utilities on Startup ---
@@ -21,7 +32,7 @@
         {
           name = "Music Player";
           type = "audio_sink";
-          args = {};
+          args = { };
           priority = 1;
           home = "Home";
           async = true;
@@ -29,7 +40,10 @@
         {
           name = "Calculator";
           type = "calculation";
-          args.capabilities = [ "calc.math" "calc.units" ];
+          args.capabilities = [
+            "calc.math"
+            "calc.units"
+          ];
           priority = 1;
         }
 
@@ -37,7 +51,7 @@
         {
           name = "App Launcher";
           type = "app_launcher";
-          args = {};
+          args = { };
           priority = 2;
           home = "Home";
         }
@@ -59,7 +73,7 @@
           name = "Kill Process";
           alias = "kill";
           type = "process";
-          args = {};
+          args = { };
           priority = 6;
           home = "Search"; # Nur bei Suche anzeigen
         }
