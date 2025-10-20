@@ -5,6 +5,9 @@ import Quickshell.Services.UPower
 
 PanelWindow {
     id: bottomBarWindow
+
+    VolumeOSD {}
+
     property bool isOpen: false
 
     // Decoupled panelHeight from isOpen to fix animation conflicts
