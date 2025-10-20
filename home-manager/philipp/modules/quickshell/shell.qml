@@ -21,11 +21,146 @@ PanelWindow {
     exclusiveZone: 0
     color: "transparent"
 
+    // Reusable Button Component with Android-Style Noise Ripple
+    component RippleButton: Rectangle {
+        id: button
+        width: fixedWidth ? 55 : Math.max(55, buttonIcon.implicitWidth + 40)
+        height: 55
+        radius: 15
+        color: "#000000"
+        
+        property alias iconText: buttonIcon.text
+        property alias iconFamily: buttonIcon.font.family
+        property alias iconSize: buttonIcon.font.pixelSize
+        property bool fixedWidth: false // Standardmäßig content-aware
+        
+        clip: true
+        Behavior on color { ColorAnimation { duration: 150 } }
+
+        Text {
+            id: buttonIcon
+            color: "white"
+            font.family: "Material Symbols Rounded"
+            font.pixelSize: 24
+            anchors.centerIn: parent
+            horizontalAlignment: Text.AlignHCenter // Ensure horizontal centering
+            z: 3
+        }
+
+        // Canvas Noise Ripple Effect (Android-Style)
+        Canvas {
+            id: sparkleCanvas
+            anchors.fill: parent
+            z: 1
+            
+            property real rippleProgress: 0
+            property point rippleCenter: Qt.point(0, 0)
+            property var noisePattern: []
+            
+            function triggerRipple(x, y) {
+                rippleCenter = Qt.point(x, y)
+                rippleProgress = 0
+                
+                // Partikelgenerierung entfernt
+                
+                rippleAnimation.restart()
+            }
+            
+            onPaint: {
+                const ctx = getContext("2d")
+                ctx.clearRect(0, 0, width, height)
+                
+                // --- Explicit Clipping for Rounded Corners ---
+                ctx.save()
+                ctx.beginPath()
+                const r = button.radius
+                const w = width
+                const h = height
+                ctx.moveTo(r, 0)
+                ctx.lineTo(w - r, 0)
+                ctx.arcTo(w, 0, w, r, r)
+                ctx.lineTo(w, h - r)
+                ctx.arcTo(w, h, w - r, h, r)
+                ctx.lineTo(r, h)
+                ctx.arcTo(0, h, 0, h - r, r)
+                ctx.lineTo(0, r)
+                ctx.arcTo(0, 0, r, 0, r)
+                ctx.closePath()
+                ctx.clip()
+                // --- End Clipping ---
+                
+                const maxRadius = Math.max(button.width, button.height) * 1.5
+                const currentRadius = rippleProgress * maxRadius
+                
+                // Sanfter Background-Ripple
+                const baseOpacity = (1 - rippleProgress) * 0.25
+                if (baseOpacity > 0) {
+                    const gradient = ctx.createRadialGradient(
+                        rippleCenter.x, rippleCenter.y, currentRadius * 0.3,
+                        rippleCenter.x, rippleCenter.y, currentRadius
+                    )
+                    gradient.addColorStop(0, `rgba(255, 255, 255, ${baseOpacity})`)
+                    gradient.addColorStop(1, "rgba(255, 255, 255, 0)")
+                    
+                    ctx.fillStyle = gradient
+                    ctx.beginPath()
+                    ctx.arc(rippleCenter.x, rippleCenter.y, currentRadius, 0, Math.PI * 2)
+                    ctx.fill()
+                }
+                
+                // Noise/Sparkle Punkte entfernt
+                
+                ctx.restore() // Restore context to remove clip
+            }
+            
+            NumberAnimation {
+                id: rippleAnimation
+                target: sparkleCanvas
+                property: "rippleProgress"
+                from: 0
+                to: 1.2
+                duration: 850
+                easing.type: Easing.OutCubic
+                
+                onRunningChanged: {
+                    if (running) {
+                        sparkleTimer.start()
+                    } else {
+                        sparkleTimer.stop()
+                    }
+                }
+            }
+            
+            Timer {
+                id: sparkleTimer
+                interval: 16
+                repeat: true
+                onTriggered: sparkleCanvas.requestPaint()
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            
+            onEntered: {
+                parent.color = "#1A1A1A"
+            }
+            
+            onExited: {
+                parent.color = "#000000"
+            }
+            
+            onPressed: function(mouse) {
+                sparkleCanvas.triggerRipple(mouse.x, mouse.y)
+            }
+        }
+    }
+
     Item {
         id: clippingRect
         anchors.fill: parent
-        
-        // Invisible trigger area at the very bottom
+
         MouseArea {
             id: edgeTrigger
             anchors {
@@ -36,7 +171,7 @@ PanelWindow {
             height: 10
             hoverEnabled: true
             z: 0
-            
+
             onEntered: {
                 bottomBarWindow.panelHeight = 65
                 isOpen = true
@@ -48,7 +183,6 @@ PanelWindow {
             }
         }
 
-        // Clipping wrapper
         Rectangle {
             id: clipRect
             anchors.fill: parent
@@ -78,7 +212,6 @@ PanelWindow {
                     }
                 }
 
-                // HoverHandler für die gesamte Bar - blockiert keine Mouse Events!
                 HoverHandler {
                     id: barHoverHandler
                     onHoveredChanged: {
@@ -107,213 +240,99 @@ PanelWindow {
                     }
                     spacing: 10
 
-                    Rectangle {
-                        width: 55
-                        height: 55
-                        radius: 15
-                        color: "#000000"
+                    RippleButton {
                         Layout.alignment: Qt.AlignVCenter
-
-                        Behavior on color { ColorAnimation { duration: 150 } }
-
-                        Text {
-                            text: "home"
-                            color: "white"
-                            font.family: "Material Symbols Rounded"
-                            font.pixelSize: 24
-                            anchors.centerIn: parent
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: {
-                                parent.color = "#1A1A1A"
-                            }
-                            onExited: {
-                                parent.color = "#000000"
-                            }
-                        }
+                        iconText: "home"
+                        fixedWidth: true
                     }
 
-                    Rectangle {
-                        width: 55
-                        height: 55
-                        radius: 15
-                        color: "#000000"
+                    RippleButton {
                         Layout.alignment: Qt.AlignVCenter
-
-                        Behavior on color { ColorAnimation { duration: 150 } }
-
-                        Text {
-                            text: "apps"
-                            color: "white"
-                            font.family: "Material Symbols Rounded"
-                            font.pixelSize: 24
-                            anchors.centerIn: parent
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: {
-                                parent.color = "#1A1A1A"
-                            }
-                            onExited: {
-                                parent.color = "#000000"
-                            }
-                        }
+                        iconText: "apps"
+                        fixedWidth: true
                     }
 
                     Item {
                         Layout.fillWidth: true
                     }
 
-                    Rectangle {
-                        width: 55
-                        height: 55
-                        radius: 15
-                        color: "#000000"
+                    RippleButton {
                         Layout.alignment: Qt.AlignVCenter
-
-                        Behavior on color { ColorAnimation { duration: 150 } }
-
-                        Text {
-                            id: clockText
-                            color: "white"
-                            font.pixelSize: 12
-                            font.weight: 500
-                            horizontalAlignment: Text.AlignHCenter
-                            anchors.centerIn: parent
-
-                            Timer {
-                                interval: 1000
-                                running: true
-                                repeat: true
-                                onTriggered: {
-                                    const now = new Date()
-                                    const hours = String(now.getHours()).padStart(2, '0')
-                                    const minutes = String(now.getMinutes()).padStart(2, '0')
-                                    clockText.text = hours + ":" + minutes
-                                }
-                            }
-
-                            Component.onCompleted: {
+                        iconSize: 12
+                        iconFamily: "Roboto"
+                        fixedWidth: true // Temporarily set to fixed width
+                        
+                        Component.onCompleted: {
+                            const now = new Date()
+                            const hours = String(now.getHours()).padStart(2, '0')
+                            const minutes = String(now.getMinutes()).padStart(2, '0')
+                            text = hours + "\n" + minutes // Use \n for new line
+                        }
+                        
+                        Timer {
+                            interval: 1000
+                            running: true
+                            repeat: true
+                            onTriggered: {
                                 const now = new Date()
                                 const hours = String(now.getHours()).padStart(2, '0')
                                 const minutes = String(now.getMinutes()).padStart(2, '0')
-                                text = hours + ":" + minutes
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: {
-                                parent.color = "#1A1A1A"
-                            }
-                            onExited: {
-                                parent.color = "#000000"
+                                parent.iconText = hours + "\n" + minutes // Use \n for new line
                             }
                         }
                     }
 
-                    Rectangle {
-                        width: 55
-                        height: 55
-                        radius: 15
-                        color: "#000000"
+                    RippleButton {
                         Layout.alignment: Qt.AlignVCenter
                         visible: UPower.displayDevice ? UPower.displayDevice.type === 2 : false
+                        iconFamily: "Material Symbols Outlined"
+                        iconSize: 20
+                        iconText: "battery_android_full"
+                        fixedWidth: true
 
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        function updateBatteryIcon() {
+                            if (UPower.displayDevice && UPower.displayDevice.ready) {
+                                const percent = UPower.displayDevice.percentage > 100 ? Math.round(UPower.displayDevice.percentage) : Math.round(UPower.displayDevice.percentage * 100)
+                                const charging = UPower.displayDevice.state === 1
 
-                        Text {
-                            id: batteryText
-                            color: "white"
-                            font.family: "Material Symbols Outlined"
-                            font.pixelSize: 20
-                            anchors.centerIn: parent
-                            text: "battery_android_full"
-
-                            function updateBatteryIcon() {
-                                if (UPower.displayDevice && UPower.displayDevice.ready) {
-                                    const percent = UPower.displayDevice.percentage > 100 ? Math.round(UPower.displayDevice.percentage) : Math.round(UPower.displayDevice.percentage * 100)
-                                    const charging = UPower.displayDevice.state === 1
-
-                                    if (charging) {
-                                        batteryText.text = "battery_android_bolt"
-                                    } else if (percent > 87) {
-                                        batteryText.text = "battery_android_full"
-                                    } else if (percent > 75) {
-                                        batteryText.text = "battery_android_6"
-                                    } else if (percent > 62) {
-                                        batteryText.text = "battery_android_5"
-                                    } else if (percent > 50) {
-                                        batteryText.text = "battery_android_4"
-                                    } else if (percent > 37) {
-                                        batteryText.text = "battery_android_3"
-                                    } else if (percent > 25) {
-                                        batteryText.text = "battery_android_2"
-                                    } else if (percent > 12.5) {
-                                        batteryText.text = "battery_android_1"
-                                    } else {
-                                        batteryText.text = "battery_android_0"
-                                    }
+                                if (charging) {
+                                    iconText = "battery_android_bolt"
+                                } else if (percent > 87) {
+                                    iconText = "battery_android_full"
+                                } else if (percent > 75) {
+                                    iconText = "battery_android_6"
+                                } else if (percent > 62) {
+                                    iconText = "battery_android_5"
+                                } else if (percent > 50) {
+                                    iconText = "battery_android_4"
+                                } else if (percent > 37) {
+                                    iconText = "battery_android_3"
+                                } else if (percent > 25) {
+                                    iconText = "battery_android_2"
+                                } else if (percent > 12.5) {
+                                    iconText = "battery_android_1"
                                 } else {
-                                    batteryText.text = "battery_unknown"
+                                    iconText = "battery_android_0"
                                 }
-                            }
-
-                            Component.onCompleted: updateBatteryIcon()
-
-                            Connections {
-                                target: UPower.displayDevice
-                                function onPercentageChanged() { batteryText.updateBatteryIcon() }
-                                function onStateChanged() { batteryText.updateBatteryIcon() }
-                                function onReadyChanged() { batteryText.updateBatteryIcon() }
+                            } else {
+                                iconText = "battery_unknown"
                             }
                         }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: {
-                                parent.color = "#1A1A1A"
-                            }
-                            onExited: {
-                                parent.color = "#000000"
-                            }
+                        Component.onCompleted: updateBatteryIcon()
+
+                        Connections {
+                            target: UPower.displayDevice
+                            function onPercentageChanged() { parent.updateBatteryIcon() }
+                            function onStateChanged() { parent.updateBatteryIcon() }
+                            function onReadyChanged() { parent.updateBatteryIcon() }
                         }
                     }
 
-                    Rectangle {
-                        width: 55
-                        height: 55
-                        radius: 15
-                        color: "#000000"
+                    RippleButton {
                         Layout.alignment: Qt.AlignVCenter
-
-                        Behavior on color { ColorAnimation { duration: 150 } }
-
-                        Text {
-                            text: "clarify"
-                            color: "white"
-                            font.family: "Material Symbols Rounded"
-                            font.pixelSize: 24
-                            anchors.centerIn: parent
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: {
-                                parent.color = "#1A1A1A"
-                            }
-                            onExited: {
-                                parent.color = "#000000"
-                            }
-                        }
+                        iconText: "clarify"
+                        fixedWidth: true
                     }
                 }
             }
