@@ -115,7 +115,8 @@ PanelWindow {
                     Text {
                         id: clockText
                         color: "white"
-                        font.pixelSize: 12
+			font.pixelSize: 12
+			font.weight: "500"
                         horizontalAlignment: Text.AlignHCenter
                         anchors.centerIn: parent
 
@@ -204,7 +205,7 @@ PanelWindow {
                     Layout.alignment: Qt.AlignVCenter
 
                     Text {
-                        text: "settings"
+                        text: "clarify"
                         color: "white"
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 24
