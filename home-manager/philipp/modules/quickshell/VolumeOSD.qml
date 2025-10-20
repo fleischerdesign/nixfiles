@@ -78,6 +78,10 @@ Scope {
                             implicitWidth: parent.width
                             implicitHeight: parent.height * (Pipewire.defaultAudioSink?.audio.volume ?? 0)
                             radius: parent.radius
+
+                            Behavior on implicitHeight {
+                                NumberAnimation { duration: 100 }
+                            }
                         }
                     }
 

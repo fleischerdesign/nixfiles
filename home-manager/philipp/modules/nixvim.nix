@@ -103,6 +103,8 @@ lib.mkIf config.my.homeManager.modules.nixvim.enable {
           vue_ls.enable = true;
           # Nix
           nil_ls.enable = true;
+	  # QML
+	  qmlls.enable = true;
         };
       };
 
