@@ -75,7 +75,7 @@ PanelWindow {
                     width: 55
                     height: 55
                     radius: 15
-                    color: "#333333"
+                    color: "#000000"
                     Layout.alignment: Qt.AlignVCenter
 
                     Text {
@@ -91,7 +91,7 @@ PanelWindow {
                     width: 55
                     height: 55
                     radius: 15
-                    color: "#333333"
+                    color: "#000000"
                     Layout.alignment: Qt.AlignVCenter
 
                     Text {
@@ -112,7 +112,7 @@ PanelWindow {
                     width: 55
                     height: 55
                     radius: 15
-                    color: "#333333"
+                    color: "#000000"
                     Layout.alignment: Qt.AlignVCenter
 
                     Text {
@@ -148,7 +148,7 @@ PanelWindow {
                     width: 55
                     height: 55
                     radius: 15
-                    color: "#333333"
+                    color: "#000000"
                     Layout.alignment: Qt.AlignVCenter
 		    visible: UPower.displayDevice ? UPower.displayDevice.type === 2 : false // 2 = UPowerDeviceType.BATTERY
 
@@ -206,7 +206,7 @@ PanelWindow {
                     width: 55
                     height: 55
                     radius: 15
-                    color: "#333333"
+                    color: "#000000"
                     Layout.alignment: Qt.AlignVCenter
 
                     Text {

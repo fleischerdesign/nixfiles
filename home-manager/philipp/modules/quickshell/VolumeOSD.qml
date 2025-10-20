@@ -70,7 +70,7 @@ Scope {
             }
             
             radius: 13
-            color: "#80000000"
+            color: "#000000"
             
             ColumnLayout {
                 anchors.fill: parent
