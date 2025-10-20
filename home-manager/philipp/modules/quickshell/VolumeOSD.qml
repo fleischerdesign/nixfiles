@@ -6,92 +6,118 @@ import Quickshell.Widgets
 
 Scope {
     id: root
-
-    // Bind the pipewire node so its volume will be tracked
+    
     PwObjectTracker {
         objects: [Pipewire.defaultAudioSink]
     }
-
+    
     Connections {
         target: Pipewire.defaultAudioSink?.audio
-
         function onVolumeChanged() {
             root.shouldShowOsd = true;
             hideTimer.restart();
         }
+        
+        function onMutedChanged() {
+            root.shouldShowOsd = true;
+            hideTimer.restart();
+        }
     }
-
+    
     property bool shouldShowOsd: false
-
+    
     Timer {
         id: hideTimer
-        interval: 1000
+        interval: 2000
         onTriggered: root.shouldShowOsd = false
     }
-
-    // The OSD window will be created and destroyed based on shouldShowOsd.
-    // PanelWindow.visible could be set instead of using a loader, but using
-    // a loader will reduce the memory overhead when the window isn't open.
-    LazyLoader {
-        active: root.shouldShowOsd
-
-        PanelWindow {
-            // Since the panel's screen is unset, it will be picked by the compositor
-            // when the window is created. Most compositors pick the current active monitor.
-
-            anchors {
-                right: true
+    
+    PanelWindow {
+        id: osdContainer
+        anchors {
+            right: true
+            // Vertikal zentriert
+            top: true
+            bottom: true
+        }
+        margins.right: 0  // KEINE Margin, damit nichts abgeschnitten wird
+        width: 60 + 20  // Breite + Slide-Distanz + extra Padding
+        height: 300
+        color: "transparent"
+	mask: Region {}
+	exclusiveZone: 0
+        
+        Rectangle {
+            id: osdContent
+            width: 60
+            height: 300
+            // Vertikal zentriert im Container
+            anchors.verticalCenter: parent.verticalCenter
+            
+            // Slide-Animation - startet von rechts außerhalb
+            x: shouldShowOsd ? 10 : (parent.width)  // 10px Abstand vom Rand wenn sichtbar
+            
+            Behavior on x {
+                NumberAnimation {
+                    duration: 250
+                    easing.type: Easing.OutCubic
+                }
             }
-            exclusiveZone: 0
-	    margins.right: 10
-            implicitWidth: 60
-            implicitHeight: 300
-            color: "transparent"
-
-            // An empty click mask prevents the window from blocking mouse events.
-            mask: Region {}
-
-            Rectangle {
+            
+            opacity: shouldShowOsd ? 1.0 : 0.0
+            Behavior on opacity {
+                NumberAnimation { duration: 200 }
+            }
+            
+            radius: 13
+            color: "#80000000"
+            
+            ColumnLayout {
                 anchors.fill: parent
-                radius: 13
-                height: 50
-                color: "#80000000"
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.left: parent.left
-                    anchors.topMargin: 15
-                    anchors.bottomMargin: 15
-
+                anchors.margins: 15
+                spacing: 10
+                
+                Rectangle {
+                    Layout.fillHeight: true
+                    Layout.alignment: Qt.AlignHCenter
+                    width: 10
+                    radius: 5
+                    color: "#50ffffff"
+                    
                     Rectangle {
-                        // Stretches to fill all left-over space
-                        Layout.fillHeight: true
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        implicitWidth: 10
-                        radius: 20
-                        color: "#50ffffff"
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            implicitWidth: parent.width
-                            implicitHeight: parent.height * (Pipewire.defaultAudioSink?.audio.volume ?? 0)
-                            radius: parent.radius
-
-                            Behavior on implicitHeight {
-                                NumberAnimation { duration: 100 }
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            bottom: parent.bottom
+                        }
+			height: Pipewire.defaultAudioSink?.audio.muted ? 0 : parent.height * (Pipewire.defaultAudioSink?.audio.volume ?? 0)
+                        radius: parent.radius
+                        color: "#ffffff"
+                        
+                        Behavior on height {
+                            NumberAnimation { 
+                                duration: 100
+                                easing.type: Easing.OutQuad
                             }
                         }
+                        
+                        Behavior on color {
+                            ColorAnimation { duration: 150 }
+                        }
                     }
-
-                    Text {
-                        text: "clarify"
-                        color: "white"
-                        font.family: "Material Symbols Rounded"
-                        font.pixelSize: 24
-                        anchors.horizontalCenter: parent.horizontalCenter
+                }
+                
+                Text {
+                    text: {
+                        if (Pipewire.defaultAudioSink?.audio.muted) return "no_sound"
+                        let vol = Pipewire.defaultAudioSink?.audio.volume ?? 0
+                        if (vol > 0.0) return "volume_up"
+                        return "volume_off"
                     }
+                    color: "white"
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 24
+                    Layout.alignment: Qt.AlignHCenter
                 }
             }
         }
