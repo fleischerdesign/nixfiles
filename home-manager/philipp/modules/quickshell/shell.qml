@@ -48,6 +48,16 @@ PanelWindow {
                 }
             }
 
+            // Shadow is now inside the wrapper and will be animated with it.
+            Rectangle {
+                id: shadow
+                anchors.fill: parent
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "#00000000" } // Top (transparent)
+                    GradientStop { position: 1.0; color: "#99000000" } // Bottom (semi-transparent black)
+                }
+            }
+
             RowLayout {
                 anchors {
                     fill: parent
