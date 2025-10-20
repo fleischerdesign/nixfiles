@@ -152,7 +152,7 @@
         # It has been substituted with the generic `screenshot` action.
         "Print".action = screenshot;
         "Ctrl+Print".action = screenshot;
-        "Alt+Print".action = screenshot-window;
+        #"Alt+Print".action = screenshot-window;
 
         "Mod+Shift+P".action = power-off-monitors;
         "Mod+Shift+E".action = quit;
