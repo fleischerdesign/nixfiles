@@ -116,7 +116,7 @@ PanelWindow {
                         id: clockText
                         color: "white"
 			font.pixelSize: 12
-			font.weight: "500"
+			font.weight: 500
                         horizontalAlignment: Text.AlignHCenter
                         anchors.centerIn: parent
 
@@ -147,6 +147,9 @@ PanelWindow {
                     radius: 15
                     color: "#333333"
                     Layout.alignment: Qt.AlignVCenter
+		    visible: UPower.displayDevice ? UPower.displayDevice.type === 2 : false // 2 = UPowerDeviceType.BATTERY
+
+
 
                     Text {
                         id: batteryText
@@ -155,7 +158,6 @@ PanelWindow {
                         font.pixelSize: 20
                         anchors.centerIn: parent
                         text: "battery_android_full"
-                        visible: UPower.displayDevice ? UPower.displayDevice.type === 2 : false // 2 = UPowerDeviceType.BATTERY
 
                         function updateBatteryIcon() {
                             if (UPower.displayDevice && UPower.displayDevice.ready) {
