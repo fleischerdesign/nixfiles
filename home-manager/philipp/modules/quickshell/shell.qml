@@ -7,13 +7,16 @@ PanelWindow {
     id: sidebarWindow
     property bool isOpen: false
 
+    // Use a separate property for width to control it independently.
+    property int panelWidth: isOpen ? (55 + 25) : 10
+    implicitWidth: panelWidth
+
     anchors {
         left: true
         top: true
         bottom: true
     }
 
-    implicitWidth: 55 + 25
     exclusiveZone: isOpen ? 55 : 0
     color: "transparent"
 
@@ -32,7 +35,7 @@ PanelWindow {
 
         Item {
             id: contentWrapper
-            width: sidebarWindow.implicitWidth
+            width: 55 + 25
             anchors.top: parent.top
             anchors.bottom: parent.bottom
 
@@ -40,8 +43,16 @@ PanelWindow {
 
             Behavior on x {
                 NumberAnimation {
+                    id: slideAnimation
                     duration: 250
                     easing.type: Easing.InOutQuad
+
+                    // After the closing animation finishes, shrink the window.
+                    onRunningChanged: {
+                        if (!running && !sidebarWindow.isOpen) {
+                            sidebarWindow.panelWidth = 10
+                        }
+                    }
                 }
             }
 
@@ -200,17 +211,19 @@ PanelWindow {
         }
 
         MouseArea {
-            // anchors.fill is replaced by manual anchors to allow for dynamic width
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            
-            // When closed, provide a small 10px strip on the left to trigger opening
-            width: isOpen ? parent.width : 10
-            
+            anchors.fill: parent
             hoverEnabled: true
-            onEntered: sidebarWindow.isOpen = true
-            onExited: sidebarWindow.isOpen = false
+            onEntered: {
+                // First, expand the window instantly.
+                sidebarWindow.panelWidth = 55 + 25
+                // Then, trigger the animation.
+                sidebarWindow.isOpen = true
+            }
+            onExited: {
+                // Just trigger the animation. The onRunningChanged handler
+                // on the animation will take care of shrinking the window later.
+                sidebarWindow.isOpen = false
+            }
         }
     }
 }
