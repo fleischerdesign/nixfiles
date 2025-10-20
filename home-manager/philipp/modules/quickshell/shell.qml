@@ -37,7 +37,7 @@ PanelWindow {
             Behavior on y {
                 NumberAnimation {
                     id: slideAnimation
-                    duration: 250
+                    duration: 200
                     easing.type: Easing.InOutQuad
                     // After the slide-out animation finishes, shrink the window.
                     onRunningChanged: {
@@ -54,7 +54,7 @@ PanelWindow {
                 anchors.fill: parent
                 gradient: Gradient {
                     GradientStop { position: 0.0; color: "#00000000" } // Top (transparent)
-                    GradientStop { position: 1.0; color: "#99000000" } // Bottom (semi-transparent black)
+                    GradientStop { position: 1.0; color: "#ff000000" } // Bottom (semi-transparent black)
                 }
             }
 
