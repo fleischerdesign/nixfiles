@@ -160,14 +160,13 @@ PanelWindow {
                     }
                 }
 
-                // Batterie-Status mit Icon
                 Text {
                     id: batteryText
                     color: "white"
-                    font.family: "Material Symbols Rounded"
+                    font.family: "Material Symbols Outlined"
                     font.pixelSize: 20
                     Layout.alignment: Qt.AlignHCenter
-                    text: "battery_full"
+                    text: "battery_android_full"
                     // Only show battery icon if a battery is present (e.g. on a laptop)
                     visible: UPower.displayDevice ? UPower.displayDevice.type === 2 : false // 2 = UPowerDeviceType.BATTERY
 
@@ -177,16 +176,25 @@ PanelWindow {
                             const charging = UPower.displayDevice.state === 1
                             
                             if (charging) {
-                                batteryText.text = "battery_charging_full"
+                                batteryText.text = "battery_android_bolt"
+                            } else if (percent > 87) {
+                                batteryText.text = "battery_android_full"
                             } else if (percent > 75) {
-                                batteryText.text = "battery_full"
-                            } else if (percent > 50) {
-                                batteryText.text = "battery_6_bar"
-                            } else if (percent > 25) {
-                                batteryText.text = "battery_4_bar"
-                            } else {
-                                batteryText.text = "battery_2_bar"
-                            }
+                                batteryText.text = "battery_android_6"
+                            } else if (percent > 62) {
+				batteryText.text = "battery_android_5"
+			      } else if (percent > 50) {
+				batteryText.text = "battery_android_4"
+			      } else if (percent > 37) {
+				batteryText.text = "battery_android_3"
+			      } else if (percent > 25) {
+				batteryText.text = "battery_android_2"
+			      } else if (percent > 12.5) {
+				batteryText.text = "battery_android_1"
+			      } else {
+				batteryText.text = "battery_android_0"
+			      }
+			     
                         } else {
                             batteryText.text = "battery_unknown"
                         }
