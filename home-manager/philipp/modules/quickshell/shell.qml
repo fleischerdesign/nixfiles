@@ -168,6 +168,8 @@ PanelWindow {
                     font.pixelSize: 20
                     Layout.alignment: Qt.AlignHCenter
                     text: "battery_full"
+                    // Only show battery icon if a battery is present (e.g. on a laptop)
+                    visible: UPower.displayDevice ? UPower.displayDevice.type === 2 : false // 2 = UPowerDeviceType.BATTERY
 
                     function updateBatteryIcon() {
                         if (UPower.displayDevice && UPower.displayDevice.ready) {
