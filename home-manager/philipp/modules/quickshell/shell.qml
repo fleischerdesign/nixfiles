@@ -7,6 +7,7 @@ PanelWindow {
     id: bottomBarWindow
 
     VolumeOSD {}
+    BrightnessOSD {}
 
     property bool isOpen: false
     property int panelHeight: 10

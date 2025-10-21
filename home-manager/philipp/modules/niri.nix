@@ -2,7 +2,7 @@
 
 {
   config = lib.mkIf config.my.homeManager.modules.niri.enable {
-    home.packages = [ pkgs.adwaita-icon-theme pkgs.swww ];
+    home.packages = [ pkgs.adwaita-icon-theme pkgs.swww pkgs.brightnessctl ];
     
     programs.niri.settings = with config.lib.niri.actions; {
       cursor = {
@@ -54,6 +54,9 @@
         "XF86AudioLowerVolume".action = spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-";
         "XF86AudioMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle";
         "XF86AudioMicMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle";
+	
+	"XF86MonBrightnessUp".action = spawn-sh "brightnessctl set +15%";
+        "XF86MonBrightnessDown".action = spawn-sh "brightnessctl set 15%-";
 
         "Mod+Q".action = close-window;
 
