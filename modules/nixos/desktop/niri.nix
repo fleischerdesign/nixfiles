@@ -12,6 +12,8 @@ in
     # Disable X server for a pure Wayland setup
     services.xserver.enable = false;
 
+    services.gvfs.enable = true;
+
     # Configure greetd with tuigreet to launch niri-session
     services.greetd = {
       enable = true;
