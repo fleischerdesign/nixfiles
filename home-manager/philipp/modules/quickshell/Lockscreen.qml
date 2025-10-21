@@ -6,7 +6,15 @@ import Quickshell.Services.Pam
 
 Rectangle {
     id: root
-    color: "#282a36"
+    color: "#000"
+
+    Image {
+        anchors.fill: parent
+        source: "file:///etc/nixos/media/wallpaper.jpg"  // Pfad anpassen
+        fillMode: Image.PreserveAspectCrop
+        opacity: 1.0
+        z: 0
+    }
 
     signal unlocked()
     property alias user: pamAuth.user

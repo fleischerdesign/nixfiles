@@ -8,96 +8,106 @@ import Quickshell.Wayland
 ShellRoot {
     VolumeOSD {}
     BrightnessOSD {}
-        WlSessionLock {
-            id: sessionLocker
-
-            surface: WlSessionLockSurface {
-
-                // NEU: Das ProxyWindow, wie von der Doku empfohlen
-                Window {
-                    // Eigenschaften, die ein Fenster braucht
-                    visible: true
-                    flags: Qt.Window | Qt.FramelessWindowHint
-                    width: parent.width
-                    height: parent.height
-                    // Darin laden wir unsere UI-Komponente
-                    Lockscreen {
-                        id: lockScreenComponent
+    
+    WlSessionLock {
+        id: sessionLocker
+        // Surface wird dynamisch basierend auf locked-Status erstellt
+        surface: sessionLocker.locked ? lockSurfaceComponent : null
+        
+        Component {
+            id: lockSurfaceComponent
+            WlSessionLockSurface {
+                color: "transparent"
+                Lockscreen {
+                    id: lockScreenComponent
+                    anchors.fill: parent
+                    
+                    onUnlocked: {
+                        sessionLocker.locked = false;
                     }
                 }
             }
-
-            // Die Verbindung lauscht auf das Signal der Lockscreen-Komponente
-            Connections {
-                target: lockScreenComponent
-                function onUnlocked() {
-                    sessionLocker.locked = false;
-                }
-            }
         }
-        IpcHandler {
-            target: "lockscreen"
-            function lock(): void {
-                // Sagt dem WlSessionLock, dass er sperren soll
-                sessionLocker.locked = true;
-            }
-        }
+    }
     
-
+    IpcHandler {
+        target: "lockscreen"
+        function lock(): void {
+            sessionLocker.locked = true;
+        }
+    }
+    
     PanelWindow {
         id: bottomBarWindow
-
         property bool isOpen: false
-        implicitHeight: 65
-
+        
+        // Dynamische Höhe: klein wenn geschlossen, groß wenn offen
+        implicitHeight: isOpen ? 65 : 10
+        
         anchors {
             left: true
             right: true
             bottom: true
         }
-
         exclusiveZone: 0
         color: "transparent"
-
-
-
+        
+        // HoverHandler für die Trigger-Zone
+        HoverHandler {
+            id: triggerHover
+            onHoveredChanged: {
+                if (hovered) {
+                    bottomBarWindow.isOpen = true;
+                }
+            }
+        }
+        
+        // Content-Wrapper mit Clip
         Item {
             id: clippingRect
             anchors.fill: parent
             clip: true
-
+            
             Item {
                 id: contentWrapper
                 height: 65
                 width: parent.width
                 opacity: bottomBarWindow.isOpen ? 1 : 0
-
                 y: bottomBarWindow.isOpen ? 0 : 55
-
+                
                 Behavior on y {
                     NumberAnimation {
                         duration: 200
                         easing.type: Easing.InOutQuad
                     }
                 }
+                
                 Behavior on opacity {
                     NumberAnimation {
                         duration: 200
                     }
                 }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-
-                    onEntered: {
-                        bottomBarWindow.isOpen = true;
-                    }
-                    onExited: {
-                        bottomBarWindow.isOpen = false;
+                
+                // HoverHandler für die geöffnete Bar
+                HoverHandler {
+                    id: barHover
+                    onHoveredChanged: {
+                        if (!hovered) {
+                            bottomBarWindow.isOpen = false;
+                        }
                     }
                 }
-
+                
+                // MouseArea nur für Event-Propagation zu Buttons
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: false
+                    propagateComposedEvents: true
+                    onPressed: function(mouse) {
+                        mouse.accepted = false;
+                    }
+                }
+                
                 Rectangle {
                     id: shadow
                     anchors.fill: parent
@@ -112,7 +122,7 @@ ShellRoot {
                         }
                     }
                 }
-
+                
                 RowLayout {
                     anchors {
                         fill: parent
@@ -121,36 +131,36 @@ ShellRoot {
                         bottomMargin: 10
                     }
                     spacing: 10
-
+                    
                     RippleButton {
                         Layout.alignment: Qt.AlignVCenter
                         iconText: "home"
                         fixedWidth: true
                     }
-
+                    
                     RippleButton {
                         Layout.alignment: Qt.AlignVCenter
                         iconText: "apps"
                         fixedWidth: true
                     }
-
+                    
                     Item {
                         Layout.fillWidth: true
                     }
-
+                    
                     RippleButton {
                         Layout.alignment: Qt.AlignVCenter
                         iconSize: 12
                         iconFamily: "Roboto"
-                        fixedWidth: true // Temporarily set to fixed width
-
+                        fixedWidth: true
+                        
                         Component.onCompleted: {
                             const now = new Date();
                             const hours = String(now.getHours()).padStart(2, '0');
                             const minutes = String(now.getMinutes()).padStart(2, '0');
-                            iconText = hours + "\n" + minutes; // Use \n for new line
+                            iconText = hours + "\n" + minutes;
                         }
-
+                        
                         Timer {
                             interval: 1000
                             running: true
@@ -159,11 +169,11 @@ ShellRoot {
                                 const now = new Date();
                                 const hours = String(now.getHours()).padStart(2, '0');
                                 const minutes = String(now.getMinutes()).padStart(2, '0');
-                                parent.iconText = hours + "\n" + minutes; // Use \n for new line
+                                parent.iconText = hours + "\n" + minutes;
                             }
                         }
                     }
-
+                    
                     RippleButton {
                         id: batteryButton
                         Layout.alignment: Qt.AlignVCenter
@@ -171,16 +181,12 @@ ShellRoot {
                         iconFamily: "Material Symbols Outlined"
                         iconSize: 20
                         fixedWidth: true
-
                         iconText: {
                             if (!UPower.displayDevice || !UPower.displayDevice.ready) {
                                 return "battery_unknown";
                             }
-
                             const percent = Math.round(UPower.displayDevice.percentage * 100);
-
                             const charging = UPower.displayDevice.state === 1;
-
                             if (charging)
                                 return "battery_android_bolt";
                             if (percent > 87)
@@ -200,7 +206,7 @@ ShellRoot {
                             return "battery_android_0";
                         }
                     }
-
+                    
                     RippleButton {
                         Layout.alignment: Qt.AlignVCenter
                         iconText: "clarify"
@@ -209,63 +215,55 @@ ShellRoot {
                 }
             }
         }
-      }
+    }
     
-
-    // Reusable Button Component with Android-Style Noise Ripple
+    // Reusable Button Component with Android-Style Ripple
     component RippleButton: Rectangle {
         id: button
         width: fixedWidth ? 55 : Math.max(55, buttonIcon.implicitWidth + 40)
         height: 55
         radius: 15
         color: "#000000"
-
         property alias iconText: buttonIcon.text
         property alias iconFamily: buttonIcon.font.family
         property alias iconSize: buttonIcon.font.pixelSize
-        property bool fixedWidth: false // Standardmäßig content-aware
-
+        property bool fixedWidth: false
         clip: true
+        
         Behavior on color {
             ColorAnimation {
                 duration: 150
             }
         }
-
+        
         Text {
             id: buttonIcon
             color: "white"
             font.family: "Material Symbols Rounded"
             font.pixelSize: 24
             anchors.centerIn: parent
-            horizontalAlignment: Text.AlignHCenter // Ensure horizontal centering
+            horizontalAlignment: Text.AlignHCenter
             z: 3
         }
-
-        // Canvas Noise Ripple Effect (Android-Style)
+        
         Canvas {
             id: sparkleCanvas
             anchors.fill: parent
             z: 1
-
             property real rippleProgress: 0
             property point rippleCenter: Qt.point(0, 0)
             property var noisePattern: []
-
+            
             function triggerRipple(x, y) {
                 rippleCenter = Qt.point(x, y);
                 rippleProgress = 0;
-
-                // Partikelgenerierung entfernt
-
                 rippleAnimation.restart();
             }
-
+            
             onPaint: {
                 const ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
-
-                // --- Explicit Clipping for Rounded Corners ---
+                
                 ctx.save();
                 ctx.beginPath();
                 const r = button.radius;
@@ -282,29 +280,27 @@ ShellRoot {
                 ctx.arcTo(0, 0, r, 0, r);
                 ctx.closePath();
                 ctx.clip();
-                // --- End Clipping ---
-
+                
                 const maxRadius = Math.max(button.width, button.height) * 1.5;
                 const currentRadius = rippleProgress * maxRadius;
-
-                // Sanfter Background-Ripple
+                
                 const baseOpacity = (1 - rippleProgress) * 0.25;
                 if (baseOpacity > 0) {
-                    const gradient = ctx.createRadialGradient(rippleCenter.x, rippleCenter.y, currentRadius * 0.3, rippleCenter.x, rippleCenter.y, currentRadius);
+                    const gradient = ctx.createRadialGradient(
+                        rippleCenter.x, rippleCenter.y, currentRadius * 0.3,
+                        rippleCenter.x, rippleCenter.y, currentRadius
+                    );
                     gradient.addColorStop(0, `rgba(255, 255, 255, ${baseOpacity})`);
                     gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-
                     ctx.fillStyle = gradient;
                     ctx.beginPath();
                     ctx.arc(rippleCenter.x, rippleCenter.y, currentRadius, 0, Math.PI * 2);
                     ctx.fill();
                 }
-
-                // Noise/Sparkle Punkte entfernt
-
-                ctx.restore(); // Restore context to remove clip
+                
+                ctx.restore();
             }
-
+            
             NumberAnimation {
                 id: rippleAnimation
                 target: sparkleCanvas
@@ -313,7 +309,6 @@ ShellRoot {
                 to: 1.2
                 duration: 850
                 easing.type: Easing.OutCubic
-
                 onRunningChanged: {
                     if (running) {
                         sparkleTimer.start();
@@ -322,7 +317,7 @@ ShellRoot {
                     }
                 }
             }
-
+            
             Timer {
                 id: sparkleTimer
                 interval: 16
@@ -330,21 +325,23 @@ ShellRoot {
                 onTriggered: sparkleCanvas.requestPaint()
             }
         }
-
+        
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
-
+            propagateComposedEvents: true
             onEntered: {
                 parent.color = "#1A1A1A";
             }
-
             onExited: {
                 parent.color = "#000000";
             }
-
             onPressed: function (mouse) {
                 sparkleCanvas.triggerRipple(mouse.x, mouse.y);
+                mouse.accepted = true;
+            }
+            onPositionChanged: function(mouse) {
+                mouse.accepted = false;
             }
         }
     }
