@@ -150,8 +150,8 @@
 
         # The action `screenshot-screen` does not exist in the library.
         # It has been substituted with the generic `screenshot` action.
-        "Print".action = screenshot;
-        "Ctrl+Print".action = screenshot;
+        #"Print".action = screenshot;
+        #"Ctrl+Print".action = screenshot;
         #"Alt+Print".action = screenshot-window;
 
         "Mod+Shift+P".action = power-off-monitors;
