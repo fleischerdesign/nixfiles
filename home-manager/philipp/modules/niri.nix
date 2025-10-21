@@ -1,9 +1,19 @@
-{ config, lib, pkgs, hostname, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  hostname,
+  ...
+}:
 
 {
   config = lib.mkIf config.my.homeManager.modules.niri.enable {
-    home.packages = [ pkgs.adwaita-icon-theme pkgs.swww pkgs.brightnessctl ];
-    
+    home.packages = [
+      pkgs.adwaita-icon-theme
+      pkgs.swww
+      pkgs.brightnessctl
+    ];
+
     programs.niri.settings = with config.lib.niri.actions; {
       cursor = {
         theme = "Adwaita";
@@ -15,6 +25,7 @@
       window-rules = [
         {
           matches = [ ];
+          focus-ring.active.color = "#67ab68";
           geometry-corner-radius = {
             top-left = 10.0;
             top-right = 10.0;
@@ -27,15 +38,27 @@
 
       spawn-at-startup = [
         { argv = [ "swww-daemon" ]; }
-        { argv = [ "swww" "img" "/etc/nixos/media/wallpaper.jpg" ]; }
+        {
+          argv = [
+            "swww"
+            "img"
+            "/etc/nixos/media/wallpaper.jpg"
+          ];
+        }
       ];
 
       outputs = lib.mkIf (hostname == "jello") {
         "DP-1" = {
-          position = { x = 320; y = 0; };
+          position = {
+            x = 320;
+            y = 0;
+          };
         };
         "HDMI-A-2" = {
-          position = { x = 0; y = 1080; };
+          position = {
+            x = 0;
+            y = 1080;
+          };
           focus-at-startup = true;
         };
       };
@@ -54,9 +77,9 @@
         "XF86AudioLowerVolume".action = spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-";
         "XF86AudioMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle";
         "XF86AudioMicMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle";
-	
-	"XF86MonBrightnessUp".action = spawn-sh "qs ipc call brightness increaseBrightness 0.15";
-        	"XF86MonBrightnessDown".action = spawn-sh "qs ipc call brightness decreaseBrightness 0.15";
+
+        "XF86MonBrightnessUp".action = spawn-sh "qs ipc call brightness increaseBrightness 0.15";
+        "XF86MonBrightnessDown".action = spawn-sh "qs ipc call brightness decreaseBrightness 0.15";
         "Mod+Q".action = close-window;
 
         "Mod+Left".action = focus-column-left;
