@@ -2,25 +2,215 @@ import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Services.UPower
+import Quickshell.Io
+import Quickshell.Wayland
 
-PanelWindow {
-    id: bottomBarWindow
-
+ShellRoot {
     VolumeOSD {}
     BrightnessOSD {}
+        WlSessionLock {
+            id: sessionLocker
 
-    property bool isOpen: false
-    property int panelHeight: 10
-    implicitHeight: panelHeight
+            surface: WlSessionLockSurface {
 
-    anchors {
-        left: true
-        right: true
-        bottom: true
-    }
+                // NEU: Das ProxyWindow, wie von der Doku empfohlen
+                Window {
+                    // Eigenschaften, die ein Fenster braucht
+                    visible: true
+                    flags: Qt.Window | Qt.FramelessWindowHint
+                    width: parent.width
+                    height: parent.height
+                    // Darin laden wir unsere UI-Komponente
+                    Lockscreen {
+                        id: lockScreenComponent
+                    }
+                }
+            }
 
-    exclusiveZone: 0
-    color: "transparent"
+            // Die Verbindung lauscht auf das Signal der Lockscreen-Komponente
+            Connections {
+                target: lockScreenComponent
+                function onUnlocked() {
+                    sessionLocker.locked = false;
+                }
+            }
+        }
+        IpcHandler {
+            target: "lockscreen"
+            function lock(): void {
+                // Sagt dem WlSessionLock, dass er sperren soll
+                sessionLocker.locked = true;
+            }
+        }
+    
+
+    PanelWindow {
+        id: bottomBarWindow
+
+        property bool isOpen: false
+        implicitHeight: 65
+
+        anchors {
+            left: true
+            right: true
+            bottom: true
+        }
+
+        exclusiveZone: 0
+        color: "transparent"
+
+
+
+        Item {
+            id: clippingRect
+            anchors.fill: parent
+            clip: true
+
+            Item {
+                id: contentWrapper
+                height: 65
+                width: parent.width
+                opacity: bottomBarWindow.isOpen ? 1 : 0
+
+                y: bottomBarWindow.isOpen ? 0 : 55
+
+                Behavior on y {
+                    NumberAnimation {
+                        duration: 200
+                        easing.type: Easing.InOutQuad
+                    }
+                }
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 200
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+
+                    onEntered: {
+                        bottomBarWindow.isOpen = true;
+                    }
+                    onExited: {
+                        bottomBarWindow.isOpen = false;
+                    }
+                }
+
+                Rectangle {
+                    id: shadow
+                    anchors.fill: parent
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0.0
+                            color: "#00000000"
+                        }
+                        GradientStop {
+                            position: 1.0
+                            color: "#ff000000"
+                        }
+                    }
+                }
+
+                RowLayout {
+                    anchors {
+                        fill: parent
+                        leftMargin: 10
+                        rightMargin: 10
+                        bottomMargin: 10
+                    }
+                    spacing: 10
+
+                    RippleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        iconText: "home"
+                        fixedWidth: true
+                    }
+
+                    RippleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        iconText: "apps"
+                        fixedWidth: true
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                    }
+
+                    RippleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        iconSize: 12
+                        iconFamily: "Roboto"
+                        fixedWidth: true // Temporarily set to fixed width
+
+                        Component.onCompleted: {
+                            const now = new Date();
+                            const hours = String(now.getHours()).padStart(2, '0');
+                            const minutes = String(now.getMinutes()).padStart(2, '0');
+                            iconText = hours + "\n" + minutes; // Use \n for new line
+                        }
+
+                        Timer {
+                            interval: 1000
+                            running: true
+                            repeat: true
+                            onTriggered: {
+                                const now = new Date();
+                                const hours = String(now.getHours()).padStart(2, '0');
+                                const minutes = String(now.getMinutes()).padStart(2, '0');
+                                parent.iconText = hours + "\n" + minutes; // Use \n for new line
+                            }
+                        }
+                    }
+
+                    RippleButton {
+                        id: batteryButton
+                        Layout.alignment: Qt.AlignVCenter
+                        visible: UPower.displayDevice && UPower.displayDevice.type === 2
+                        iconFamily: "Material Symbols Outlined"
+                        iconSize: 20
+                        fixedWidth: true
+
+                        iconText: {
+                            if (!UPower.displayDevice || !UPower.displayDevice.ready) {
+                                return "battery_unknown";
+                            }
+
+                            const percent = Math.round(UPower.displayDevice.percentage * 100);
+
+                            const charging = UPower.displayDevice.state === 1;
+
+                            if (charging)
+                                return "battery_android_bolt";
+                            if (percent > 87)
+                                return "battery_android_full";
+                            if (percent > 75)
+                                return "battery_android_6";
+                            if (percent > 62)
+                                return "battery_android_5";
+                            if (percent > 50)
+                                return "battery_android_4";
+                            if (percent > 37)
+                                return "battery_android_3";
+                            if (percent > 25)
+                                return "battery_android_2";
+                            if (percent > 12.5)
+                                return "battery_android_1";
+                            return "battery_android_0";
+                        }
+                    }
+
+                    RippleButton {
+                        Layout.alignment: Qt.AlignVCenter
+                        iconText: "clarify"
+                        fixedWidth: true
+                    }
+                }
+            }
+        }
+      }
+    
 
     // Reusable Button Component with Android-Style Noise Ripple
     component RippleButton: Rectangle {
@@ -155,184 +345,6 @@ PanelWindow {
 
             onPressed: function (mouse) {
                 sparkleCanvas.triggerRipple(mouse.x, mouse.y);
-            }
-        }
-    }
-
-    Item {
-        id: clippingRect
-        anchors.fill: parent
-
-        MouseArea {
-            id: edgeTrigger
-            anchors {
-                left: parent.left
-                right: parent.right
-                bottom: parent.bottom
-            }
-            height: 10
-            hoverEnabled: true
-            z: 0
-
-            onEntered: {
-                bottomBarWindow.panelHeight = 65;
-                isOpen = true;
-            }
-            onExited: {
-                if (!contentWrapper.barHovered) {
-                    isOpen = false;
-                }
-            }
-        }
-
-        Rectangle {
-            id: clipRect
-            anchors.fill: parent
-            clip: true
-            color: "transparent"
-            z: 1
-
-            Item {
-                id: contentWrapper
-                height: 65
-                width: parent.width
-
-                property bool barHovered: false
-
-                y: isOpen ? 0 : height
-
-                Behavior on y {
-                    NumberAnimation {
-                        id: slideAnimation
-                        duration: 200
-                        easing.type: Easing.InOutQuad
-                        onRunningChanged: {
-                            if (!running && !isOpen) {
-                                bottomBarWindow.panelHeight = 10;
-                            }
-                        }
-                    }
-                }
-
-                HoverHandler {
-                    id: barHoverHandler
-                    onHoveredChanged: {
-                        contentWrapper.barHovered = hovered;
-                        if (!hovered) {
-                            isOpen = false;
-                        }
-                    }
-                }
-
-                Rectangle {
-                    id: shadow
-                    anchors.fill: parent
-                    gradient: Gradient {
-                        GradientStop {
-                            position: 0.0
-                            color: "#00000000"
-                        }
-                        GradientStop {
-                            position: 1.0
-                            color: "#ff000000"
-                        }
-                    }
-                }
-
-                RowLayout {
-                    anchors {
-                        fill: parent
-                        leftMargin: 10
-                        rightMargin: 10
-                        bottomMargin: 10
-                    }
-                    spacing: 10
-
-                    RippleButton {
-                        Layout.alignment: Qt.AlignVCenter
-                        iconText: "home"
-                        fixedWidth: true
-                    }
-
-                    RippleButton {
-                        Layout.alignment: Qt.AlignVCenter
-                        iconText: "apps"
-                        fixedWidth: true
-                    }
-
-                    Item {
-                        Layout.fillWidth: true
-                    }
-
-                    RippleButton {
-                        Layout.alignment: Qt.AlignVCenter
-                        iconSize: 12
-                        iconFamily: "Roboto"
-                        fixedWidth: true // Temporarily set to fixed width
-
-                        Component.onCompleted: {
-                            const now = new Date();
-                            const hours = String(now.getHours()).padStart(2, '0');
-                            const minutes = String(now.getMinutes()).padStart(2, '0');
-                            iconText = hours + "\n" + minutes; // Use \n for new line
-                        }
-
-                        Timer {
-                            interval: 1000
-                            running: true
-                            repeat: true
-                            onTriggered: {
-                                const now = new Date();
-                                const hours = String(now.getHours()).padStart(2, '0');
-                                const minutes = String(now.getMinutes()).padStart(2, '0');
-                                parent.iconText = hours + "\n" + minutes; // Use \n for new line
-                            }
-                        }
-                    }
-
-                    RippleButton {
-                        id: batteryButton
-                        Layout.alignment: Qt.AlignVCenter
-                        visible: UPower.displayDevice && UPower.displayDevice.type === 2
-                        iconFamily: "Material Symbols Outlined"
-                        iconSize: 20
-                        fixedWidth: true
-
-                        iconText: {
-                            if (!UPower.displayDevice || !UPower.displayDevice.ready) {
-                                return "battery_unknown";
-                            }
-
-                            const percent = Math.round(UPower.displayDevice.percentage * 100);
-
-                            const charging = UPower.displayDevice.state === 1;
-
-                            if (charging)
-                                return "battery_android_bolt";
-                            if (percent > 87)
-                                return "battery_android_full";
-                            if (percent > 75)
-                                return "battery_android_6";
-                            if (percent > 62)
-                                return "battery_android_5";
-                            if (percent > 50)
-                                return "battery_android_4";
-                            if (percent > 37)
-                                return "battery_android_3";
-                            if (percent > 25)
-                                return "battery_android_2";
-                            if (percent > 12.5)
-                                return "battery_android_1";
-                            return "battery_android_0";
-                        }
-                    }
-
-                    RippleButton {
-                        Layout.alignment: Qt.AlignVCenter
-                        iconText: "clarify"
-                        fixedWidth: true
-                    }
-                }
             }
         }
     }
