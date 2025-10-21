@@ -55,9 +55,8 @@
         "XF86AudioMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle";
         "XF86AudioMicMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle";
 	
-	"XF86MonBrightnessUp".action = spawn-sh "brightnessctl set +15%";
-        "XF86MonBrightnessDown".action = spawn-sh "brightnessctl set 15%-";
-
+	"XF86MonBrightnessUp".action = spawn-sh "qs ipc call brightness increaseBrightness 0.15";
+        	"XF86MonBrightnessDown".action = spawn-sh "qs ipc call brightness decreaseBrightness 0.15";
         "Mod+Q".action = close-window;
 
         "Mod+Left".action = focus-column-left;

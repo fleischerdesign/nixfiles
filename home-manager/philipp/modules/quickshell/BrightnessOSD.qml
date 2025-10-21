@@ -7,76 +7,82 @@ Scope {
 
     property real currentBrightness: 0.0
     property int maxBrightness: 1
-    property bool errorLogged: false
+
+
+    IpcHandler {
+        id: brightness
+        target: "brightness"
+
+        function setBrightness(value: real): void {
+            let brightnessValue = Math.round(value * 100);
+            setBrightnessProcess.command = ["brightnessctl", "set", brightnessValue + "%"];
+            setBrightnessProcess.running = true;
+            root.currentBrightness = value;
+            osd.shouldShow = true;
+            hideTimer.restart();
+        }
+
+        function getBrightness(): real {
+            getBrightnessProcess.running = true;
+            return root.currentBrightness;
+        }
+
+        function increaseBrightness(step: real): void {
+            let newBrightness = root.currentBrightness + step;
+            if (newBrightness > 1.0) {
+                newBrightness = 1.0;
+            }
+            setBrightness(newBrightness);
+        }
+
+        function decreaseBrightness(step: real): void {
+            let newBrightness = root.currentBrightness - step;
+            if (newBrightness < 0.0) {
+                newBrightness = 0.0;
+            }
+            setBrightness(newBrightness);
+        }
+    }
 
     Process {
-        id: maxBrightnessReader
-        command: ["brightnessctl", "max"]
+        id: setBrightnessProcess
+        onExited: (exitCode) => {
+            if (exitCode !== 0) {
+                console.error(`Error setting brightness: brightnessctl exited with code ${exitCode}`);
+            }
+        }
+    }
 
+    Process {
+        id: getBrightnessProcess
+        command: ["brightnessctl", "get"]
         stdout: StdioCollector {
             onStreamFinished: {
                 let output = this.text.trim();
                 if (output) {
-                    let maxValue = parseInt(output, 10);
-                    if (maxValue > 0) {
-                        root.maxBrightness = maxValue;
-                    }
-                    console.log("Max brightness set to:", root.maxBrightness);
-                    
-                    currentBrightnessReader.running = true;
-                    pollTimer.running = true;
-                } else {
-                     console.error("Error on 'brightnessctl max': No output");
+                    let currentValue = parseInt(output, 10);
+                    // We need max brightness to calculate percentage
+                    const onMaxBrightnessExited = (exitCode) => {
+                        if (exitCode === 0 && getMaxBrightnessProcess.stdout.text.trim()) {
+                            const maxValue = parseInt(getMaxBrightnessProcess.stdout.text.trim(), 10);
+                            if (maxValue > 0) {
+                                root.maxBrightness = maxValue;
+                                root.currentBrightness = currentValue / root.maxBrightness;
+                            }
+                        }
+                        getMaxBrightnessProcess.exited.disconnect(onMaxBrightnessExited);
+                    };
+                    getMaxBrightnessProcess.exited.connect(onMaxBrightnessExited);
+                    getMaxBrightnessProcess.running = true;
                 }
-            }
-        }
-
-        onExited: (exitCode) => {
-            if (exitCode !== 0) {
-                console.error(`Error: 'brightnessctl max' exited with code: ${exitCode}`);
             }
         }
     }
 
     Process {
-        id: currentBrightnessReader
-        command: ["brightnessctl", "get"]
-
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (root.maxBrightness > 0) {
-                    let output = this.text.trim();
-                    if (output) {
-                        let currentValue = parseInt(output, 10);
-                        root.currentBrightness = currentValue / root.maxBrightness;
-                    }
-                }
-            }
-        }
-    }
-
-    Timer {
-        id: pollTimer
-        interval: 50
-        repeat: true
-        running: false
-        property real lastBrightness: -1.0
-        onTriggered: {
-            currentBrightnessReader.running = true;
-        }
-    }
-
-    onCurrentBrightnessChanged: {
-        if (pollTimer.lastBrightness < 0.0) {
-            pollTimer.lastBrightness = currentBrightness;
-            return;
-        }
-        if (Math.abs(currentBrightness - pollTimer.lastBrightness) > 0.01) {
-            console.log("Brightness change detected:", currentBrightness);
-            osd.shouldShow = true;
-            hideTimer.restart();
-            pollTimer.lastBrightness = currentBrightness;
-        }
+        id: getMaxBrightnessProcess
+        command: ["brightnessctl", "max"]
+        stdout: StdioCollector {}
     }
 
     Timer {
@@ -96,6 +102,6 @@ Scope {
     }
 
     Component.onCompleted: {
-        maxBrightnessReader.running = true;
+        brightness.getBrightness();
     }
 }
