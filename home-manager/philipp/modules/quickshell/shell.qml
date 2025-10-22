@@ -15,18 +15,41 @@ ShellRoot {
 	top: true
       } 
       margins.bottom: 65 + 10
-      margins.right: 10
+      margins.right: StateManager.notificationCenterOpened ? 10 : -implicitWidth+1
       margins.top: 10
       exclusiveZone: 0
       color: "transparent"
       implicitWidth: 400
-      visible: false
+      visible: true
 
       Rectangle {
 	anchors.fill: parent
 	radius: 15
 	color: "#000"
+	opacity: StateManager.notificationCenterOpened ? 1.0 : 0.0
+            Behavior on opacity {
+
+                NumberAnimation {
+
+                    duration: 200
+
+                    easing.type: Easing.InOutQuad
+
+                }
+
+            }
       }
+            Behavior on margins.right {
+
+                NumberAnimation {
+
+                    duration: 200
+
+                    easing.type: Easing.InOutQuad
+
+                }
+
+            }
     }
 
     WlSessionLock {

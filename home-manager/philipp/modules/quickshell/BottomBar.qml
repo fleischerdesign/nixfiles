@@ -58,7 +58,7 @@ PanelWindow {
             HoverHandler {
                 id: barHover
                 onHoveredChanged: {
-                    if (!hovered) {
+                    if (!hovered && !StateManager.notificationCenterOpened) {
                         bottomBarWindow.isOpen = false;
                     }
                 }
@@ -197,7 +197,11 @@ PanelWindow {
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 24
                         anchors.centerIn: parent
-                    }
+		      }
+
+		      onClicked: {
+			StateManager.notificationCenterOpened =  !StateManager.notificationCenterOpened
+		      }
                 }
             }
         }

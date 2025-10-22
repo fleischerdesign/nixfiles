@@ -7,6 +7,7 @@ Rectangle {
     height: 55
     radius: 15
     color: "#000000"
+    signal clicked()
     property bool fixedWidth: false
     default property alias content: contentItem.data
     clip: true
@@ -118,7 +119,10 @@ Rectangle {
         onPressed: function (mouse) {
             sparkleCanvas.triggerRipple(mouse.x, mouse.y);
             mouse.accepted = true;
-        }
+	}
+	onClicked: {
+	  button.clicked();
+	}
         onPositionChanged: function(mouse) {
             mouse.accepted = false;
         }
