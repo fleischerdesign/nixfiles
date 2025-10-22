@@ -21,7 +21,15 @@ PanelWindow {
     height: popup.height
     color: "transparent"
     exclusiveZone: 0
-    
+
+    Timer {
+        id: autoHideTimer
+        interval: 5000
+        repeat: false
+        running: notification && !notification.resident
+        onTriggered: popupWindow.startDismiss()
+    }
+
     Behavior on margins.top {
         NumberAnimation {
             duration: 200
