@@ -6,18 +6,20 @@ Rectangle {
     width: fixedWidth ? 55 : Math.max(55, contentItem.implicitWidth + 40)
     height: 55
     radius: 15
-    color: "#000000"
-    signal clicked()
+    color: M3ColorPalette.m3SurfaceContainer
+    property color onColor: "#E1E4D9"
+
+    signal clicked
     property bool fixedWidth: false
     default property alias content: contentItem.data
     clip: true
-    
+
     Behavior on color {
         ColorAnimation {
             duration: 150
         }
     }
-    
+
     Item {
         id: contentItem
         implicitWidth: childrenRect.width
@@ -25,7 +27,16 @@ Rectangle {
         anchors.centerIn: parent
         z: 3
     }
-    
+    HoverHandler {
+        id: hoverHandler
+    }
+
+    // NEU: 2. Die M3 State Layer Komponente
+    M3StateLayer {
+        z: 1 // Muss über dem Button-Hintergrund (z: 0), aber unter dem Text liegen
+        stateColor: M3ColorPalette.m3OnSurface // Übergibt die On-Color des Buttons
+        isHovered: hoverHandler.hovered // Übergibt den Hover-Status
+    }
     Canvas {
         id: sparkleCanvas
         anchors.fill: parent
@@ -33,17 +44,17 @@ Rectangle {
         property real rippleProgress: 0
         property point rippleCenter: Qt.point(0, 0)
         property var noisePattern: []
-        
+
         function triggerRipple(x, y) {
             rippleCenter = Qt.point(x, y);
             rippleProgress = 0;
             rippleAnimation.restart();
         }
-        
+
         onPaint: {
             const ctx = getContext("2d");
             ctx.clearRect(0, 0, width, height);
-            
+
             ctx.save();
             ctx.beginPath();
             const r = button.radius;
@@ -60,27 +71,27 @@ Rectangle {
             ctx.arcTo(0, 0, r, 0, r);
             ctx.closePath();
             ctx.clip();
-            
-            const maxRadius = Math.max(button.width, button.height) * 1.5;
+
+            const maxRadius = Math.max(button.width, button.height) * 2.5;
             const currentRadius = rippleProgress * maxRadius;
-            
+
             const baseOpacity = (1 - rippleProgress) * 0.25;
             if (baseOpacity > 0) {
-                const gradient = ctx.createRadialGradient(
-                    rippleCenter.x, rippleCenter.y, currentRadius * 0.3,
-                    rippleCenter.x, rippleCenter.y, currentRadius
-                );
-                gradient.addColorStop(0, `rgba(255, 255, 255, ${baseOpacity})`);
-                gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+                const gradient = ctx.createRadialGradient(rippleCenter.x, rippleCenter.y, currentRadius * 0.3, rippleCenter.x, rippleCenter.y, currentRadius);
+		const rippleStartColor = Qt.rgba(button.onColor.r, button.onColor.g, button.onColor.b, baseOpacity);
+		console.log(rippleStartColor)
+
+                gradient.addColorStop(0, rippleStartColor.toString(Qt.RGBA)); // Nutzt die dynamische On-Color
+                gradient.addColorStop(1, "rgba(0, 0, 0, 0)"); // Fade nach transparent
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
                 ctx.arc(rippleCenter.x, rippleCenter.y, currentRadius, 0, Math.PI * 2);
                 ctx.fill();
             }
-            
+
             ctx.restore();
         }
-        
+
         NumberAnimation {
             id: rippleAnimation
             target: sparkleCanvas
@@ -97,7 +108,7 @@ Rectangle {
                 }
             }
         }
-        
+
         Timer {
             id: sparkleTimer
             interval: 16
@@ -105,25 +116,19 @@ Rectangle {
             onTriggered: sparkleCanvas.requestPaint()
         }
     }
-    
+
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
         propagateComposedEvents: true
-        onEntered: {
-            parent.color = "#1A1A1A";
-        }
-        onExited: {
-            parent.color = "#000000";
-        }
         onPressed: function (mouse) {
             sparkleCanvas.triggerRipple(mouse.x, mouse.y);
             mouse.accepted = true;
-	}
-	onClicked: {
-	  button.clicked();
-	}
-        onPositionChanged: function(mouse) {
+        }
+        onClicked: {
+            button.clicked();
+        }
+        onPositionChanged: function (mouse) {
             mouse.accepted = false;
         }
     }

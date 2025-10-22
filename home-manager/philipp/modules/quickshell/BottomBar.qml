@@ -103,7 +103,7 @@ PanelWindow {
                     fixedWidth: true
                     Text {
                         text: "apps"
-                        color: "white"
+                        color: M3ColorPalette.m3OnSurface
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 24
                         anchors.centerIn: parent
@@ -120,7 +120,7 @@ PanelWindow {
                     
                     Text {
                         id: clockText
-                        color: "white"
+                        color: M3ColorPalette.m3OnSurface
                         font.pixelSize: 12
                         font.family: "Roboto"
                         anchors.fill: parent
@@ -156,7 +156,7 @@ PanelWindow {
                     
                     Text {
                         id: batteryText
-                        color: "white"
+                        color: M3ColorPalette.m3OnSurface
                         font.family: "Material Symbols Outlined"
                         font.pixelSize: 20
                         anchors.centerIn: parent
@@ -193,7 +193,7 @@ PanelWindow {
                     fixedWidth: true
                     Text {
                         text: "clarify"
-                        color: "white"
+                        color: M3ColorPalette.m3OnSurface
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 24
                         anchors.centerIn: parent

@@ -25,7 +25,7 @@
       window-rules = [
         {
           matches = [ ];
-          focus-ring.active.color = "#67ab68";
+          focus-ring.active.color = "#364A2B";
           geometry-corner-radius = {
             top-left = 10.0;
             top-right = 10.0;

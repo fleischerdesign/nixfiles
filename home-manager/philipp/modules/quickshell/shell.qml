@@ -27,7 +27,7 @@ ShellRoot {
     Rectangle {
         anchors.fill: parent
         radius: 15
-        color: "#000"
+        color: M3ColorPalette.m3SurfaceContainer
         opacity: StateManager.notificationCenterOpened ? 1.0 : 0.0
         
         Behavior on opacity {
@@ -60,10 +60,12 @@ ShellRoot {
                     Layout.preferredWidth: 40
                     Layout.preferredHeight: 40
                     fixedWidth: true
+		    color: M3ColorPalette.m3Primary
+		    onColor: M3ColorPalette.m3OnPrimary
                     
                     Text {
                         text: "delete_sweep"
-                        color: "white"
+                        color: M3ColorPalette.m3OnPrimary
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 20
                         anchors.centerIn: parent
