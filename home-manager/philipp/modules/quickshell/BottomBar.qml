@@ -123,8 +123,9 @@ PanelWindow {
                         color: "white"
                         font.pixelSize: 12
                         font.family: "Roboto"
-                        anchors.centerIn: parent
-                        horizontalAlignment: Text.AlignHCenter
+                        anchors.fill: parent
+			horizontalAlignment: Text.AlignHCenter
+			verticalAlignment: Text.AlignVCenter
                         
                         Component.onCompleted: {
                             const now = new Date();
