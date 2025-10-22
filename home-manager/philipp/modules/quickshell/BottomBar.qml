@@ -100,14 +100,14 @@ PanelWindow {
                 
                 RippleButton {
                     Layout.alignment: Qt.AlignVCenter
-                    iconText: "home"
                     fixedWidth: true
-                }
-                
-                RippleButton {
-                    Layout.alignment: Qt.AlignVCenter
-                    iconText: "apps"
-                    fixedWidth: true
+                    Text {
+                        text: "apps"
+                        color: "white"
+                        font.family: "Material Symbols Rounded"
+                        font.pixelSize: 24
+                        anchors.centerIn: parent
+                    }
                 }
                 
                 Item {
@@ -116,26 +116,33 @@ PanelWindow {
                 
                 RippleButton {
                     Layout.alignment: Qt.AlignVCenter
-                    iconSize: 12
-                    iconFamily: "Roboto"
                     fixedWidth: true
                     
-                    Component.onCompleted: {
-                        const now = new Date();
-                        const hours = String(now.getHours()).padStart(2, '0');
-                        const minutes = String(now.getMinutes()).padStart(2, '0');
-                        iconText = hours + "\n" + minutes;
-                    }
-                    
-                    Timer {
-                        interval: 1000
-                        running: true
-                        repeat: true
-                        onTriggered: {
+                    Text {
+                        id: clockText
+                        color: "white"
+                        font.pixelSize: 12
+                        font.family: "Roboto"
+                        anchors.centerIn: parent
+                        horizontalAlignment: Text.AlignHCenter
+                        
+                        Component.onCompleted: {
                             const now = new Date();
                             const hours = String(now.getHours()).padStart(2, '0');
                             const minutes = String(now.getMinutes()).padStart(2, '0');
-                            parent.iconText = hours + "\n" + minutes;
+                            clockText.text = hours + "\n" + minutes;
+                        }
+                        
+                        Timer {
+                            interval: 1000
+                            running: true
+                            repeat: true
+                            onTriggered: {
+                                const now = new Date();
+                                const hours = String(now.getHours()).padStart(2, '0');
+                                const minutes = String(now.getMinutes()).padStart(2, '0');
+                                clockText.text = hours + "\n" + minutes;
+                            }
                         }
                     }
                 }
@@ -144,39 +151,52 @@ PanelWindow {
                     id: batteryButton
                     Layout.alignment: Qt.AlignVCenter
                     visible: UPower.displayDevice && UPower.displayDevice.type === 2
-                    iconFamily: "Material Symbols Outlined"
-                    iconSize: 20
                     fixedWidth: true
-                    iconText: {
-                        if (!UPower.displayDevice || !UPower.displayDevice.ready) {
-                            return "battery_unknown";
+                    
+                    Text {
+                        id: batteryText
+                        color: "white"
+                        font.family: "Material Symbols Outlined"
+                        font.pixelSize: 20
+                        anchors.centerIn: parent
+                        
+                        text: {
+                            if (!UPower.displayDevice || !UPower.displayDevice.ready) {
+                                return "battery_unknown";
+                            }
+                            const percent = Math.round(UPower.displayDevice.percentage * 100);
+                            const charging = UPower.displayDevice.state === 1;
+                            if (charging)
+                                return "battery_android_bolt";
+                            if (percent > 87)
+                                return "battery_android_full";
+                            if (percent > 75)
+                                return "battery_android_6";
+                            if (percent > 62)
+                                return "battery_android_5";
+                            if (percent > 50)
+                                return "battery_android_4";
+                            if (percent > 37)
+                                return "battery_android_3";
+                            if (percent > 25)
+                                return "battery_android_2";
+                            if (percent > 12.5)
+                                return "battery_android_1";
+                            return "battery_android_0";
                         }
-                        const percent = Math.round(UPower.displayDevice.percentage * 100);
-                        const charging = UPower.displayDevice.state === 1;
-                        if (charging)
-                            return "battery_android_bolt";
-                        if (percent > 87)
-                            return "battery_android_full";
-                        if (percent > 75)
-                            return "battery_android_6";
-                        if (percent > 62)
-                            return "battery_android_5";
-                        if (percent > 50)
-                            return "battery_android_4";
-                        if (percent > 37)
-                            return "battery_android_3";
-                        if (percent > 25)
-                            return "battery_android_2";
-                        if (percent > 12.5)
-                            return "battery_android_1";
-                        return "battery_android_0";
                     }
                 }
                 
                 RippleButton {
                     Layout.alignment: Qt.AlignVCenter
-                    iconText: "clarify"
                     fixedWidth: true
+                    Text {
+                        text: "clarify"
+                        color: "white"
+                        font.family: "Material Symbols Rounded"
+                        font.pixelSize: 24
+                        anchors.centerIn: parent
+                    }
                 }
             }
         }

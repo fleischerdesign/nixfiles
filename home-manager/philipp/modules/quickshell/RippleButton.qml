@@ -7,10 +7,8 @@ Rectangle {
     height: 55
     radius: 15
     color: "#000000"
-    property alias iconText: buttonIcon.text
-    property alias iconFamily: buttonIcon.font.family
-    property alias iconSize: buttonIcon.font.pixelSize
     property bool fixedWidth: false
+    default property alias content: contentItem.data
     clip: true
     
     Behavior on color {
@@ -19,13 +17,9 @@ Rectangle {
         }
     }
     
-    Text {
-        id: buttonIcon
-        color: "white"
-        font.family: "Material Symbols Rounded"
-        font.pixelSize: 24
+    Item {
+        id: contentItem
         anchors.centerIn: parent
-        horizontalAlignment: Text.AlignHCenter
         z: 3
     }
     
