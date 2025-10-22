@@ -84,7 +84,7 @@ PanelWindow {
                     }
                     GradientStop {
                         position: 1.0
-                        color: "#ff000000"
+                        color: "#99000000"
                     }
                 }
             }
