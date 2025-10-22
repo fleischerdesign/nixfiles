@@ -3,7 +3,7 @@ import QtQuick
 // Reusable Button Component with Android-Style Ripple
 Rectangle {
     id: button
-    width: fixedWidth ? 55 : Math.max(55, buttonIcon.implicitWidth + 40)
+    width: fixedWidth ? 55 : Math.max(55, contentItem.implicitWidth + 40)
     height: 55
     radius: 15
     color: "#000000"
@@ -19,6 +19,8 @@ Rectangle {
     
     Item {
         id: contentItem
+        implicitWidth: childrenRect.width
+        implicitHeight: childrenRect.height
         anchors.centerIn: parent
         z: 3
     }
