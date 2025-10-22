@@ -42,8 +42,7 @@ ShellRoot {
         property bool isOpen: false
         
         // Dynamische Höhe: klein wenn geschlossen, groß wenn offen
-        implicitHeight: isOpen ? 65 : 10
-        
+       implicitHeight: isOpen ? 65 : (contentWrapper.y >= 55 ? 10 : 65) 
         anchors {
             left: true
             right: true
