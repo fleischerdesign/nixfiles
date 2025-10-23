@@ -31,11 +31,10 @@ Rectangle {
         id: hoverHandler
     }
 
-    // NEU: 2. Die M3 State Layer Komponente
     M3StateLayer {
-        z: 1 // Muss über dem Button-Hintergrund (z: 0), aber unter dem Text liegen
-        stateColor: M3ColorPalette.m3OnSurface // Übergibt die On-Color des Buttons
-        isHovered: hoverHandler.hovered // Übergibt den Hover-Status
+        z: 1
+        stateColor: M3ColorPalette.m3OnSurface
+        isHovered: hoverHandler.hovered
     }
     Canvas {
         id: sparkleCanvas

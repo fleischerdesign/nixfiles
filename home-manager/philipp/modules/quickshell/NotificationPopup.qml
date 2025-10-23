@@ -5,31 +5,30 @@ Rectangle {
     id: root
     width: 400
     height: contentColumn.height + 30
-    radius: 15
-    color: M3ColorPalette.m3SurfaceContainer
-    
+    radius: 15 
+    clip: true 
     property var notification
-    signal dismissRequested()
-
-    // Urgency Indicator
-    Rectangle {
-        anchors {
-            left: parent.left
-            top: parent.top
-            bottom: parent.bottom
-        }
-        width: 4
-        radius: 2
-        color: {
-            if (!root.notification) return "#FFB84A";
-            switch (root.notification.urgency) {
-                case 0: return M3ColorPalette.m3Tertiary; // Low - Blue
-                case 1: return M3ColorPalette.m3Primary; // Normal - Orange
-                case 2: return M3ColorPalette.m3Error; // Critical - Red
-                default: return "#FFB84A";
-            }
+    color: {
+        if (!root.notification) return "#FFB84A";
+        switch (root.notification.urgency) {
+            case 0: return M3ColorPalette.m3SurfaceContainer;
+            case 1: return M3ColorPalette.m3SurfaceContainer;
+            case 2: return M3ColorPalette.m3Error;
+            default: return M3ColorPalette.m3SurfaceContainer;
         }
     }
+    
+    property color onSurfaceColor: {
+        if (!root.notification) return M3ColorPalette.m3OnSurfaceContainer;
+        switch (root.notification.urgency) {
+            case 0: return M3ColorPalette.m3OnSurface;
+            case 1: return M3ColorPalette.m3OnSurface;
+            case 2: return M3ColorPalette.m3OnError;
+            default: return M3ColorPalette.m3OnSurface;
+        }
+    }
+
+    signal dismissRequested()
 
     ColumnLayout {
         id: contentColumn
@@ -51,7 +50,7 @@ Rectangle {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 radius: 8
-                color: M3ColorPalette.m3OnSurface
+                color: onSurfaceColor
                 visible: root.notification && root.notification.appIcon !== ""
                 
                 Image {
@@ -65,7 +64,7 @@ Rectangle {
             // App Name
             Text {
                 text: root.notification ? root.notification.appName : ""
-                color: M3ColorPalette.m3OnSurface
+                color: onSurfaceColor
                 font.pixelSize: 12
                 Layout.fillWidth: true
             }
@@ -74,12 +73,15 @@ Rectangle {
             Rectangle {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
-                radius: 12
-                color: closeHover.hovered ? M3ColorPalette.m3Primary : "transparent"
-                
+		radius: 12
+		color: "transparent"
+                M3StateLayer {
+		  stateColor: onSurfaceColor
+		  isHovered: closeHover.hovered
+		} 
                 Text {
                     text: "close"
-                    color: M3ColorPalette.m3OnPrimary
+		    color: onSurfaceColor
                     font.family: "Material Symbols Rounded"
                     font.pixelSize: 18
                     anchors.centerIn: parent
@@ -99,7 +101,7 @@ Rectangle {
         // Summary (Title)
         Text {
             text: root.notification ? root.notification.summary : ""
-            color: "white"
+            color: onSurfaceColor
             font.pixelSize: 16
             font.weight: Font.Bold
             Layout.fillWidth: true
@@ -110,7 +112,7 @@ Rectangle {
         // Body
         Text {
             text: root.notification ? root.notification.body : ""
-            color: M3ColorPalette.m3OnSurface
+            color: onSurfaceColor
             font.pixelSize: 14
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
@@ -125,7 +127,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 150
             radius: 8
-            color: "#2A2A2A"
+            color: onSurfaceColor
             visible: root.notification && root.notification.image !== ""
             clip: true
             
