@@ -81,4 +81,13 @@ PanelWindow {
             popupWindow.startDismiss();
         }
     }
+
+    Connections {
+        target: StateManager
+        function onNotificationCenterOpenedChanged() {
+            if (StateManager.notificationCenterOpened) {
+                popupWindow.startDismiss();
+            }
+        }
+    }
 }
