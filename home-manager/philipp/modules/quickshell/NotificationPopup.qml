@@ -4,9 +4,9 @@ import QtQuick.Layouts
 Rectangle {
     id: root
     width: 400
-    height: contentColumn.height + 20
+    height: contentColumn.height + 30
     radius: 15
-    color: "#1A1A1A"
+    color: M3ColorPalette.m3SurfaceContainer
     
     property var notification
     signal dismissRequested()
@@ -16,7 +16,7 @@ Rectangle {
         anchors {
             left: parent.left
             right: parent.right
-            top: parent.top
+	    top: parent.top
             margins: 15
         }
         spacing: 10
@@ -31,7 +31,7 @@ Rectangle {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 radius: 8
-                color: "#2A2A2A"
+                color: M3ColorPalette.m3OnSurface
                 visible: root.notification && root.notification.appIcon !== ""
                 
                 Image {
@@ -45,7 +45,7 @@ Rectangle {
             // App Name
             Text {
                 text: root.notification ? root.notification.appName : ""
-                color: "#AAA"
+                color: M3ColorPalette.m3OnSurface
                 font.pixelSize: 12
                 Layout.fillWidth: true
             }
@@ -55,11 +55,11 @@ Rectangle {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
                 radius: 12
-                color: closeHover.hovered ? "#3A3A3A" : "transparent"
+                color: closeHover.hovered ? M3ColorPalette.m3Primary : "transparent"
                 
                 Text {
                     text: "close"
-                    color: "white"
+                    color: M3ColorPalette.m3OnPrimary
                     font.family: "Material Symbols Rounded"
                     font.pixelSize: 18
                     anchors.centerIn: parent
@@ -90,7 +90,7 @@ Rectangle {
         // Body
         Text {
             text: root.notification ? root.notification.body : ""
-            color: "#CCC"
+            color: M3ColorPalette.m3OnSurface
             font.pixelSize: 14
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
@@ -171,9 +171,9 @@ Rectangle {
         color: {
             if (!root.notification) return "#FFB84A";
             switch (root.notification.urgency) {
-                case 0: return "#4A9EFF"; // Low - Blue
-                case 1: return "#FFB84A"; // Normal - Orange
-                case 2: return "#FF4A4A"; // Critical - Red
+                case 0: return M3ColorPalette.m3Tertiary; // Low - Blue
+                case 1: return M3ColorPalette.m3Primary; // Normal - Orange
+                case 2: return M3ColorPalette.m3Error; // Critical - Red
                 default: return "#FFB84A";
             }
         }
