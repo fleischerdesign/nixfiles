@@ -92,9 +92,10 @@ ShellRoot {
                 clip: true
                 model: StateManager.notificationServer.trackedNotifications
                 
-                delegate: NotificationItem {
+                delegate: NotificationPopup {
                     width: notificationList.width
                     notification: modelData
+                    onDismissRequested: modelData.dismiss()
                 }
                 
                 Text {
