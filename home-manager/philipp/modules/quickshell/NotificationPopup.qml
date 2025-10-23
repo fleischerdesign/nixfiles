@@ -10,7 +10,27 @@ Rectangle {
     
     property var notification
     signal dismissRequested()
-    
+
+    // Urgency Indicator
+    Rectangle {
+        anchors {
+            left: parent.left
+            top: parent.top
+            bottom: parent.bottom
+        }
+        width: 4
+        radius: 2
+        color: {
+            if (!root.notification) return "#FFB84A";
+            switch (root.notification.urgency) {
+                case 0: return M3ColorPalette.m3Tertiary; // Low - Blue
+                case 1: return M3ColorPalette.m3Primary; // Normal - Orange
+                case 2: return M3ColorPalette.m3Error; // Critical - Red
+                default: return "#FFB84A";
+            }
+        }
+    }
+
     ColumnLayout {
         id: contentColumn
         anchors {
@@ -158,24 +178,4 @@ Rectangle {
             }
         }
     }
-    
-    // Urgency Indicator
-    Rectangle {
-        anchors {
-            left: parent.left
-            top: parent.top
-            bottom: parent.bottom
-        }
-        width: 4
-        radius: 2
-        color: {
-            if (!root.notification) return "#FFB84A";
-            switch (root.notification.urgency) {
-                case 0: return M3ColorPalette.m3Tertiary; // Low - Blue
-                case 1: return M3ColorPalette.m3Primary; // Normal - Orange
-                case 2: return M3ColorPalette.m3Error; // Critical - Red
-                default: return "#FFB84A";
-            }
-        }
-    }
-}
+  } 
