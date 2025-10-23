@@ -2,7 +2,8 @@ import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Services.UPower
-import Quickshell.Io
+import qs.core
+import qs.components
 
 PanelWindow {
     id: bottomBarWindow

@@ -2,7 +2,8 @@ import Quickshell
 import QtQuick
 import Quickshell.Io
 import Quickshell.Wayland
-import QtQuick.Layouts
+import qs.core
+import qs.modules
 
 ShellRoot {
     ClickInterceptor {

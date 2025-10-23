@@ -88,7 +88,7 @@ Rectangle {
             visible: false
             onAccepted: pamAuth.respond(passwordInput.text)
             
-            SequentialAnimation { 
+            SequentialAnimation {
                 id: shakeAnimation; running: false
                 NumberAnimation { target: passwordInput; property: "x"; to: 10; duration: 50 }
                 NumberAnimation { target: passwordInput; property: "x"; to: -10; duration: 100 }

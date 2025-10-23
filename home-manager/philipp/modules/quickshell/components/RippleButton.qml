@@ -1,4 +1,5 @@
 import QtQuick
+import qs.components
 
 // Reusable Button Component with Android-Style Ripple
 // Supports 'filled' and 'text' styles.
