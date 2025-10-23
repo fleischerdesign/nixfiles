@@ -60,8 +60,8 @@ ShellRoot {
                     Layout.preferredWidth: 40
                     Layout.preferredHeight: 40
                     fixedWidth: true
-		    color: M3ColorPalette.m3Primary
-		    onColor: M3ColorPalette.m3OnPrimary
+                    filledColor: M3ColorPalette.m3Primary
+                    contentColor: M3ColorPalette.m3OnPrimary
                     onClicked: {
                         const notifications = StateManager.notificationServer.trackedNotifications.values;
                         for (let i = notifications.length - 1; i >= 0; i--) {
@@ -71,7 +71,7 @@ ShellRoot {
 
                     Text {
                         text: "delete_sweep"
-                        color: M3ColorPalette.m3OnPrimary
+                        color: parent.contentColor
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 20
                         anchors.centerIn: parent

@@ -38,7 +38,7 @@ Rectangle {
 
     property color onSurfaceColor: {
         if (!root.notification)
-            return M3ColorPalette.m3OnSurfaceContainer;
+            return M3ColorPalette.m3OnSurface;
         switch (root.notification.urgency) {
         case 0:
             return M3ColorPalette.m3OnSurface;
@@ -93,39 +93,26 @@ Rectangle {
             }
 
             // Close Button
-            Rectangle {
+            RippleButton {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
                 radius: 12
-                color: "transparent"
-		opacity: popupHover.hovered ? 1 : 0
+                filled: false
+                contentColor: root.onSurfaceColor
+                onClicked: root.dismissRequested()
+                opacity: popupHover.hovered ? 1 : 0
 
-		Behavior on opacity {
-		    NumberAnimation {
-		    	duration: 200
-		    }
-		}
-
-                M3StateLayer {
-                    stateColor: onSurfaceColor
-                    isHovered: closeHover.hovered
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: 200
+                    }
                 }
+
                 Text {
                     text: "close"
-                    color: onSurfaceColor
                     font.family: "Material Symbols Rounded"
                     font.pixelSize: 18
-                    anchors.centerIn: parent
-                }
-
-                HoverHandler {
-                    id: closeHover
-                }
-
-                RippleEffect {
-                    rippleColor: onSurfaceColor
-                    parentRadius: parent.radius
-                    onClicked: root.dismissRequested()
+                    color: root.onSurfaceColor // Bind to the button's content color
                 }
             }
         }
@@ -179,34 +166,27 @@ Rectangle {
             Repeater {
                 model: (root.notification && root.notification.actions) ? root.notification.actions : []
 
-                Rectangle {
-                    width: actionText.width + 20
+                RippleButton {
                     height: 32
-                    radius: 8
-                    color: actionHover.hovered ? "#3A3A3A" : "#2A2A2A"
+                    radius: 15 // As per user request
+                    filled: false
+                    contentColor: root.onSurfaceColor
+                    baseOpacity: 0.1 // User wanted a visible resting state
+                    hoverOpacity: 0.18 // A bit more than base
+                    onClicked: {
+                        if (modelData) {
+                            modelData.invoke();
+                        }
+                        if (root.notification && !root.notification.resident) {
+                            root.dismissRequested();
+                        }
+                    }
 
                     Text {
-                        id: actionText
                         text: modelData ? modelData.text : ""
-                        color: "white"
-                        font.pixelSize: 13
-                        anchors.centerIn: parent
-                    }
-
-                    HoverHandler {
-                        id: actionHover
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            if (modelData) {
-                                modelData.invoke();
-                            }
-                            if (root.notification && !root.notification.resident) {
-                                root.dismissRequested();
-                            }
-                        }
+                        font.pixelSize: 14
+                        font.weight: Font.Medium
+                        color: root.onSurfaceColor
                     }
                 }
             }
