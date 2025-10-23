@@ -122,8 +122,9 @@ Rectangle {
                     id: closeHover
                 }
 
-                MouseArea {
-                    anchors.fill: parent
+                RippleEffect {
+                    rippleColor: onSurfaceColor
+                    parentRadius: parent.radius
                     onClicked: root.dismissRequested()
                 }
             }
