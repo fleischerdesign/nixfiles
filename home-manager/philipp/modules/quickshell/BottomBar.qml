@@ -7,6 +7,15 @@ import Quickshell.Io
 PanelWindow {
     id: bottomBarWindow
     property bool isOpen: false
+
+    Connections {
+        target: StateManager
+        function onNotificationCenterOpenedChanged() {
+            if (!StateManager.notificationCenterOpened && !barHover.hovered) {
+                bottomBarWindow.isOpen = false;
+            }
+        }
+    }
     
     // Dynamische Höhe: klein wenn geschlossen, groß wenn offen
    implicitHeight: isOpen ? 65 : (contentWrapper.y >= 55 ? 10 : 65) 

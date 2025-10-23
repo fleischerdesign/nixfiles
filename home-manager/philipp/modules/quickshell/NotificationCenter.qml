@@ -4,37 +4,76 @@ import QtQuick.Layouts
 
 PanelWindow {
     id: notificationCenter
+
+    // This property is controlled by shell.qml
+    property bool shouldBeVisible: false
+
+    // Initial visual properties
+    implicitWidth: 400
+    color: "transparent"
+    visible: false // Initially invisible
+    exclusiveZone: 0
     anchors {
         right: true
         bottom: true
         top: true
     }
     margins.bottom: 65 + 10
-    margins.right: StateManager.notificationCenterOpened ? 10 : -implicitWidth+1
     margins.top: 10
-    exclusiveZone: 0
-    color: "transparent"
-    implicitWidth: 400
-    visible: true
-    
+    // margins.right is now controlled by the state machine
+
+    // The visible content
     Rectangle {
+        id: contentRectangle
         anchors.fill: parent
         radius: 15
         color: M3ColorPalette.m3SurfaceContainer
-        opacity: StateManager.notificationCenterOpened ? 1.0 : 0.0
-        
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-                easing.type: Easing.InOutQuad
+        // opacity is now controlled by the state machine
+
+    // State Machine
+    state: "CLOSED"
+
+    states: [
+        State {
+            name: "OPEN"
+            when: shouldBeVisible
+            PropertyChanges { target: notificationCenter; visible: true }
+            PropertyChanges { target: notificationCenter; margins.right: 10 }
+            PropertyChanges { target: contentRectangle; opacity: 1.0 }
+        },
+        State {
+            name: "CLOSED"
+            when: !shouldBeVisible
+            // Property values for the closed state are set by the exit transition
+        }
+    ]
+
+    transitions: [
+        Transition { // To OPEN state
+            from: "CLOSED"; to: "OPEN"
+            ParallelAnimation {
+                NumberAnimation { target: notificationCenter; property: "margins.right"; duration: 200; easing.type: Easing.InOutQuad }
+                NumberAnimation { target: contentRectangle; property: "opacity"; duration: 200; easing.type: Easing.InOutQuad }
+            }
+        },
+        Transition { // To CLOSED state
+            from: "OPEN"; to: "CLOSED"
+            SequentialAnimation {
+                ParallelAnimation {
+                    NumberAnimation { target: notificationCenter; property: "margins.right"; to: -notificationCenter.implicitWidth + 1; duration: 200; easing.type: Easing.InOutQuad }
+                    NumberAnimation { target: contentRectangle; property: "opacity"; to: 0.0; duration: 200; easing.type: Easing.InOutQuad }
+                }
+                // After animation, set window to invisible
+                PropertyAction { target: notificationCenter; property: "visible"; value: false }
             }
         }
-        
+    ]
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 15
             spacing: 10
-            visible: parent.opacity > 0
+            visible: contentRectangle.opacity > 0
             
             // Header
             RowLayout {
@@ -98,11 +137,5 @@ PanelWindow {
             }
         }
     }
-    
-    Behavior on margins.right {
-        NumberAnimation {
-            duration: 200
-            easing.type: Easing.InOutQuad
-        }
-    }
+
 }

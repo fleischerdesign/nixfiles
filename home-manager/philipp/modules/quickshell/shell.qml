@@ -5,11 +5,21 @@ import Quickshell.Wayland
 import QtQuick.Layouts
 
 ShellRoot {
+    ClickInterceptor {
+        id: ncInterceptor
+        visible: StateManager.notificationCenterOpened
+        onClicked: {
+            StateManager.notificationCenterOpened = false
+        }
+    }
     VolumeOSD {}
     BrightnessOSD {}
     Notifications {}
 
-    NotificationCenter {}
+    NotificationCenter {
+        id: nc
+        shouldBeVisible: ncInterceptor.backingWindowVisible && StateManager.notificationCenterOpened
+    }
 
     WlSessionLock {
         id: sessionLocker
