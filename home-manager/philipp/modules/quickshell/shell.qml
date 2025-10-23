@@ -62,23 +62,19 @@ ShellRoot {
                     fixedWidth: true
 		    color: M3ColorPalette.m3Primary
 		    onColor: M3ColorPalette.m3OnPrimary
-                    
+                    onClicked: {
+                        const notifications = StateManager.notificationServer.trackedNotifications.values;
+                        for (let i = notifications.length - 1; i >= 0; i--) {
+                            notifications[i].dismiss();
+                        }
+                    }
+
                     Text {
                         text: "delete_sweep"
                         color: M3ColorPalette.m3OnPrimary
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 20
                         anchors.centerIn: parent
-                    }
-                    
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            const notifications = StateManager.notificationServer.trackedNotifications.values;
-                            for (let i = notifications.length - 1; i >= 0; i--) {
-                                notifications[i].dismiss();
-                            }
-                        }
                     }
                 }
             }
@@ -96,6 +92,7 @@ ShellRoot {
                     width: notificationList.width
                     notification: modelData
                     onDismissRequested: modelData.dismiss()
+                    isInNotificationCenter: true
                 }
                 
                 Text {

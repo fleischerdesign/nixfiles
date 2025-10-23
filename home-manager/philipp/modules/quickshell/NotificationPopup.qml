@@ -15,18 +15,24 @@ Rectangle {
         id: popupHover
     }
     property var notification
+    property bool isInNotificationCenter: false
     color: {
         if (!root.notification)
             return "#FFB84A";
+
+        var baseColor = root.isInNotificationCenter
+            ? M3ColorPalette.m3SurfaceContainerHigh
+            : M3ColorPalette.m3SurfaceContainer;
+
         switch (root.notification.urgency) {
         case 0:
-            return M3ColorPalette.m3SurfaceContainer;
+            return baseColor;
         case 1:
-            return M3ColorPalette.m3SurfaceContainer;
+            return baseColor;
         case 2:
             return M3ColorPalette.m3Error;
         default:
-            return M3ColorPalette.m3SurfaceContainer;
+            return baseColor;
         }
     }
 
