@@ -22,11 +22,15 @@ PanelWindow {
     color: "transparent"
     exclusiveZone: 0
 
+    HoverHandler {
+      id: popupWindowHover
+    }
+
     Timer {
         id: autoHideTimer
         interval: 5000
         repeat: false
-        running: notification && !notification.resident
+        running: !popupWindowHover.hovered && notification && !notification.resident
         onTriggered: popupWindow.startDismiss()
     }
 
