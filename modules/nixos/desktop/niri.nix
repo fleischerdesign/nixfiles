@@ -1,4 +1,10 @@
-{ config, lib, pkgs, inputs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}:
 
 let
   cfg = config.my.nixos.desktop.niri;
@@ -23,7 +29,7 @@ in
         };
       };
     };
-    
+
     programs.niri.enable = true;
     programs.niri.package = pkgs.niri;
 

@@ -22,6 +22,9 @@
 
       prefer-no-csd = true;
 
+      xwayland-satellite.enable = true;
+      xwayland-satellite.path = lib.getExe pkgs.xwayland-satellite;
+
       window-rules = [
         {
           matches = [ ];
