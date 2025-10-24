@@ -52,6 +52,13 @@ Rectangle {
 
     signal dismissRequested
 
+    RippleEffect {
+      enabled: root.enabled;
+      rippleColor: root.onSurfaceColor; 
+      parentRadius: root.radius
+      onClicked: root.clicked();
+    }
+
     // State Layer mit neuer API
     M3StateLayer {
         colorRole: root.notification && root.notification.urgency === 2 
@@ -177,7 +184,7 @@ Rectangle {
 
                 RippleButton {
                     implicitHeight: 32
-                    style: RippleButton.Style.Text
+                    style: RippleButton.Style.Filled
                     colorRole: root.notification && root.notification.urgency === 2 
                         ? RippleButton.ColorRole.Error 
                         : RippleButton.ColorRole.Primary

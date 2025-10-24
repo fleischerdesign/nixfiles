@@ -94,7 +94,7 @@ PanelWindow {
                 
 		RippleButton {
 		  style: RippleButton.Style.Filled
-		  colorRole: RippleButton.ColorRole.Primary
+		  colorRole: RippleButton.ColorRole.Error
                     onClicked: {
                         const notifications = StateManager.notificationServer.trackedNotifications.values;
                         for (let i = notifications.length - 1; i >= 0; i--) {
