@@ -26,8 +26,8 @@ Scope {
             bottom: true
         }
         margins.right: 0
-        width: root.osdWidth + root.slideDistance + root.rightMargin
-        height: root.osdHeight
+        implicitWidth: root.osdWidth + root.slideDistance + root.rightMargin
+        implicitHeight: root.osdHeight
         color: "transparent"
         mask: Region {}
         exclusiveZone: 0

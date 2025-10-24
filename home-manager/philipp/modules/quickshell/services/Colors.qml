@@ -68,20 +68,21 @@ Singleton {
     // --- Farbschema laden ---
     function load(data, isPreview) {
         const colours = isPreview ? preview : current;
-        const scheme = JSON.parse(data);
+        const theme = JSON.parse(data);
+
+        const schemeName = (isPreview ? root.previewLight : root.currentLight) ? "light" : "dark";
+        const schemeData = theme.schemes[schemeName];
 
         if (!isPreview) {
-            root.scheme = scheme.name;
-            root.flavour = scheme.flavour;
-            root.currentLight = scheme.mode === "light";
-        } else {
-            root.previewLight = scheme.mode === "light";
+            root.scheme = "material"; // Placeholder name from the file
+            root.flavour = schemeName;
         }
 
-        for (const [name, colour] of Object.entries(scheme.colours)) {
-            const propName = name.startsWith("term") ? name : `m3${name.charAt(0).toUpperCase() + name.slice(1)}`; // Anpassung für m3-Präfix und CamelCase
-            if (colours.hasOwnProperty(propName))
-                colours[propName] = `#${colour}`;
+        for (const [name, colour] of Object.entries(schemeData)) {
+            const propName = name.startsWith("term") ? name : `m3${name.charAt(0).toUpperCase() + name.slice(1)}`;
+            if (colours.hasOwnProperty(propName)) {
+                colours[propName] = colour;
+            }
         }
     }
 

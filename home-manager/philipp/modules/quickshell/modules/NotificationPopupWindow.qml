@@ -19,8 +19,8 @@ PanelWindow {
     margins.right: 10
     margins.top: 10 + (popupIndex * (popup.height + 10))
     
-    width: 400
-    height: popup.height
+    implicitWidth: 400
+    implicitHeight: popup.height
     color: "transparent"
     exclusiveZone: 0
 
