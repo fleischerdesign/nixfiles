@@ -34,7 +34,7 @@ Singleton {
         persistenceSupported: true
         keepOnReload: false
         
-        onNotification: root.handleNotification(notification)
+        onNotification: function(notification) { root.handleNotification(notification) }
     }
     
     // === PRIVATE STATE ===
