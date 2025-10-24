@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.components
 import qs.modules
+import qs.core
 
 PanelWindow {
     id: notificationCenter

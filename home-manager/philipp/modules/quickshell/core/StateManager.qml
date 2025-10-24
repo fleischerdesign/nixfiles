@@ -1,9 +1,10 @@
 // StateManager.qml
 pragma Singleton
 import QtQuick
+import Quickshell
 import Quickshell.Services.Notifications
 
-QtObject {
+Singleton {
     property bool notificationCenterOpened: false
     
     property NotificationServer notificationServer: NotificationServer {

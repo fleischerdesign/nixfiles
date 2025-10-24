@@ -1,11 +1,12 @@
 // home-manager/philipp/modules/quickshell/Colors.qml
 
 pragma Singleton
+import Quickshell
 import QtQuick
 
 // Material 3 Color Scheme - Alle Eigenschaften mit dem "m3"-Präfix
 
-QtObject {
+Singleton {
     id: m3Colors
 
     // =================================================================
