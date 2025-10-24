@@ -9,7 +9,8 @@ PanelWindow {
     
     anchors {
         right: true
-        top: true
+	top: true
+	bottom: true
     }
     margins.right: 10
     margins.top: 10
