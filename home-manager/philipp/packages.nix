@@ -25,6 +25,7 @@
       pkgs.inkscape
       pkgs.evince
       pkgs.nautilus
+      pkgs.gnome-disk-utility
       (pkgs.callPackage ../../packages/lychee-slicer { })
       (pkgs.callPackage ../../packages/ficsit { })
       (pkgs.callPackage ../../packages/karere { })
