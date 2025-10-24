@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import qs.components
 import qs.modules
 import qs.core
+import qs.services
 
 PanelWindow {
     id: notificationCenter
@@ -30,7 +31,7 @@ PanelWindow {
         id: contentRectangle
         anchors.fill: parent
         radius: 15
-        color: M3ColorPalette.m3SurfaceContainer
+        color: Colors.palette.m3SurfaceContainer
         // opacity is now controlled by the state machine
 
     // State Machine
