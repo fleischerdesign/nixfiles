@@ -92,7 +92,8 @@ PanelWindow {
                 }
                 
 		RippleButton {
-		    style: RippleButton.Style.FilledTonal
+		  style: RippleButton.Style.Filled
+		  colorRole: RippleButton.ColorRole.Primary
                     onClicked: {
                         const notifications = StateManager.notificationServer.trackedNotifications.values;
                         for (let i = notifications.length - 1; i >= 0; i--) {
