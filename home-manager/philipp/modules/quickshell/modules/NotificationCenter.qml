@@ -87,7 +87,7 @@ PanelWindow {
 
                     Text {
                         text: "delete_sweep"
-                        color: parent.contentColor
+                        color: parent.autoContentColor
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 20
                         anchors.centerIn: parent
