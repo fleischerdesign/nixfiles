@@ -15,11 +15,11 @@ ShellRoot {
     }
     VolumeOSD {}
     BrightnessOSD {}
-    Notifications {}
+    NotificationPopupWindow {}
 
     NotificationCenter {
         id: nc
-        shouldBeVisible: ncInterceptor.backingWindowVisible && StateManager.notificationCenterOpened
+        shouldBeVisible: ncInterceptor.backingWindowVisible
     }
 
     WlSessionLock {

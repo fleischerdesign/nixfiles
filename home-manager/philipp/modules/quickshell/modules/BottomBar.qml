@@ -136,7 +136,7 @@ PanelWindow {
                     // Custom content für zweizeilige Uhr
                     Text {
                         id: clockText
-                        color: Colors.palette.m3OnSurface
+                        color: ColorService.palette.m3OnSurface
                         font.pixelSize: 12
                         font.family: "Roboto"
                         anchors.fill: parent

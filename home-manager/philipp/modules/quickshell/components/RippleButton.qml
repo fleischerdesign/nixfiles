@@ -80,7 +80,7 @@ Rectangle {
         
         // Elevated nutzt Surface
         if (style === RippleButton.Style.Elevated) {
-            return Colors.layer(Colors.palette.m3SurfaceContainerLow, 1);
+            return ColorService.layer(ColorService.palette.m3SurfaceContainerLow, 1);
         }
         
         // Filled und FilledTonal
@@ -88,16 +88,16 @@ Rectangle {
         
         switch (colorRole) {
             case RippleButton.ColorRole.Primary:
-                return isTonal ? Colors.palette.m3PrimaryContainer : Colors.palette.m3Primary;
+                return isTonal ? ColorService.palette.m3PrimaryContainer : ColorService.palette.m3Primary;
             case RippleButton.ColorRole.Secondary:
-                return isTonal ? Colors.palette.m3SecondaryContainer : Colors.palette.m3Secondary;
+                return isTonal ? ColorService.palette.m3SecondaryContainer : ColorService.palette.m3Secondary;
             case RippleButton.ColorRole.Tertiary:
-                return isTonal ? Colors.palette.m3TertiaryContainer : Colors.palette.m3Tertiary;
+                return isTonal ? ColorService.palette.m3TertiaryContainer : ColorService.palette.m3Tertiary;
             case RippleButton.ColorRole.Error:
-                return isTonal ? Colors.palette.m3ErrorContainer : Colors.palette.m3Error;
+                return isTonal ? ColorService.palette.m3ErrorContainer : ColorService.palette.m3Error;
             case RippleButton.ColorRole.Surface:
             default:
-                return Colors.palette.m3SurfaceContainerHigh;
+                return ColorService.palette.m3SurfaceContainerHigh;
         }
     }
     
@@ -106,21 +106,21 @@ Rectangle {
         if (style === RippleButton.Style.Text || style === RippleButton.Style.Outlined) {
             switch (colorRole) {
                 case RippleButton.ColorRole.Primary:
-                    return Colors.palette.m3Primary;
+                    return ColorService.palette.m3Primary;
                 case RippleButton.ColorRole.Secondary:
-                    return Colors.palette.m3Secondary;
+                    return ColorService.palette.m3Secondary;
                 case RippleButton.ColorRole.Tertiary:
-                    return Colors.palette.m3Tertiary;
+                    return ColorService.palette.m3Tertiary;
                 case RippleButton.ColorRole.Error:
-                    return Colors.palette.m3Error;
+                    return ColorService.palette.m3Error;
                 default:
-                    return Colors.palette.m3OnSurface;
+                    return ColorService.palette.m3OnSurface;
             }
         }
         
         // Elevated nutzt Primary als Text
         if (style === RippleButton.Style.Elevated) {
-            return Colors.palette.m3Primary;
+            return ColorService.palette.m3Primary;
         }
         
         // Filled und FilledTonal
@@ -128,16 +128,16 @@ Rectangle {
         
         switch (colorRole) {
             case RippleButton.ColorRole.Primary:
-                return isTonal ? Colors.palette.m3OnPrimaryContainer : Colors.palette.m3OnPrimary;
+                return isTonal ? ColorService.palette.m3OnPrimaryContainer : ColorService.palette.m3OnPrimary;
             case RippleButton.ColorRole.Secondary:
-                return isTonal ? Colors.palette.m3OnSecondaryContainer : Colors.palette.m3OnSecondary;
+                return isTonal ? ColorService.palette.m3OnSecondaryContainer : ColorService.palette.m3OnSecondary;
             case RippleButton.ColorRole.Tertiary:
-                return isTonal ? Colors.palette.m3OnTertiaryContainer : Colors.palette.m3OnTertiary;
+                return isTonal ? ColorService.palette.m3OnTertiaryContainer : ColorService.palette.m3OnTertiary;
             case RippleButton.ColorRole.Error:
-                return isTonal ? Colors.palette.m3OnErrorContainer : Colors.palette.m3OnError;
+                return isTonal ? ColorService.palette.m3OnErrorContainer : ColorService.palette.m3OnError;
             case RippleButton.ColorRole.Surface:
             default:
-                return Colors.palette.m3OnSurface;
+                return ColorService.palette.m3OnSurface;
         }
     }
     
@@ -149,7 +149,7 @@ Rectangle {
     
     // Outline für Outlined Style
     border.width: style === RippleButton.Style.Outlined ? 1 : 0
-    border.color: Colors.palette.m3Outline
+    border.color: ColorService.palette.m3Outline
     
     // Elevation Shadow für Elevated Style
     

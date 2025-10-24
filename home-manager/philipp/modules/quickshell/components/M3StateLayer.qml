@@ -45,21 +45,21 @@ Rectangle {
     readonly property color autoStateColor: {
         switch (root.colorRole) {
             case M3StateLayer.ColorRole.Primary:
-                return Colors.palette.m3OnPrimary;
+                return ColorService.palette.m3OnPrimary;
             case M3StateLayer.ColorRole.Secondary:
-                return Colors.palette.m3OnSecondary;
+                return ColorService.palette.m3OnSecondary;
             case M3StateLayer.ColorRole.Tertiary:
-                return Colors.palette.m3OnTertiary;
+                return ColorService.palette.m3OnTertiary;
             case M3StateLayer.ColorRole.Surface:
-                return Colors.palette.m3OnSurface;
+                return ColorService.palette.m3OnSurface;
             case M3StateLayer.ColorRole.SurfaceVariant:
-                return Colors.palette.m3OnSurfaceVariant;
+                return ColorService.palette.m3OnSurfaceVariant;
             case M3StateLayer.ColorRole.Error:
-                return Colors.palette.m3OnError;
+                return ColorService.palette.m3OnError;
             case M3StateLayer.ColorRole.Custom:
                 return root.customStateColor;
             default:
-                return Colors.palette.m3OnSurface;
+                return ColorService.palette.m3OnSurface;
         }
     }
     

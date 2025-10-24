@@ -3,20 +3,16 @@ import QtQuick
 import QtQuick.Layouts
 import qs.components
 import qs.modules
-import qs.core
 import qs.services
 
 PanelWindow {
     id: notificationCenter
 
-    // This property is controlled by shell.qml
     property bool shouldBeVisible: false
 
-    // Initial visual properties
     implicitWidth: 400
     color: "transparent"
-    visible: false // Initially invisible
-    exclusiveZone: 0
+    visible: false
     anchors {
         right: true
         bottom: true
@@ -24,54 +20,42 @@ PanelWindow {
     }
     margins.bottom: 65 + 10
     margins.top: 10
-    // margins.right is now controlled by the state machine
+    margins.right: shouldBeVisible ? 10 : -implicitWidth + 1
+    exclusiveZone: 0
+    
+    Behavior on margins.right {
+        NumberAnimation {
+            id: animation
+            duration: 200
+            easing.type: Easing.InOutQuad
+            onRunningChanged: {
+                if (!running && !shouldBeVisible) {
+                    visible = false
+                }
+            }
+        }
+    }
+    
+    onShouldBeVisibleChanged: {
+        if (shouldBeVisible) {
+            visible = true
+            NotificationService.dismissAll();
+        }
+    }
 
-    // The visible content
     Rectangle {
         id: contentRectangle
         anchors.fill: parent
         radius: 15
-        color: Colors.palette.m3SurfaceContainer
-        // opacity is now controlled by the state machine
-
-    // State Machine
-    state: "CLOSED"
-
-    states: [
-        State {
-            name: "OPEN"
-            when: shouldBeVisible
-            PropertyChanges { target: notificationCenter; visible: true }
-            PropertyChanges { target: notificationCenter; margins.right: 10 }
-            PropertyChanges { target: contentRectangle; opacity: 1.0 }
-        },
-        State {
-            name: "CLOSED"
-            when: !shouldBeVisible
-            // Property values for the closed state are set by the exit transition
-        }
-    ]
-
-    transitions: [
-        Transition { // To OPEN state
-            from: "CLOSED"; to: "OPEN"
-            ParallelAnimation {
-                NumberAnimation { target: notificationCenter; property: "margins.right"; duration: 200; easing.type: Easing.InOutQuad }
-                NumberAnimation { target: contentRectangle; property: "opacity"; duration: 200; easing.type: Easing.InOutQuad }
-            }
-        },
-        Transition { // To CLOSED state
-            from: "OPEN"; to: "CLOSED"
-            SequentialAnimation {
-                ParallelAnimation {
-                    NumberAnimation { target: notificationCenter; property: "margins.right"; to: -notificationCenter.implicitWidth + 1; duration: 200; easing.type: Easing.InOutQuad }
-                    NumberAnimation { target: contentRectangle; property: "opacity"; to: 0.0; duration: 200; easing.type: Easing.InOutQuad }
-                }
-                // After animation, set window to invisible
-                PropertyAction { target: notificationCenter; property: "visible"; value: false }
+        color: ColorService.palette.m3SurfaceContainer
+        opacity: shouldBeVisible ? 1.0 : 0.0
+        
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 200
+                easing.type: Easing.InOutQuad
             }
         }
-    ]
 
         ColumnLayout {
             anchors.fill: parent
@@ -79,7 +63,6 @@ PanelWindow {
             spacing: 10
             visible: contentRectangle.opacity > 0
             
-            // Header
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
@@ -92,11 +75,11 @@ PanelWindow {
                     Layout.fillWidth: true
                 }
                 
-		RippleButton {
-		  style: RippleButton.Style.Filled
-		  colorRole: RippleButton.ColorRole.Error
+                RippleButton {
+                    style: RippleButton.Style.Filled
+                    colorRole: RippleButton.ColorRole.Primary
                     onClicked: {
-                        const notifications = StateManager.notificationServer.trackedNotifications.values;
+                        const notifications = NotificationService.server.trackedNotifications.values;
                         for (let i = notifications.length - 1; i >= 0; i--) {
                             notifications[i].dismiss();
                         }
@@ -112,14 +95,13 @@ PanelWindow {
                 }
             }
             
-            // Notification List
             ListView {
                 id: notificationList
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 10
                 clip: true
-                model: StateManager.notificationServer.trackedNotifications
+                model: NotificationService.server.trackedNotifications
                 
                 delegate: NotificationPopup {
                     width: notificationList.width
@@ -138,5 +120,4 @@ PanelWindow {
             }
         }
     }
-
 }

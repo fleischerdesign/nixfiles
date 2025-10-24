@@ -16,11 +16,11 @@ Rectangle {
     // Hintergrundfarbe basierend auf Urgency
     color: {
         if (!root.notification)
-            return Colors.palette.m3SurfaceContainer;
+            return ColorService.palette.m3SurfaceContainer;
 
         var baseColor = root.isInNotificationCenter
-            ? Colors.palette.m3SurfaceContainerHigh
-            : Colors.palette.m3SurfaceContainer;
+            ? ColorService.palette.m3SurfaceContainerHigh
+            : ColorService.palette.m3SurfaceContainer;
 
         switch (root.notification.urgency) {
         case 0: // Low
@@ -28,7 +28,7 @@ Rectangle {
         case 1: // Normal
             return baseColor;
         case 2: // Critical
-            return Colors.palette.m3ErrorContainer;
+            return ColorService.palette.m3ErrorContainer;
         default:
             return baseColor;
         }
@@ -37,16 +37,16 @@ Rectangle {
     // Content-Farbe basierend auf Urgency
     property color onSurfaceColor: {
         if (!root.notification)
-            return Colors.palette.m3OnSurface;
+            return ColorService.palette.m3OnSurface;
         switch (root.notification.urgency) {
         case 0: // Low
-            return Colors.palette.m3OnSurface;
+            return ColorService.palette.m3OnSurface;
         case 1: // Normal
-            return Colors.palette.m3OnSurface;
+            return ColorService.palette.m3OnSurface;
         case 2: // Critical
-            return Colors.palette.m3OnErrorContainer;
+            return ColorService.palette.m3OnErrorContainer;
         default:
-            return Colors.palette.m3OnSurface;
+            return ColorService.palette.m3OnSurface;
         }
     }
 
