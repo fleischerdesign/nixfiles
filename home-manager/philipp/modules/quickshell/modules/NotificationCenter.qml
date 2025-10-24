@@ -91,12 +91,8 @@ PanelWindow {
                     Layout.fillWidth: true
                 }
                 
-                RippleButton {
-                    Layout.preferredWidth: 40
-                    Layout.preferredHeight: 40
-                    fixedWidth: true
-                    filledColor: M3ColorPalette.m3Primary
-                    contentColor: M3ColorPalette.m3OnPrimary
+		RippleButton {
+		    style: RippleButton.Style.FilledTonal
                     onClicked: {
                         const notifications = StateManager.notificationServer.trackedNotifications.values;
                         for (let i = notifications.length - 1; i >= 0; i--) {

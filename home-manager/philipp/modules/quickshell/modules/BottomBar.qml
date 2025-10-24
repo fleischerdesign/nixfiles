@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import Quickshell.Services.UPower
 import qs.core
 import qs.components
+import qs.services
 
 PanelWindow {
     id: bottomBarWindow
@@ -19,7 +20,7 @@ PanelWindow {
     }
     
     // Dynamische Höhe: klein wenn geschlossen, groß wenn offen
-   implicitHeight: isOpen ? 65 : (contentWrapper.y >= 55 ? 10 : 65) 
+    implicitHeight: isOpen ? 65 : (contentWrapper.y >= 55 ? 10 : 65) 
     anchors {
         left: true
         right: true
@@ -84,6 +85,7 @@ PanelWindow {
                 }
             }
             
+            // Shadow Gradient
             Rectangle {
                 id: shadow
                 anchors.fill: parent
@@ -108,34 +110,38 @@ PanelWindow {
                 }
                 spacing: 10
                 
+                // App Launcher Button
                 RippleButton {
                     Layout.alignment: Qt.AlignVCenter
+                    style: RippleButton.Style.FilledTonal
+                    colorRole: RippleButton.ColorRole.Surface
+                    icon: "apps"
+                    iconOnly: true
                     fixedWidth: true
-                    Text {
-                        text: "apps"
-                        color: M3ColorPalette.m3OnSurface
-                        font.family: "Material Symbols Rounded"
-                        font.pixelSize: 24
-                        anchors.centerIn: parent
-                    }
+                    implicitHeight: 55
                 }
                 
                 Item {
                     Layout.fillWidth: true
                 }
                 
+                // Clock Button
                 RippleButton {
                     Layout.alignment: Qt.AlignVCenter
+                    style: RippleButton.Style.FilledTonal
+                    colorRole: RippleButton.ColorRole.Surface
                     fixedWidth: true
+                    implicitHeight: 55
                     
+                    // Custom content für zweizeilige Uhr
                     Text {
                         id: clockText
-                        color: M3ColorPalette.m3OnSurface
+                        color: Colors.palette.m3OnSurface
                         font.pixelSize: 12
                         font.family: "Roboto"
                         anchors.fill: parent
-			horizontalAlignment: Text.AlignHCenter
-			verticalAlignment: Text.AlignVCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                         
                         Component.onCompleted: {
                             const now = new Date();
@@ -158,60 +164,62 @@ PanelWindow {
                     }
                 }
                 
+                // Battery Button
                 RippleButton {
                     id: batteryButton
                     Layout.alignment: Qt.AlignVCenter
                     visible: UPower.displayDevice && UPower.displayDevice.type === 2
+                    style: RippleButton.Style.FilledTonal
+                    colorRole: RippleButton.ColorRole.Surface
                     fixedWidth: true
+                    implicitHeight: 55
+                    iconSize: 20
+                    iconOnly: true
                     
-                    Text {
-                        id: batteryText
-                        color: M3ColorPalette.m3OnSurface
-                        font.family: "Material Symbols Outlined"
-                        font.pixelSize: 20
-                        anchors.centerIn: parent
-                        
-                        text: {
-                            if (!UPower.displayDevice || !UPower.displayDevice.ready) {
-                                return "battery_unknown";
-                            }
-                            const percent = Math.round(UPower.displayDevice.percentage * 100);
-                            const charging = UPower.displayDevice.state === 1;
-                            if (charging)
-                                return "battery_android_bolt";
-                            if (percent > 87)
-                                return "battery_android_full";
-                            if (percent > 75)
-                                return "battery_android_6";
-                            if (percent > 62)
-                                return "battery_android_5";
-                            if (percent > 50)
-                                return "battery_android_4";
-                            if (percent > 37)
-                                return "battery_android_3";
-                            if (percent > 25)
-                                return "battery_android_2";
-                            if (percent > 12.5)
-                                return "battery_android_1";
-                            return "battery_android_0";
+                    icon: {
+                        if (!UPower.displayDevice || !UPower.displayDevice.ready) {
+                            return "battery_unknown";
                         }
+                        const percent = Math.round(UPower.displayDevice.percentage * 100);
+                        const charging = UPower.displayDevice.state === 1;
+                        
+                        if (charging)
+                            return "battery_charging_full";
+                        if (percent > 87)
+                            return "battery_full";
+                        if (percent > 75)
+                            return "battery_6_bar";
+                        if (percent > 62)
+                            return "battery_5_bar";
+                        if (percent > 50)
+                            return "battery_4_bar";
+                        if (percent > 37)
+                            return "battery_3_bar";
+                        if (percent > 25)
+                            return "battery_2_bar";
+                        if (percent > 12.5)
+                            return "battery_1_bar";
+                        return "battery_0_bar";
                     }
                 }
                 
+                // Notification Center Button
                 RippleButton {
                     Layout.alignment: Qt.AlignVCenter
+                    style: StateManager.notificationCenterOpened 
+                        ? RippleButton.Style.Filled 
+                        : RippleButton.Style.FilledTonal
+                    colorRole: StateManager.notificationCenterOpened 
+                        ? RippleButton.ColorRole.Primary 
+                        : RippleButton.ColorRole.Surface
+                    icon: "notifications"
+                    iconOnly: true
                     fixedWidth: true
-                    Text {
-                        text: "clarify"
-                        color: M3ColorPalette.m3OnSurface
-                        font.family: "Material Symbols Rounded"
-                        font.pixelSize: 24
-                        anchors.centerIn: parent
-		      }
-
-		      onClicked: {
-			StateManager.notificationCenterOpened =  !StateManager.notificationCenterOpened
-		      }
+                    implicitHeight: 55
+                    
+                    onClicked: {
+                        StateManager.notificationCenterOpened = !StateManager.notificationCenterOpened
+                    }
                 }
             }
         }

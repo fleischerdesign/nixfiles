@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.components
+import qs.services
 
 Rectangle {
     id: root
@@ -8,51 +9,61 @@ Rectangle {
     height: contentColumn.height + 30
     radius: 15
     clip: true
-    M3StateLayer {
-      stateColor: onSurfaceColor
-      isHovered: popupHover.hovered
-    }
-    HoverHandler {
-        id: popupHover
-    }
+    
     property var notification
     property bool isInNotificationCenter: false
+    
+    // Hintergrundfarbe basierend auf Urgency
     color: {
         if (!root.notification)
-            return "#FFB84A";
+            return Colors.palette.m3SurfaceContainer;
 
         var baseColor = root.isInNotificationCenter
-            ? M3ColorPalette.m3SurfaceContainerHigh
-            : M3ColorPalette.m3SurfaceContainer;
+            ? Colors.palette.m3SurfaceContainerHigh
+            : Colors.palette.m3SurfaceContainer;
 
         switch (root.notification.urgency) {
-        case 0:
+        case 0: // Low
             return baseColor;
-        case 1:
+        case 1: // Normal
             return baseColor;
-        case 2:
-            return M3ColorPalette.m3Error;
+        case 2: // Critical
+            return Colors.palette.m3ErrorContainer;
         default:
             return baseColor;
         }
     }
 
+    // Content-Farbe basierend auf Urgency
     property color onSurfaceColor: {
         if (!root.notification)
-            return M3ColorPalette.m3OnSurface;
+            return Colors.palette.m3OnSurface;
         switch (root.notification.urgency) {
-        case 0:
-            return M3ColorPalette.m3OnSurface;
-        case 1:
-            return M3ColorPalette.m3OnSurface;
-        case 2:
-            return M3ColorPalette.m3OnError;
+        case 0: // Low
+            return Colors.palette.m3OnSurface;
+        case 1: // Normal
+            return Colors.palette.m3OnSurface;
+        case 2: // Critical
+            return Colors.palette.m3OnErrorContainer;
         default:
-            return M3ColorPalette.m3OnSurface;
+            return Colors.palette.m3OnSurface;
         }
     }
 
     signal dismissRequested
+
+    // State Layer mit neuer API
+    M3StateLayer {
+        colorRole: root.notification && root.notification.urgency === 2 
+            ? M3StateLayer.ColorRole.Error 
+            : M3StateLayer.ColorRole.Surface
+        customStateColor: root.onSurfaceColor
+        isHovered: popupHover.hovered
+    }
+    
+    HoverHandler {
+        id: popupHover
+    }
 
     ColumnLayout {
         id: contentColumn
@@ -74,7 +85,7 @@ Rectangle {
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32
                 radius: 8
-                color: onSurfaceColor
+                color: root.onSurfaceColor
                 visible: root.notification && root.notification.appIcon !== ""
 
                 Image {
@@ -88,32 +99,29 @@ Rectangle {
             // App Name
             Text {
                 text: root.notification ? root.notification.appName : ""
-                color: onSurfaceColor
+                color: root.onSurfaceColor
                 font.pixelSize: 12
                 Layout.fillWidth: true
             }
 
-            // Close Button
+            // Close Button mit neuem RippleButton
             RippleButton {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
-                radius: 12
-                filled: false
-                contentColor: root.onSurfaceColor
-                onClicked: root.dismissRequested()
+                style: RippleButton.Style.Text
+                colorRole: root.notification && root.notification.urgency === 2 
+                    ? RippleButton.ColorRole.Error 
+                    : RippleButton.ColorRole.Surface
+                icon: "close"
+                iconOnly: true
+                iconSize: 18
                 opacity: popupHover.hovered ? 1 : 0
+                onClicked: root.dismissRequested()
 
                 Behavior on opacity {
                     NumberAnimation {
                         duration: 200
                     }
-                }
-
-                Text {
-                    text: "close"
-                    font.family: "Material Symbols Rounded"
-                    font.pixelSize: 18
-                    color: root.onSurfaceColor // Bind to the button's content color
                 }
             }
         }
@@ -121,7 +129,7 @@ Rectangle {
         // Summary (Title)
         Text {
             text: root.notification ? root.notification.summary : ""
-            color: onSurfaceColor
+            color: root.onSurfaceColor
             font.pixelSize: 16
             font.weight: Font.Bold
             Layout.fillWidth: true
@@ -132,7 +140,7 @@ Rectangle {
         // Body
         Text {
             text: root.notification ? root.notification.body : ""
-            color: onSurfaceColor
+            color: root.onSurfaceColor
             font.pixelSize: 14
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
@@ -147,7 +155,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 150
             radius: 8
-            color: onSurfaceColor
+            color: root.onSurfaceColor
             visible: root.notification && root.notification.image !== ""
             clip: true
 
@@ -158,7 +166,7 @@ Rectangle {
             }
         }
 
-        // Actions
+        // Actions mit neuem RippleButton
         Flow {
             Layout.fillWidth: true
             spacing: 8
@@ -168,12 +176,13 @@ Rectangle {
                 model: (root.notification && root.notification.actions) ? root.notification.actions : []
 
                 RippleButton {
-                    height: 32
-                    radius: 15 // As per user request
-                    filled: false
-                    contentColor: root.onSurfaceColor
-                    baseOpacity: 0.1 // User wanted a visible resting state
-                    hoverOpacity: 0.18 // A bit more than base
+                    implicitHeight: 32
+                    style: RippleButton.Style.Text
+                    colorRole: root.notification && root.notification.urgency === 2 
+                        ? RippleButton.ColorRole.Error 
+                        : RippleButton.ColorRole.Primary
+                    text: modelData ? modelData.text : ""
+                    
                     onClicked: {
                         if (modelData) {
                             modelData.invoke();
@@ -182,15 +191,13 @@ Rectangle {
                             root.dismissRequested();
                         }
                     }
-
-                    Text {
-                        text: modelData ? modelData.text : ""
-                        font.pixelSize: 14
-                        font.weight: Font.Medium
-                        color: root.onSurfaceColor
-                    }
                 }
             }
         }
+    }
+    
+    // Smooth color transitions
+    Behavior on color {
+        ColorAnimation { duration: 200 }
     }
 }
