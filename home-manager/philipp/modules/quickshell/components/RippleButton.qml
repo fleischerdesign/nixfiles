@@ -168,8 +168,8 @@ Rectangle {
     
     Item {
         id: contentItem
-        implicitWidth: contentRow.implicitWidth
-        implicitHeight: contentRow.implicitHeight
+        implicitWidth: childrenRect.width
+        implicitHeight: childrenRect.height
         anchors.centerIn: parent
         z: 3
         

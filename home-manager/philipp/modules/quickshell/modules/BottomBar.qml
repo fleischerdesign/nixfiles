@@ -164,59 +164,10 @@ PanelWindow {
                     }
                 }
                 
-                // Battery Button
-                RippleButton {
-                    id: batteryButton
-                    Layout.alignment: Qt.AlignVCenter
-                    visible: UPower.displayDevice && UPower.displayDevice.type === 2
-                    style: RippleButton.Style.FilledTonal
-                    colorRole: RippleButton.ColorRole.Surface
-                    fixedWidth: true
-                    implicitHeight: 55
-                    iconSize: 20
-                    iconOnly: true
-                    
-                    icon: {
-                        if (!UPower.displayDevice || !UPower.displayDevice.ready) {
-                            return "battery_unknown";
-                        }
-                        const percent = Math.round(UPower.displayDevice.percentage * 100);
-                        const charging = UPower.displayDevice.state === 1;
-                        
-                        if (charging)
-                            return "battery_charging_full";
-                        if (percent > 87)
-                            return "battery_full";
-                        if (percent > 75)
-                            return "battery_6_bar";
-                        if (percent > 62)
-                            return "battery_5_bar";
-                        if (percent > 50)
-                            return "battery_4_bar";
-                        if (percent > 37)
-                            return "battery_3_bar";
-                        if (percent > 25)
-                            return "battery_2_bar";
-                        if (percent > 12.5)
-                            return "battery_1_bar";
-                        return "battery_0_bar";
-                    }
-                }
                 
                 // Notification Center Button
-                RippleButton {
+                QuickStatusButton {
                     Layout.alignment: Qt.AlignVCenter
-                    style: StateManager.notificationCenterOpened 
-                        ? RippleButton.Style.Filled 
-                        : RippleButton.Style.FilledTonal
-                    colorRole: StateManager.notificationCenterOpened 
-                        ? RippleButton.ColorRole.Primary 
-                        : RippleButton.ColorRole.Surface
-                    icon: "notifications"
-                    iconOnly: true
-                    fixedWidth: true
-                    implicitHeight: 55
-                    
                     onClicked: {
                         StateManager.notificationCenterOpened = !StateManager.notificationCenterOpened
                     }
