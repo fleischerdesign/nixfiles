@@ -4,11 +4,55 @@ import QtQuick.Layouts
 import qs.components
 import qs.modules
 import qs.services
+import qs.core
 
 PanelWindow {
     id: notificationCenter
 
     property bool shouldBeVisible: false
+    property var interceptor: null
+
+    Component {
+        id: interceptorComponent
+        ClickInterceptor {}
+    }
+
+    Connections {
+        target: StateManager
+        function onNotificationCenterOpenedChanged() {
+            if (StateManager.notificationCenterOpened) {
+                if (interceptor === null) {
+                    interceptor = interceptorComponent.createObject(notificationCenter);
+                    interceptor.clicked.connect(function() {
+                        StateManager.notificationCenterOpened = false;
+                    });
+
+                    // Wait for the interceptor's window to actually be visible
+                    // before showing the notification center. This ensures the NC
+                    // is rendered on top of the interceptor.
+                    var connection = interceptor.backingWindowVisibleChanged.connect(function() {
+                        if (interceptor.backingWindowVisible) {
+                            notificationCenter.shouldBeVisible = true;
+                            // Disconnect to prevent this from firing again
+                            interceptor.backingWindowVisibleChanged.disconnect(connection);
+                        }
+                    });
+
+                    // Make the interceptor visible, which starts the process.
+                    interceptor.visible = true;
+                }
+            } else {
+                // Hide the notification center first
+                notificationCenter.shouldBeVisible = false;
+
+                // Then destroy the interceptor
+                if (interceptor !== null) {
+                    interceptor.destroy();
+                    interceptor = null;
+                }
+            }
+        }
+    }
 
     implicitWidth: 400
     color: "transparent"

@@ -6,20 +6,12 @@ import qs.core
 import qs.modules
 
 ShellRoot {
-    ClickInterceptor {
-        id: ncInterceptor
-        visible: StateManager.notificationCenterOpened
-        onClicked: {
-            StateManager.notificationCenterOpened = false
-        }
-    }
     VolumeOSD {}
     BrightnessOSD {}
     NotificationPopupWindow {}
 
     NotificationCenter {
         id: nc
-        shouldBeVisible: ncInterceptor.backingWindowVisible
     }
 
     WlSessionLock {
