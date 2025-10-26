@@ -1,36 +1,55 @@
-# lib/helper.nix - Optimiert: Automatisches Scanning, aber performant
+# lib/helper.nix - Snowfall-inspirierte Optimierungen
 { pkgs-unstable, home-manager-unstable, ... }:
 
 let
   lib = pkgs-unstable.lib;
 
-  # Effizientere Version von getNixFilesRecursive
-  # Anstatt jeden Eintrag einzeln zu stat'en, nutzen wir eine single Sortierung
-  getNixFilesRecursive = dir:
-    let
-      entries = builtins.readDir dir;
-      # Sortiere und filtere in einem Schritt
-      sorted = lib.attrNames entries;
-    in
-    lib.concatMap (name:
-      let 
-        path = dir + "/${name}";
-        type = entries.${name};
-      in
-      if type == "directory" then
-        getNixFilesRecursive path
-      else if type == "regular" && lib.hasSuffix ".nix" name && name != "home.nix" then
-        [ path ]
-      else
-        []
-    ) sorted;
+  # === FILE SYSTEM UTILITIES (Snowfall-Style) ===
+  
+  # Read directory safely
+  safeReadDir = dir:
+    if builtins.pathExists dir
+    then builtins.readDir dir
+    else {};
 
-  # Memoized version - Cache die Ergebnisse
-  cachedGetNixFilesRecursive = dir:
-    if builtins.pathExists dir then 
-      getNixFilesRecursive dir 
-    else 
-      [];
+  # Snowfall-style: filterAttrs DANN map (weniger Allokationen)
+  getFilesRecursive = dir:
+    let
+      entries = safeReadDir dir;
+      # Filter ZUERST (reduziert Map-Aufrufe)
+      filtered = lib.filterAttrs 
+        (name: type: type == "directory" || type == "regular") 
+        entries;
+      
+      # Map über gefilterte Einträge
+      mapFile = name: type:
+        let path = dir + "/${name}";
+        in
+        if type == "directory" then
+          getFilesRecursive path
+        else
+          [ { inherit name type path; } ];
+      
+      # Snowfall's map-concat-attrs-to-list Pattern
+      files = lib.flatten (lib.mapAttrsToList mapFile filtered);
+    in
+    files;
+
+  # Filter für .nix Dateien
+  filterNixFiles = files:
+    builtins.filter (f: 
+      lib.hasSuffix ".nix" f.name && f.name != "home.nix"
+    ) files;
+
+  # Get nix files - EINMAL scannen, dann filtern
+  getNixFiles = dir:
+    let
+      allFiles = getFilesRecursive dir;
+      nixFiles = filterNixFiles allFiles;
+    in
+    map (f: f.path) nixFiles;
+
+  # === OPTION GENERATION ===
 
   pathToAttrPath = baseDir: filePath:
     let
@@ -42,49 +61,45 @@ let
     in
     lib.splitString "/" pathWithoutDefault;
 
-  # Optimiert: Builds die komplette Optionen-Struktur in einem Pass
-  buildOptionTree = paths:
+  # Optimiert: Direkte Optionsgenerierung
+  mkOptions = attrPaths:
     let
-      # Nutze foldl' mit einem map für bessere Performance
-      buildSingle = path:
-        let
-          parts = path;
-          buildNested = index:
-            if index >= lib.length parts then
-              { enable = lib.mkOption {
-                  type = lib.types.bool;
-                  default = false;
-                  description = "Enable module '${lib.concatStringsSep "." parts}'";
-                };
-              }
-            else
-              { ${lib.elemAt parts index} = buildNested (index + 1); };
-        in
-        buildNested 0;
-
-      # Merge alle Optionen zusammen
-      mergeNested = acc: nested:
-        lib.recursiveUpdate acc nested;
+      mkSingleOption = path: {
+        path = path;
+        option = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable module '${lib.concatStringsSep "." path}'";
+        };
+      };
+      
+      # Baue verschachtelte Struktur
+      setAtPath = acc: item:
+        lib.setAttrByPath item.path { enable = item.option; } // acc;
+      
+      options = map mkSingleOption attrPaths;
     in
-    lib.foldl' mergeNested {} (map buildSingle paths);
+    lib.foldl' (acc: item: lib.recursiveUpdate acc (setAtPath {} item)) {} options;
 
-  # Generate enable options für Verzeichnis
+  # === MODULE SYSTEM ===
+
   mkModuleOptions = { baseDir, optionPath }:
     let
-      files = cachedGetNixFilesRecursive baseDir;
+      files = getNixFiles baseDir;
       attrPaths = map (pathToAttrPath baseDir) files;
-      options = buildOptionTree attrPaths;
+      options = mkOptions attrPaths;
     in
     { options = lib.setAttrByPath optionPath options; };
 
-  # Create module set mit automatischem Discovery
-  mkNixosModuleSet = { baseDir }:
+  mkModuleSet = { baseDir, optionPath }:
     let
-      files = cachedGetNixFilesRecursive baseDir;
-      unconditionalModules = map (file: import file) files;
+      files = getNixFiles baseDir;
+      modules = map (file: import file) files;
+      optionsModule = mkModuleOptions { inherit baseDir optionPath; };
     in
-    [ (mkModuleOptions { inherit baseDir; optionPath = ["my" "nixos"]; }) ] 
-    ++ unconditionalModules;
+    [ optionsModule ] ++ modules;
+
+  # === SYSTEM BUILDER ===
 
   mkSystem = {
     system,
@@ -98,56 +113,56 @@ let
     modulesDir = toString ../modules/nixos;
     homeManagerDir = toString ../home-manager;
 
+    # Scanne alle User-Verzeichnisse EINMAL
+    userDirs = lib.filterAttrs (n: t: t == "directory" && n != "default") 
+      (safeReadDir homeManagerDir);
+
     mkHomeManagerUserConfig = user:
       let
         globalModulesDir = homeManagerDir + "/default";
         userModulesDir = homeManagerDir + "/${user.name}";
 
-        # Global modules - immer importiert
-        globalFiles = cachedGetNixFilesRecursive globalModulesDir;
-        globalModules = map (file: import file) globalFiles;
-
-        # User modules - mit enable flags
-        userFiles = cachedGetNixFilesRecursive userModulesDir;
+        # Einmal scannen
+        globalFiles = getNixFiles globalModulesDir;
+        userFiles = getNixFiles userModulesDir;
+        
+        globalModules = map (f: import f) globalFiles;
+        
         userAttrPaths = map (pathToAttrPath userModulesDir) userFiles;
-        userOptions = buildOptionTree userAttrPaths;
-        userOptionsModule = { options = lib.setAttrByPath ["my" "homeManager"] userOptions; };
-        userModules = map (file: import file) userFiles;
+        userOptions = mkOptions userAttrPaths;
+        userOptionsModule = { 
+          options = lib.setAttrByPath ["my" "homeManager"] userOptions; 
+        };
+        userModules = map (f: import f) userFiles;
       in
       {
         name = user.name;
         value = {
-          imports = [
-            userOptionsModule
-          ]
-          ++ globalModules
-          ++ userModules ++ [
-            (import (userModulesDir + "/home.nix"))
-          ] ++ (user.homeModules or []);
+          imports = 
+            [ userOptionsModule ]
+            ++ globalModules
+            ++ userModules 
+            ++ [ (import (userModulesDir + "/home.nix")) ]
+            ++ (user.homeModules or []);
         };
       };
 
     homeManagerUsers = lib.listToAttrs (map mkHomeManagerUserConfig users);
-    nixosModuleSet = mkNixosModuleSet { baseDir = modulesDir; };
+    nixosModuleSet = mkModuleSet { 
+      baseDir = modulesDir; 
+      optionPath = ["my" "nixos"]; 
+    };
 
   in
   pkgs-unstable.lib.nixosSystem {
     inherit system;
     specialArgs = { inherit inputs; };
     modules = [
-      {
-        nixpkgs = {
-          overlays = overlays;
-          config.allowUnfree = true;
-        };
-      }
-
-      # Base-Config
+      { nixpkgs = { inherit overlays; config.allowUnfree = true; }; }
       (import (hostsDir + "/base.nix"))
     ] ++ nixosModuleSet ++ [
-      # Host-spezifische Konfiguration
       (import (hostsDir + "/${hostname}/configuration.nix"))
-
+      
       home-manager-unstable.nixosModules.home-manager
       {
         home-manager = {
@@ -159,6 +174,7 @@ let
       }
     ];
   };
+
 in {
-  inherit mkModuleOptions mkNixosModuleSet mkSystem;
+  inherit mkModuleOptions mkModuleSet mkSystem getNixFiles;
 }
