@@ -72,11 +72,6 @@ PanelWindow {
             id: animation
             duration: 200
             easing.type: Easing.InOutQuad
-            onRunningChanged: {
-                if (!running && !shouldBeVisible) {
-                    visible = false
-                }
-            }
         }
     }
     
