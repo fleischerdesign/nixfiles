@@ -48,7 +48,7 @@ Rectangle {
     property bool fixedWidth: false
     implicitWidth: {
         if (fixedWidth) return 55;
-        if (iconOnly) return height;
+        if (iconOnly) return implicitHeight;
         return Math.max(55, contentItem.implicitWidth + (icon ? 48 : 40));
     }
     implicitHeight: 40  // M3 Standard Button Height

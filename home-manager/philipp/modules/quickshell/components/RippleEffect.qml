@@ -18,10 +18,12 @@ Item {
         z: 1 // Ensure it's above the background but below content
         property real rippleProgress: 0
         property point rippleCenter: Qt.point(0, 0)
+        property real _maxRippleRadius: 0 // Pre-calculated max radius for ripple
 
         function triggerRipple(x, y) {
             rippleCenter = Qt.point(x, y);
             rippleProgress = 0;
+            _maxRippleRadius = Math.max(parent.width, parent.height) * 2.5; // Calculate once
             rippleAnimation.restart();
         }
 
@@ -46,8 +48,7 @@ Item {
             ctx.closePath();
             ctx.clip();
 
-            const maxRadius = Math.max(parent.width, parent.height) * 2.5;
-            const currentRadius = rippleProgress * maxRadius;
+            const currentRadius = rippleProgress * _maxRippleRadius;
 
             const baseOpacity = (1 - rippleProgress) * 0.25;
             if (baseOpacity > 0) {
@@ -84,7 +85,7 @@ Item {
 
         Timer {
             id: sparkleTimer
-            interval: 16
+            interval: 30 // Reduced repaint frequency for performance
             repeat: true
             onTriggered: sparkleCanvas.requestPaint()
         }
