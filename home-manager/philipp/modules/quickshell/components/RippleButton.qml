@@ -177,7 +177,6 @@ Rectangle {
             id: contentRow
             visible: (root.text !== "" || root.icon !== "") && contentItem.children.length === 1
             spacing: 8
-            anchors.centerIn: parent
             
             // Icon
             Text {

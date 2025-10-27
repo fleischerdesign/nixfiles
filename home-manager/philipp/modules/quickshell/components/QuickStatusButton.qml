@@ -28,7 +28,6 @@ RippleButton {
 
     RowLayout {
         id: statusIcons
-        anchors.centerIn: parent
         spacing: 8
 
         Text {
