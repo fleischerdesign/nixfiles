@@ -74,21 +74,22 @@ Rectangle {
             ? M3StateLayer.ColorRole.Error 
             : M3StateLayer.ColorRole.Surface
         customStateColor: root.onSurfaceColor
-        isHovered: mouseArea.containsMouse
+        isHovered: popupHover.hovered
     }
     
-    MouseArea {
-        id: mouseArea
-        anchors.fill: parent
-        hoverEnabled: true
-        acceptedButtons: Qt.LeftButton
+    HoverHandler {
+        id: popupHover
+    }
 
-        onPressed: (mouse) => {
-            rippleEffect.trigger(mouse.x, mouse.y);
-        }
-
-        onClicked: {
+    TapHandler {
+        id: tapHandler
+        onTapped: {
             root.expanded = !root.expanded;
+        }
+        onPressedChanged: {
+            if (pressed) {
+                rippleEffect.trigger(tapHandler.point.pressPosition.x, tapHandler.point.pressPosition.y);
+            }
         }
     }
 
