@@ -8,7 +8,6 @@
         ];
       })
       pkgs.nerd-fonts.jetbrains-mono
-      pkgs.libreoffice
       # pkgs.gimp
       pkgs.obsidian
       pkgs.orca-slicer
