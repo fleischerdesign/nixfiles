@@ -5,11 +5,12 @@ import Quickshell.Services.UPower
 import qs.core
 import qs.components
 import qs.services
+import Quickshell.Wayland
 
 PanelWindow {
     id: bottomBarWindow
     property bool isOpen: false
-
+    WlrLayershell.layer: WlrLayer.Overlay
     Connections {
         target: StateManager
         function onNotificationCenterOpenedChanged() {

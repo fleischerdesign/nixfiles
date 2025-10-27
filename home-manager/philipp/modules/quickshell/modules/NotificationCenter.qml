@@ -28,7 +28,6 @@ Modal {
             visible = true
             NotificationService.dismissAll();
         } else {
-            // A short delay to allow the closing animation to finish
             var timer = Qt.createQmlObject("import QtQuick; Timer {interval: 200; onTriggered: { notificationCenterModal.visible = false; } }", notificationCenterModal);
             timer.start();
         }
@@ -37,21 +36,36 @@ Modal {
     Rectangle {
         id: contentRectangle
         width: 400
+
+    Component.onCompleted: {
+        // Initialisiere x außerhalb (rechts), OHNE Animation
+        x = screen.width;
+    }
+
+        // Feste Anchors (kein rightMargin mehr)
         anchors {
             top: parent.top
             bottom: parent.bottom
-            right: parent.right
             bottomMargin: 65 + 10
             topMargin: 10
-            rightMargin: shouldBeVisible ? 10 : -width
         }
         
-        Behavior on anchors.rightMargin {
+        // Position mit x statt anchors.rightMargin
+        x: shouldBeVisible 
+            ? (parent.width - width - 10)  // Sichtbar: 10px vom rechten Rand
+            : parent.width                  // Versteckt: komplett rechts raus
+        
+        // GPU-beschleunigte Animation
+        Behavior on x {
             NumberAnimation {
                 duration: 200
                 easing.type: Easing.InOutQuad
             }
         }
+        
+        // Performance-Boost: Rendere als GPU-Texture
+        layer.enabled: true
+        layer.smooth: true
         
         radius: 15
         color: ColorService.palette.m3SurfaceContainer
