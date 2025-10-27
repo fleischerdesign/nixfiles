@@ -8,7 +8,9 @@ Item {
     property color rippleColor: "white"
     property real parentRadius: 0
 
-    signal clicked
+    function trigger(x, y) {
+        sparkleCanvas.triggerRipple(x, y);
+    }
 
     Canvas {
         id: sparkleCanvas
@@ -49,7 +51,7 @@ Item {
 
             const baseOpacity = (1 - rippleProgress) * 0.25;
             if (baseOpacity > 0) {
-                const gradient = ctx.createRadialGradient(rippleCenter.x, rippleCenter.y, currentRadius * 0.3, rippleCenter.x, rippleCenter.y, currentRadius);
+                const gradient = ctx.createRadialGradient(rippleCenter.x, rippleCenter.y, 0, rippleCenter.x, rippleCenter.y, currentRadius);
                 const rippleStartColor = Qt.rgba(root.rippleColor.r, root.rippleColor.g, root.rippleColor.b, baseOpacity);
 
                 gradient.addColorStop(0, rippleStartColor.toString(Qt.RGBA));
@@ -85,22 +87,6 @@ Item {
             interval: 16
             repeat: true
             onTriggered: sparkleCanvas.requestPaint()
-        }
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        propagateComposedEvents: true
-        onPressed: function (mouse) {
-            sparkleCanvas.triggerRipple(mouse.x, mouse.y);
-            mouse.accepted = true;
-        }
-        onClicked: {
-            root.clicked();
-        }
-        onPositionChanged: function (mouse) {
-            mouse.accepted = false;
         }
     }
 }

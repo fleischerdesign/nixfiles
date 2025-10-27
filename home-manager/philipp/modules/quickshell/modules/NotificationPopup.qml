@@ -62,10 +62,10 @@ Rectangle {
     }
 
     RippleEffect {
+        id: rippleEffect
         enabled: root.enabled
         rippleColor: root.onSurfaceColor
         parentRadius: root.radius
-        onClicked: root.expanded = !root.expanded
     }
 
     // State Layer mit neuer API
@@ -74,11 +74,22 @@ Rectangle {
             ? M3StateLayer.ColorRole.Error 
             : M3StateLayer.ColorRole.Surface
         customStateColor: root.onSurfaceColor
-        isHovered: popupHover.hovered
+        isHovered: mouseArea.containsMouse
     }
     
-    HoverHandler {
-        id: popupHover
+    MouseArea {
+        id: mouseArea
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.LeftButton
+
+        onPressed: (mouse) => {
+            rippleEffect.trigger(mouse.x, mouse.y);
+        }
+
+        onClicked: {
+            root.expanded = !root.expanded;
+        }
     }
 
     ColumnLayout {

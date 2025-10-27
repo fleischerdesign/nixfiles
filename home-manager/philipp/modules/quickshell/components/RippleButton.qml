@@ -214,26 +214,24 @@ Rectangle {
     // INTERACTION HANDLERS
     // ========================================
     
-    HoverHandler {
-        id: hoverHandler
-        enabled: root.enabled
-    }
-    
-    TapHandler {
-        id: tapHandler
-        enabled: root.enabled
-        
-        onTapped: root.clicked()
-        
-        onPressedChanged: {
-            if (pressed) {
-                root.pressed();
-            } else {
-                root.released();
-            }
+    MouseArea {
+        id: mouseArea
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.LeftButton
+
+        onPressed: (mouse) => {
+            rippleEffect.trigger(mouse.x, mouse.y);
+            root.pressed();
         }
-        
-        onLongPressed: root.longPressed()
+
+        onReleased: {
+            root.released();
+        }
+
+        onClicked: {
+            root.clicked();
+        }
     }
     
     // ========================================
@@ -267,8 +265,8 @@ Rectangle {
         }
         
         customStateColor: root.autoContentColor
-        isHovered: hoverHandler.hovered && root.enabled
-        isPressed: tapHandler.pressed && root.enabled
+        isHovered: mouseArea.containsMouse && root.enabled
+        isPressed: mouseArea.pressed && root.enabled
     }
     
     // ========================================
@@ -276,11 +274,11 @@ Rectangle {
     // ========================================
     
     RippleEffect {
+        id: rippleEffect
         z: 2
         enabled: root.enabled
         rippleColor: root.autoContentColor
         parentRadius: root.radius
-        onClicked: root.clicked()
     }
 }
 
