@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import qs.services
 
 Scope {
     id: root
@@ -9,7 +10,7 @@ Scope {
     property bool shouldShow: false
     property real value: 0.0  // 0.0 bis 1.0
     property string icon: "circle"
-    property color barColor: "#ffffff"
+    property color barColor: ColorService.palette.m3OnSurface
     property int autoHideDelay: 2000
     
     // Layout-Eigenschaften
@@ -53,7 +54,7 @@ Scope {
             }
             
             radius: 13
-            color: "#000000"
+            color: ColorService.palette.m3SurfaceContainer
             
             ColumnLayout {
                 anchors.fill: parent
@@ -66,7 +67,7 @@ Scope {
                     Layout.alignment: Qt.AlignHCenter
                     width: 10
                     radius: 5
-                    color: "#50ffffff"
+                    color: ColorService.tPalette.m3OnSurface
                     
                     Rectangle {
                         anchors {
@@ -93,7 +94,7 @@ Scope {
                 // Icon
                 Text {
                     text: root.icon
-                    color: "white"
+                    color: ColorService.palette.m3OnSurface
                     font.family: "Material Symbols Rounded"
                     font.pixelSize: 24
                     Layout.alignment: Qt.AlignHCenter
