@@ -1,4 +1,3 @@
-import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import qs.components
@@ -6,101 +5,61 @@ import qs.modules
 import qs.services
 import qs.core
 
-PanelWindow {
-    id: notificationCenter
+Modal {
+    id: notificationCenterModal
 
     property bool shouldBeVisible: false
-    property var interceptor: null
 
-    Component {
-        id: interceptorComponent
-        ClickInterceptor {}
+    contentItem: contentRectangle
+    visible: false
+    onBackgroundClicked: {
+        StateManager.notificationCenterOpened = false;
     }
 
     Connections {
         target: StateManager
         function onNotificationCenterOpenedChanged() {
-            if (StateManager.notificationCenterOpened) {
-                if (interceptor === null) {
-                    interceptor = interceptorComponent.createObject(notificationCenter);
-                    interceptor.clicked.connect(function() {
-                        StateManager.notificationCenterOpened = false;
-                    });
-
-                    // Wait for the interceptor's window to actually be visible
-                    // before showing the notification center. This ensures the NC
-                    // is rendered on top of the interceptor.
-                    var connection = interceptor.backingWindowVisibleChanged.connect(function() {
-                        if (interceptor.backingWindowVisible) {
-                            notificationCenter.shouldBeVisible = true;
-                            // Disconnect to prevent this from firing again
-                            interceptor.backingWindowVisibleChanged.disconnect(connection);
-                        }
-                    });
-
-                    // Make the interceptor visible, which starts the process.
-                    interceptor.visible = true;
-                }
-            } else {
-                // Hide the notification center first
-                notificationCenter.shouldBeVisible = false;
-
-                // Then destroy the interceptor
-                if (interceptor !== null) {
-                    interceptor.destroy();
-                    interceptor = null;
-                }
-            }
+            shouldBeVisible = StateManager.notificationCenterOpened;
         }
     }
 
-    implicitWidth: 400
-    color: "transparent"
-    visible: false
-    anchors {
-        right: true
-        bottom: true
-        top: true
-    }
-    margins.bottom: 65 + 10
-    margins.top: 10
-    margins.right: shouldBeVisible ? 10 : -implicitWidth + 1
-    exclusiveZone: 0
-    
-    Behavior on margins.right {
-        NumberAnimation {
-            id: animation
-            duration: 200
-            easing.type: Easing.InOutQuad
-        }
-    }
-    
     onShouldBeVisibleChanged: {
         if (shouldBeVisible) {
             visible = true
             NotificationService.dismissAll();
+        } else {
+            // A short delay to allow the closing animation to finish
+            var timer = Qt.createQmlObject("import QtQuick; Timer {interval: 200; onTriggered: { notificationCenterModal.visible = false; } }", notificationCenterModal);
+            timer.start();
         }
     }
 
     Rectangle {
         id: contentRectangle
-        anchors.fill: parent
-        radius: 15
-        color: ColorService.palette.m3SurfaceContainer
-        opacity: shouldBeVisible ? 1.0 : 0.0
+        width: 400
+        anchors {
+            top: parent.top
+            bottom: parent.bottom
+            right: parent.right
+            bottomMargin: 65 + 10
+            topMargin: 10
+            rightMargin: shouldBeVisible ? 10 : -width
+        }
         
-        Behavior on opacity {
+        Behavior on anchors.rightMargin {
             NumberAnimation {
                 duration: 200
                 easing.type: Easing.InOutQuad
             }
         }
-
+        
+        radius: 15
+        color: ColorService.palette.m3SurfaceContainer
+        
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 15
             spacing: 10
-            visible: contentRectangle.opacity > 0
             
             RowLayout {
                 Layout.fillWidth: true
