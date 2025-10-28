@@ -10,7 +10,7 @@ import Quickshell.Wayland
 PanelWindow {
     id: bottomBarWindow
     property bool isOpen: false
-    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.layer: WlrLayer.Top
     Connections {
         target: StateManager
         function onNotificationCenterOpenedChanged() {
