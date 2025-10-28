@@ -168,7 +168,6 @@ PanelWindow {
                 
                 // Notification Center Button
                 QuickStatusButton {
-                    Layout.alignment: Qt.AlignVCenter
                     onClicked: {
                         StateManager.notificationCenterOpened = !StateManager.notificationCenterOpened
                     }
