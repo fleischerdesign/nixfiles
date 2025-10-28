@@ -227,9 +227,9 @@ Rectangle {
             if (pressed) {
                 rippleEffect.trigger(tapHandler.point.pressPosition.x, tapHandler.point.pressPosition.y);
                 root.pressed();
-                root.clicked();
             } else {
                 root.released();
+                root.clicked();
             }
         }
 
