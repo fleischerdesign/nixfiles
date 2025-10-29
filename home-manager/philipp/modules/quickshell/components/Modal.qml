@@ -13,6 +13,19 @@ PanelWindow {
 
     color: "transparent"
 
+    mask: Region {
+        item: bottomBarArea
+        intersection: Region.Intersection.Xor
+    }
+
+    Rectangle {
+        id: bottomBarArea
+        width: parent.width
+        height: 65
+        anchors.bottom: parent.bottom
+        visible: false
+    }
+
     anchors {
         top: true
         bottom: true
