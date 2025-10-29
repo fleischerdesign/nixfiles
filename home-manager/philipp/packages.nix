@@ -25,7 +25,6 @@
       pkgs.evince
       pkgs.nautilus
       pkgs.gnome-disk-utility
-      pkgs.quickemu
       pkgs.firefox
       (pkgs.callPackage ../../packages/lychee-slicer { })
       (pkgs.callPackage ../../packages/ficsit { })
