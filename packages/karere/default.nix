@@ -1,4 +1,4 @@
-{ lib, stdenv, fetchFromGitHub, meson, pkg-config, vala, gtk4, libadwaita, webkitgtk_6_0, json-glib, libgee, blueprint-compiler, desktop-file-utils, appstream, ninja, wrapGAppsHook, gsettings-desktop-schemas }:
+{ lib, stdenv, fetchFromGitHub, meson, pkg-config, vala, gtk4, libadwaita, webkitgtk_6_0, json-glib, libgee, blueprint-compiler, desktop-file-utils, appstream, ninja, wrapGAppsHook3, gsettings-desktop-schemas }:
 
 stdenv.mkDerivation rec {
   pname = "karere";
@@ -19,7 +19,7 @@ stdenv.mkDerivation rec {
     desktop-file-utils
     appstream
     ninja
-    wrapGAppsHook
+    wrapGAppsHook3
   ];
 
   buildInputs = [
