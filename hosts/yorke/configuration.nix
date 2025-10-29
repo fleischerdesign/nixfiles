@@ -20,5 +20,6 @@
     audio.pipewire.enable = true;
     desktop.gnome.enable = false;
     desktop.niri.enable = true;
+    gaming.enable = true;
   };
 }

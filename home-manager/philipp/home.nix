@@ -31,6 +31,24 @@
   # Let Home Manager install and manage itself.
   systemd.user.startServices = "sd-switch";
 
+xdg.desktopEntries."ls3d-handler" = {
+    # KORREKTUR 1: 'desktopName' heißt hier 'name'
+    name = "WBS Learnspace 3D Handler"; 
+    
+    exec = "/home/philipp/ls3d-handler.sh %u"; 
+    type = "Application";
+    terminal = false;
+    noDisplay = true;
+    
+    # KORREKTUR 2: 'mimeTypes' (Plural) heißt hier 'mimeType' (Singular)
+    mimeType = [ "x-scheme-handler/ls3d" ];
+  };
+
+  # Dieser Teil war schon korrekt und ist wichtig
+  xdg.mimeApps.defaultApplications = {
+    "x-scheme-handler/ls3d" = "ls3d-handler.desktop";
+  };
+
   programs = {
     home-manager.enable = true;
   };
