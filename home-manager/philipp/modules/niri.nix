@@ -12,6 +12,7 @@
       pkgs.adwaita-icon-theme
       pkgs.swww
       pkgs.brightnessctl
+      pkgs.libnotify
     ];
 
     programs.niri.settings = with config.lib.niri.actions; {
