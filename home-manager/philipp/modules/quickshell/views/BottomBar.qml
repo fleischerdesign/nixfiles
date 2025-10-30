@@ -116,7 +116,8 @@ PanelWindow {
                     Layout.alignment: Qt.AlignVCenter
                     style: M3Button.Style.FilledTonal
                     colorRole: M3Button.ColorRole.Surface
-                    iconOnly: true
+		    iconOnly: true
+		    icon: "apps"
                     fixedWidth: true
                     implicitHeight: 55
                 }
