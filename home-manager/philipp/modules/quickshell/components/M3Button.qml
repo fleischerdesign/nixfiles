@@ -1,4 +1,4 @@
-// home-manager/philipp/modules/quickshell/components/RippleButton.qml
+// home-manager/philipp/modules/quickshell/components/M3Button.qml
 // Material 3 Button Component mit vollständiger State Layer Integration
 
 import QtQuick
@@ -21,7 +21,7 @@ Rectangle {
         Text           // Text-only Button
     }
     
-    property int style: RippleButton.Style.Filled
+    property int style: M3Button.Style.Filled
     
     // --- M3 Color Roles ---
     enum ColorRole {
@@ -32,7 +32,7 @@ Rectangle {
         Error
     }
     
-    property int colorRole: RippleButton.ColorRole.Primary
+    property int colorRole: M3Button.ColorRole.Primary
     
     // --- Icon Support ---
     property string icon: ""
@@ -74,28 +74,28 @@ Rectangle {
     // Automatische Farbberechnung basierend auf Style & Role
     readonly property color autoBackgroundColor: {
         // Transparent für Text und Outlined
-        if (style === RippleButton.Style.Text || style === RippleButton.Style.Outlined) {
+        if (style === M3Button.Style.Text || style === M3Button.Style.Outlined) {
             return "transparent";
         }
         
         // Elevated nutzt Surface
-        if (style === RippleButton.Style.Elevated) {
+        if (style === M3Button.Style.Elevated) {
             return ColorService.layer(ColorService.palette.m3SurfaceContainerLow, 1);
         }
         
         // Filled und FilledTonal
-        const isTonal = style === RippleButton.Style.FilledTonal;
+        const isTonal = style === M3Button.Style.FilledTonal;
         
         switch (colorRole) {
-            case RippleButton.ColorRole.Primary:
+            case M3Button.ColorRole.Primary:
                 return isTonal ? ColorService.palette.m3PrimaryContainer : ColorService.palette.m3Primary;
-            case RippleButton.ColorRole.Secondary:
+            case M3Button.ColorRole.Secondary:
                 return isTonal ? ColorService.palette.m3SecondaryContainer : ColorService.palette.m3Secondary;
-            case RippleButton.ColorRole.Tertiary:
+            case M3Button.ColorRole.Tertiary:
                 return isTonal ? ColorService.palette.m3TertiaryContainer : ColorService.palette.m3Tertiary;
-            case RippleButton.ColorRole.Error:
+            case M3Button.ColorRole.Error:
                 return isTonal ? ColorService.palette.m3ErrorContainer : ColorService.palette.m3Error;
-            case RippleButton.ColorRole.Surface:
+            case M3Button.ColorRole.Surface:
             default:
                 return ColorService.palette.m3SurfaceContainerHigh;
         }
@@ -103,15 +103,15 @@ Rectangle {
     
     readonly property color autoContentColor: {
         // Text und Outlined verwenden Akzentfarbe als Text
-        if (style === RippleButton.Style.Text || style === RippleButton.Style.Outlined) {
+        if (style === M3Button.Style.Text || style === M3Button.Style.Outlined) {
             switch (colorRole) {
-                case RippleButton.ColorRole.Primary:
+                case M3Button.ColorRole.Primary:
                     return ColorService.palette.m3Primary;
-                case RippleButton.ColorRole.Secondary:
+                case M3Button.ColorRole.Secondary:
                     return ColorService.palette.m3Secondary;
-                case RippleButton.ColorRole.Tertiary:
+                case M3Button.ColorRole.Tertiary:
                     return ColorService.palette.m3Tertiary;
-                case RippleButton.ColorRole.Error:
+                case M3Button.ColorRole.Error:
                     return ColorService.palette.m3Error;
                 default:
                     return ColorService.palette.m3OnSurface;
@@ -119,23 +119,23 @@ Rectangle {
         }
         
         // Elevated nutzt Primary als Text
-        if (style === RippleButton.Style.Elevated) {
+        if (style === M3Button.Style.Elevated) {
             return ColorService.palette.m3Primary;
         }
         
         // Filled und FilledTonal
-        const isTonal = style === RippleButton.Style.FilledTonal;
+        const isTonal = style === M3Button.Style.FilledTonal;
         
         switch (colorRole) {
-            case RippleButton.ColorRole.Primary:
+            case M3Button.ColorRole.Primary:
                 return isTonal ? ColorService.palette.m3OnPrimaryContainer : ColorService.palette.m3OnPrimary;
-            case RippleButton.ColorRole.Secondary:
+            case M3Button.ColorRole.Secondary:
                 return isTonal ? ColorService.palette.m3OnSecondaryContainer : ColorService.palette.m3OnSecondary;
-            case RippleButton.ColorRole.Tertiary:
+            case M3Button.ColorRole.Tertiary:
                 return isTonal ? ColorService.palette.m3OnTertiaryContainer : ColorService.palette.m3OnTertiary;
-            case RippleButton.ColorRole.Error:
+            case M3Button.ColorRole.Error:
                 return isTonal ? ColorService.palette.m3OnErrorContainer : ColorService.palette.m3OnError;
-            case RippleButton.ColorRole.Surface:
+            case M3Button.ColorRole.Surface:
             default:
                 return ColorService.palette.m3OnSurface;
         }
@@ -148,7 +148,7 @@ Rectangle {
     color: autoBackgroundColor
     
     // Outline für Outlined Style
-    border.width: style === RippleButton.Style.Outlined ? 1 : 0
+    border.width: style === M3Button.Style.Outlined ? 1 : 0
     border.color: ColorService.palette.m3Outline
     
     // Elevation Shadow für Elevated Style
@@ -246,22 +246,22 @@ Rectangle {
         z: 1
         colorRole: {
             // State Layer nutzt immer "On"-Farbe des Buttons
-            if (root.style === RippleButton.Style.Text || 
-                root.style === RippleButton.Style.Outlined ||
-                root.style === RippleButton.Style.Elevated) {
+            if (root.style === M3Button.Style.Text || 
+                root.style === M3Button.Style.Outlined ||
+                root.style === M3Button.Style.Elevated) {
                 return M3StateLayer.ColorRole.Surface;
             }
             
             switch (root.colorRole) {
-                case RippleButton.ColorRole.Primary:
-                    return root.style === RippleButton.Style.FilledTonal 
+                case M3Button.ColorRole.Primary:
+                    return root.style === M3Button.Style.FilledTonal 
                         ? M3StateLayer.ColorRole.Primary 
                         : M3StateLayer.ColorRole.Primary;
-                case RippleButton.ColorRole.Secondary:
+                case M3Button.ColorRole.Secondary:
                     return M3StateLayer.ColorRole.Secondary;
-                case RippleButton.ColorRole.Tertiary:
+                case M3Button.ColorRole.Tertiary:
                     return M3StateLayer.ColorRole.Tertiary;
-                case RippleButton.ColorRole.Error:
+                case M3Button.ColorRole.Error:
                     return M3StateLayer.ColorRole.Error;
                 default:
                     return M3StateLayer.ColorRole.Surface;

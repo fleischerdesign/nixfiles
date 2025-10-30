@@ -86,9 +86,9 @@ Modal {
                     Layout.fillWidth: true
                 }
                 
-                RippleButton {
-                    style: RippleButton.Style.Filled
-                    colorRole: RippleButton.ColorRole.Primary
+                M3Button {
+                    style: M3Button.Style.Filled
+                    colorRole: M3Button.ColorRole.Primary
                     onClicked: {
                         const notifications = NotificationService.server.trackedNotifications.values;
                         for (let i = notifications.length - 1; i >= 0; i--) {

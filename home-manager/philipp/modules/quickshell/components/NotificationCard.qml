@@ -134,13 +134,13 @@ Rectangle {
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
-            RippleButton {
+            M3Button {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
-                style: RippleButton.Style.Text
+                style: M3Button.Style.Text
                 colorRole: root.notification && root.notification.urgency === 2 
-                    ? RippleButton.ColorRole.Error 
-                    : RippleButton.ColorRole.Surface
+                    ? M3Button.ColorRole.Error 
+                    : M3Button.ColorRole.Surface
                 icon: root.expanded ? "expand_less" : "expand_more"
                 iconOnly: true
                 iconSize: 18
@@ -158,13 +158,13 @@ Rectangle {
         
 
             // Close Button
-            RippleButton {
+            M3Button {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
-                style: RippleButton.Style.Text
+                style: M3Button.Style.Text
                 colorRole: root.notification && root.notification.urgency === 2 
-                    ? RippleButton.ColorRole.Error 
-                    : RippleButton.ColorRole.Surface
+                    ? M3Button.ColorRole.Error 
+                    : M3Button.ColorRole.Surface
                 icon: "close"
                 iconOnly: true
                 iconSize: 18
@@ -222,12 +222,12 @@ Rectangle {
                 Repeater {
                     model: (root.notification && root.notification.actions) ? root.notification.actions : []
 
-                    RippleButton {
+                    M3Button {
                         implicitHeight: 32
-                        style: RippleButton.Style.Filled
+                        style: M3Button.Style.Filled
                         colorRole: root.notification && root.notification.urgency === 2 
-                            ? RippleButton.ColorRole.Error 
-                            : RippleButton.ColorRole.Primary
+                            ? M3Button.ColorRole.Error 
+                            : M3Button.ColorRole.Primary
                         text: modelData ? modelData.text : ""
                         
                         onClicked: {

@@ -112,11 +112,10 @@ PanelWindow {
                 spacing: 10
                 
                 // App Launcher Button
-                RippleButton {
+                M3Button {
                     Layout.alignment: Qt.AlignVCenter
-                    style: RippleButton.Style.FilledTonal
-                    colorRole: RippleButton.ColorRole.Surface
-                    icon: "apps"
+                    style: M3Button.Style.FilledTonal
+                    colorRole: M3Button.ColorRole.Surface
                     iconOnly: true
                     fixedWidth: true
                     implicitHeight: 55
@@ -127,10 +126,10 @@ PanelWindow {
                 }
                 
                 // Clock Button
-                RippleButton {
+                M3Button {
                     Layout.alignment: Qt.AlignVCenter
-                    style: RippleButton.Style.FilledTonal
-                    colorRole: RippleButton.ColorRole.Surface
+                    style: M3Button.Style.FilledTonal
+                    colorRole: M3Button.ColorRole.Surface
                     fixedWidth: true
                     implicitHeight: 55
                     

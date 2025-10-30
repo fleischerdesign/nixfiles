@@ -6,17 +6,17 @@ import qs.components.status
 import qs.services
 import Quickshell.Services.UPower // Import für Batterie-Service
 
-RippleButton {
+M3Button {
     id: root
 
     property bool notificationCenterOpened: StateManager.notificationCenterOpened
 
     style: notificationCenterOpened
-        ? RippleButton.Style.Filled
-        : RippleButton.Style.FilledTonal
+        ? M3Button.Style.Filled
+        : M3Button.Style.FilledTonal
     colorRole: notificationCenterOpened
-        ? RippleButton.ColorRole.Primary
-        : RippleButton.ColorRole.Surface
+        ? M3Button.ColorRole.Primary
+        : M3Button.ColorRole.Surface
     
     implicitHeight: 55
 
