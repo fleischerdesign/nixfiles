@@ -34,6 +34,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    nix-vscode-extensions = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
   };
 
   outputs =
@@ -59,7 +64,7 @@
           system = "x86_64-linux";
           hostname = "yorke";
           inputs = inputs;
-          overlays = [ (import ./overlays/pip-on-top) ];
+          overlays = [ (import ./overlays/pip-on-top) inputs.nix-vscode-extensions.overlays.default ];
           users = [
             {
               name = "philipp";
@@ -71,7 +76,7 @@
           system = "x86_64-linux";
           hostname = "jello";
           inputs = inputs;
-          overlays = [ (import ./overlays/pip-on-top) ];
+          overlays = [ (import ./overlays/pip-on-top) inputs.nix-vscode-extensions.overlays.default ];
           users = [
             {
               name = "philipp";

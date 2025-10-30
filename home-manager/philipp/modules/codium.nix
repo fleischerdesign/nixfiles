@@ -12,7 +12,7 @@
       mutableExtensionsDir = false;
 
       profiles.default = {
-        extensions = with pkgs.vscode-extensions; [
+        extensions = with pkgs.vscode-marketplace; [
           prisma.prisma
           bradlc.vscode-tailwindcss
           vue.volar
@@ -27,6 +27,7 @@
           vscjava.vscode-java-dependency
           visualstudioexptteam.vscodeintellicode
           dbaeumer.vscode-eslint
+	  bbenoist.qml
         ];
         userSettings = {
           "extensions.autoUpdate" = false;
