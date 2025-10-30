@@ -167,7 +167,7 @@ PanelWindow {
                 
                 
                 // Notification Center Button
-                QuickStatusButton {
+                StatusButton {
                     onClicked: {
                         StateManager.notificationCenterOpened = !StateManager.notificationCenterOpened
                     }

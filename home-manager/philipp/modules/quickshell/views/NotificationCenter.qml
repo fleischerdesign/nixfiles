@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.components
-import qs.modules
 import qs.services
 import qs.core
 
@@ -114,7 +113,7 @@ Modal {
                 clip: true
                 model: NotificationService.server.trackedNotifications
                 
-                delegate: NotificationPopup {
+                delegate: NotificationCard {
                     width: notificationList.width
                     notification: modelData
                     onDismissRequested: modelData.dismiss()

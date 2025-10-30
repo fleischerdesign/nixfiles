@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.services
-import qs.modules
+import qs.components
 
 Scope {
     id: root
@@ -20,7 +20,7 @@ Scope {
         onTriggered: osd.shouldShow = false
     }
 
-    GenericOSD {
+    OSD {
         id: osd
         value: BrightnessService.currentBrightness
         icon: {

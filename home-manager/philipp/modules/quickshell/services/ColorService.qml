@@ -95,7 +95,7 @@ Singleton {
     // --- Dateibetrachtung für Farbschema (Annahme für Pfad) ---
     FileView {
         // path: `${Paths.state}/scheme.json` // Annahme: Paths.state ist definiert
-        path: "/etc/nixos/home-manager/philipp/modules/quickshell/material-theme.json" // Pfad zur material-theme.json im Root-Verzeichnis
+        path: System.getenv("QS_CONFIG_PATH") + "material-theme.json"
         watchChanges: true
         onFileChanged: reload()
         onLoaded: root.load(text(), false)

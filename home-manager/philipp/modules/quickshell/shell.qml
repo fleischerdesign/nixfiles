@@ -3,12 +3,12 @@ import QtQuick
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.core
-import qs.modules
+import qs.views
 
 ShellRoot {
     VolumeOSD {}
     BrightnessOSD {}
-    NotificationPopupWindow {}
+    NotificationHost {}
 
     NotificationCenter {
         id: nc

@@ -1,7 +1,7 @@
 import Quickshell
 import QtQuick
 import qs.services
-import qs.modules
+import qs.components
 
 // REINE UI - keine Business Logic
 PanelWindow {
@@ -46,7 +46,7 @@ PanelWindow {
                 width: popupColumn.width
                 height: popup.height
                 
-                NotificationPopup {
+                NotificationCard {
                     id: popup
                     width: parent.width
                     notification: model.notification
