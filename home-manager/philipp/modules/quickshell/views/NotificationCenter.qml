@@ -64,7 +64,6 @@ Modal {
         
         // Performance-Boost: Rendere als GPU-Texture
         layer.enabled: true
-        layer.smooth: true
         
         radius: 15
         color: ColorService.palette.m3SurfaceContainer
