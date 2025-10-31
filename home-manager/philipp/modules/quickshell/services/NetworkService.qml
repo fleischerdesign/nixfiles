@@ -10,6 +10,7 @@ Singleton {
     // --- Properties ---
     property bool wifiEnabled: false
     property var wifiNetworks: []
+    property bool ethernetConnected: false
     property bool isScanning: false
 
     // --- Methods ---
@@ -17,6 +18,7 @@ Singleton {
         // This will be called to update the network state
         if (isScanning) return;
         getWifiRadioStateProcess.running = true;
+        getEthernetStateProcess.running = true;
         listNetworksProcess.running = true;
     }
 
@@ -60,6 +62,35 @@ Singleton {
         onExited: (exitCode) => {
             if (exitCode !== 0) {
                 console.error("NetworkService: Failed to get WiFi radio state. Is nmcli installed and in PATH?");
+            }
+        }
+    }
+
+    // Process to get the Ethernet connection state
+    Process {
+        id: getEthernetStateProcess
+        command: ["nmcli", "-t", "-f", "TYPE,STATE", "d", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let output = this.text.trim();
+                let isConnected = false;
+                if (output) {
+                    const lines = output.split('
+');
+                    for (const line of lines) {
+                        const parts = line.split(':');
+                        if (parts.length >= 2 && parts[0] === 'ethernet' && parts[1] === 'connected') {
+                            isConnected = true;
+                            break;
+                        }
+                    }
+                }
+                root.ethernetConnected = isConnected;
+            }
+        }
+        onExited: (exitCode) => {
+            if (exitCode !== 0) {
+                console.error("NetworkService: Failed to get Ethernet state.");
             }
         }
     }
