@@ -33,8 +33,13 @@ M3Button {
         id: statusIcons
         spacing: 8
 
+        EthernetIcon {
+            iconColor: root._iconColor
+        }
+
         WifiIcon {
             iconColor: root._iconColor
+            visible: !NetworkService.ethernetConnected
         }
 
         VolumeIcon {
