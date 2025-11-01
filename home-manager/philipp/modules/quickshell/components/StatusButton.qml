@@ -46,6 +46,11 @@ M3Button {
             iconColor: root._iconColor
         }
 
+        MicrophoneIcon {
+            iconColor: root._iconColor
+            visible: AudioService.microphoneMuted
+        }
+
         BatteryIcon {
             iconColor: root._iconColor
         }

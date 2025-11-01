@@ -10,11 +10,12 @@ Singleton {
     // Components should use the methods below to request changes.
     readonly property double volume: Pipewire.defaultAudioSink?.audio.volume ?? 0.0
     readonly property bool muted: Pipewire.defaultAudioSink?.audio.muted ?? false
+    readonly property bool microphoneMuted: Pipewire.defaultAudioSource?.audio.muted ?? false
     property double volumeStep: 0.05 // Configurable step for volume changes
 
     // Internal Pipewire Handling
     PwObjectTracker {
-        objects: [Pipewire.defaultAudioSink]
+        objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource]
     }
 
     // Methods for controlling audio
@@ -38,6 +39,12 @@ Singleton {
     function toggleMute() {
         if (Pipewire.defaultAudioSink?.audio) {
             Pipewire.defaultAudioSink.audio.muted = !Pipewire.defaultAudioSink.audio.muted;
+        }
+    }
+
+    function toggleMicrophoneMute() {
+        if (Pipewire.defaultAudioSource?.audio) {
+            Pipewire.defaultAudioSource.audio.muted = !Pipewire.defaultAudioSource.audio.muted;
         }
     }
 }
