@@ -42,6 +42,10 @@ M3Button {
             visible: !NetworkService.ethernetConnected
         }
 
+        BluetoothIcon {
+            iconColor: root._iconColor
+        }
+
         VolumeIcon {
             iconColor: root._iconColor
         }
