@@ -13,7 +13,7 @@ in
 
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   boot.kernelPackages = pkgs.linuxPackages_testing;
-  
+
   # Boot loader configuration
   my.nixos = {
     boot.enable = true;

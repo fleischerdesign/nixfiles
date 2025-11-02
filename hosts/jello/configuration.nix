@@ -18,7 +18,7 @@
       "adbusers"
     ];
   };
-  
+
   programs.adb.enable = true;
 
   my.nixos = {

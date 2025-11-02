@@ -15,7 +15,7 @@
         useOSProber = true; # Findet andere OS automatisch
 
         # Optional: Schöneres Theme
-        theme = pkgs.sleek-grub-theme;
+        theme = pkgs.nixos-grub2-theme;
       };
 
       efi = {

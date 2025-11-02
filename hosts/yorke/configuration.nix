@@ -1,5 +1,11 @@
 # /etc/nixos/hosts/yorke/configuration.nix
-{ inputs, config, lib, pkgs, ... }:
+{
+  inputs,
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   imports = [
     ./hardware-configuration.nix
@@ -11,7 +17,11 @@
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Fleischer";
-    extraGroups = [ "networkmanager" "wheel" "adbusers" ];
+    extraGroups = [
+      "networkmanager"
+      "wheel"
+      "adbusers"
+    ];
   };
 
   system.stateVersion = "24.05";
