@@ -11,6 +11,9 @@ PanelWindow {
     id: bottomBarWindow
     property bool isOpen: false
     WlrLayershell.layer: WlrLayer.Top
+
+    signal appLauncherClicked()
+
     Connections {
         target: StateManager
         function onNotificationCenterOpenedChanged() {
@@ -120,6 +123,7 @@ PanelWindow {
 		    icon: "apps"
                     fixedWidth: true
                     implicitHeight: 55
+                    onClicked: bottomBarWindow.appLauncherClicked()
                 }
                 
                 Item {

@@ -4,8 +4,18 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.core
 import qs.views
+import qs.components
 
 ShellRoot {
+    AppLauncher {
+        id: appLauncher
+        onAppLaunched: (appName) => {
+            // TODO: Implement actual application launching logic
+            console.log("Request to launch:", appName)
+            appLauncher.visible = false
+        }
+    }
+
     VolumeOSD {}
     BrightnessOSD {}
     NotificationHost {}
@@ -44,5 +54,6 @@ ShellRoot {
     
     BottomBar {
         id: bottomBarWindow
+        onAppLauncherClicked: appLauncher.toggle()
     }
 }
