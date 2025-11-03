@@ -14,15 +14,58 @@ import Quickshell.Widgets
 Modal {
     id: appLauncherModal
 
-    // Point to the content item
-    contentItem: launcherContent
+    // --- Data Models ---
+
+    // 1. A clean, JS-friendly copy of all applications.
+    // This is populated once at startup by the Repeater below.
+    ListModel {
+        id: allAppsModel
+    }
+
+    // 2. The model that is actually displayed by the GridView.
+    // This is the target for our filtering logic.
+    ListModel {
+        id: filteredAppsModel
+    }
+
+    // 3. An invisible Repeater that bridges the C++ model to our clean ListModel.
+    Repeater {
+        model: DesktopEntries.applications
+        delegate: Item {
+            required property var modelData
+            Component.onCompleted: {
+                var keywordString = ""
+                if (modelData.keywords && typeof modelData.keywords.length !== 'undefined') {
+                    for (var i = 0; i < modelData.keywords.length; i++) {
+                        keywordString += modelData.keywords[i] + " "
+                    }
+                }
+
+                allAppsModel.append({
+                    "name": modelData.name,
+                    "icon": modelData.icon,
+                    "genericName": modelData.genericName,
+                    "keywords": keywordString, // Store the pre-joined string
+                    "entryObject": modelData // Store original object to call execute()
+                })
+            }
+        }
+    }
 
     // --- Behavior ---
+
+    Component.onCompleted: {
+        // Use a short timer to ensure the Repeater has finished its one-time population.
+        var timer = Qt.createQmlObject("import QtQuick; Timer {interval: 50; running: true; onTriggered: { appLauncherModal.updateFilter() } }", appLauncherModal);
+    }
+
     visible: false
 
     onVisibleChanged: {
         if (visible) {
-            searchInput.forceActiveFocus();
+            searchInput.text = "" // Clear search on open
+            updateFilter()
+            searchInput.forceActiveFocus()
         }
     }
 
@@ -30,14 +73,44 @@ Modal {
         visible = false
     }
 
-    // --- Signals & API ---
+    // --- Functions & Signals ---
+
     signal appLaunched(string appName)
 
     function toggle() {
         visible = !visible;
     }
 
+    function updateFilter() {
+        filteredAppsModel.clear()
+        const searchText = searchInput.text.toLowerCase()
+
+        for (var i = 0; i < allAppsModel.count; i++) {
+            const entry = allAppsModel.get(i)
+
+            if (searchText === "") {
+                filteredAppsModel.append(entry)
+                continue
+            }
+
+            // Search in name, generic name, and keywords
+            const name = entry.name ? entry.name.toLowerCase() : ""
+            const generic = entry.genericName ? entry.genericName.toLowerCase() : ""
+            const keywords = entry.keywords ? entry.keywords.toLowerCase() : "" // entry.keywords is now a string
+            const searchableString = name + " " + generic + " " + keywords
+
+            if (searchableString.includes(searchText)) {
+                filteredAppsModel.append(entry)
+            }
+        }
+    }
+
     // --- Visual Content Definition ---
+
+    contentItem: launcherContent
+
+    // --- Visual Content Definition ---
+
     Rectangle {
         id: launcherContent
 
@@ -47,7 +120,6 @@ Modal {
         color: ColorService.palette.m3SurfaceContainerHigh
         clip: true
 
-        // Position the launcher content above the bottom bar
         anchors {
             left: parent.left
             bottom: parent.bottom
@@ -74,10 +146,9 @@ Modal {
                     anchors.rightMargin: 20
                     font.pixelSize: 18
                     placeholderText: "Anwendungen suchen..."
-                    background: null // Remove the default TextField background
+                    background: null
                     color: ColorService.palette.m3OnSurface
-
-                    // TODO: Implement search logic to filter the GridView model
+                    onTextChanged: appLauncherModal.updateFilter()
                 }
             }
 
@@ -89,8 +160,8 @@ Modal {
                 clip: true
                 cellWidth: 120
                 cellHeight: 120
+                model: filteredAppsModel // Bind to the clean, filtered model
 
-                // Explicitly remove any potential top spacing
                 header: null
 
                 ScrollBar.vertical: ScrollBar {
@@ -105,8 +176,6 @@ Modal {
                     }
                 }
 
-                model: DesktopEntries.applications
-
                 delegate: Item {
                     width: appGrid.cellWidth
                     height: appGrid.cellHeight
@@ -118,14 +187,14 @@ Modal {
                         IconImage {
                             Layout.alignment: Qt.AlignHCenter
                             implicitSize: 64
-                            source: "image://icon/" + modelData.icon
+                            source: "image://icon/" + model.icon
                             mipmap: true
                             asynchronous: true
                         }
 
                         Text {
                             Layout.fillWidth: true
-                            text: modelData.name
+                            text: model.name
                             color: ColorService.palette.m3OnSurface
                             font.pixelSize: 14
                             horizontalAlignment: Text.AlignHCenter
@@ -136,7 +205,7 @@ Modal {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            modelData.execute()
+                            model.entryObject.execute()
                             appLauncherModal.visible = false
                         }
                     }
