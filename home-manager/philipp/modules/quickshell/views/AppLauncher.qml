@@ -146,23 +146,41 @@ Modal {
                     anchors.rightMargin: 20
                     font.pixelSize: 18
                     placeholderText: "Anwendungen suchen..."
+                    placeholderTextColor: ColorService.palette.m3OnSurfaceVariant
                     background: null
                     color: ColorService.palette.m3OnSurface
                     onTextChanged: appLauncherModal.updateFilter()
+
+                    Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_Down) {
+                            appListView.forceActiveFocus()
+                            appListView.currentIndex = 0
+                            event.accepted = true
+                        }
+                    }
                 }
             }
 
             // 2. App Grid
-            GridView {
-                id: appGrid
+            ListView {
+                id: appListView
+                focus: true // Allow the list to receive keyboard focus
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                cellWidth: 120
-                cellHeight: 120
+                spacing: 4
+
                 model: filteredAppsModel // Bind to the clean, filtered model
 
-                header: null
+                Keys.onPressed: (event) => {
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        if (currentIndex >= 0) {
+                            model.get(currentIndex).entryObject.execute()
+                            appLauncherModal.visible = false
+                        }
+                        event.accepted = true
+                    }
+                }
 
                 ScrollBar.vertical: ScrollBar {
                     policy: ScrollBar.AsNeeded
@@ -176,38 +194,74 @@ Modal {
                     }
                 }
 
-                delegate: Item {
-                    width: appGrid.cellWidth
-                    height: appGrid.cellHeight
+                delegate: Rectangle {
+                    id: delegateRoot
+                    width: appListView.width
+                    height: 55
+                    radius: 8
+                    color: "transparent" // Visual feedback is handled by the state layer
+                    clip: true
 
-                    ColumnLayout {
+                    property bool isCurrent: ListView.isCurrentItem
+
+                    // --- Content (on top) ---
+                    Item {
                         anchors.fill: parent
-                        spacing: 8
+                        z: 2
 
                         IconImage {
-                            Layout.alignment: Qt.AlignHCenter
-                            implicitSize: 64
+                            id: icon
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitSize: 32
                             source: "image://icon/" + model.icon
                             mipmap: true
                             asynchronous: true
                         }
 
-                        Text {
-                            Layout.fillWidth: true
-                            text: model.name
-                            color: ColorService.palette.m3OnSurface
-                            font.pixelSize: 14
-                            horizontalAlignment: Text.AlignHCenter
-                            wrapMode: Text.WordWrap
+                        ColumnLayout {
+                            anchors.left: icon.right
+                            anchors.leftMargin: 15
+                            anchors.right: parent.right
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 2
+
+                            Text {
+                                text: model.name
+                                font.pixelSize: 14
+                                elide: Text.ElideRight
+                                color: ColorService.palette.m3OnSurface
+                            }
+                            Text {
+                                text: model.genericName
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+                                visible: text !== ""
+                                color: ColorService.palette.m3OnSurfaceVariant
+                            }
                         }
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
+                    // --- Input Handlers (non-visual) ---
+                    HoverHandler { id: hoverHandler }
+
+                    TapHandler {
+                        id: tapHandler
+                        onTapped: {
                             model.entryObject.execute()
                             appLauncherModal.visible = false
                         }
+                    }
+
+                    // --- Feedback Layer (in the back) ---
+                    M3StateLayer {
+                        anchors.fill: parent
+                        z: 1
+                        isHovered: hoverHandler.hovered
+                        isPressed: tapHandler.pressed || delegateRoot.isCurrent
+                        colorRole: M3StateLayer.ColorRole.Surface
                     }
                 }
             }
