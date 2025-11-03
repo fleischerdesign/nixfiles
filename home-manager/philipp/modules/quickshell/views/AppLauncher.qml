@@ -5,6 +5,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import qs.services
 import qs.components
+import Quickshell
+import Quickshell.Widgets
 
 // AppLauncher.qml
 // A self-contained Modal component for the application launcher.
@@ -39,7 +41,7 @@ Modal {
     Rectangle {
         id: launcherContent
 
-        width: 500
+        width: 510
         height: 600
         radius: 15
         color: ColorService.palette.m3SurfaceContainerHigh
@@ -55,12 +57,13 @@ Modal {
 
         ColumnLayout {
             anchors.fill: parent
+            anchors.margins: 15
+            spacing: 15
 
             // 1. Search Bar
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 50
-                Layout.margins: 20
                 radius: 25
                 color: ColorService.palette.m3SurfaceContainerLowest
                 
@@ -83,44 +86,59 @@ Modal {
                 id: appGrid
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.margins: 10
-
+                clip: true
                 cellWidth: 120
                 cellHeight: 120
 
-                model: ListModel {
-                    ListElement { appName: "Firefox"; appIcon: "web-browser" }
-                    ListElement { appName: "Terminal"; appIcon: "utilities-terminal" }
-                    ListElement { appName: "Dateien"; appIcon: "system-file-manager" }
-                    ListElement { appName: "Editor"; appIcon: "accessories-text-editor" }
-                    ListElement { appName: "Einstellungen"; appIcon: "system-settings" }
-                    ListElement { appName: "Rechner"; appIcon: "accessories-calculator" }
+                // Explicitly remove any potential top spacing
+                header: null
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                    width: 8
+                    background: Rectangle { color: "transparent" }
+                    contentItem: Rectangle {
+                        implicitWidth: 8
+                        radius: 4
+                        color: ColorService.palette.m3Outline
+                        opacity: 0.5
+                    }
                 }
 
-                delegate: ColumnLayout {
+                model: DesktopEntries.applications
+
+                delegate: Item {
                     width: appGrid.cellWidth
                     height: appGrid.cellHeight
-                    spacing: 8
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        spacing: 8
+
+                        IconImage {
+                            Layout.alignment: Qt.AlignHCenter
+                            implicitSize: 64
+                            source: "image://icon/" + modelData.icon
+                            mipmap: true
+                            asynchronous: true
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: modelData.name
+                            color: ColorService.palette.m3OnSurface
+                            font.pixelSize: 14
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.WordWrap
+                        }
+                    }
 
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: appLauncherModal.appLaunched(appName)
-                    }
-
-                    Image {
-                        Layout.alignment: Qt.AlignHCenter
-                        width: 64
-                        height: 64
-                        source: "qrc:/icons/" + appIcon + ".svg" // Placeholder path
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: appName
-                        color: ColorService.palette.m3OnSurface
-                        font.pixelSize: 14
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
+                        onClicked: {
+                            modelData.execute()
+                            appLauncherModal.visible = false
+                        }
                     }
                 }
             }
