@@ -7,6 +7,7 @@ import qs.services
 import qs.components
 import Quickshell
 import Quickshell.Widgets
+import qs.core
 
 // AppLauncher.qml
 // A self-contained Modal component for the application launcher.
@@ -18,8 +19,19 @@ Modal {
 
     // 1. A clean, JS-friendly copy of all applications.
     // This is populated once at startup by the Repeater below.
+    Timer {
+        id: filterDebounceTimer
+        interval: 10
+        onTriggered: appLauncherModal.updateFilter()
+    }
+
     ListModel {
         id: allAppsModel
+        onCountChanged: {
+            // Debounce the filter update. This is more robust than a fixed timer.
+            // It waits until the repeater has stopped adding items for 10ms.
+            filterDebounceTimer.restart()
+        }
     }
 
     // 2. The model that is actually displayed by the GridView.
@@ -54,23 +66,27 @@ Modal {
 
     // --- Behavior ---
 
-    Component.onCompleted: {
-        // Use a short timer to ensure the Repeater has finished its one-time population.
-        var timer = Qt.createQmlObject("import QtQuick; Timer {interval: 50; running: true; onTriggered: { appLauncherModal.updateFilter() } }", appLauncherModal);
-    }
-
     visible: false
 
-    onVisibleChanged: {
-        if (visible) {
-            searchInput.text = "" // Clear search on open
-            updateFilter()
-            searchInput.forceActiveFocus()
+    Component.onCompleted: {
+        // Initialize visibility from StateManager
+        visible = StateManager.appLauncherOpened
+    }
+
+    Connections {
+        target: StateManager
+        function onAppLauncherOpenedChanged() {
+            visible = StateManager.appLauncherOpened
+            if (visible) {
+                searchInput.text = "" // Clear search on open
+                updateFilter()
+                searchInput.forceActiveFocus()
+            }
         }
     }
 
     onBackgroundClicked: {
-        visible = false
+        StateManager.appLauncherOpened = false
     }
 
     // --- Functions & Signals ---
@@ -78,7 +94,7 @@ Modal {
     signal appLaunched(string appName)
 
     function toggle() {
-        visible = !visible;
+        StateManager.appLauncherOpened = !StateManager.appLauncherOpened
     }
 
     function updateFilter() {
@@ -119,6 +135,7 @@ Modal {
         radius: 15
         color: ColorService.palette.m3SurfaceContainerHigh
         clip: true
+        layer.enabled: true
 
         anchors {
             left: parent.left
@@ -157,6 +174,10 @@ Modal {
                             appListView.currentIndex = 0
                             event.accepted = true
                         }
+                        if (event.key === Qt.Key_Escape) {
+                            StateManager.appLauncherOpened = false
+                            event.accepted = true
+                        }
                     }
                 }
             }
@@ -176,8 +197,12 @@ Modal {
                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         if (currentIndex >= 0) {
                             model.get(currentIndex).entryObject.execute()
-                            appLauncherModal.visible = false
+                            StateManager.appLauncherOpened = false
                         }
+                        event.accepted = true
+                    }
+                    if (event.key === Qt.Key_Escape) {
+                        StateManager.appLauncherOpened = false
                         event.accepted = true
                     }
                 }
@@ -251,7 +276,7 @@ Modal {
                         id: tapHandler
                         onTapped: {
                             model.entryObject.execute()
-                            appLauncherModal.visible = false
+                            StateManager.appLauncherOpened = false
                         }
                     }
 

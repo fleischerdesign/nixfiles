@@ -17,7 +17,12 @@ PanelWindow {
     Connections {
         target: StateManager
         function onNotificationCenterOpenedChanged() {
-            if (!StateManager.notificationCenterOpened && !barHover.hovered) {
+            if (!StateManager.notificationCenterOpened && !StateManager.appLauncherOpened && !barHover.hovered) {
+                bottomBarWindow.isOpen = false;
+            }
+        }
+        function onAppLauncherOpenedChanged() {
+            if (!StateManager.notificationCenterOpened && !StateManager.appLauncherOpened && !barHover.hovered) {
                 bottomBarWindow.isOpen = false;
             }
         }
@@ -73,7 +78,7 @@ PanelWindow {
             HoverHandler {
                 id: barHover
                 onHoveredChanged: {
-                    if (!hovered && !StateManager.notificationCenterOpened) {
+                    if (!hovered && !StateManager.notificationCenterOpened && !StateManager.appLauncherOpened) {
                         bottomBarWindow.isOpen = false;
                     }
                 }
@@ -116,14 +121,22 @@ PanelWindow {
                 
                 // App Launcher Button
                 M3Button {
+                    property bool appLauncherOpened: StateManager.appLauncherOpened
+
                     Layout.alignment: Qt.AlignVCenter
-                    style: M3Button.Style.FilledTonal
-                    colorRole: M3Button.ColorRole.Surface
-		    iconOnly: true
+                    style: appLauncherOpened ? M3Button.Style.Filled : M3Button.Style.FilledTonal
+                    colorRole: appLauncherOpened ? M3Button.ColorRole.Primary : M3Button.ColorRole.Surface
 		    icon: "apps"
                     fixedWidth: true
                     implicitHeight: 55
                     onClicked: bottomBarWindow.appLauncherClicked()
+
+                    Connections {
+                        target: StateManager
+                        function onAppLauncherOpenedChanged() {
+                            appLauncherOpened = StateManager.appLauncherOpened
+                        }
+                    }
                 }
                 
                 Item {
