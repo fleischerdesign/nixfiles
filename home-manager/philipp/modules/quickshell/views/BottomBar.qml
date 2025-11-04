@@ -121,6 +121,7 @@ PanelWindow {
                 
                 // App Launcher Button
                 M3Button {
+                    id: appLauncherButton
                     property bool appLauncherOpened: StateManager.appLauncherOpened
 
                     Layout.alignment: Qt.AlignVCenter
@@ -134,7 +135,7 @@ PanelWindow {
                     Connections {
                         target: StateManager
                         function onAppLauncherOpenedChanged() {
-                            appLauncherOpened = StateManager.appLauncherOpened
+                            appLauncherButton.appLauncherOpened = StateManager.appLauncherOpened
                         }
                     }
                 }
