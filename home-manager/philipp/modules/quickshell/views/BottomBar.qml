@@ -17,12 +17,16 @@ PanelWindow {
     Connections {
         target: StateManager
         function onNotificationCenterOpenedChanged() {
-            if (!StateManager.notificationCenterOpened && !StateManager.appLauncherOpened && !barHover.hovered) {
+            if (StateManager.notificationCenterOpened) {
+                bottomBarWindow.isOpen = true;
+            } else if (!StateManager.appLauncherOpened && !barHover.hovered) {
                 bottomBarWindow.isOpen = false;
             }
         }
         function onAppLauncherOpenedChanged() {
-            if (!StateManager.notificationCenterOpened && !StateManager.appLauncherOpened && !barHover.hovered) {
+            if (StateManager.appLauncherOpened) {
+                bottomBarWindow.isOpen = true;
+            } else if (!StateManager.notificationCenterOpened && !barHover.hovered) {
                 bottomBarWindow.isOpen = false;
             }
         }

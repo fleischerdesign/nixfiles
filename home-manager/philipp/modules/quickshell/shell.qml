@@ -51,6 +51,19 @@ ShellRoot {
             sessionLocker.locked = true;
         }
     }
+
+    IpcHandler {
+        target: "applauncher"
+        function open(): void {
+            StateManager.appLauncherOpened = true;
+        }
+        function close(): void {
+            StateManager.appLauncherOpened = false;
+        }
+        function toggle(): void {
+            StateManager.appLauncherOpened = !StateManager.appLauncherOpened;
+        }
+    }
     
     BottomBar {
         id: bottomBarWindow

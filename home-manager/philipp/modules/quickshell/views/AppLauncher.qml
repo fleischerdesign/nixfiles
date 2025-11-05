@@ -169,6 +169,13 @@ Modal {
                     onTextChanged: appLauncherModal.updateFilter()
 
                     Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (appListView.currentIndex >= 0) {
+                                filteredAppsModel.get(appListView.currentIndex).entryObject.execute()
+                                StateManager.appLauncherOpened = false
+                            }
+                            event.accepted = true
+                        }
                         if (event.key === Qt.Key_Down) {
                             appListView.forceActiveFocus()
                             appListView.currentIndex = 0
