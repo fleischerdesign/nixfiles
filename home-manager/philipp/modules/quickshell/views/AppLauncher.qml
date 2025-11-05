@@ -183,110 +183,145 @@ Modal {
             }
 
             // 2. App Grid
-            ListView {
-                id: appListView
-                focus: true // Allow the list to receive keyboard focus
+            Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                spacing: 4
+                color: "transparent"
 
-                model: filteredAppsModel // Bind to the clean, filtered model
+                ListView {
+                    id: appListView
+                    focus: true // Allow the list to receive keyboard focus
+                    anchors.fill: parent
+                    spacing: 4
 
-                Keys.onPressed: (event) => {
-                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        if (currentIndex >= 0) {
-                            model.get(currentIndex).entryObject.execute()
-                            StateManager.appLauncherOpened = false
+                    model: filteredAppsModel // Bind to the clean, filtered model
+
+                    Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (currentIndex >= 0) {
+                                model.get(currentIndex).entryObject.execute()
+                                StateManager.appLauncherOpened = false
+                            }
+                            event.accepted = true
                         }
-                        event.accepted = true
+                        if (event.key === Qt.Key_Escape) {
+                            StateManager.appLauncherOpened = false
+                            event.accepted = true
+                        }
                     }
-                    if (event.key === Qt.Key_Escape) {
-                        StateManager.appLauncherOpened = false
-                        event.accepted = true
+
+                    ScrollBar.vertical: ScrollBar {
+                        policy: ScrollBar.AsNeeded
+                        width: 8
+                        background: Rectangle { color: "transparent" }
+                        contentItem: Rectangle {
+                            implicitWidth: 8
+                            radius: 4
+                            color: ColorService.palette.m3Outline
+                            opacity: 0.5
+                        }
+                    }
+
+                    delegate: Rectangle {
+                        id: delegateRoot
+                        width: appListView.width
+                        height: 55
+                        radius: 8
+                        color: "transparent" // Visual feedback is handled by the state layer
+                        clip: true
+
+                        property bool isCurrent: ListView.isCurrentItem
+
+                        // --- Content (on top) ---
+                        Item {
+                            anchors.fill: parent
+                            z: 2
+
+                            IconImage {
+                                id: icon
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                implicitSize: 32
+                                source: "image://icon/" + model.icon
+                                mipmap: true
+                                asynchronous: true
+                            }
+
+                            ColumnLayout {
+                                anchors.left: icon.right
+                                anchors.leftMargin: 15
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Text {
+                                    text: model.name
+                                    font.pixelSize: 14
+                                    elide: Text.ElideRight
+                                    color: ColorService.palette.m3OnSurface
+                                }
+                                Text {
+                                    text: model.genericName
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                    visible: text !== ""
+                                    color: ColorService.palette.m3OnSurfaceVariant
+                                }
+                            }
+                        }
+
+                        // --- Input Handlers (non-visual) ---
+                        HoverHandler { id: hoverHandler }
+
+                        TapHandler {
+                            id: tapHandler
+                            onTapped: {
+                                model.entryObject.execute()
+                                StateManager.appLauncherOpened = false
+                            }
+                        }
+
+                        // --- Feedback Layer (in the back) ---
+                        M3StateLayer {
+                            anchors.fill: parent
+                            z: 1
+                            isHovered: hoverHandler.hovered
+                            isPressed: tapHandler.pressed || delegateRoot.isCurrent
+                            colorRole: M3StateLayer.ColorRole.Surface
+                        }
                     }
                 }
 
-                ScrollBar.vertical: ScrollBar {
-                    policy: ScrollBar.AsNeeded
-                    width: 8
-                    background: Rectangle { color: "transparent" }
-                    contentItem: Rectangle {
-                        implicitWidth: 8
-                        radius: 4
-                        color: ColorService.palette.m3Outline
-                        opacity: 0.5
+                // Fade out at the top
+                Rectangle {
+                    anchors.top: parent.top
+                    width: parent.width
+                    height: 15
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: ColorService.palette.m3SurfaceContainerHigh }
+                        GradientStop { position: 1.0; color: "transparent" }
+                    }
+                    opacity: appListView.contentY > 0 ? 1 : 0
+                    Behavior on opacity {
+                        NumberAnimation { duration: 200 }
                     }
                 }
 
-                delegate: Rectangle {
-                    id: delegateRoot
-                    width: appListView.width
-                    height: 55
-                    radius: 8
-                    color: "transparent" // Visual feedback is handled by the state layer
-                    clip: true
-
-                    property bool isCurrent: ListView.isCurrentItem
-
-                    // --- Content (on top) ---
-                    Item {
-                        anchors.fill: parent
-                        z: 2
-
-                        IconImage {
-                            id: icon
-                            anchors.left: parent.left
-                            anchors.leftMargin: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            implicitSize: 32
-                            source: "image://icon/" + model.icon
-                            mipmap: true
-                            asynchronous: true
-                        }
-
-                        ColumnLayout {
-                            anchors.left: icon.right
-                            anchors.leftMargin: 15
-                            anchors.right: parent.right
-                            anchors.rightMargin: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 2
-
-                            Text {
-                                text: model.name
-                                font.pixelSize: 14
-                                elide: Text.ElideRight
-                                color: ColorService.palette.m3OnSurface
-                            }
-                            Text {
-                                text: model.genericName
-                                font.pixelSize: 11
-                                elide: Text.ElideRight
-                                visible: text !== ""
-                                color: ColorService.palette.m3OnSurfaceVariant
-                            }
-                        }
+                // Fade out at the bottom
+                Rectangle {
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 15
+                    gradient: Gradient {
+                        GradientStop { position: 0.0; color: "transparent" }
+                        GradientStop { position: 1.0; color: ColorService.palette.m3SurfaceContainerHigh }
                     }
-
-                    // --- Input Handlers (non-visual) ---
-                    HoverHandler { id: hoverHandler }
-
-                    TapHandler {
-                        id: tapHandler
-                        onTapped: {
-                            model.entryObject.execute()
-                            StateManager.appLauncherOpened = false
-                        }
-                    }
-
-                    // --- Feedback Layer (in the back) ---
-                    M3StateLayer {
-                        anchors.fill: parent
-                        z: 1
-                        isHovered: hoverHandler.hovered
-                        isPressed: tapHandler.pressed || delegateRoot.isCurrent
-                        colorRole: M3StateLayer.ColorRole.Surface
+                    opacity: appListView.contentY < (appListView.contentHeight - appListView.height) ? 1 : 0
+                    Behavior on opacity {
+                        NumberAnimation { duration: 200 }
                     }
                 }
             }
