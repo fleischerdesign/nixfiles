@@ -71,6 +71,7 @@ Item {
                 }
                 allAppsModel.append({
                     "name": modelData.name,
+                    "priority": 100,
                     "icon": {
                         "type": "image",
                         "source": modelData.icon

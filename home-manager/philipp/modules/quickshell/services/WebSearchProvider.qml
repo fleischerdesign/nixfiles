@@ -39,6 +39,7 @@ Item {
 
             results.push({
                 "name": "Im Web suchen nach: '" + trimmedText + "'",
+                "priority": 0,
                 "icon": {
                     "type": "fontIcon",
                     "source": "search",

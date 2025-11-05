@@ -35,24 +35,52 @@ QtObject {
         }
     }
 
+    // --- Internal State ---
+    property var pendingResults: []
+    property int activeQueries: 0
+
     // --- Logic ---
     onSearchTextChanged: {
-        // Clear previous results and query all registered providers.
+        pendingResults = []
         results.clear()
 
-        // When search text is cleared, we still want to query providers
-        // so they can provide default results (e.g., all apps).
+        if (providers.length === 0) return;
+
+        activeQueries = providers.length
         for (var i = 0; i < providers.length; i++) {
             providers[i].query(searchText)
         }
     }
 
     function handleProviderResults(providerResults) {
-        // This function is connected to the resultsReady signal of each provider.
-        // A real implementation might sort or rank results from different providers.
-        // For now, we just append them as they come in.
-        for (var i = 0; i < providerResults.length; i++) {
-            results.append(providerResults[i])
+        pendingResults = pendingResults.concat(providerResults)
+        activeQueries--
+
+        if (activeQueries === 0) {
+            processAndDisplayResults()
         }
+    }
+
+    function processAndDisplayResults() {
+        if (pendingResults.length === 0) {
+            return;
+        }
+
+        // 1. Find the highest priority among all pending results.
+        let highestPriority = -1;
+        for (var i = 0; i < pendingResults.length; i++) {
+            if (pendingResults[i].priority > highestPriority) {
+                highestPriority = pendingResults[i].priority;
+            }
+        }
+
+        // 2. Filter for results with the highest priority.
+        for (var i = 0; i < pendingResults.length; i++) {
+            if (pendingResults[i].priority === highestPriority) {
+                results.append(pendingResults[i])
+            }
+        }
+
+        pendingResults = [] // Clear for next search
     }
 }

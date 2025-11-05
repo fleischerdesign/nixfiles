@@ -53,6 +53,7 @@ Item {
 
                     results.push({
                         "name": "" + result,
+                        "priority": 100,
                         "icon": {
                             "type": "fontIcon",
                             "source": "calculate",
