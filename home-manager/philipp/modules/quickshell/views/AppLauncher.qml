@@ -18,6 +18,7 @@ Modal {
     // Instantiate the providers for the SearchService. They will register themselves.
     AppSearchProvider {}
     CalculatorProvider {}
+    WebSearchProvider {}
 
     // --- Behavior ---
 
