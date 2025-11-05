@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell.Services.Notifications
 import Quickshell
+import Quickshell.Io // Import Process component
 
 // REINE Business Logic - keine UI-Abhängigkeiten
 Singleton {
@@ -15,6 +16,17 @@ Singleton {
     signal popupAdded(var notification)
     signal popupDismissed(var notification)
     signal popupRemoved(var notification)
+
+    function send(summary, body, icon) {
+        notifyProcess.command = [
+            "notify-send",
+            "-a", "Quickshell",
+            "-i", icon,
+            summary,
+            body
+        ]
+        notifyProcess.running = true
+    }
     
     // === CONFIGURATION ===
     property int autoHideDelay: 5000  // ms
@@ -25,6 +37,7 @@ Singleton {
         id: popupsModel
     }
     
+    // === INTERNAL COMPONENTS ===
     NotificationServer {
         id: notificationServer
         actionsSupported: true
@@ -36,11 +49,15 @@ Singleton {
         
         onNotification: function(notification) { root.handleNotification(notification) }
     }
+
+    Process {
+        id: notifyProcess
+    }
     
     // === PRIVATE STATE ===
     property var autoHideTimers: ({})
     
-    // === PUBLIC METHODS ===
+    // === PUBLIC METHODS (for existing notifications) ===
     
     function dismiss(notification) {
         console.log("[NotificationService] Dismiss:", notification.summary);
