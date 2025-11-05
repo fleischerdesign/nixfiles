@@ -81,8 +81,7 @@
       binds = {
         # --- User-defined Apps ---
         "Mod+Return".action = spawn "ghostty";
-        "Mod+D".action = spawn-sh "qs ipc call applauncher open";
-        "Mod+Space".action = spawn-sh "qs ipc call applauncher open"; # User preference
+        "Mod+Space".action = spawn-sh "qs ipc call applauncher toggle"; # User preference
 
         # --- Defaults based on the definitive action list ---
         "Mod+Shift+Slash".action = show-hotkey-overlay;

@@ -195,13 +195,17 @@ Modal {
                                 StateManager.appLauncherOpened = false
                             }
                             event.accepted = true
-                        }
-                        if (event.key === Qt.Key_Down) {
-                            appListView.forceActiveFocus()
-                            appListView.currentIndex = 0
+                        } else if (event.key === Qt.Key_Down) {
+                            if (appListView.currentIndex < appListView.count - 1) {
+                                appListView.currentIndex++
+                            }
                             event.accepted = true
-                        }
-                        if (event.key === Qt.Key_Escape) {
+                        } else if (event.key === Qt.Key_Up) {
+                            if (appListView.currentIndex > 0) {
+                                appListView.currentIndex--
+                            }
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Escape) {
                             StateManager.appLauncherOpened = false
                             event.accepted = true
                         }
@@ -231,9 +235,16 @@ Modal {
                                 StateManager.appLauncherOpened = false
                             }
                             event.accepted = true
-                        }
-                        if (event.key === Qt.Key_Escape) {
+                        } else if (event.key === Qt.Key_Escape) {
                             StateManager.appLauncherOpened = false
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Backspace && searchInput.text.length > 0) {
+                            searchInput.forceActiveFocus()
+                            searchInput.backspace()
+                            event.accepted = true
+                        } else if (event.text.length > 0) {
+                            searchInput.forceActiveFocus()
+                            searchInput.insert(searchInput.cursorPosition, event.text)
                             event.accepted = true
                         }
                     }
