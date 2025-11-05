@@ -1,5 +1,3 @@
-
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -11,58 +9,15 @@ import qs.core
 
 // AppLauncher.qml
 // A self-contained Modal component for the application launcher.
+// This view is now a "dumb" component. All logic is handled by the
+// SearchService and its providers.
 
 Modal {
     id: appLauncherModal
 
-    // --- Data Models ---
-
-    // 1. A clean, JS-friendly copy of all applications.
-    // This is populated once at startup by the Repeater below.
-    Timer {
-        id: filterDebounceTimer
-        interval: 10
-        onTriggered: appLauncherModal.updateFilter()
-    }
-
-    ListModel {
-        id: allAppsModel
-        onCountChanged: {
-            // Debounce the filter update. This is more robust than a fixed timer.
-            // It waits until the repeater has stopped adding items for 10ms.
-            filterDebounceTimer.restart()
-        }
-    }
-
-    // 2. The model that is actually displayed by the GridView.
-    // This is the target for our filtering logic.
-    ListModel {
-        id: filteredAppsModel
-    }
-
-    // 3. An invisible Repeater that bridges the C++ model to our clean ListModel.
-    Repeater {
-        model: DesktopEntries.applications
-        delegate: Item {
-            required property var modelData
-            Component.onCompleted: {
-                var keywordString = ""
-                if (modelData.keywords && typeof modelData.keywords.length !== 'undefined') {
-                    for (var i = 0; i < modelData.keywords.length; i++) {
-                        keywordString += modelData.keywords[i] + " "
-                    }
-                }
-
-                allAppsModel.append({
-                    "name": modelData.name,
-                    "icon": modelData.icon,
-                    "genericName": modelData.genericName,
-                    "keywords": keywordString, // Store the pre-joined string
-                    "entryObject": modelData // Store original object to call execute()
-                })
-            }
-        }
-    }
+    // Instantiate the providers for the SearchService. They will register themselves.
+    AppSearchProvider {}
+    CalculatorProvider {}
 
     // --- Behavior ---
 
@@ -79,8 +34,9 @@ Modal {
         function onAppLauncherOpenedChanged() {
             shouldBeVisible = StateManager.appLauncherOpened
             if (shouldBeVisible) {
-                searchInput.text = "" // Clear search on open
-                updateFilter()
+                // Clear search on open. This will trigger the service
+                // to query providers for default results.
+                SearchService.searchText = ""
                 searchInput.forceActiveFocus()
             }
         }
@@ -102,30 +58,6 @@ Modal {
 
     function toggle() {
         StateManager.appLauncherOpened = !StateManager.appLauncherOpened
-    }
-
-    function updateFilter() {
-        filteredAppsModel.clear()
-        const searchText = searchInput.text.toLowerCase()
-
-        for (var i = 0; i < allAppsModel.count; i++) {
-            const entry = allAppsModel.get(i)
-
-            if (searchText === "") {
-                filteredAppsModel.append(entry)
-                continue
-            }
-
-            // Search in name, generic name, and keywords
-            const name = entry.name ? entry.name.toLowerCase() : ""
-            const generic = entry.genericName ? entry.genericName.toLowerCase() : ""
-            const keywords = entry.keywords ? entry.keywords.toLowerCase() : "" // entry.keywords is now a string
-            const searchableString = name + " " + generic + " " + keywords
-
-            if (searchableString.includes(searchText)) {
-                filteredAppsModel.append(entry)
-            }
-        }
     }
 
     // --- Visual Content Definition ---
@@ -186,12 +118,15 @@ Modal {
                     placeholderTextColor: ColorService.palette.m3OnSurfaceVariant
                     background: null
                     color: ColorService.palette.m3OnSurface
-                    onTextChanged: appLauncherModal.updateFilter()
+                    
+                    // Bind the text to the central search service
+                    text: SearchService.searchText
+                    onTextChanged: SearchService.searchText = text
 
                     Keys.onPressed: (event) => {
                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             if (appListView.currentIndex >= 0) {
-                                filteredAppsModel.get(appListView.currentIndex).entryObject.execute()
+                                SearchService.results.get(appListView.currentIndex).entryObject.execute()
                                 StateManager.appLauncherOpened = false
                             }
                             event.accepted = true
@@ -226,7 +161,8 @@ Modal {
                     anchors.fill: parent
                     spacing: 4
 
-                    model: filteredAppsModel // Bind to the clean, filtered model
+                    // Bind the model to the central search service results
+                    model: SearchService.results
 
                     Keys.onPressed: (event) => {
                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -276,20 +212,36 @@ Modal {
                             anchors.fill: parent
                             z: 2
 
+                            // Data-driven icon display
                             IconImage {
-                                id: icon
                                 anchors.left: parent.left
                                 anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 implicitSize: 32
-                                source: "image://icon/" + model.icon
+                                source: "image://icon/" + model.icon.source
                                 mipmap: true
                                 asynchronous: true
+                                visible: model.icon.type === "image"
+                            }
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 32
+                                height: 32
+                                font.pixelSize: 32
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                font.family: model.icon.fontFamily
+                                text: model.icon.source
+                                color: ColorService.palette.m3OnSurface
+                                visible: model.icon.type === "fontIcon"
                             }
 
                             ColumnLayout {
-                                anchors.left: icon.right
-                                anchors.leftMargin: 15
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10 + 32 + 15 // left margin + icon width + spacing
                                 anchors.right: parent.right
                                 anchors.rightMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
