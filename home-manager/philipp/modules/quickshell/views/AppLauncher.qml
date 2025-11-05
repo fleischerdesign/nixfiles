@@ -335,6 +335,7 @@ Modal {
                     Behavior on opacity {
                         NumberAnimation { duration: 200 }
                     }
+                    z: 3
                 }
 
                 // Fade out at the bottom
@@ -350,6 +351,7 @@ Modal {
                     Behavior on opacity {
                         NumberAnimation { duration: 200 }
                     }
+                    z: 3
                 }
             }
         }
