@@ -66,18 +66,19 @@ Modal {
 
     // --- Behavior ---
 
+    property bool shouldBeVisible: false
+
     visible: false
 
-    Component.onCompleted: {
-        // Initialize visibility from StateManager
-        visible = StateManager.appLauncherOpened
+    onBackgroundClicked: {
+        StateManager.appLauncherOpened = false
     }
 
     Connections {
         target: StateManager
         function onAppLauncherOpenedChanged() {
-            visible = StateManager.appLauncherOpened
-            if (visible) {
+            shouldBeVisible = StateManager.appLauncherOpened
+            if (shouldBeVisible) {
                 searchInput.text = "" // Clear search on open
                 updateFilter()
                 searchInput.forceActiveFocus()
@@ -85,8 +86,14 @@ Modal {
         }
     }
 
-    onBackgroundClicked: {
-        StateManager.appLauncherOpened = false
+    onShouldBeVisibleChanged: {
+        if (shouldBeVisible) {
+            visible = true
+        } else {
+            // Delay hiding the modal to allow the slide-out animation to finish
+            var timer = Qt.createQmlObject("import QtQuick; Timer {interval: 200; onTriggered: { appLauncherModal.visible = false; } }", appLauncherModal);
+            timer.start();
+        }
     }
 
     // --- Functions & Signals ---
@@ -127,23 +134,36 @@ Modal {
 
     // --- Visual Content Definition ---
 
-    Rectangle {
-        id: launcherContent
-
-        width: 510
-        height: 600
-        radius: 15
-        color: ColorService.palette.m3SurfaceContainerHigh
-        clip: true
-        layer.enabled: true
-
-        anchors {
-            left: parent.left
-            bottom: parent.bottom
-            leftMargin: 10
-            bottomMargin: 75 // 65 (bar height) + 10 (spacing)
-        }
-
+        Rectangle {
+            id: launcherContent
+    
+            width: 510
+            height: 600
+            radius: 15
+            color: ColorService.palette.m3SurfaceContainerHigh
+            clip: true
+    
+            Component.onCompleted: {
+                // Set initial position off-screen to the left without animation
+                x = -width
+            }
+    
+            // Position using x for animation
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 75 // 65 (bar height) + 10 (spacing)
+            anchors.leftMargin: 10 // Keep the left margin for the visible state
+            x: shouldBeVisible
+                ? 10 // Visible: 10px from the left edge (parent.left + leftMargin)
+                : -width // Hidden: completely off-screen to the left
+    
+            // Animate the x property
+            Behavior on x {
+                NumberAnimation {
+                    duration: 200
+                    easing.type: Easing.InOutQuad
+                }
+            }
+            layer.enabled: true
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 15
