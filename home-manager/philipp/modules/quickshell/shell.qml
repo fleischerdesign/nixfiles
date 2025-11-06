@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import qs.core
 import qs.views
 import qs.components
+import qs.services.search as Search
 
 ShellRoot {
     AppLauncher {

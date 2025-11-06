@@ -7,7 +7,6 @@ import Quickshell
 import Quickshell.Widgets
 import qs.core
 import qs.services.search as Search
-import qs.services.search.providers as SearchProviders
 
 // AppLauncher.qml
 // A self-contained Modal component for the application launcher.
@@ -17,13 +16,7 @@ import qs.services.search.providers as SearchProviders
 Modal {
     id: appLauncherModal
 
-    // Instantiate the providers for the SearchService. They will register themselves.
-    SearchProviders.AppSearchProvider {}
-    SearchProviders.CalculatorProvider {}
-    SearchProviders.WebSearchProvider {}
-    SearchProviders.FileSearchProvider {}
-    SearchProviders.SystemActionProvider {}
-    SearchProviders.WeatherProvider {}
+property bool providersInitialized: false
 
     // --- Behavior ---
 
@@ -49,6 +42,10 @@ Modal {
     }
 
     onShouldBeVisibleChanged: {
+        if (shouldBeVisible && !providersInitialized) {
+            Search.ProviderRegistry.ensureProvidersLoaded()
+            providersInitialized = true
+        }
         if (shouldBeVisible) {
             visible = true
         } else {
