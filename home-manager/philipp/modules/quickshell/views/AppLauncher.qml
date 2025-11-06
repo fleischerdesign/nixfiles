@@ -42,15 +42,24 @@ property bool providersInitialized: false
     }
 
     onShouldBeVisibleChanged: {
+        // ✅ Provider beim ersten Öffnen laden
         if (shouldBeVisible && !providersInitialized) {
             Search.ProviderRegistry.ensureProvidersLoaded()
             providersInitialized = true
         }
+        
         if (shouldBeVisible) {
+            // Modal sichtbar machen (Slide-In Animation startet)
             visible = true
         } else {
+            // ✅ NEU: Breche laufende Suchen ab BEVOR Animation startet
+            Search.SearchService.cancelSearch()
+            
             // Delay hiding the modal to allow the slide-out animation to finish
-            var timer = Qt.createQmlObject("import QtQuick; Timer {interval: 200; onTriggered: { appLauncherModal.visible = false; } }", appLauncherModal);
+            var timer = Qt.createQmlObject(
+                "import QtQuick; Timer {interval: 200; onTriggered: { appLauncherModal.visible = false; } }", 
+                appLauncherModal
+            );
             timer.start();
         }
     }

@@ -1,3 +1,4 @@
+// services/search/SearchService.qml
 pragma Singleton
 import QtQuick
 import Quickshell
@@ -27,7 +28,7 @@ Item {
             debounceTimer = Qt.createQmlObject(`import QtQuick; Timer { interval: ${metadata.debounce} }`, root)
             debounceTimer.triggered.connect(function() {
                 console.log(`[SearchService] Debounce timer triggered for provider ${providerId}`)
-                provider.query(searchText, searchGeneration)
+                queryProvider(providerId, searchText, searchGeneration)
             })
         }
 
@@ -79,8 +80,10 @@ Item {
         searchGeneration++
         searchInProgress = true
         console.log(`>>>> [SearchService] STARTING search generation ${searchGeneration} for text: "${searchText}"`)
+        
         pendingResults = []
         results.clear()
+        activeQueries = 0  // ✅ Reset BEFORE counting
 
         const providerIds = Object.keys(providers)
         if (providerIds.length === 0) {
@@ -88,52 +91,79 @@ Item {
             return;
         }
 
-        activeQueries = providerIds.length
         const trimmedText = searchText.trim()
 
         for (var i = 0; i < providerIds.length; i++) {
             const providerId = providerIds[i]
             const providerData = providers[providerId]
-            const provider = providerData.instance
-            const metadata = providerData.metadata
 
-            var shouldQuery = true;
-
-            if (metadata.minLength && trimmedText.length < metadata.minLength) {
-                shouldQuery = false;
-            }
-
-            if (shouldQuery && metadata.trigger) {
-                if (!trimmedText.toLowerCase().startsWith(metadata.trigger)) {
-                    shouldQuery = false
-                }
-            }
-            
-            if (shouldQuery && metadata.regex) {
-                const regex = new RegExp(metadata.regex, 'i')
-                if (!regex.test(trimmedText)) {
-                    shouldQuery = false
-                }
-            }
-
-            if (shouldQuery) {
+            // ✅ Prüfe ob Provider abgefragt werden soll
+            if (shouldQueryProvider(providerData, trimmedText)) {
+                activeQueries++  // ✅ Nur zählen wenn wirklich abgefragt
+                
                 if (providerData.debounceTimer) {
+                    // ✅ Stoppe alten Timer, dann restart
+                    providerData.debounceTimer.stop()
                     providerData.debounceTimer.restart()
                 } else {
-                    provider.query(searchText, searchGeneration)
+                    queryProvider(providerId, searchText, searchGeneration)
                 }
-            } else {
-                activeQueries--
+            }
+            // ✅ Kein activeQueries-- mehr nötig!
+        }
+
+        console.log(`[SearchService] Active queries for generation ${searchGeneration}: ${activeQueries}`)
+
+        // ✅ Wenn kein Provider abgefragt wird, sofort fertig
+        if (activeQueries === 0) {
+            searchInProgress = false
+            console.log(`[SearchService] No providers matched criteria. Search complete.`)
+        }
+    }
+
+    // ✅ NEUE: Zentrale Query-Funktion
+    function queryProvider(providerId, text, generation) {
+        const providerData = providers[providerId]
+        if (!providerData) {
+            console.warn(`[SearchService] Provider ${providerId} not found`)
+            return
+        }
+        
+        console.log(`[SearchService] Querying provider ${providerId} for generation ${generation}`)
+        providerData.instance.query(text, generation)
+    }
+
+    // ✅ NEUE: Hilfsfunktion für Provider-Prüfung
+    function shouldQueryProvider(providerData, trimmedText) {
+        const metadata = providerData.metadata
+
+        // Prüfe minLength
+        if (metadata.minLength && trimmedText.length < metadata.minLength) {
+            return false
+        }
+
+        // Prüfe trigger (z.B. "wetter")
+        if (metadata.trigger) {
+            if (!trimmedText.toLowerCase().startsWith(metadata.trigger)) {
+                return false
+            }
+        }
+        
+        // Prüfe regex (z.B. nur Zahlen/Operatoren für Calculator)
+        if (metadata.regex) {
+            const regex = new RegExp(metadata.regex, 'i')
+            if (!regex.test(trimmedText)) {
+                return false
             }
         }
 
-        if (activeQueries === 0) {
-            searchInProgress = false
-        }
+        return true
     }
 
     function handleProviderResults(providerResults, generation) {
         console.log(`[SearchService] Received ${providerResults.length} results for generation ${generation}. Current generation is ${searchGeneration}.`)
+        
+        // ✅ Ignoriere stale results
         if (generation !== searchGeneration) {
             console.log(`[SearchService] Discarding stale results for generation ${generation}.`)
             return;
@@ -143,8 +173,15 @@ Item {
         activeQueries--
         console.log(`[SearchService] Handled results. Active queries remaining: ${activeQueries}`)
         
+        // ✅ Safety check: activeQueries sollte nie negativ sein
+        if (activeQueries < 0) {
+            console.error(`[SearchService] ERROR: activeQueries is negative! Resetting to 0.`)
+            activeQueries = 0
+        }
+        
         if (activeQueries === 0) {
             searchInProgress = false
+            console.log(`[SearchService] All queries complete for generation ${searchGeneration}.`)
         }
 
         processAndDisplayResults()
@@ -153,6 +190,7 @@ Item {
     function processAndDisplayResults() {
         console.log(`[SearchService] Processing ${pendingResults.length} pending results.`)
 
+        // Finde höchste Priorität
         let highestPriority = -1;
         for (var i = 0; i < pendingResults.length; i++) {
             if (pendingResults[i].priority > highestPriority) {
@@ -161,6 +199,7 @@ Item {
         }
         console.log(`[SearchService] Found highest priority: ${highestPriority}.`)
 
+        // Filtere nur Ergebnisse mit höchster Priorität
         var finalResults = []
         for (var i = 0; i < pendingResults.length; i++) {
             if (pendingResults[i].priority === highestPriority) {
@@ -173,6 +212,24 @@ Item {
         console.log(`[SearchService] Appending ${finalResults.length} final results to model.`)
         for (var i = 0; i < finalResults.length; i++) {
             results.append(finalResults[i])
+        }
+    }
+
+    // ✅ NEUE: Abbruch-Funktion für wenn AppLauncher geschlossen wird
+    function cancelSearch() {
+        console.log(`[SearchService] Cancelling search generation ${searchGeneration}`)
+        searchGeneration++  // Macht alle laufenden Queries ungültig
+        pendingResults = []
+        activeQueries = 0
+        searchInProgress = false
+        
+        // Stoppe alle Debounce-Timer
+        const providerIds = Object.keys(providers)
+        for (var i = 0; i < providerIds.length; i++) {
+            const providerData = providers[providerIds[i]]
+            if (providerData.debounceTimer && providerData.debounceTimer.running) {
+                providerData.debounceTimer.stop()
+            }
         }
     }
 }
