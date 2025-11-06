@@ -143,7 +143,7 @@ property bool providersInitialized: false
                     anchors.leftMargin: 20
                     anchors.rightMargin: 20
                     font.pixelSize: 18
-                    placeholderText: "Anwendungen suchen..."
+                    placeholderText: "Suche"
                     placeholderTextColor: ColorService.palette.m3OnSurfaceVariant
                     background: null
                     color: ColorService.palette.m3OnSurface

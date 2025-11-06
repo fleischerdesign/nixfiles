@@ -33,7 +33,7 @@ PanelWindow {
     }
     
     // Dynamische Höhe: klein wenn geschlossen, groß wenn offen
-    implicitHeight: isOpen ? 65 : (contentWrapper.y >= 55 ? 10 : 65) 
+    implicitHeight: isOpen ? 75 : (contentWrapper.y >= 55 ? 10 : 75) 
     anchors {
         left: true
         right: true
@@ -56,11 +56,11 @@ PanelWindow {
     Item {
         id: clippingRect
         anchors.fill: parent
-        clip: true
+        clip: false
         
         Item {
             id: contentWrapper
-            height: 65
+            height: 75
             width: parent.width
             opacity: bottomBarWindow.isOpen ? 1 : 0
             y: bottomBarWindow.isOpen ? 0 : 55
@@ -119,7 +119,7 @@ PanelWindow {
                     fill: parent
                     leftMargin: 10
                     rightMargin: 10
-                    bottomMargin: 10
+                    bottomMargin: 10 // Reverted to original value
                 }
                 spacing: 10
                 
@@ -128,12 +128,13 @@ PanelWindow {
                     id: appLauncherButton
                     property bool appLauncherOpened: StateManager.appLauncherOpened
 
-                    Layout.alignment: Qt.AlignVCenter
+                    Layout.alignment: Qt.AlignBottom // Changed from Qt.AlignVCenter
                     style: appLauncherOpened ? M3Button.Style.Filled : M3Button.Style.FilledTonal
                     colorRole: appLauncherOpened ? M3Button.ColorRole.Primary : M3Button.ColorRole.Surface
 		    icon: "apps"
                     fixedWidth: true
                     implicitHeight: 55
+                    shadowEnabled: true // Shadow enabled
                     onClicked: bottomBarWindow.appLauncherClicked()
 
                     Connections {
@@ -150,11 +151,12 @@ PanelWindow {
                 
                 // Clock Button
                 M3Button {
-                    Layout.alignment: Qt.AlignVCenter
+                    Layout.alignment: Qt.AlignBottom // Changed from Qt.AlignVCenter
                     style: M3Button.Style.FilledTonal
                     colorRole: M3Button.ColorRole.Surface
                     fixedWidth: true
                     implicitHeight: 55
+                    shadowEnabled: true // Shadow enabled
                     
                     // Custom content für zweizeilige Uhr
                     Text {
@@ -190,6 +192,8 @@ PanelWindow {
                 
                 // Notification Center Button
                 StatusButton {
+                    Layout.alignment: Qt.AlignBottom // Corrected alignment
+                    shadowEnabled: true // Enabled shadow
                     onClicked: {
                         StateManager.notificationCenterOpened = !StateManager.notificationCenterOpened
                     }

@@ -1,12 +1,25 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import qs.components
+import QtQuick.Effects
 
 PanelWindow {
     id: modal
 
     property Item contentItem: null
+
+    RectangularShadow {
+        anchors.fill: contentItem
+        visible: contentItem !== null
+        color: Qt.rgba(0, 0, 0, 0.2)
+        blur: 16
+        radius: contentItem.radius
+        antialiasing: true
+        cached: true
+    }
+
     property bool closeOnClickOutside: true
 
     signal backgroundClicked()

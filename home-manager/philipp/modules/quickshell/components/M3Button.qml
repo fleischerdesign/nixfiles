@@ -4,6 +4,7 @@
 import QtQuick
 import qs.components
 import qs.services
+import QtQuick.Effects // Added for RectangularShadow
 
 Rectangle {
     id: root
@@ -33,6 +34,7 @@ Rectangle {
     }
     
     property int colorRole: M3Button.ColorRole.Primary
+    property bool shadowEnabled: style === M3Button.Style.Elevated // Added shadowEnabled property
     
     // --- Icon Support ---
     property string icon: ""
@@ -55,7 +57,18 @@ Rectangle {
     
     // M3 Shape Token
     radius: 20  // M3 Full Corner Radius für Buttons
-    clip: true
+    clip: false
+    
+    RectangularShadow {
+        anchors.fill: root
+        visible: root.shadowEnabled && root.enabled
+        color: Qt.rgba(0, 0, 0, 0.1) // MD3-like shadow color
+        blur: 10 // Subtle blur for buttons
+        radius: root.radius // Match button's corner radius
+        antialiasing: true
+        cached: true
+        z: -1 // Ensure shadow is behind the button
+    }
     
     // --- Enabled State ---
     property bool enabled: true
