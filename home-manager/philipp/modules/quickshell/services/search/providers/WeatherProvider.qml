@@ -13,7 +13,7 @@ Item {
         ready()
     }
 
-    function createResultFromData(weatherData) {
+    function createResultFromData(weatherData, location) {
         const current = weatherData.current_condition[0];
         const area = weatherData.nearest_area[0];
         const weatherDesc = current.weatherDesc[0].value;
@@ -28,8 +28,14 @@ Item {
             },
             "genericName": `${weatherDesc}, ${current.temp_C}°C (Gefühlt ${current.FeelsLikeC}°C)`,
             "actionObject": {
-                "type": "noAction"
-            }
+                "type": "url",
+                "url": (() => {
+                    console.log("DEBUG: Location in createResultFromData: " + location);
+                    const url = "https://www.google.com/search?q=wetter+" + encodeURIComponent(location);
+                    console.log("DEBUG: Constructed URL (Google Weather): " + url);
+                    return url;
+                })()
+            },
         };
     }
 
@@ -61,7 +67,7 @@ Item {
         WeatherService.getWeatherFor(location, function(data) {
             // This callback will be executed when the data is ready.
             if (data) {
-                const result = createResultFromData(data);
+                const result = createResultFromData(data, location);
                 resultsReady([result], generation);
             } else {
                 // The fetch failed or returned no data.
