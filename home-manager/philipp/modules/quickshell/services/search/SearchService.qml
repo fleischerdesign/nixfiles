@@ -13,20 +13,37 @@ Item {
     readonly property ListModel results: ListModel {}
 
     // --- Provider Management ---
-    property var providers: []
+    property var providers: ({})
     property int readyProviders: 0
     property bool allProvidersReady: false
 
     function registerProvider(provider) {
         console.log(`[SearchService] Registering provider: ${provider}`)
-        providers.push(provider)
+        const providerId = provider.toString()
+        const metadata = provider.metadata || {}
+        var debounceTimer = null
+
+        if (metadata.debounce > 0) {
+            debounceTimer = Qt.createQmlObject(`import QtQuick; Timer { interval: ${metadata.debounce} }`, root)
+            debounceTimer.triggered.connect(function() {
+                console.log(`[SearchService] Debounce timer triggered for provider ${providerId}`)
+                provider.query(searchText, searchGeneration)
+            })
+        }
+
+        providers[providerId] = {
+            "instance": provider,
+            "metadata": metadata,
+            "debounceTimer": debounceTimer
+        }
+
         provider.resultsReady.connect(handleProviderResults)
 
         provider.ready.connect(function() {
             if (allProvidersReady) return;
             readyProviders++;
-            console.log(`[SearchService] Provider ready. ${readyProviders}/${providers.length}`)
-            if (readyProviders === providers.length) {
+            console.log(`[SearchService] Provider ready. ${readyProviders}/${Object.keys(providers).length}`)
+            if (readyProviders === Object.keys(providers).length) {
                 allProvidersReady = true;
                 console.log(">>>> [SearchService] All providers ready. Triggering initial population.")
                 onSearchTextChanged()
@@ -35,10 +52,13 @@ Item {
     }
 
     function unregisterProvider(provider) {
-        console.log(`[SearchService] Unregistering provider: ${provider}`)
-        const index = providers.indexOf(provider);
-        if (index > -1) {
-            providers.splice(index, 1);
+        const providerId = provider.toString()
+        console.log(`[SearchService] Unregistering provider: ${providerId}`)
+        if (providers[providerId]) {
+            if (providers[providerId].debounceTimer) {
+                providers[providerId].debounceTimer.destroy()
+            }
+            delete providers[providerId]
         }
     }
 
@@ -62,16 +82,53 @@ Item {
         pendingResults = []
         results.clear()
 
-        if (providers.length === 0) {
-            console.log("[SearchService] No providers registered, aborting search.")
+        const providerIds = Object.keys(providers)
+        if (providerIds.length === 0) {
             searchInProgress = false
             return;
         }
 
-        activeQueries = providers.length
-        for (var i = 0; i < providers.length; i++) {
-            console.log(`[SearchService] Querying provider ${providers[i]} for generation ${searchGeneration}`)
-            providers[i].query(searchText, searchGeneration)
+        activeQueries = providerIds.length
+        const trimmedText = searchText.trim()
+
+        for (var i = 0; i < providerIds.length; i++) {
+            const providerId = providerIds[i]
+            const providerData = providers[providerId]
+            const provider = providerData.instance
+            const metadata = providerData.metadata
+
+            var shouldQuery = true;
+
+            if (metadata.minLength && trimmedText.length < metadata.minLength) {
+                shouldQuery = false;
+            }
+
+            if (shouldQuery && metadata.trigger) {
+                if (!trimmedText.toLowerCase().startsWith(metadata.trigger)) {
+                    shouldQuery = false
+                }
+            }
+            
+            if (shouldQuery && metadata.regex) {
+                const regex = new RegExp(metadata.regex, 'i')
+                if (!regex.test(trimmedText)) {
+                    shouldQuery = false
+                }
+            }
+
+            if (shouldQuery) {
+                if (providerData.debounceTimer) {
+                    providerData.debounceTimer.restart()
+                } else {
+                    provider.query(searchText, searchGeneration)
+                }
+            } else {
+                activeQueries--
+            }
+        }
+
+        if (activeQueries === 0) {
+            searchInProgress = false
         }
     }
 

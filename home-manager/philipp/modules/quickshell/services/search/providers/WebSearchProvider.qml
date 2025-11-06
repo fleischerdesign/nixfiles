@@ -1,5 +1,5 @@
 import QtQuick
-import qs.services
+import qs.services.search as Search
 import qs.components
 import Quickshell.Io
 
@@ -7,37 +7,11 @@ import Quickshell.Io
 Item {
     id: root
 
-    // --- Public API for SearchService ---
+    // --- Public API for Search.SearchService ---
     signal resultsReady(var resultsArray, int generation)
     signal ready
 
-    // --- Component Factory ---
-    Component {
-        id: actionFactory
-        Action {
-            property string searchText
-
-            Process {
-                id: shellProcess
-                onExited: (exitCode) => {
-                    if (exitCode !== 0) {
-                        NotificationService.send(
-                            "Fehler beim Öffnen des Browsers",
-                            "Der Befehl 'xdg-open' konnte nicht ausgeführt werden.",
-                            "dialog-error"
-                        )
-                    }
-                }
-            }
-
-            onTriggered: {
-                const encodedText = encodeURIComponent(searchText)
-                const url = "https://www.google.com/search?q=" + encodedText
-                shellProcess.command = ["xdg-open", url]
-                shellProcess.running = true
-            }
-        }
-    }
+    property var metadata: ({})
 
     // --- Query Logic ---
     function query(searchText, generation) {
@@ -46,7 +20,8 @@ Item {
         const trimmedText = searchText.trim()
 
         if (trimmedText !== "") {
-            var actionInstance = actionFactory.createObject(root, { "searchText": trimmedText });
+            const encodedText = encodeURIComponent(trimmedText)
+            const url = "https://www.google.com/search?q=" + encodedText
 
             results.push({
                 "name": "Im Web suchen nach: '" + trimmedText + "'",
@@ -57,7 +32,10 @@ Item {
                     "fontFamily": "Material Symbols Rounded"
                 },
                 "genericName": "Öffnet den Browser mit der Google-Suche",
-                "entryObject": actionInstance
+                "actionObject": {
+                    "type": "url",
+                    "url": url
+                }
             })
         }
         console.log(`[WebSearchProvider] Sending ${results.length} results for generation ${generation}`)
@@ -67,11 +45,11 @@ Item {
     // --- Lifecycle ---
     Component.onCompleted: {
         console.log("[WebSearchProvider] Component.onCompleted")
-        SearchService.registerProvider(root)
+        Search.SearchService.registerProvider(root)
         ready()
     }
 
     Component.onDestruction: {
-        SearchService.unregisterProvider(root)
+        Search.SearchService.unregisterProvider(root)
     }
 }

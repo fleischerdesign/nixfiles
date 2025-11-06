@@ -1,9 +1,9 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
-import qs.services
+import qs.services.search as Search
 
-// This component's job is to load all applications and provide them to the SearchService.
+// This component's job is to load all applications and provide them to the Search.SearchService.
 Item {
     id: root
 
@@ -52,11 +52,11 @@ Item {
 
     Component.onCompleted: {
         console.log("[AppSearchProvider] Component.onCompleted")
-        SearchService.registerProvider(root)
+        Search.SearchService.registerProvider(root)
     }
 
     Component.onDestruction: {
-        SearchService.unregisterProvider(root)
+        Search.SearchService.unregisterProvider(root)
     }
 
     // Use a Repeater to robustly load the application list from the C++ model.

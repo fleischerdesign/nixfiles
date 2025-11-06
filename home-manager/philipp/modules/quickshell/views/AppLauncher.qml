@@ -6,6 +6,8 @@ import qs.components
 import Quickshell
 import Quickshell.Widgets
 import qs.core
+import qs.services.search as Search
+import qs.services.search.providers as SearchProviders
 
 // AppLauncher.qml
 // A self-contained Modal component for the application launcher.
@@ -16,12 +18,12 @@ Modal {
     id: appLauncherModal
 
     // Instantiate the providers for the SearchService. They will register themselves.
-    AppSearchProvider {}
-    CalculatorProvider {}
-    WebSearchProvider {}
-    FileSearchProvider {}
-    SystemActionProvider {}
-    WeatherProvider {}
+    SearchProviders.AppSearchProvider {}
+    SearchProviders.CalculatorProvider {}
+    SearchProviders.WebSearchProvider {}
+    SearchProviders.FileSearchProvider {}
+    SearchProviders.SystemActionProvider {}
+    SearchProviders.WeatherProvider {}
 
     // --- Behavior ---
 
@@ -40,7 +42,7 @@ Modal {
             if (shouldBeVisible) {
                 // Clear search on open. This will trigger the service
                 // to query providers for default results.
-                SearchService.searchText = ""
+                Search.SearchService.searchText = ""
                 searchInput.forceActiveFocus()
             }
         }
@@ -112,9 +114,9 @@ Modal {
             }
 
             Connections {
-                target: SearchService
+                target: Search.SearchService
                 function onSearchInProgressChanged() {
-                    if (SearchService.searchInProgress) {
+                    if (Search.SearchService.searchInProgress) {
                         appListView.animationsEnabled = false
                     } else {
                         animationEnableTimer.restart()
@@ -141,13 +143,13 @@ Modal {
                     color: ColorService.palette.m3OnSurface
                     
                     // Bind the text to the central search service
-                    text: SearchService.searchText
-                    onTextChanged: SearchService.searchText = text
+                    text: Search.SearchService.searchText
+                    onTextChanged: Search.SearchService.searchText = text
 
                     Keys.onPressed: (event) => {
                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             if (appListView.currentIndex >= 0) {
-                                SearchService.results.get(appListView.currentIndex).entryObject.execute()
+                                Search.SearchService.results.get(appListView.currentIndex).entryObject.execute()
                                 StateManager.appLauncherOpened = false
                             }
                             event.accepted = true
@@ -184,12 +186,17 @@ Modal {
                     spacing: 4
 
                     // Bind the model to the central search service results
-                    model: SearchService.results
+                    model: Search.SearchService.results
 
                     Keys.onPressed: (event) => {
                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             if (currentIndex >= 0) {
-                                model.get(currentIndex).entryObject.execute()
+                                const item = model.get(currentIndex)
+                                if (item.entryObject) {
+                                    item.entryObject.execute()
+                                } else if (item.actionObject) {
+                                    ActionHandler.execute(item.actionObject)
+                                }
                                 StateManager.appLauncherOpened = false
                             }
                             event.accepted = true
@@ -291,7 +298,11 @@ Modal {
                         TapHandler {
                             id: tapHandler
                             onTapped: {
-                                model.entryObject.execute()
+                                if (model.entryObject) {
+                                    model.entryObject.execute()
+                                } else if (model.actionObject) {
+                                    ActionHandler.execute(model.actionObject)
+                                }
                                 StateManager.appLauncherOpened = false
                             }
                         }

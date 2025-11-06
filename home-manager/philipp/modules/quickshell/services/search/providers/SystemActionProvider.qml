@@ -1,5 +1,5 @@
 import QtQuick
-import qs.services
+import qs.services.search as Search
 import qs.components
 import Quickshell.Io
 
@@ -7,9 +7,11 @@ import Quickshell.Io
 Item {
     id: root
 
-    // --- Public API for SearchService ---
+    // --- Public API for Search.SearchService ---
     signal resultsReady(var resultsArray, int generation)
     signal ready // We are ready immediately
+
+    property var metadata: ({})
 
     // --- Data ---
     property var systemActions: [
@@ -33,31 +35,6 @@ Item {
         }
     ]
 
-    // --- Component Factory ---
-    Component {
-        id: actionFactory
-        Action {
-            property var commandToRun
-            Process {
-                id: shellProcess
-                onExited: (exitCode) => {
-                    if (exitCode !== 0) {
-                        NotificationService.send(
-                            "System-Aktion fehlgeschlagen",
-                            `Befehl '${commandToRun[0]}' ist fehlgeschlagen.`,
-                            "dialog-error"
-                        )
-                    }
-                }
-            }
-
-            onTriggered: {
-                shellProcess.command = commandToRun
-                shellProcess.running = true
-            }
-        }
-    }
-
     // --- Query Logic ---
     function query(searchText, generation) {
         console.log(`[SystemActionProvider] Received query for generation ${generation} with text: "${searchText}"`)
@@ -74,8 +51,6 @@ Item {
             const searchableString = (action.name + " " + action.keywords).toLowerCase()
 
             if (searchableString.includes(trimmedText)) {
-                var actionInstance = actionFactory.createObject(root, { "commandToRun": action.command });
-
                 results.push({
                     "name": action.name,
                     "priority": 90, // High, but below apps
@@ -85,7 +60,10 @@ Item {
                         "fontFamily": "Material Symbols Rounded"
                     },
                     "genericName": "System-Aktion ausführen",
-                    "entryObject": actionInstance
+                    "actionObject": {
+                        "type": "command",
+                        "command": action.command
+                    }
                 })
             }
         }
@@ -96,11 +74,11 @@ Item {
     // --- Lifecycle ---
     Component.onCompleted: {
         console.log("[SystemActionProvider] Component.onCompleted")
-        SearchService.registerProvider(root)
+        Search.SearchService.registerProvider(root)
         ready()
     }
 
     Component.onDestruction: {
-        SearchService.unregisterProvider(root)
+        Search.SearchService.unregisterProvider(root)
     }
 }

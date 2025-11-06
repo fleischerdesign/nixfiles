@@ -1,5 +1,6 @@
 import QtQuick
 import qs.services
+import qs.services.search as Search
 
 Item {
     id: root
@@ -8,7 +9,7 @@ Item {
     signal ready
 
     Component.onCompleted: {
-        SearchService.registerProvider(root)
+        Search.SearchService.registerProvider(root)
         ready()
     }
 
@@ -26,7 +27,7 @@ Item {
                 "fontFamily": "monospace"
             },
             "genericName": `${weatherDesc}, ${current.temp_C}°C (Gefühlt ${current.FeelsLikeC}°C)`,
-            "entryObject": Qt.createQmlObject('import QtQuick; QtObject { function execute() {} }', root)
+            "actionObject": Qt.createQmlObject('import QtQuick; QtObject { function execute() {} }', root)
         };
     }
 
@@ -44,43 +45,26 @@ Item {
         return "🌡️";
     }
 
-    property string _pendingSearchText: ""
-    property int _pendingGeneration: 0
+    property var metadata: ({ "debounce": 300, "trigger": "wetter" })
 
-    Timer {
-        id: debounceTimer
-        interval: 300
-        onTriggered: _doQuery()
-    }
-
-    function _doQuery() {
-        const trimmedText = _pendingSearchText.trim().toLowerCase();
+    function query(searchText, generation) {
+        const trimmedText = searchText.trim().toLowerCase();
         const parts = trimmedText.split(/\s+/);
 
-        if (parts[0] !== "wetter") {
-            resultsReady([], _pendingGeneration);
-            return;
-        }
-
-        let location = (parts.length === 1) ? "Neubrandenburg" : parts.slice(1).join(" ");
+        // The Search.SearchService already ensures this provider is only called when the
+        // search text starts with "wetter". We can safely parse the location.
+        const location = parts.length <= 1 ? "Neubrandenburg" : parts.slice(1).join(" ");
 
         // Call the service and provide a callback function to handle the result.
         WeatherService.getWeatherFor(location, function(data) {
             // This callback will be executed when the data is ready.
-            // The 'generation' variable is available here because of closure.
             if (data) {
                 const result = createResultFromData(data);
-                resultsReady([result], _pendingGeneration);
+                resultsReady([result], generation);
             } else {
                 // The fetch failed or returned no data.
-                resultsReady([], _pendingGeneration);
+                resultsReady([], generation);
             }
         });
-    }
-
-    function query(searchText, generation) {
-        _pendingSearchText = searchText;
-        _pendingGeneration = generation;
-        debounceTimer.restart();
     }
 }

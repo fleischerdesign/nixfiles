@@ -1,5 +1,5 @@
 import QtQuick
-import qs.services
+import qs.services.search as Search
 import qs.components
 import Quickshell.Io
 
@@ -7,42 +7,12 @@ import Quickshell.Io
 Item {
     id: root
 
-    // --- Public API for SearchService ---
+    // --- Public API for Search.SearchService ---
     signal resultsReady(var resultsArray, int generation)
     signal ready // We are ready immediately
 
     property int currentQueryGeneration: 0
 
-    // --- Component Factory ---
-    Component {
-        id: actionFactory
-        Action {
-            property string filePath
-
-            Process {
-                id: shellProcess
-                onExited: (exitCode) => {
-                    if (exitCode !== 0) {
-                        NotificationService.send(
-                            "Fehler beim Öffnen des Ordners",
-                            "Der Befehl 'xdg-open' konnte nicht ausgeführt werden.",
-                            "dialog-error"
-                        )
-                    }
-                }
-            }
-
-            onTriggered: {
-                // Open the directory containing the file
-                const lastSlash = filePath.lastIndexOf('/');
-                const directory = (lastSlash > 0) ? filePath.substring(0, lastSlash) : "/";
-                shellProcess.command = ["xdg-open", directory]
-                shellProcess.running = true
-            }
-        }
-    }
-
-    // --- Internal Process for running plocate ---
     Process {
         id: searchProcess
         stdout: StdioCollector { id: stdioCollector }
@@ -56,7 +26,7 @@ Item {
                     if (fullPath === "") continue;
                     const lastSlash = fullPath.lastIndexOf('/');
                     const fileName = (lastSlash !== -1) ? fullPath.substring(lastSlash + 1) : fullPath;
-                    var actionInstance = actionFactory.createObject(root, { "filePath": fullPath });
+                    const directory = (lastSlash > 0) ? fullPath.substring(0, lastSlash) : "/";
                     searchResults.push({
                         "name": fileName,
                         "priority": 50,
@@ -66,7 +36,10 @@ Item {
                             "fontFamily": "Material Symbols Rounded"
                         },
                         "genericName": fullPath,
-                        "entryObject": actionInstance
+                        "actionObject": {
+                            "type": "command",
+                            "command": ["xdg-open", directory]
+                        }
                     })
                 }
             } else {
@@ -76,6 +49,8 @@ Item {
             resultsReady(searchResults, currentQueryGeneration)
         }
     }
+
+    property var metadata: ({ "minLength": 3 })
 
     // --- Query Logic ---
     function query(searchText, generation) {
@@ -88,13 +63,6 @@ Item {
             searchProcess.kill();
         }
 
-        // Only search if the query is reasonably long
-        if (trimmedText.length < 3) {
-            console.log("[FileSearchProvider] Search text too short, sending empty results.")
-            resultsReady([], generation) // Return empty results for this generation
-            return;
-        }
-
         // Execute plocate
         console.log(`[FileSearchProvider] Starting plocate for generation ${generation}`)
         searchProcess.command = ["plocate", "-i", "--limit", "10", "*" + trimmedText + "*"]
@@ -104,11 +72,11 @@ Item {
     // --- Lifecycle ---
     Component.onCompleted: {
         console.log("[FileSearchProvider] Component.onCompleted")
-        SearchService.registerProvider(root)
+        Search.SearchService.registerProvider(root)
         ready()
     }
 
     Component.onDestruction: {
-        SearchService.unregisterProvider(root)
+        Search.SearchService.unregisterProvider(root)
     }
 }
