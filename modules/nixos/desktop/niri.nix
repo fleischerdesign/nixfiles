@@ -48,5 +48,10 @@ in
     };
 
     services.gnome.gnome-keyring.enable = true;
+
+    services.locate = {
+      enable = true;
+      package = pkgs.plocate;
+    };
   };
 }

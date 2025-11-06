@@ -19,6 +19,7 @@ Modal {
     AppSearchProvider {}
     CalculatorProvider {}
     WebSearchProvider {}
+    FileSearchProvider {}
 
     // --- Behavior ---
 
