@@ -7,11 +7,11 @@ import qs.services
 Item {
     id: root
 
-    // --- Public API for SearchService ---
-    signal resultsReady(var resultsArray)
+    signal resultsReady(var resultsArray, int generation)
     signal ready
 
-    function query(searchText) {
+    function query(searchText, generation) {
+        console.log(`[AppSearchProvider] Received query for generation ${generation} with text: "${searchText}"`)
         var filteredResults = []
         const currentSearchText = searchText.toLowerCase()
 
@@ -33,23 +33,30 @@ Item {
                 }
             }
         }
-        resultsReady(filteredResults)
+        console.log(`[AppSearchProvider] Sending ${filteredResults.length} results for generation ${generation}`)
+        resultsReady(filteredResults, generation)
     }
 
     // --- Internal data loading ---
     Timer {
         id: readyTimer
         interval: 50 // A short delay to ensure the Repeater has finished.
-        onTriggered: root.ready()
+        onTriggered: {
+            console.log("[AppSearchProvider] Ready timer triggered.")
+            ready()
+        }
     }
 
     ListModel {
         id: allAppsModel
-        onCountChanged: readyTimer.restart()
+        onCountChanged: {
+            // console.log("[AppSearchProvider] allAppsModel count changed: " + count)
+            readyTimer.restart()
+        }
     }
 
     Component.onCompleted: {
-        // Register this component as a search provider in the central service.
+        console.log("[AppSearchProvider] Component.onCompleted")
         SearchService.registerProvider(root)
     }
 

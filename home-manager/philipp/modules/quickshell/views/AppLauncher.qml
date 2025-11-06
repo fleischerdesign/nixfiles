@@ -20,6 +20,7 @@ Modal {
     CalculatorProvider {}
     WebSearchProvider {}
     FileSearchProvider {}
+    SystemActionProvider {}
 
     // --- Behavior ---
 
@@ -220,10 +221,10 @@ Modal {
                                 anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 implicitSize: 32
-                                source: "image://icon/" + model.icon.source
                                 mipmap: true
                                 asynchronous: true
                                 visible: model.icon.type === "image"
+                                source: visible ? ("image://icon/" + model.icon.source) : ""
                             }
 
                             Text {
@@ -235,10 +236,10 @@ Modal {
                                 font.pixelSize: 32
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
-                                font.family: model.icon.fontFamily
-                                text: model.icon.source
                                 color: ColorService.palette.m3OnSurface
                                 visible: model.icon.type === "fontIcon"
+                                font.family: visible ? model.icon.fontFamily : ""
+                                text: visible ? model.icon.source : ""
                             }
 
                             ColumnLayout {

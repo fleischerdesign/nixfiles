@@ -8,7 +8,8 @@ Item {
     id: root
 
     // --- Public API for SearchService ---
-    signal resultsReady(var resultsArray)
+    signal resultsReady(var resultsArray, int generation)
+    signal ready
 
     // --- Component Factory ---
     Component {
@@ -18,6 +19,15 @@ Item {
 
             Process {
                 id: shellProcess
+                onExited: (exitCode) => {
+                    if (exitCode !== 0) {
+                        NotificationService.send(
+                            "Fehler beim Öffnen des Browsers",
+                            "Der Befehl 'xdg-open' konnte nicht ausgeführt werden.",
+                            "dialog-error"
+                        )
+                    }
+                }
             }
 
             onTriggered: {
@@ -30,7 +40,8 @@ Item {
     }
 
     // --- Query Logic ---
-    function query(searchText) {
+    function query(searchText, generation) {
+        console.log(`[WebSearchProvider] Received query for generation ${generation} with text: "${searchText}"`)
         var results = []
         const trimmedText = searchText.trim()
 
@@ -49,12 +60,15 @@ Item {
                 "entryObject": actionInstance
             })
         }
-        resultsReady(results)
+        console.log(`[WebSearchProvider] Sending ${results.length} results for generation ${generation}`)
+        resultsReady(results, generation)
     }
 
     // --- Lifecycle ---
     Component.onCompleted: {
+        console.log("[WebSearchProvider] Component.onCompleted")
         SearchService.registerProvider(root)
+        ready()
     }
 
     Component.onDestruction: {

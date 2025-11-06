@@ -9,21 +9,30 @@ Item {
     id: root
 
     // --- Public API for SearchService ---
-    signal resultsReady(var resultsArray)
+    signal resultsReady(var resultsArray, int generation)
+    signal ready
 
     // --- Component Factory ---
-    // This defines a template for creating our Action objects. Each Action instance
-    // will be a self-contained QObject with its own Process for executing shell commands.
     Component {
         id: actionFactory
-                Action {
-                    property string resultText
-        
-                    // Each Action instance gets its own private Process component for the copy action.
-                    Process {
-                        id: copyProcess
+        Action {
+            property string resultText
+
+            // Each Action instance gets its own private Process component for the copy action.
+            Process {
+                id: copyProcess
+                onExited: (exitCode) => {
+                    if (exitCode !== 0) {
+                        NotificationService.send(
+                            "Fehler beim Kopieren",
+                            "Der Befehl 'wl-copy' konnte nicht ausgeführt werden.",
+                            "dialog-error"
+                        )
                     }
-        
+                }
+            }
+
+            // The logic is now fully encapsulated within the Action object.
             onTriggered: {
                 // 1. Copy to clipboard via wl-copy
                 copyProcess.command = ["sh", "-c", `echo "${resultText}" | wl-copy`]
@@ -36,10 +45,12 @@ Item {
                     "calculate"
                 )
             }
-                }    }
+        }
+    }
 
     // --- Query Logic ---
-    function query(searchText) {
+    function query(searchText, generation) {
+        console.log(`[CalculatorProvider] Received query for generation ${generation} with text: "${searchText}"`)
         const trimmedText = searchText.trim()
         var results = []
 
@@ -67,12 +78,15 @@ Item {
                 // Invalid expression, do nothing.
             }
         }
-        resultsReady(results)
+        console.log(`[CalculatorProvider] Sending ${results.length} results for generation ${generation}`)
+        resultsReady(results, generation)
     }
 
     // --- Lifecycle ---
     Component.onCompleted: {
+        console.log("[CalculatorProvider] Component.onCompleted")
         SearchService.registerProvider(root)
+        ready()
     }
 
     Component.onDestruction: {
