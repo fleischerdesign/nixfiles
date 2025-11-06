@@ -149,7 +149,10 @@ Modal {
                     Keys.onPressed: (event) => {
                         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                             if (appListView.currentIndex >= 0) {
-                                Search.SearchService.results.get(appListView.currentIndex).entryObject.execute()
+                                const item = Search.SearchService.results.get(appListView.currentIndex)
+                                if (item.actionObject) {
+                                    ActionHandler.execute(item.actionObject)
+                                }
                                 StateManager.appLauncherOpened = false
                             }
                             event.accepted = true
@@ -298,9 +301,7 @@ Modal {
                         TapHandler {
                             id: tapHandler
                             onTapped: {
-                                if (model.entryObject) {
-                                    model.entryObject.execute()
-                                } else if (model.actionObject) {
+                                if (model.actionObject) {
                                     ActionHandler.execute(model.actionObject)
                                 }
                                 StateManager.appLauncherOpened = false

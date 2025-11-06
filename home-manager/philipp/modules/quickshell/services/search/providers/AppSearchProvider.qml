@@ -85,7 +85,10 @@ Item {
                     },
                     "genericName": modelData.genericName,
                     "keywords": keywordString,
-                    "entryObject": modelData,
+                    "actionObject": {
+                        "type": "launchApp",
+                        "appEntry": modelData
+                    },
                     "searchableString": searchable
                 })
             }

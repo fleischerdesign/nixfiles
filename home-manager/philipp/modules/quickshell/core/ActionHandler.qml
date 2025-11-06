@@ -43,6 +43,16 @@ Item {
                     "content_copy"
                 )
                 break;
+            case "launchApp": // New case for launching applications
+                if (action.appEntry && typeof action.appEntry.execute === 'function') {
+                    action.appEntry.execute();
+                } else {
+                    console.warn(`[ActionHandler] launchApp action missing executable appEntry: ${JSON.stringify(action)}`);
+                }
+                break;
+            case "noAction": // New case for actions that do nothing
+                // Do nothing
+                break;
             default:
                 console.warn(`[ActionHandler] Unknown action type: ${action.type}`)
         }

@@ -27,7 +27,9 @@ Item {
                 "fontFamily": "monospace"
             },
             "genericName": `${weatherDesc}, ${current.temp_C}°C (Gefühlt ${current.FeelsLikeC}°C)`,
-            "actionObject": Qt.createQmlObject('import QtQuick; QtObject { function execute() {} }', root)
+            "actionObject": {
+                "type": "noAction"
+            }
         };
     }
 
