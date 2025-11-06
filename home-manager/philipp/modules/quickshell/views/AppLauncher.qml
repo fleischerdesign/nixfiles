@@ -21,6 +21,7 @@ Modal {
     WebSearchProvider {}
     FileSearchProvider {}
     SystemActionProvider {}
+    WeatherProvider {}
 
     // --- Behavior ---
 
