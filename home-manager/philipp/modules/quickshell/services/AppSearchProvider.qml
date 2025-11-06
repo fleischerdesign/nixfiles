@@ -23,12 +23,7 @@ Item {
         } else {
             for (var i = 0; i < allAppsModel.count; i++) {
                 const entry = allAppsModel.get(i)
-                const name = entry.name ? entry.name.toLowerCase() : ""
-                const generic = entry.genericName ? entry.genericName.toLowerCase() : ""
-                const keywords = entry.keywords ? entry.keywords.toLowerCase() : ""
-                const searchableString = name + " " + generic + " " + keywords
-
-                if (searchableString.includes(currentSearchText)) {
+                if (entry.searchableString.includes(currentSearchText)) {
                     filteredResults.push(entry)
                 }
             }
@@ -76,6 +71,11 @@ Item {
                         keywordString += modelData.keywords[i] + " "
                     }
                 }
+
+                const name = modelData.name || ""
+                const genericName = modelData.genericName || ""
+                const searchable = (name + " " + genericName + " " + keywordString).toLowerCase()
+
                 allAppsModel.append({
                     "name": modelData.name,
                     "priority": 100,
@@ -85,7 +85,8 @@ Item {
                     },
                     "genericName": modelData.genericName,
                     "keywords": keywordString,
-                    "entryObject": modelData
+                    "entryObject": modelData,
+                    "searchableString": searchable
                 })
             }
         }
