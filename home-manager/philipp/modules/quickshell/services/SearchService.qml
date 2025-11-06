@@ -5,7 +5,7 @@ import Quickshell.Widgets
 
 // This singleton service coordinates search queries across multiple providers.
 // It is completely headless and knows nothing about what it is searching for.
-QtObject {
+Item {
     id: root
 
     // --- Public API ---
@@ -48,6 +48,8 @@ QtObject {
     property int searchGeneration: 0
 
     // --- Logic ---
+    property bool searchInProgress: false
+
     onSearchTextChanged: {
         if (!allProvidersReady) {
             console.log("[SearchService] onSearchTextChanged ignored: Not all providers are ready.")
@@ -55,12 +57,14 @@ QtObject {
         }
 
         searchGeneration++
+        searchInProgress = true
         console.log(`>>>> [SearchService] STARTING search generation ${searchGeneration} for text: "${searchText}"`)
         pendingResults = []
         results.clear()
 
         if (providers.length === 0) {
             console.log("[SearchService] No providers registered, aborting search.")
+            searchInProgress = false
             return;
         }
 
@@ -75,27 +79,22 @@ QtObject {
         console.log(`[SearchService] Received ${providerResults.length} results for generation ${generation}. Current generation is ${searchGeneration}.`)
         if (generation !== searchGeneration) {
             console.log(`[SearchService] Discarding stale results for generation ${generation}.`)
-            // This is not an error, just an old request finishing, but we need to decrement the counter.
-            activeQueries--
-            console.log(`[SearchService] Stale results handled. Active queries remaining: ${activeQueries}`)
             return;
         }
 
         pendingResults = pendingResults.concat(providerResults)
         activeQueries--
         console.log(`[SearchService] Handled results. Active queries remaining: ${activeQueries}`)
+        
         if (activeQueries === 0) {
-            console.log(">>>> [SearchService] All providers finished for generation " + generation + ". Processing results.")
-            processAndDisplayResults()
+            searchInProgress = false
         }
+
+        processAndDisplayResults()
     }
 
     function processAndDisplayResults() {
         console.log(`[SearchService] Processing ${pendingResults.length} pending results.`)
-        if (pendingResults.length === 0) {
-            console.log("[SearchService] No pending results to process.")
-            return;
-        }
 
         let highestPriority = -1;
         for (var i = 0; i < pendingResults.length; i++) {
@@ -112,11 +111,11 @@ QtObject {
             }
         }
 
+        results.clear()
+
         console.log(`[SearchService] Appending ${finalResults.length} final results to model.`)
         for (var i = 0; i < finalResults.length; i++) {
             results.append(finalResults[i])
         }
-
-        pendingResults = [] // Clear for next search
     }
 }

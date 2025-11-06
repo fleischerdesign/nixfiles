@@ -105,6 +105,23 @@ Modal {
             anchors.margins: 15
             spacing: 15
 
+            Timer {
+                id: animationEnableTimer
+                interval: 50
+                onTriggered: appListView.animationsEnabled = true
+            }
+
+            Connections {
+                target: SearchService
+                function onSearchInProgressChanged() {
+                    if (SearchService.searchInProgress) {
+                        appListView.animationsEnabled = false
+                    } else {
+                        animationEnableTimer.restart()
+                    }
+                }
+            }
+
             // 1. Search Bar
             Rectangle {
                 Layout.fillWidth: true
@@ -161,6 +178,7 @@ Modal {
 
                 ListView {
                     id: appListView
+                    property bool animationsEnabled: true
                     focus: true // Allow the list to receive keyboard focus
                     anchors.fill: parent
                     spacing: 4
@@ -285,6 +303,7 @@ Modal {
                             isHovered: hoverHandler.hovered
                             isPressed: tapHandler.pressed || delegateRoot.isCurrent
                             colorRole: M3StateLayer.ColorRole.Surface
+                            animationsEnabled: appListView.animationsEnabled
                         }
                     }
                 }

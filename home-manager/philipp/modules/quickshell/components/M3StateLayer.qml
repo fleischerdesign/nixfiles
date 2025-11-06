@@ -69,8 +69,11 @@ Rectangle {
     color: root.autoStateColor
     opacity: root.finalOpacity
     
+    property bool animationsEnabled: true
+
     // M3-konforme Animationen
     Behavior on opacity {
+        enabled: root.animationsEnabled
         NumberAnimation {
             duration: root.isPressed ? 100 : 150
             easing.type: Easing.OutCubic
@@ -78,6 +81,7 @@ Rectangle {
     }
     
     Behavior on color {
+        enabled: root.animationsEnabled
         ColorAnimation {
             duration: 150
         }

@@ -44,12 +44,21 @@ Item {
         return "🌡️";
     }
 
-    function query(searchText, generation) {
-        const trimmedText = searchText.trim().toLowerCase();
+    property string _pendingSearchText: ""
+    property int _pendingGeneration: 0
+
+    Timer {
+        id: debounceTimer
+        interval: 300
+        onTriggered: _doQuery()
+    }
+
+    function _doQuery() {
+        const trimmedText = _pendingSearchText.trim().toLowerCase();
         const parts = trimmedText.split(/\s+/);
 
         if (parts[0] !== "wetter") {
-            resultsReady([], generation);
+            resultsReady([], _pendingGeneration);
             return;
         }
 
@@ -61,11 +70,17 @@ Item {
             // The 'generation' variable is available here because of closure.
             if (data) {
                 const result = createResultFromData(data);
-                resultsReady([result], generation);
+                resultsReady([result], _pendingGeneration);
             } else {
                 // The fetch failed or returned no data.
-                resultsReady([], generation);
+                resultsReady([], _pendingGeneration);
             }
         });
+    }
+
+    function query(searchText, generation) {
+        _pendingSearchText = searchText;
+        _pendingGeneration = generation;
+        debounceTimer.restart();
     }
 }
