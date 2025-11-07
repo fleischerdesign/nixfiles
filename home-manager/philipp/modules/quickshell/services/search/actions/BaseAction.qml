@@ -2,6 +2,7 @@
 import QtQuick
 
 Item {
+    objectName: "actionHandler"
     // The unique type name for this action, e.g., "command", "url".
     property string type: ""
 

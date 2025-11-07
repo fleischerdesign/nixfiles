@@ -3,6 +3,7 @@ import qs.services.search as Search
 
 Item {
     id: root
+    objectName: "searchProvider"
 
     // --- Public API for Search.SearchService ---
     // Signal emitted when search results are available.

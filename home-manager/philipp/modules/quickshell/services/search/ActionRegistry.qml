@@ -19,14 +19,13 @@ Singleton {
     readonly property var actionHandlers: ({})
 
     Component.onCompleted: {
-        // Populate the map from the statically declared handlers.
-        actionHandlers[commandAction.type] = commandAction;
-        actionHandlers[copyAction.type] = copyAction;
-        actionHandlers[launchAppAction.type] = launchAppAction;
-        actionHandlers[noAction.type] = noAction;
-        actionHandlers[urlAction.type] = urlAction;
-        
-        console.log(`[ActionRegistry] All ${Object.keys(actionHandlers).length} handlers registered.`)
+        for (const prop in this) {
+            const handler = this[prop];
+            if (handler && handler.objectName === "actionHandler") {
+                actionHandlers[handler.type] = handler;
+            }
+        }
+        console.log(`[ActionRegistry] All ${Object.keys(actionHandlers).length} handlers registered via introspection.`);
     }
 
     // Public API

@@ -2,65 +2,56 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
+import "./providers" as Providers
 
 // This singleton service coordinates search queries across multiple providers.
-// It is completely headless and knows nothing about what it is searching for.
+// It is now self-contained and owns its providers.
 Item {
     id: root
 
-    // Public API
+    // --- Provider Declaration ---
+    property var appSearchProvider: Providers.AppSearchProvider {}
+    property var calculatorProvider: Providers.CalculatorProvider {}
+    property var fileSearchProvider: Providers.FileSearchProvider {}
+    property var systemActionProvider: Providers.SystemActionProvider {}
+    property var weatherProvider: Providers.WeatherProvider {}
+    property var webSearchProvider: Providers.WebSearchProvider {}
+
+    // --- Public API ---
     property string searchText: ""
     readonly property ListModel results: ListModel {}
 
-    // Provider Management
+    // --- Provider Management ---
     property var providers: ({})
-    property int readyProviders: 0
-    property bool allProvidersReady: false
 
-    function registerProvider(provider) {
-        console.log(`[SearchService] Registering provider: ${provider}`)
-        const providerId = provider.toString()
-        const metadata = provider.metadata || {}
-        var debounceTimer = null
+    Component.onCompleted: {
+        for (const prop in this) {
+            const provider = this[prop];
 
-        if (metadata.debounce > 0) {
-            debounceTimer = Qt.createQmlObject(`import QtQuick; Timer { interval: ${metadata.debounce} }`, root)
-            debounceTimer.triggered.connect(function() {
-                console.log(`[SearchService] Debounce timer triggered for provider ${providerId}`)
-                queryProvider(providerId, searchText, searchGeneration)
-            })
-        }
+            // Check if the property is a valid search provider
+            if (provider && provider.objectName === "searchProvider") {
+                const providerId = provider.toString();
+                const metadata = provider.metadata || {};
+                var debounceTimer = null;
 
-        providers[providerId] = {
-            "instance": provider,
-            "metadata": metadata,
-            "debounceTimer": debounceTimer
-        }
+                if (metadata.debounce > 0) {
+                    debounceTimer = Qt.createQmlObject(`import QtQuick; Timer { interval: ${metadata.debounce} }`, root);
+                    debounceTimer.triggered.connect(function() {
+                        console.log(`[SearchService] Debounce timer triggered for provider ${providerId}`);
+                        queryProvider(providerId, searchText, searchGeneration);
+                    });
+                }
 
-        provider.resultsReady.connect(handleProviderResults)
+                providers[providerId] = {
+                    "instance": provider,
+                    "metadata": metadata,
+                    "debounceTimer": debounceTimer
+                };
 
-        provider.ready.connect(function() {
-            if (allProvidersReady) return;
-            readyProviders++;
-            console.log(`[SearchService] Provider ready. ${readyProviders}/${Object.keys(providers).length}`)
-            if (readyProviders === Object.keys(providers).length) {
-                allProvidersReady = true;
-                console.log(">>>> [SearchService] All providers ready. Triggering initial population.")
-                // Re-trigger the search handler by re-assigning the property
-                searchText = searchText
+                provider.resultsReady.connect(handleProviderResults);
             }
-        })
-    }
-
-    function unregisterProvider(provider) {
-        const providerId = provider.toString()
-        console.log(`[SearchService] Unregistering provider: ${providerId}`)
-        if (providers[providerId]) {
-            if (providers[providerId].debounceTimer) {
-                providers[providerId].debounceTimer.destroy()
-            }
-            delete providers[providerId]
         }
+        console.log(`[SearchService] All ${Object.keys(providers).length} self-owned providers are configured via introspection.`);
     }
 
     // Internal State
@@ -72,11 +63,6 @@ Item {
     property bool searchInProgress: false
 
     onSearchTextChanged: {
-        if (!allProvidersReady) {
-            console.log("[SearchService] onSearchTextChanged ignored: Not all providers are ready.")
-            return;
-        }
-
         searchGeneration++
         searchInProgress = true
         console.log(`>>>> [SearchService] STARTING search generation ${searchGeneration} for text: "${searchText}"`)

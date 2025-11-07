@@ -22,14 +22,6 @@ Modal {
 
     visible: false
 
-    Component.onCompleted: {
-        // Calling the load() function forces the QML engine to instantiate
-        // the ProviderRegistry singleton, which in turn instantiates all
-        // the static providers. This is a necessary, non-optimizable
-        // access point to ensure the search system is initialized at startup.
-        Search.ProviderRegistry.load()
-    }
-
     onBackgroundClicked: {
         StateManager.appLauncherOpened = false
     }
