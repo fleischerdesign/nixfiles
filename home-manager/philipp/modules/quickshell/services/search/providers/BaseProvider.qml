@@ -25,14 +25,6 @@ Item {
     }
 
     // --- Lifecycle Management ---
-    Component.onCompleted: {
-        Search.SearchService.registerProvider(root)
-        // Most providers are ready immediately. If a provider needs to do
-        // async work, it can override onCompleted and emit ready() itself.
-        ready()
-    }
-
-    Component.onDestruction: {
-        Search.SearchService.unregisterProvider(root)
-    }
+    // Providers are now owned and registered directly by SearchService.
+    // Self-registration is no longer needed.
 }
