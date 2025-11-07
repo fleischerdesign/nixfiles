@@ -50,7 +50,6 @@ BaseProvider {
     Component.onCompleted: {
         console.log("[AppSearchProvider] Component.onCompleted")
         // We must register the provider here because we override the base onCompleted.
-        Search.SearchService.registerProvider(root)
         // We do NOT call ready() here. The readyTimer will do that once the model is loaded.
     }
 

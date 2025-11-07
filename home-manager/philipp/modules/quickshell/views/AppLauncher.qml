@@ -164,7 +164,7 @@ property bool providersInitialized: false
                             if (appListView.currentIndex >= 0) {
                                 const item = Search.SearchService.results.get(appListView.currentIndex)
                                 if (item.actionObject) {
-                                    ActionHandler.execute(item.actionObject)
+                                    Search.ActionRegistry.execute(item.actionObject)
                                 }
                                 StateManager.appLauncherOpened = false
                             }
@@ -211,7 +211,7 @@ property bool providersInitialized: false
                                 if (item.entryObject) {
                                     item.entryObject.execute()
                                 } else if (item.actionObject) {
-                                    ActionHandler.execute(item.actionObject)
+                                    Search.ActionRegistry.execute(item.actionObject)
                                 }
                                 StateManager.appLauncherOpened = false
                             }
@@ -315,7 +315,7 @@ property bool providersInitialized: false
                             id: tapHandler
                             onTapped: {
                                 if (model.actionObject) {
-                                    ActionHandler.execute(model.actionObject)
+                                    Search.ActionRegistry.execute(model.actionObject)
                                 }
                                 StateManager.appLauncherOpened = false
                             }
