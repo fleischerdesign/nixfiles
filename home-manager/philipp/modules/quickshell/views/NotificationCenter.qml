@@ -48,7 +48,7 @@ Modal {
             bottomMargin: 65 + 10
             topMargin: 10
         }
-        
+        opacity: shouldBeVisible ? 1.0 : 0
         // Position mit x statt anchors.rightMargin
         x: shouldBeVisible 
             ? (parent.width - width - 10)  // Sichtbar: 10px vom rechten Rand
@@ -61,6 +61,12 @@ Modal {
                 easing.type: Easing.InOutQuad
             }
         }
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 200
+                    easing.type: Easing.InOutQuad
+                }
+            }
         
         // Performance-Boost: Rendere als GPU-Texture
         layer.enabled: true

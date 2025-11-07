@@ -86,6 +86,7 @@ property bool providersInitialized: false
             radius: 15
             color: ColorService.palette.m3SurfaceContainerHigh
             clip: true
+            opacity: shouldBeVisible ? 1.0 : 0
     
             Component.onCompleted: {
                 // Set initial position off-screen to the left without animation
@@ -102,6 +103,12 @@ property bool providersInitialized: false
     
             // Animate the x property
             Behavior on x {
+                NumberAnimation {
+                    duration: 200
+                    easing.type: Easing.InOutQuad
+                }
+            }
+            Behavior on opacity {
                 NumberAnimation {
                     duration: 200
                     easing.type: Easing.InOutQuad
