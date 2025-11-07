@@ -24,7 +24,7 @@ Item {
             "icon": {
                 "type": "fontIcon",
                 "source": getIconForWeatherDesc(weatherDesc),
-                "fontFamily": "monospace"
+                "fontFamily": "Material Symbols Rounded"
             },
             "genericName": `${weatherDesc}, ${current.temp_C}°C (Gefühlt ${current.FeelsLikeC}°C)`,
             "actionObject": {
@@ -41,16 +41,15 @@ Item {
 
     function getIconForWeatherDesc(weatherDesc) {
         const desc = weatherDesc.toLowerCase();
-        if (desc.includes("sunny") || desc.includes("clear")) return "☀️";
-        if (desc.includes("partly cloudy")) return "⛅️";
-        if (desc.includes("cloudy")) return "☁️";
-        if (desc.includes("overcast")) return "☁️";
-        if (desc.includes("mist") || desc.includes("fog")) return "🌫️";
-        if (desc.includes("patchy rain") || desc.includes("light rain") || desc.includes("drizzle")) return "🌦️";
-        if (desc.includes("rain") || desc.includes("shower")) return "🌧️";
-        if (desc.includes("thunder")) return "⛈️";
-        if (desc.includes("snow") || desc.includes("sleet") || desc.includes("blizzard")) return "❄️";
-        return "🌡️";
+        if (desc.includes("sunny") || desc.includes("clear")) return "light_mode";
+        if (desc.includes("partly cloudy")) return "partly_cloudy";
+        if (desc.includes("cloudy") || desc.includes("overcast")) return "cloud";
+        if (desc.includes("mist") || desc.includes("fog")) return "foggy";
+        if (desc.includes("patchy rain") || desc.includes("light rain") || desc.includes("drizzle")) return "rainy";
+        if (desc.includes("rain") || desc.includes("shower")) return "rainy";
+        if (desc.includes("thunder")) return "thunderstorm";
+        if (desc.includes("snow") || desc.includes("sleet") || desc.includes("blizzard")) return "weather_snowy";
+        return "device_thermostat";
     }
 
     property var metadata: ({ "debounce": 300, "trigger": "wetter" })
