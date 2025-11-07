@@ -2,102 +2,32 @@
 pragma Singleton
 import QtQuick
 import Quickshell
-import qs.services.search.providers
-import Qt.labs.folderlistmodel 2.15
+import qs.services.search.providers as Providers
 
 Singleton {
     id: root
 
-    // --- Properties ---
-    property var providerLoaders: ({})
-    property bool allProvidersLoaded: false
-    property bool _loadRequested: false
+    // Statically declare each provider as a property. This is the clean,
+    // declarative, and syntactically valid way to instantiate them.
+    property var appSearchProvider: Providers.AppSearchProvider {}
+    property var calculatorProvider: Providers.CalculatorProvider {}
+    property var fileSearchProvider: Providers.FileSearchProvider {}
+    property var systemActionProvider: Providers.SystemActionProvider {}
+    property var weatherProvider: Providers.WeatherProvider {}
+    property var webSearchProvider: Providers.WebSearchProvider {}
 
-    // --- Dynamic Provider Discovery ---
+    // The purpose of this singleton is to ensure providers are loaded.
+    // By declaring them statically as properties, they are instantiated
+    // when this singleton is first accessed. Their `Component.onCompleted`
+    // handles registration with the SearchService automatically.
 
-    // 1. Find all provider QML files
-    FolderListModel {
-        id: providerFilesModel
-        folder: Qt.resolvedUrl("providers/")
-        nameFilters: ["*Provider.qml"]
-        showDirs: false
-    }
-
-    // 2. For each file, create a LazyLoader instance
-    Instantiator {
-        model: providerFilesModel
-
-        delegate: LazyLoader {
-            source: filePath
-
-            Component.onCompleted: {
-                const baseName = providerFilesModel.get(index, "fileBaseName");
-
-                // Exclude the base provider itself by simply not adding it to the map.
-                if (baseName === "BaseProvider") {
-                    return;
-                }
-
-                const providerName = baseName.replace("Provider", "").toLowerCase();
-                root.providerLoaders[providerName] = this;
-
-                // Check if this is the last expected provider to be instantiated
-                const expectedCount = providerFilesModel.count - 1; // -1 for BaseProvider
-                if (Object.keys(root.providerLoaders).length === expectedCount) {
-                    console.log(`[ProviderRegistry] All ${expectedCount} providers instantiated.`);
-                    // If loading was already requested, trigger it now.
-                    if (root._loadRequested) {
-                        root._activateAllProviders();
-                    }
-                }
-            }
-        }
-    }
-
-    // --- Private Functions ---
-    function _activateAllProviders() {
-        if (allProvidersLoaded) return;
-
-        console.log("[ProviderRegistry] Activating all providers...");
-        for (const name in providerLoaders) {
-            providerLoaders[name].loading = true;
-        }
-
-        allProvidersLoaded = true;
-        console.log(`[ProviderRegistry] All ${Object.keys(providerLoaders).length} providers are loading in the background.`);
-    }
-
-    // --- Public API ---
-    function ensureProvidersLoaded() {
-        if (allProvidersLoaded) return;
-        _loadRequested = true;
-
-        // If discovery and instantiation is already complete, trigger activation now.
-        const expectedCount = providerFilesModel.count > 0 ? providerFilesModel.count - 1 : 0;
-        if (expectedCount > 0 && Object.keys(providerLoaders).length === expectedCount) {
-            _activateAllProviders();
-        }
-    }
-
-    function loadProvider(name) {
-        const loader = providerLoaders[name];
-        if (!loader) {
-            console.error(`[ProviderRegistry] Unknown provider: ${name}`);
-            return null;
-        }
-        const instance = loader.item;
-        if (!instance) {
-            console.error(`[ProviderRegistry] Failed to instantiate ${name}.`);
-            return null;
-        }
-        return instance;
-    }
-
-    function unloadProvider(name) {
-        const loader = providerLoaders[name];
-        if (loader && loader.active) {
-            loader.active = false;
-            console.log(`[ProviderRegistry] Unloaded provider: ${name}`);
-        }
+    function load() {
+        // This function is a deliberate no-op.
+        // Its purpose is to serve as a non-optimizable access point.
+        // Calling this function from another component forces the QML engine
+        // to instantiate this singleton, which in turn triggers the creation
+        // of all static provider properties and their registration.
+        // A simple property access like `var _ = Registry` might be optimized
+        // away by the engine if the variable is unused. A function call is safer.
     }
 }

@@ -16,13 +16,19 @@ import qs.services.search as Search
 Modal {
     id: appLauncherModal
 
-property bool providersInitialized: false
-
     // --- Behavior ---
 
     property bool shouldBeVisible: false
 
     visible: false
+
+    Component.onCompleted: {
+        // Calling the load() function forces the QML engine to instantiate
+        // the ProviderRegistry singleton, which in turn instantiates all
+        // the static providers. This is a necessary, non-optimizable
+        // access point to ensure the search system is initialized at startup.
+        Search.ProviderRegistry.load()
+    }
 
     onBackgroundClicked: {
         StateManager.appLauncherOpened = false
@@ -42,12 +48,6 @@ property bool providersInitialized: false
     }
 
     onShouldBeVisibleChanged: {
-        // ✅ Provider beim ersten Öffnen laden
-        if (shouldBeVisible && !providersInitialized) {
-            Search.ProviderRegistry.ensureProvidersLoaded()
-            providersInitialized = true
-        }
-        
         if (shouldBeVisible) {
             // Modal sichtbar machen (Slide-In Animation startet)
             visible = true
