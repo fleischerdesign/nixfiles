@@ -10,7 +10,6 @@ Singleton {
     property var _fetching: ({})
 
     // Main function to be called by providers.
-    // It gets weather data for a location and executes the callback when data is ready.
     function getWeatherFor(location, callback) {
         const locationKey = location.toLowerCase();
         const cachedItem = cache[locationKey];
