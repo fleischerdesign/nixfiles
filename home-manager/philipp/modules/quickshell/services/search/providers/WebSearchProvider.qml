@@ -4,14 +4,8 @@ import qs.components
 import Quickshell.Io
 
 // This provider provides a web search action for any given search query.
-Item {
+BaseProvider {
     id: root
-
-    // --- Public API for Search.SearchService ---
-    signal resultsReady(var resultsArray, int generation)
-    signal ready
-
-    property var metadata: ({})
 
     // --- Query Logic ---
     function query(searchText, generation) {
@@ -40,16 +34,5 @@ Item {
         }
         console.log(`[WebSearchProvider] Sending ${results.length} results for generation ${generation}`)
         resultsReady(results, generation)
-    }
-
-    // --- Lifecycle ---
-    Component.onCompleted: {
-        console.log("[WebSearchProvider] Component.onCompleted")
-        Search.SearchService.registerProvider(root)
-        ready()
-    }
-
-    Component.onDestruction: {
-        Search.SearchService.unregisterProvider(root)
     }
 }

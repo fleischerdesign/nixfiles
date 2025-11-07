@@ -46,7 +46,8 @@ Item {
             if (readyProviders === Object.keys(providers).length) {
                 allProvidersReady = true;
                 console.log(">>>> [SearchService] All providers ready. Triggering initial population.")
-                onSearchTextChanged()
+                // Re-trigger the search handler by re-assigning the property
+                searchText = searchText
             }
         })
     }

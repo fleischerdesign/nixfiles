@@ -5,13 +5,10 @@ import Quickshell.Io
 
 // This provider checks if the search query is a mathematical expression
 // and provides the result as a search item.
-Item {
+BaseProvider {
     id: root
 
     // --- Public API for Search.SearchService ---
-    signal resultsReady(var resultsArray, int generation)
-    signal ready
-
     property var metadata: ({ "regex": "^[\\d\\s\\(\\)\\+\\-\\*\\/\\.]+$" })
 
     function query(searchText, generation) {
@@ -44,15 +41,5 @@ Item {
         
         console.log(`[CalculatorProvider] Sending ${results.length} results for generation ${generation}`)
         resultsReady(results, generation)
-    }
-
-    Component.onCompleted: {
-        console.log("[CalculatorProvider] Component.onCompleted")
-        Search.SearchService.registerProvider(root)
-        ready()
-    }
-
-    Component.onDestruction: {
-        Search.SearchService.unregisterProvider(root)
     }
 }

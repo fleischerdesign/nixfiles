@@ -4,12 +4,8 @@ import qs.components
 import Quickshell.Io
 
 // This provider uses 'plocate' to quickly search for files system-wide.
-Item {
+BaseProvider {
     id: root
-
-    // --- Public API for Search.SearchService ---
-    signal resultsReady(var resultsArray, int generation)
-    signal ready // We are ready immediately
 
     property int currentQueryGeneration: 0
 
@@ -67,16 +63,5 @@ Item {
         console.log(`[FileSearchProvider] Starting plocate for generation ${generation}`)
         searchProcess.command = ["plocate", "-i", "--limit", "10", "*" + trimmedText + "*"]
         searchProcess.running = true
-    }
-
-    // --- Lifecycle ---
-    Component.onCompleted: {
-        console.log("[FileSearchProvider] Component.onCompleted")
-        Search.SearchService.registerProvider(root)
-        ready()
-    }
-
-    Component.onDestruction: {
-        Search.SearchService.unregisterProvider(root)
     }
 }

@@ -2,69 +2,102 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+import qs.services.search.providers
+import Qt.labs.folderlistmodel 2.15
 
 Singleton {
     id: root
-    
-    // Mapping: Provider-Name → Component
-    property var providerComponents: ({
-        "app": Qt.createComponent("providers/AppSearchProvider.qml"),
-        "calculator": Qt.createComponent("providers/CalculatorProvider.qml"),
-        "web": Qt.createComponent("providers/WebSearchProvider.qml"),
-        "file": Qt.createComponent("providers/FileSearchProvider.qml"),
-        "system": Qt.createComponent("providers/SystemActionProvider.qml"),
-        "weather": Qt.createComponent("providers/WeatherProvider.qml")
-    })
-    
-    property var loadedProviders: ({})
+
+    // --- Properties ---
+    property var providerLoaders: ({})
     property bool allProvidersLoaded: false
-    
-    // Lade alle Provider (wird vom AppLauncher aufgerufen)
+    property bool _loadRequested: false
+
+    // --- Dynamic Provider Discovery ---
+
+    // 1. Find all provider QML files
+    FolderListModel {
+        id: providerFilesModel
+        folder: Qt.resolvedUrl("providers/")
+        nameFilters: ["*Provider.qml"]
+        showDirs: false
+    }
+
+    // 2. For each file, create a LazyLoader instance
+    Instantiator {
+        model: providerFilesModel
+
+        delegate: LazyLoader {
+            source: filePath
+
+            Component.onCompleted: {
+                const baseName = providerFilesModel.get(index, "fileBaseName");
+
+                // Exclude the base provider itself by simply not adding it to the map.
+                if (baseName === "BaseProvider") {
+                    return;
+                }
+
+                const providerName = baseName.replace("Provider", "").toLowerCase();
+                root.providerLoaders[providerName] = this;
+
+                // Check if this is the last expected provider to be instantiated
+                const expectedCount = providerFilesModel.count - 1; // -1 for BaseProvider
+                if (Object.keys(root.providerLoaders).length === expectedCount) {
+                    console.log(`[ProviderRegistry] All ${expectedCount} providers instantiated.`);
+                    // If loading was already requested, trigger it now.
+                    if (root._loadRequested) {
+                        root._activateAllProviders();
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Private Functions ---
+    function _activateAllProviders() {
+        if (allProvidersLoaded) return;
+
+        console.log("[ProviderRegistry] Activating all providers...");
+        for (const name in providerLoaders) {
+            providerLoaders[name].loading = true;
+        }
+
+        allProvidersLoaded = true;
+        console.log(`[ProviderRegistry] All ${Object.keys(providerLoaders).length} providers are loading in the background.`);
+    }
+
+    // --- Public API ---
     function ensureProvidersLoaded() {
-        if (allProvidersLoaded) return
-        
-        console.log("[ProviderRegistry] Loading all providers...")
-        
-        for (const name in providerComponents) {
-            loadProvider(name)
+        if (allProvidersLoaded) return;
+        _loadRequested = true;
+
+        // If discovery and instantiation is already complete, trigger activation now.
+        const expectedCount = providerFilesModel.count > 0 ? providerFilesModel.count - 1 : 0;
+        if (expectedCount > 0 && Object.keys(providerLoaders).length === expectedCount) {
+            _activateAllProviders();
         }
-        
-        allProvidersLoaded = true
-        console.log(`[ProviderRegistry] Loaded ${Object.keys(loadedProviders).length} providers`)
     }
-    
-    // Lade einzelnen Provider
+
     function loadProvider(name) {
-        if (loadedProviders[name]) return loadedProviders[name]
-        
-        const component = providerComponents[name]
-        if (!component) {
-            console.error(`[ProviderRegistry] Unknown provider: ${name}`)
-            return null
+        const loader = providerLoaders[name];
+        if (!loader) {
+            console.error(`[ProviderRegistry] Unknown provider: ${name}`);
+            return null;
         }
-        
-        if (component.status === Component.Error) {
-            console.error(`[ProviderRegistry] Error loading ${name}:`, component.errorString())
-            return null
-        }
-        
-        const instance = component.createObject(root)
+        const instance = loader.item;
         if (!instance) {
-            console.error(`[ProviderRegistry] Failed to instantiate ${name}`)
-            return null
+            console.error(`[ProviderRegistry] Failed to instantiate ${name}.`);
+            return null;
         }
-        
-        loadedProviders[name] = instance
-        console.log(`[ProviderRegistry] Loaded provider: ${name}`)
-        return instance
+        return instance;
     }
-    
-    // Entlade Provider (z.B. bei niedrigem RAM)
+
     function unloadProvider(name) {
-        if (!loadedProviders[name]) return
-        
-        loadedProviders[name].destroy()
-        delete loadedProviders[name]
-        console.log(`[ProviderRegistry] Unloaded provider: ${name}`)
+        const loader = providerLoaders[name];
+        if (loader && loader.active) {
+            loader.active = false;
+            console.log(`[ProviderRegistry] Unloaded provider: ${name}`);
+        }
     }
 }

@@ -4,11 +4,8 @@ import Quickshell.Widgets
 import qs.services.search as Search
 
 // This component's job is to load all applications and provide them to the Search.SearchService.
-Item {
+BaseProvider {
     id: root
-
-    signal resultsReady(var resultsArray, int generation)
-    signal ready
 
     function query(searchText, generation) {
         console.log(`[AppSearchProvider] Received query for generation ${generation} with text: "${searchText}"`)
@@ -52,11 +49,9 @@ Item {
 
     Component.onCompleted: {
         console.log("[AppSearchProvider] Component.onCompleted")
+        // We must register the provider here because we override the base onCompleted.
         Search.SearchService.registerProvider(root)
-    }
-
-    Component.onDestruction: {
-        Search.SearchService.unregisterProvider(root)
+        // We do NOT call ready() here. The readyTimer will do that once the model is loaded.
     }
 
     // Use a Repeater to robustly load the application list from the C++ model.

@@ -2,16 +2,8 @@ import QtQuick
 import qs.services
 import qs.services.search as Search
 
-Item {
+BaseProvider {
     id: root
-
-    signal resultsReady(var resultsArray, int generation)
-    signal ready
-
-    Component.onCompleted: {
-        Search.SearchService.registerProvider(root)
-        ready()
-    }
 
     function createResultFromData(weatherData, location) {
         const current = weatherData.current_condition[0];

@@ -4,14 +4,8 @@ import qs.components
 import Quickshell.Io
 
 // This provider offers system-level actions like shutdown and reboot.
-Item {
+BaseProvider {
     id: root
-
-    // --- Public API for Search.SearchService ---
-    signal resultsReady(var resultsArray, int generation)
-    signal ready // We are ready immediately
-
-    property var metadata: ({})
 
     // --- Data ---
     property var systemActions: [
@@ -69,16 +63,5 @@ Item {
         }
         console.log(`[SystemActionProvider] Sending ${results.length} results for generation ${generation}`)
         resultsReady(results, generation)
-    }
-
-    // --- Lifecycle ---
-    Component.onCompleted: {
-        console.log("[SystemActionProvider] Component.onCompleted")
-        Search.SearchService.registerProvider(root)
-        ready()
-    }
-
-    Component.onDestruction: {
-        Search.SearchService.unregisterProvider(root)
     }
 }
