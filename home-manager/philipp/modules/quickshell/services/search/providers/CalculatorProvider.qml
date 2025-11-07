@@ -1,7 +1,7 @@
 import QtQuick
 import qs.services.search as Search
 import qs.components
-import Quickshell.Io // Import the Process component
+import Quickshell.Io
 
 // This provider checks if the search query is a mathematical expression
 // and provides the result as a search item.
@@ -14,7 +14,6 @@ Item {
 
     property var metadata: ({ "regex": "^[\\d\\s\\(\\)\\+\\-\\*\\/\\.]+$" })
 
-    // --- Query Logic ---
     function query(searchText, generation) {
         console.log(`[CalculatorProvider] Received query for generation ${generation} with text: "${searchText}"`)
         const trimmedText = searchText.trim()
@@ -47,7 +46,6 @@ Item {
         resultsReady(results, generation)
     }
 
-    // --- Lifecycle ---
     Component.onCompleted: {
         console.log("[CalculatorProvider] Component.onCompleted")
         Search.SearchService.registerProvider(root)

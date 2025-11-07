@@ -13,42 +13,31 @@ Rectangle {
     property var notification
     property bool isInNotificationCenter: false
     property bool expanded: false
+
+        readonly property color baseColor: root.isInNotificationCenter
+        ? ColorService.palette.m3SurfaceContainerHigh
+        : ColorService.palette.m3SurfaceContainer
     
-    // Hintergrundfarbe basierend auf Urgency
     color: {
         if (!root.notification)
-            return ColorService.palette.m3SurfaceContainer;
-
-        var baseColor = root.isInNotificationCenter
-            ? ColorService.palette.m3SurfaceContainerHigh
-            : ColorService.palette.m3SurfaceContainer;
+            return baseColor;
 
         switch (root.notification.urgency) {
-        case 0: // Low
-            return baseColor;
-        case 1: // Normal
-            return baseColor;
         case 2: // Critical
             return ColorService.palette.m3ErrorContainer;
-        default:
+        default: // Low (0) und Normal (1)
             return baseColor;
         }
     }
 
     // Content-Farbe basierend auf Urgency
-    property color onSurfaceColor: {
+    readonly property color onSurfaceColor: {
         if (!root.notification)
             return ColorService.palette.m3OnSurface;
-        switch (root.notification.urgency) {
-        case 0: // Low
-            return ColorService.palette.m3OnSurface;
-        case 1: // Normal
-            return ColorService.palette.m3OnSurface;
-        case 2: // Critical
-            return ColorService.palette.m3OnErrorContainer;
-        default:
-            return ColorService.palette.m3OnSurface;
-        }
+        
+        return root.notification.urgency === 2
+            ? ColorService.palette.m3OnErrorContainer
+            : ColorService.palette.m3OnSurface;
     }
 
     signal dismissRequested
@@ -134,13 +123,16 @@ Rectangle {
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
+
+            readonly property int buttonColorRole: root.notification && root.notification.urgency === 2 
+                ? M3Button.ColorRole.Error 
+                : M3Button.ColorRole.Surface
+
             M3Button {
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
                 style: M3Button.Style.Text
-                colorRole: root.notification && root.notification.urgency === 2 
-                    ? M3Button.ColorRole.Error 
-                    : M3Button.ColorRole.Surface
+                colorRole: parent.buttonColorRole
                 icon: root.expanded ? "expand_less" : "expand_more"
                 iconOnly: true
                 iconSize: 18

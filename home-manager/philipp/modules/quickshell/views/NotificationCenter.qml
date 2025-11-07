@@ -37,11 +37,9 @@ Modal {
         width: 400
 
     Component.onCompleted: {
-        // Initialisiere x außerhalb (rechts), OHNE Animation
         x = screen.width;
     }
 
-        // Feste Anchors (kein rightMargin mehr)
         anchors {
             top: parent.top
             bottom: parent.bottom
@@ -49,12 +47,10 @@ Modal {
             topMargin: 10
         }
         opacity: shouldBeVisible ? 1.0 : 0
-        // Position mit x statt anchors.rightMargin
         x: shouldBeVisible 
-            ? (parent.width - width - 10)  // Sichtbar: 10px vom rechten Rand
-            : parent.width                  // Versteckt: komplett rechts raus
+            ? (parent.width - width - 10)
+            : parent.width
         
-        // GPU-beschleunigte Animation
         Behavior on x {
             NumberAnimation {
                 duration: 200
@@ -68,8 +64,8 @@ Modal {
                 }
             }
         
-        // Performance-Boost: Rendere als GPU-Texture
-        layer.enabled: true
+        // Performance-Boost with true: render as gpu texture
+        layer.enabled: false
         
         radius: 15
         color: ColorService.palette.m3SurfaceContainer

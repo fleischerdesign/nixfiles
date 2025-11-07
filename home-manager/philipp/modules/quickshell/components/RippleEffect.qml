@@ -85,9 +85,10 @@ Item {
 
         Timer {
             id: sparkleTimer
-            interval: 30 // Reduced repaint frequency for performance
+            interval: 16
             repeat: true
             onTriggered: sparkleCanvas.requestPaint()
+            triggeredOnStart: false
         }
     }
 }

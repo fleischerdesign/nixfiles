@@ -1,4 +1,3 @@
-// services/search/SearchService.qml
 pragma Singleton
 import QtQuick
 import Quickshell
@@ -9,11 +8,11 @@ import Quickshell.Widgets
 Item {
     id: root
 
-    // --- Public API ---
+    // Public API
     property string searchText: ""
     readonly property ListModel results: ListModel {}
 
-    // --- Provider Management ---
+    // Provider Management
     property var providers: ({})
     property int readyProviders: 0
     property bool allProvidersReady: false
@@ -63,12 +62,12 @@ Item {
         }
     }
 
-    // --- Internal State ---
+    // Internal State
     property var pendingResults: []
     property int activeQueries: 0
     property int searchGeneration: 0
 
-    // --- Logic ---
+    // Logic 
     property bool searchInProgress: false
 
     onSearchTextChanged: {
@@ -83,7 +82,7 @@ Item {
         
         pendingResults = []
         results.clear()
-        activeQueries = 0  // ✅ Reset BEFORE counting
+        activeQueries = 0 // Reset before counting
 
         const providerIds = Object.keys(providers)
         if (providerIds.length === 0) {
@@ -97,31 +96,27 @@ Item {
             const providerId = providerIds[i]
             const providerData = providers[providerId]
 
-            // ✅ Prüfe ob Provider abgefragt werden soll
             if (shouldQueryProvider(providerData, trimmedText)) {
-                activeQueries++  // ✅ Nur zählen wenn wirklich abgefragt
+                activeQueries++
                 
                 if (providerData.debounceTimer) {
-                    // ✅ Stoppe alten Timer, dann restart
+                    // Stop old timer, then restart
                     providerData.debounceTimer.stop()
                     providerData.debounceTimer.restart()
                 } else {
                     queryProvider(providerId, searchText, searchGeneration)
                 }
             }
-            // ✅ Kein activeQueries-- mehr nötig!
         }
 
         console.log(`[SearchService] Active queries for generation ${searchGeneration}: ${activeQueries}`)
 
-        // ✅ Wenn kein Provider abgefragt wird, sofort fertig
         if (activeQueries === 0) {
             searchInProgress = false
             console.log(`[SearchService] No providers matched criteria. Search complete.`)
         }
     }
 
-    // ✅ NEUE: Zentrale Query-Funktion
     function queryProvider(providerId, text, generation) {
         const providerData = providers[providerId]
         if (!providerData) {
@@ -133,23 +128,19 @@ Item {
         providerData.instance.query(text, generation)
     }
 
-    // ✅ NEUE: Hilfsfunktion für Provider-Prüfung
     function shouldQueryProvider(providerData, trimmedText) {
         const metadata = providerData.metadata
 
-        // Prüfe minLength
         if (metadata.minLength && trimmedText.length < metadata.minLength) {
             return false
         }
 
-        // Prüfe trigger (z.B. "wetter")
         if (metadata.trigger) {
             if (!trimmedText.toLowerCase().startsWith(metadata.trigger)) {
                 return false
             }
         }
         
-        // Prüfe regex (z.B. nur Zahlen/Operatoren für Calculator)
         if (metadata.regex) {
             const regex = new RegExp(metadata.regex, 'i')
             if (!regex.test(trimmedText)) {
@@ -163,17 +154,16 @@ Item {
     function handleProviderResults(providerResults, generation) {
         console.log(`[SearchService] Received ${providerResults.length} results for generation ${generation}. Current generation is ${searchGeneration}.`)
         
-        // ✅ Ignoriere stale results
+        // Ignore stale results
         if (generation !== searchGeneration) {
             console.log(`[SearchService] Discarding stale results for generation ${generation}.`)
             return;
         }
 
         pendingResults = pendingResults.concat(providerResults)
-        activeQueries--
+        activeQueries = Math.max(0, activeQueries - 1)
         console.log(`[SearchService] Handled results. Active queries remaining: ${activeQueries}`)
         
-        // ✅ Safety check: activeQueries sollte nie negativ sein
         if (activeQueries < 0) {
             console.error(`[SearchService] ERROR: activeQueries is negative! Resetting to 0.`)
             activeQueries = 0
@@ -190,7 +180,6 @@ Item {
     function processAndDisplayResults() {
         console.log(`[SearchService] Processing ${pendingResults.length} pending results.`)
 
-        // Finde höchste Priorität
         let highestPriority = -1;
         for (var i = 0; i < pendingResults.length; i++) {
             if (pendingResults[i].priority > highestPriority) {
@@ -199,7 +188,6 @@ Item {
         }
         console.log(`[SearchService] Found highest priority: ${highestPriority}.`)
 
-        // Filtere nur Ergebnisse mit höchster Priorität
         var finalResults = []
         for (var i = 0; i < pendingResults.length; i++) {
             if (pendingResults[i].priority === highestPriority) {
@@ -215,15 +203,14 @@ Item {
         }
     }
 
-    // ✅ NEUE: Abbruch-Funktion für wenn AppLauncher geschlossen wird
     function cancelSearch() {
         console.log(`[SearchService] Cancelling search generation ${searchGeneration}`)
-        searchGeneration++  // Macht alle laufenden Queries ungültig
+        searchGeneration++  // Invalidate all running queries
         pendingResults = []
         activeQueries = 0
         searchInProgress = false
         
-        // Stoppe alle Debounce-Timer
+        // Stop all debounce timers
         const providerIds = Object.keys(providers)
         for (var i = 0; i < providerIds.length; i++) {
             const providerData = providers[providerIds[i]]
