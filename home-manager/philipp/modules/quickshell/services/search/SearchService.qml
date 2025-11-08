@@ -168,25 +168,23 @@ Item {
         console.log(`[SearchService] Processing ${pendingResults.length} pending results.`)
 
         let highestPriority = -1;
-        for (var i = 0; i < pendingResults.length; i++) {
-            if (pendingResults[i].priority > highestPriority) {
-                highestPriority = pendingResults[i].priority;
+        let finalResults = [];
+
+        for (let i = 0; i < pendingResults.length; i++) {
+            const result = pendingResults[i];
+            if (result.priority > highestPriority) {
+                highestPriority = result.priority;
+                finalResults = [result]; // Start a new list with the higher priority item
+            } else if (result.priority === highestPriority) {
+                finalResults.push(result); // Add to the current list
             }
         }
-        console.log(`[SearchService] Found highest priority: ${highestPriority}.`)
 
-        var finalResults = []
-        for (var i = 0; i < pendingResults.length; i++) {
-            if (pendingResults[i].priority === highestPriority) {
-                finalResults.push(pendingResults[i])
-            }
-        }
+        results.clear();
 
-        results.clear()
-
-        console.log(`[SearchService] Appending ${finalResults.length} final results to model.`)
-        for (var i = 0; i < finalResults.length; i++) {
-            results.append(finalResults[i])
+        console.log(`[SearchService] Appending ${finalResults.length} final results to model with highest priority ${highestPriority}.`);
+        for (let i = 0; i < finalResults.length; i++) {
+            results.append(finalResults[i]);
         }
     }
 
