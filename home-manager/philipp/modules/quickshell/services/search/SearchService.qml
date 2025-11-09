@@ -70,7 +70,6 @@ Item {
         pendingResults = []
         results.clear()
 
-        // Stop all running debounce timers to prevent stale queries from firing.
         const providerIds = Object.keys(providers)
         for (var i = 0; i < providerIds.length; i++) {
             const providerData = providers[providerIds[i]]
@@ -79,37 +78,57 @@ Item {
             }
         }
 
-        activeQueries = 0 // Reset active query counter for the new generation.
+        activeQueries = 0
 
-        if (providerIds.length === 0) {
-            searchInProgress = false
+        const trimmedText = searchText.trim()
+        if (providerIds.length === 0 || trimmedText === "") {
+            // If search is cleared, query all providers that should run on empty text
+            for (i = 0; i < providerIds.length; i++) {
+                const providerId = providerIds[i]
+                const providerData = providers[providerId]
+                if (shouldQueryProvider(providerData, "")) {
+                     queryProvider(providerId, "", searchGeneration)
+                }
+            }
+            if (activeQueries === 0) searchInProgress = false;
             return;
         }
 
-        const trimmedText = searchText.trim()
-        var providersWillQuery = 0
+        // --- Trigger-based provider filtering ---
+        let triggeredProvidersWillQuery = []
+        let generalProvidersWillQuery = []
 
         for (i = 0; i < providerIds.length; i++) {
             const providerId = providerIds[i]
-            const providerData = providers[providerId]
-
-            if (shouldQueryProvider(providerData, trimmedText)) {
-                providersWillQuery++
-                if (providerData.debounceTimer) {
-                    providerData.debounceTimer.restart()
+            if (shouldQueryProvider(providers[providerId], trimmedText)) {
+                if (providers[providerId].metadata.trigger) {
+                    triggeredProvidersWillQuery.push(providerId)
                 } else {
-                    // Query non-debounced providers immediately.
-                    queryProvider(providerId, searchText, searchGeneration)
+                    generalProvidersWillQuery.push(providerId)
                 }
             }
         }
 
-        console.log(`[SearchService] Providers that will query for generation ${searchGeneration}: ${providersWillQuery}`)
+        const providersToQuery = triggeredProvidersWillQuery.length > 0
+            ? triggeredProvidersWillQuery
+            : generalProvidersWillQuery;
 
-        // If no providers are going to run for this text, the search is already over.
-        if (providersWillQuery === 0) {
+        console.log(`[SearchService] Providers to query for generation ${searchGeneration}: ${providersToQuery.join(", ")}`)
+
+        if (providersToQuery.length === 0) {
             searchInProgress = false
             console.log(`[SearchService] No providers matched criteria. Search complete.`)
+            return;
+        }
+
+        for (i = 0; i < providersToQuery.length; i++) {
+            const providerId = providersToQuery[i]
+            const providerData = providers[providerId]
+            if (providerData.debounceTimer) {
+                providerData.debounceTimer.restart()
+            } else {
+                queryProvider(providerId, searchText, searchGeneration)
+            }
         }
     }
 

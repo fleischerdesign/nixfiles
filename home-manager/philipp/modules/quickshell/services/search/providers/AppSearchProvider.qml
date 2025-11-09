@@ -9,6 +9,20 @@ BaseProvider {
 
     property bool isReady: false
 
+    function fuzzyMatch(search, text) {
+        let score = 0
+        let searchPos = 0
+        
+        for (let i = 0; i < text.length && searchPos < search.length; i++) {
+            if (text[i].toLowerCase() === search[searchPos].toLowerCase()) { // Case-insensitive match
+                score += (100 - i) // Earlier matches = higher score
+                searchPos++
+            }
+        }
+        
+        return searchPos === search.length ? score : 0
+    }
+
     function query(searchText, generation) {
         if (!isReady) {
             console.warn("[AppSearchProvider] Not ready yet, returning empty results.")
@@ -28,10 +42,19 @@ BaseProvider {
         } else {
             for (var i = 0; i < allAppsModel.count; i++) {
                 const entry = allAppsModel.get(i)
-                if (entry.searchableString.includes(currentSearchText)) {
-                    filteredResults.push(entry)
+                const score = fuzzyMatch(currentSearchText, entry.searchableString)
+                if (score > 0) {
+                    var newEntry = {};
+                    for (var key in entry) {
+                        newEntry[key] = entry[key];
+                    }
+                    newEntry.priority = 100 + score;
+                    newEntry.matchQuality = score;
+                    filteredResults.push(newEntry);
                 }
             }
+            // Sort by priority (descending) after fuzzy matching
+            filteredResults.sort((a, b) => b.priority - a.priority)
         }
         console.log(`[AppSearchProvider] Sending ${filteredResults.length} results for generation ${generation}`)
         resultsReady(filteredResults, generation)

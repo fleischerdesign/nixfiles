@@ -12,7 +12,7 @@ BaseProvider {
 
         return {
             "name": `Wetter für ${area.areaName[0].value}, ${area.country[0].value}`,
-            "priority": 90,
+            "priority": 200,
             "icon": {
                 "type": "fontIcon",
                 "source": getIconForWeatherDesc(weatherDesc),

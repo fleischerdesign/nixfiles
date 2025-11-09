@@ -44,16 +44,17 @@ Modal {
             // Modal sichtbar machen (Slide-In Animation startet)
             visible = true
         } else {
-            // ✅ NEU: Breche laufende Suchen ab BEVOR Animation startet
+            // Breche laufende Suchen ab BEVOR Animation startet
             Search.SearchService.cancelSearch()
-            
             // Delay hiding the modal to allow the slide-out animation to finish
-            var timer = Qt.createQmlObject(
-                "import QtQuick; Timer {interval: 200; onTriggered: { appLauncherModal.visible = false; } }", 
-                appLauncherModal
-            );
-            timer.start();
+            hideDelayTimer.start()
         }
+    }
+
+    Timer {
+        id: hideDelayTimer
+        interval: 200
+        onTriggered: appLauncherModal.visible = false
     }
 
     // --- Functions & Signals ---
