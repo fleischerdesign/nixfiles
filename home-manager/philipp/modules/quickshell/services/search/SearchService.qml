@@ -66,39 +66,48 @@ Item {
         searchGeneration++
         searchInProgress = true
         console.log(`>>>> [SearchService] STARTING search generation ${searchGeneration} for text: "${searchText}"`)
-        
+
         pendingResults = []
         results.clear()
-        activeQueries = 0 // Reset before counting
 
+        // Stop all running debounce timers to prevent stale queries from firing.
         const providerIds = Object.keys(providers)
+        for (var i = 0; i < providerIds.length; i++) {
+            const providerData = providers[providerIds[i]]
+            if (providerData.debounceTimer && providerData.debounceTimer.running) {
+                providerData.debounceTimer.stop()
+            }
+        }
+
+        activeQueries = 0 // Reset active query counter for the new generation.
+
         if (providerIds.length === 0) {
             searchInProgress = false
             return;
         }
 
         const trimmedText = searchText.trim()
+        var providersWillQuery = 0
 
-        for (var i = 0; i < providerIds.length; i++) {
+        for (i = 0; i < providerIds.length; i++) {
             const providerId = providerIds[i]
             const providerData = providers[providerId]
 
             if (shouldQueryProvider(providerData, trimmedText)) {
-                activeQueries++
-                
+                providersWillQuery++
                 if (providerData.debounceTimer) {
-                    // Stop old timer, then restart
-                    providerData.debounceTimer.stop()
                     providerData.debounceTimer.restart()
                 } else {
+                    // Query non-debounced providers immediately.
                     queryProvider(providerId, searchText, searchGeneration)
                 }
             }
         }
 
-        console.log(`[SearchService] Active queries for generation ${searchGeneration}: ${activeQueries}`)
+        console.log(`[SearchService] Providers that will query for generation ${searchGeneration}: ${providersWillQuery}`)
 
-        if (activeQueries === 0) {
+        // If no providers are going to run for this text, the search is already over.
+        if (providersWillQuery === 0) {
             searchInProgress = false
             console.log(`[SearchService] No providers matched criteria. Search complete.`)
         }
@@ -110,8 +119,10 @@ Item {
             console.warn(`[SearchService] Provider ${providerId} not found`)
             return
         }
-        
-        console.log(`[SearchService] Querying provider ${providerId} for generation ${generation}`)
+
+        // A query is now officially active.
+        activeQueries++
+        console.log(`[SearchService] Querying provider ${providerId} for generation ${generation} (active queries: ${activeQueries})`)
         providerData.instance.query(text, generation)
     }
 
@@ -139,52 +150,41 @@ Item {
     }
 
     function handleProviderResults(providerResults, generation) {
-        console.log(`[SearchService] Received ${providerResults.length} results for generation ${generation}. Current generation is ${searchGeneration}.`)
-        
-        // Ignore stale results
+        // Ignore stale results from a previous search generation.
         if (generation !== searchGeneration) {
             console.log(`[SearchService] Discarding stale results for generation ${generation}.`)
             return;
         }
 
+        console.log(`[SearchService] Received ${providerResults.length} results for generation ${generation}.`)
         pendingResults = pendingResults.concat(providerResults)
         activeQueries = Math.max(0, activeQueries - 1)
         console.log(`[SearchService] Handled results. Active queries remaining: ${activeQueries}`)
-        
+
         if (activeQueries < 0) {
             console.error(`[SearchService] ERROR: activeQueries is negative! Resetting to 0.`)
             activeQueries = 0
         }
-        
+
+        // Only process the final list when all providers have returned their results.
         if (activeQueries === 0) {
             searchInProgress = false
             console.log(`[SearchService] All queries complete for generation ${searchGeneration}.`)
+            processAndDisplayResults()
         }
-
-        processAndDisplayResults()
     }
 
     function processAndDisplayResults() {
-        console.log(`[SearchService] Processing ${pendingResults.length} pending results.`)
+        console.log(`[SearchService] Processing ${pendingResults.length} final results.`)
 
-        let highestPriority = -1;
-        let finalResults = [];
-
-        for (let i = 0; i < pendingResults.length; i++) {
-            const result = pendingResults[i];
-            if (result.priority > highestPriority) {
-                highestPriority = result.priority;
-                finalResults = [result]; // Start a new list with the higher priority item
-            } else if (result.priority === highestPriority) {
-                finalResults.push(result); // Add to the current list
-            }
-        }
+        // Sort all collected results by priority, descending.
+        pendingResults.sort((a, b) => b.priority - a.priority)
 
         results.clear();
 
-        console.log(`[SearchService] Appending ${finalResults.length} final results to model with highest priority ${highestPriority}.`);
-        for (let i = 0; i < finalResults.length; i++) {
-            results.append(finalResults[i]);
+        console.log(`[SearchService] Appending ${pendingResults.length} sorted results to model.`);
+        for (let i = 0; i < pendingResults.length; i++) {
+            results.append(pendingResults[i]);
         }
     }
 
