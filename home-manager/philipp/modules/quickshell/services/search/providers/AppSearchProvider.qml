@@ -44,13 +44,16 @@ BaseProvider {
                 const entry = allAppsModel.get(i)
                 const score = fuzzyMatch(currentSearchText, entry.searchableString)
                 if (score > 0) {
-                    var newEntry = {};
-                    for (var key in entry) {
-                        newEntry[key] = entry[key];
-                    }
-                    newEntry.priority = 100 + score;
-                    newEntry.matchQuality = score;
-                    filteredResults.push(newEntry);
+                    filteredResults.push({
+                        name: entry.name,
+                        icon: entry.icon,
+                        genericName: entry.genericName,
+                        keywords: entry.keywords,
+                        actionObject: entry.actionObject,
+                        searchableString: entry.searchableString,
+                        priority: 100 + score,
+                        matchQuality: score
+                    });
                 }
             }
             // Sort by priority (descending) after fuzzy matching

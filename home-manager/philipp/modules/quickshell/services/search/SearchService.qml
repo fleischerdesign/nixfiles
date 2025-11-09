@@ -65,28 +65,33 @@ Item {
     onSearchTextChanged: {
         searchGeneration++
         searchInProgress = true
-        console.log(`>>>> [SearchService] STARTING search generation ${searchGeneration} for text: "${searchText}"`)
+        console.log(`>>>> [SearchService] STARTING search generation ${searchGeneration}`)
 
         pendingResults = []
         results.clear()
 
+        // ✅ Stoppe alle Debounce-Timer OHNE activeQueries zu ändern
         const providerIds = Object.keys(providers)
         for (var i = 0; i < providerIds.length; i++) {
             const providerData = providers[providerIds[i]]
-            if (providerData.debounceTimer && providerData.debounceTimer.running) {
+            if (providerData.debounceTimer?.running) {
                 providerData.debounceTimer.stop()
             }
         }
 
+        // ✅ JETZT erst activeQueries zurücksetzen
         activeQueries = 0
 
         const trimmedText = searchText.trim()
+        
+        // ... Trigger-Logik ...
         if (providerIds.length === 0 || trimmedText === "") {
             // If search is cleared, query all providers that should run on empty text
             for (i = 0; i < providerIds.length; i++) {
                 const providerId = providerIds[i]
                 const providerData = providers[providerId]
                 if (shouldQueryProvider(providerData, "")) {
+                     activeQueries++  // ✅ Hier zählen!
                      queryProvider(providerId, "", searchGeneration)
                 }
             }
@@ -121,15 +126,21 @@ Item {
             return;
         }
 
+        // ✅ Zähle ALLE Queries, auch mit Debounce
         for (i = 0; i < providersToQuery.length; i++) {
             const providerId = providersToQuery[i]
             const providerData = providers[providerId]
+            
+            activeQueries++  // ✅ Hier zählen!
+            
             if (providerData.debounceTimer) {
                 providerData.debounceTimer.restart()
             } else {
                 queryProvider(providerId, searchText, searchGeneration)
             }
         }
+        
+        console.log(`[SearchService] Started ${activeQueries} queries for generation ${searchGeneration}`)
     }
 
     function queryProvider(providerId, text, generation) {
@@ -138,10 +149,11 @@ Item {
             console.warn(`[SearchService] Provider ${providerId} not found`)
             return
         }
-
-        // A query is now officially active.
-        activeQueries++
-        console.log(`[SearchService] Querying provider ${providerId} for generation ${generation} (active queries: ${activeQueries})`)
+        
+        // ❌ NICHT hier zählen:
+        // activeQueries++
+        
+        console.log(`[SearchService] Querying provider ${providerId}`)
         providerData.instance.query(text, generation)
     }
 
