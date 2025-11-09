@@ -13,6 +13,7 @@
       pkgs.swww
       pkgs.brightnessctl
       pkgs.libnotify
+      pkgs.sushi
     ];
 
     programs.niri.settings = with config.lib.niri.actions; {
@@ -38,17 +39,17 @@
           };
           clip-to-geometry = true;
         }
-	{
-	  matches = [ {	title = "^Bild im Bild$"; } ];
-	  open-floating = true;
-	  default-column-width.fixed = 480;
-	  default-window-height.fixed = 270;
-	  default-floating-position = {
-	    relative-to = "bottom-right";
-	    x = 20;
-	    y = 20;
-	  };
-	}
+        {
+          matches = [ { title = "^Bild im Bild$"; } ];
+          open-floating = true;
+          default-column-width.fixed = 480;
+          default-window-height.fixed = 270;
+          default-floating-position = {
+            relative-to = "bottom-right";
+            x = 20;
+            y = 20;
+          };
+        }
       ];
 
       spawn-at-startup = [
