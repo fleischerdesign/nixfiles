@@ -7,7 +7,15 @@ import qs.services.search as Search
 BaseProvider {
     id: root
 
+    property bool isReady: false
+
     function query(searchText, generation) {
+        if (!isReady) {
+            console.warn("[AppSearchProvider] Not ready yet, returning empty results.")
+            resultsReady([], generation)
+            return
+        }
+
         console.log(`[AppSearchProvider] Received query for generation ${generation} with text: "${searchText}"`)
         var filteredResults = []
         const currentSearchText = searchText.toLowerCase()
@@ -34,7 +42,8 @@ BaseProvider {
         id: readyTimer
         interval: 50 // A short delay to ensure the Repeater has finished.
         onTriggered: {
-            console.log("[AppSearchProvider] Ready timer triggered.")
+            console.log("[AppSearchProvider] Ready timer triggered. Provider is now ready.")
+            root.isReady = true
             ready()
         }
     }
