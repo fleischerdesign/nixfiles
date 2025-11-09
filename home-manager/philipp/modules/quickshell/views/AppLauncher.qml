@@ -228,10 +228,36 @@ Modal {
                         width: 8
                         background: Rectangle { color: "transparent" }
                         contentItem: Rectangle {
+                            id: scrollbarIndicator
                             implicitWidth: 8
                             radius: 4
                             color: ColorService.palette.m3Outline
-                            opacity: 0.5
+                            property bool scrollbarVisible: false
+                            opacity: scrollbarVisible ? 0.75 : 0
+
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: 200
+                                }
+                            }
+
+                            Timer {
+                                id: hideScrollbarTimer
+                                interval: 500 // 500ms delay
+                                onTriggered: scrollbarIndicator.scrollbarVisible = false
+                            }
+
+                            Connections {
+                                target: appListView
+                                function onMovingChanged() {
+                                    if (appListView.moving) {
+                                        scrollbarIndicator.scrollbarVisible = true
+                                        hideScrollbarTimer.stop()
+                                    } else {
+                                        hideScrollbarTimer.start()
+                                    }
+                                }
+                            }
                         }
                     }
 
