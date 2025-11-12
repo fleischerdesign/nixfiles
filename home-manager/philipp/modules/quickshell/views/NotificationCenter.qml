@@ -138,41 +138,26 @@ Modal {
                 Slider {
                     id: control
                     implicitHeight: 40
-		    anchors {
-		      left: parent.left
-		      right:parent.right
-		      margins: 15		    }
-                    background: Row {
-		      width: parent.width
-                        spacing: 0
-			Rectangle {
-			    id: leftBar
-                            y: control.topPadding + control.availableHeight / 2 - height / 2
-			    topLeftRadius: 5
-			    bottomLeftRadius: 5
-                            implicitHeight: 30
-                            implicitWidth: parent.width * control.visualPosition
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        margins: 15
+                    }
+                    background: Rectangle {
+                        y: control.topPadding + control.availableHeight / 2 - height / 2
+                        width: parent.width
+                        height: 30
+                        radius: 5
+                        color: ColorService.palette.m3SurfaceContainerHighest
+
+                        Rectangle {
+                            width: parent.width * control.visualPosition
+                            height: parent.height
+                            radius: 5
                             color: ColorService.palette.m3Primary
                         }
-                        Rectangle {
-                            y: control.topPadding + control.availableHeight / 2 - height / 2
-			    topRightRadius: 5
-			    bottomRightRadius: 5
-                            implicitHeight: 30
-                            implicitWidth: parent.width - leftBar.width
-                            color: ColorService.palette.m3SurfaceContainerHighest
-                        }
                     }
-
-		    handle: Rectangle {
-			id: handler
-                        radius: 5
-                        implicitHeight: 35
-                        color: ColorService.palette.m3Primary
-                        width: 5
-                        x: control.leftPadding - 1 + control.visualPosition * (control.width)
-                        y: control.topPadding + control.availableHeight / 2 - height / 2
-                    }
+		    handle: null
                 }
             }
         }
