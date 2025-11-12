@@ -86,7 +86,7 @@
 
         # --- Defaults based on the definitive action list ---
         "Mod+Shift+Slash".action = show-hotkey-overlay;
-        "Super+Alt+L".action = spawn "swaylock";
+        "Super+Alt+L".action = spawn-sh "qs ipc call lockscreen lock";
 
         "XF86AudioRaiseVolume".action = spawn-sh "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 0.1+";
         "XF86AudioLowerVolume".action = spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-";
