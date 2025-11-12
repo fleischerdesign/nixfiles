@@ -20,6 +20,9 @@ Item {
     property string icon: ""
     signal iconClicked()
 
+    // Dynamic icon color based on toggled state
+    readonly property color iconColor: toggled ? ColorService.palette.m3OnPrimary : ColorService.palette.m3OnSurfaceVariant
+
     // --- Internal Logic ---
     readonly property real displayPosition: toggled ? slider.position : 0
 
@@ -62,7 +65,7 @@ Item {
         text: root.icon
         font.family: "Material Symbols Rounded"
         font.pixelSize: 20
-        color: ColorService.palette.m3OnPrimary
+        color: root.iconColor
         
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: parent.left
