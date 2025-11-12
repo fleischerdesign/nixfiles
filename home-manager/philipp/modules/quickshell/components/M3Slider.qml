@@ -6,37 +6,54 @@ Item {
     id: root
 
     // --- Public API ---
-    // We alias all the relevant properties from the internal Slider.
-    // This makes our component behave just like a regular Slider from the outside.
-    property alias value: slider.value
+    // 'value' ist jetzt eine normale Eigenschaft, nicht mehr ein Alias.
+    // Dies ermöglicht uns, die Aktualisierungen zu steuern.
+    property real value
     property alias from: slider.from
     property alias to: slider.to
     property alias stepSize: slider.stepSize
     property alias pressed: slider.pressed
     property alias position: slider.position
 
-    // Our custom properties
+    // Unsere benutzerdefinierten Eigenschaften
     property bool toggled: true
     property string icon: ""
     signal iconClicked()
 
-    // Dynamic icon color based on toggled state
+    // Dynamische Icon-Farbe basierend auf dem 'toggled'-Zustand
     readonly property color iconColor: toggled ? ColorService.palette.m3OnPrimary : ColorService.palette.m3OnSurfaceVariant
 
-    // --- Internal Logic ---
-    readonly property real displayPosition: toggled ? slider.position : 0
+    // --- Interne Logik ---
+    // Wenn sich die externe 'value'-Eigenschaft ändert, aktualisieren wir den Wert des internen Sliders,
+    // aber nur, wenn der Benutzer ihn nicht gerade zieht.
+    onValueChanged: {
+        if (!slider.pressed) {
+            slider.value = value
+        }
+    }
+
+    Component.onCompleted: {
+        slider.value = value // Initialisiert den internen Slider-Wert
+    }
 
     // --- Visuals and Children ---
     implicitHeight: 40
 
-    // The actual Slider control, providing logic and state.
-    // It's mostly transparent to input where the icon is.
+    // Das eigentliche Slider-Steuerelement, das Logik und Zustand bereitstellt.
     Slider {
         id: slider
         anchors.fill: parent
         stepSize: 0.05
         wheelEnabled: true
         handle: null
+
+        // Wenn sich der Wert des internen Sliders ändert (z.B. durch Benutzerinteraktion),
+        // aktualisieren wir die öffentliche 'value'-Eigenschaft, was das Signal auslöst.
+        onValueChanged: {
+            if (slider.pressed) {
+                root.value = value // Das alleinige Setzen der Eigenschaft löst das Signal aus.
+            }
+        }
 
         background: Rectangle {
             id: backgroundTrack
@@ -46,10 +63,10 @@ Item {
             color: ColorService.palette.m3SurfaceContainerHighest
             anchors.verticalCenter: parent.verticalCenter
 
-            // The progress bar's width is driven by our custom displayPosition.
+            // Die Breite des Fortschrittsbalkens wird direkt vom slider.position gesteuert.
             Rectangle {
                 id: progressBar
-                width: backgroundTrack.width * root.displayPosition
+                width: backgroundTrack.width * slider.position
                 height: parent.height
                 radius: 15
                 color: ColorService.palette.m3Primary
@@ -57,8 +74,7 @@ Item {
         }
     }
 
-    // The Icon is a sibling to the Slider, layered on top.
-    // This is crucial to separate its input handling from the Slider's.
+    // Das Icon ist ein Geschwister des Sliders und liegt darüber.
     Text {
         id: iconText
         visible: root.icon !== ""
@@ -66,12 +82,11 @@ Item {
         font.family: "Material Symbols Rounded"
         font.pixelSize: 20
         color: root.iconColor
-        
+
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: parent.left
         anchors.leftMargin: 10
 
-        // This MouseArea only covers the icon. Its clicks will not be seen by the Slider.
         MouseArea {
             anchors.fill: parent
             onClicked: root.iconClicked()
