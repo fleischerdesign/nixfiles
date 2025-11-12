@@ -143,25 +143,32 @@ Modal {
                     anchors.margins: 15
                     spacing: 15
 
-                    Slider {
-                        id: control
+                    M3Slider {
                         Layout.fillWidth: true
-                        implicitHeight: 40
-                        background: Rectangle {
-                            y: control.topPadding + control.availableHeight / 2 - height / 2
-                            width: parent.width
-                            height: 30
-                            radius: 5
-                            color: ColorService.palette.m3SurfaceContainerHighest
+                        icon: "brightness_6"
+                        from: 0.0
+                        to: 1.0
+                        value: BrightnessService.currentBrightness
 
-                            Rectangle {
-                                width: parent.width * control.visualPosition
-                                height: parent.height
-                                radius: 5
-                                color: ColorService.palette.m3Primary
+                        onPositionChanged: {
+                            if (pressed) {
+                                BrightnessService.setBrightness(value)
                             }
                         }
-                        handle: null
+                    }
+
+                    M3Slider {
+                        Layout.fillWidth: true
+                        icon: AudioService.muted ? "volume_off" : "volume_up"
+                        from: 0.0
+                        to: 1.0
+                        value: AudioService.volume
+
+                        onPositionChanged: {
+                            if (pressed) {
+                                AudioService.setVolume(value)
+                            }
+                        }
                     }
 
                     GridLayout {

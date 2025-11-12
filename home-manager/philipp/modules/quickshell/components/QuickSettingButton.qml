@@ -16,7 +16,7 @@ M3Button {
     // Make it a square
     implicitWidth: 80
     implicitHeight: 80
-    radius: 24 // Larger radius for a more rounded "squircle" look
+    radius: 15
 
     // Override default content (which is a Row) with a Column
     content: Column {
