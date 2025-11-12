@@ -9,6 +9,9 @@ Slider {
 
     implicitHeight: 40
 
+    stepSize: 0.05 // Default step size
+    wheelEnabled: true
+
     handle: null
 
     background: Rectangle {

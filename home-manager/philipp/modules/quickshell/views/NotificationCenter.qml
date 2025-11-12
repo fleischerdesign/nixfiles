@@ -150,10 +150,8 @@ Modal {
                         to: 1.0
                         value: BrightnessService.currentBrightness
 
-                        onPositionChanged: {
-                            if (pressed) {
-                                BrightnessService.setBrightness(value)
-                            }
+                        onValueChanged: {
+                            BrightnessService.setBrightness(value)
                         }
                     }
 
@@ -164,10 +162,8 @@ Modal {
                         to: 1.0
                         value: AudioService.volume
 
-                        onPositionChanged: {
-                            if (pressed) {
-                                AudioService.setVolume(value)
-                            }
+                        onValueChanged: {
+                            AudioService.setVolume(value)
                         }
                     }
 
