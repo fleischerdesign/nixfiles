@@ -48,7 +48,9 @@ Item {
                     "debounceTimer": debounceTimer
                 };
 
-                provider.resultsReady.connect(handleProviderResults);
+                provider.resultsReady.connect(function(results, gen) {
+                    handleProviderResults(results, gen, providerId);
+                });
             }
         }
         console.log(`[SearchService] All ${Object.keys(providers).length} self-owned providers are configured via introspection.`);
@@ -114,9 +116,7 @@ Item {
             }
         }
 
-        const providersToQuery = triggeredProvidersWillQuery.length > 0
-            ? triggeredProvidersWillQuery
-            : generalProvidersWillQuery;
+        const providersToQuery = triggeredProvidersWillQuery.concat(generalProvidersWillQuery);
 
         console.log(`[SearchService] Providers to query for generation ${searchGeneration}: ${providersToQuery.join(", ")}`)
 
@@ -180,14 +180,28 @@ Item {
         return true
     }
 
-    function handleProviderResults(providerResults, generation) {
+    function handleProviderResults(providerResults, generation, providerId) {
         // Ignore stale results from a previous search generation.
         if (generation !== searchGeneration) {
             console.log(`[SearchService] Discarding stale results for generation ${generation}.`)
             return;
         }
 
-        console.log(`[SearchService] Received ${providerResults.length} results for generation ${generation}.`)
+        // --- NEW: Priority Boost for Triggered Providers ---
+        const providerData = providers[providerId];
+        if (providerData && providerData.metadata.trigger) {
+            console.log(`[SearchService] Boosting priority for triggered provider: ${providerId}`);
+            for (var i = 0; i < providerResults.length; i++) {
+                // Ensure priority exists, default to 0 if not
+                if (typeof providerResults[i].priority === 'undefined') {
+                    providerResults[i].priority = 0;
+                }
+                providerResults[i].priority += 1000; // Add a large boost
+            }
+        }
+        // --- END NEW ---
+
+        console.log(`[SearchService] Received ${providerResults.length} results for generation ${generation} from ${providerId}.`)
         pendingResults = pendingResults.concat(providerResults)
         activeQueries = Math.max(0, activeQueries - 1)
         console.log(`[SearchService] Handled results. Active queries remaining: ${activeQueries}`)
