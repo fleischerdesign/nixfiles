@@ -150,9 +150,7 @@ Modal {
                         to: 1.0
                         value: BrightnessService.currentBrightness
                         onValueChanged: {
-                            if (pressed) {
-                                BrightnessService.setBrightness(value)
-                            }
+                            BrightnessService.setBrightness(value)
                         }
                     }
 
@@ -165,11 +163,9 @@ Modal {
                         toggled: !AudioService.muted
 
                         onValueChanged: {
-                            if (pressed) {
-                                AudioService.setVolume(value)
-                                if (AudioService.muted && value > 0) {
-                                    AudioService.toggleMute()
-                                }
+                            AudioService.setVolume(value)
+                            if (AudioService.muted && value > 0) {
+                                AudioService.toggleMute()
                             }
                         }
                         onIconClicked: {
