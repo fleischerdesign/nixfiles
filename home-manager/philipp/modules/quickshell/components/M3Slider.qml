@@ -41,7 +41,7 @@ Item {
         background: Rectangle {
             id: backgroundTrack
             width: slider.width
-            height: 30
+            height: 40
             radius: 15
             color: ColorService.palette.m3SurfaceContainerHighest
             anchors.verticalCenter: parent.verticalCenter
