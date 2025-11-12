@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import qs.components
 import qs.services
 import qs.core
+import QtQuick.Controls.Basic
 
 Modal {
     id: notificationCenterModal
@@ -24,7 +25,7 @@ Modal {
 
     onShouldBeVisibleChanged: {
         if (shouldBeVisible) {
-            visible = true
+            visible = true;
             NotificationService.dismissAll();
         } else {
             var timer = Qt.createQmlObject("import QtQuick; Timer {interval: 200; onTriggered: { notificationCenterModal.visible = false; } }", notificationCenterModal);
@@ -36,9 +37,9 @@ Modal {
         id: contentRectangle
         width: 400
 
-    Component.onCompleted: {
-        x = screen.width;
-    }
+        Component.onCompleted: {
+            x = screen.width;
+        }
 
         anchors {
             top: parent.top
@@ -47,38 +48,36 @@ Modal {
             topMargin: 10
         }
         opacity: shouldBeVisible ? 1.0 : 0
-        x: shouldBeVisible 
-            ? (parent.width - width - 10)
-            : parent.width
-        
+        x: shouldBeVisible ? (parent.width - width - 10) : parent.width
+
         Behavior on x {
             NumberAnimation {
                 duration: 200
                 easing.type: Easing.InOutQuad
             }
         }
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 200
-                    easing.type: Easing.InOutQuad
-                }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 200
+                easing.type: Easing.InOutQuad
             }
-        
+        }
+
         // Performance-Boost with true: render as gpu texture
         layer.enabled: false
-        
+
         radius: 15
         color: ColorService.palette.m3SurfaceContainer
-        
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 15
             spacing: 10
-            
+
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
-                
+
                 Text {
                     text: "Benachrichtigungen"
                     color: "white"
@@ -86,7 +85,7 @@ Modal {
                     font.weight: Font.Bold
                     Layout.fillWidth: true
                 }
-                
+
                 M3Button {
                     style: M3Button.Style.Filled
                     colorRole: M3Button.ColorRole.Primary
@@ -105,7 +104,7 @@ Modal {
                     }
                 }
             }
-            
+
             ListView {
                 id: notificationList
                 Layout.fillWidth: true
@@ -113,20 +112,67 @@ Modal {
                 spacing: 10
                 clip: true
                 model: NotificationService.server.trackedNotifications
-                
+
                 delegate: NotificationCard {
                     width: notificationList.width
                     notification: modelData
                     onDismissRequested: modelData.dismiss()
                     isInNotificationCenter: true
                 }
-                
+
                 Text {
                     anchors.centerIn: parent
                     visible: notificationList.count === 0
                     text: "Keine Benachrichtigungen"
-                    color: "#888"
+                    color: "#888888"
                     font.pixelSize: 14
+                }
+            }
+
+            Rectangle {
+                implicitHeight: 200
+                color: ColorService.palette.m3SurfaceContainerHigh
+                width: parent.width
+                radius: 15
+
+                Slider {
+                    id: control
+                    implicitHeight: 40
+		    anchors {
+		      left: parent.left
+		      right:parent.right
+		      margins: 15		    }
+                    background: Row {
+		      width: parent.width
+                        spacing: 0
+			Rectangle {
+			    id: leftBar
+                            y: control.topPadding + control.availableHeight / 2 - height / 2
+			    topLeftRadius: 5
+			    bottomLeftRadius: 5
+                            implicitHeight: 30
+                            implicitWidth: parent.width * control.visualPosition
+                            color: ColorService.palette.m3Primary
+                        }
+                        Rectangle {
+                            y: control.topPadding + control.availableHeight / 2 - height / 2
+			    topRightRadius: 5
+			    bottomRightRadius: 5
+                            implicitHeight: 30
+                            implicitWidth: parent.width - leftBar.width
+                            color: ColorService.palette.m3SurfaceContainerHighest
+                        }
+                    }
+
+		    handle: Rectangle {
+			id: handler
+                        radius: 5
+                        implicitHeight: 35
+                        color: ColorService.palette.m3Primary
+                        width: 5
+                        x: control.leftPadding - 1 + control.visualPosition * (control.width)
+                        y: control.topPadding + control.availableHeight / 2 - height / 2
+                    }
                 }
             }
         }
