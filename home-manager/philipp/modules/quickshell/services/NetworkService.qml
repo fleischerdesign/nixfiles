@@ -30,6 +30,12 @@ Singleton {
         }
     }
 
+    function toggleWifi() {
+        const command = wifiEnabled ? "off" : "on";
+        toggleWifiProcess.command = ["nmcli", "radio", "wifi", command];
+        toggleWifiProcess.running = true;
+    }
+
     // --- Internal Processes ---
 
     // Long-running process to monitor for any network changes
@@ -140,6 +146,17 @@ Singleton {
                 console.error("NetworkService: Failed to list WiFi networks.");
                 root.isScanning = false;
             }
+        }
+    }
+
+    Process {
+        id: toggleWifiProcess
+        onExited: (exitCode) => {
+            if (exitCode !== 0) {
+                console.error("NetworkService: Failed to toggle WiFi state.");
+            }
+            // Refresh state after command execution
+            root.refresh();
         }
     }
 

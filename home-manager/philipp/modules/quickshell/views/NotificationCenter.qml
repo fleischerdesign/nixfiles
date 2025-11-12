@@ -130,34 +130,60 @@ Modal {
             }
 
             Rectangle {
-                implicitHeight: 200
+                id: quickSettingsContainer
                 color: ColorService.palette.m3SurfaceContainerHigh
                 width: parent.width
                 radius: 15
+                Layout.fillWidth: true
+                Layout.preferredHeight: settingsLayout.implicitHeight + 30
 
-                Slider {
-                    id: control
-                    implicitHeight: 40
-                    anchors {
-                        left: parent.left
-                        right: parent.right
-                        margins: 15
-                    }
-                    background: Rectangle {
-                        y: control.topPadding + control.availableHeight / 2 - height / 2
-                        width: parent.width
-                        height: 30
-                        radius: 5
-                        color: ColorService.palette.m3SurfaceContainerHighest
+                ColumnLayout {
+                    id: settingsLayout
+                    anchors.fill: parent
+                    anchors.margins: 15
+                    spacing: 15
 
-                        Rectangle {
-                            width: parent.width * control.visualPosition
-                            height: parent.height
+                    Slider {
+                        id: control
+                        Layout.fillWidth: true
+                        implicitHeight: 40
+                        background: Rectangle {
+                            y: control.topPadding + control.availableHeight / 2 - height / 2
+                            width: parent.width
+                            height: 30
                             radius: 5
-                            color: ColorService.palette.m3Primary
+                            color: ColorService.palette.m3SurfaceContainerHighest
+
+                            Rectangle {
+                                width: parent.width * control.visualPosition
+                                height: parent.height
+                                radius: 5
+                                color: ColorService.palette.m3Primary
+                            }
+                        }
+                        handle: null
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 4
+                        columnSpacing: 10
+                        rowSpacing: 10
+
+                        QuickSettingButton {
+                            icon: "wifi"
+                            label: "WLAN"
+                            toggled: NetworkService.wifiEnabled
+                            onClicked: NetworkService.toggleWifi()
+                        }
+
+                        QuickSettingButton {
+                            icon: "bluetooth"
+                            label: "Bluetooth"
+                            toggled: BluetoothService.enabled
+                            onClicked: BluetoothService.togglePower()
                         }
                     }
-		    handle: null
                 }
             }
         }
