@@ -70,7 +70,7 @@ BaseProvider {
         onTriggered: {
             console.log("[AppSearchProvider] Ready timer triggered. Provider is now ready.")
             root.isReady = true
-            ready()
+            root.ready()
         }
     }
 

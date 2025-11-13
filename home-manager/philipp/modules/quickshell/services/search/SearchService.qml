@@ -10,7 +10,16 @@ Item {
     id: root
 
     // --- Provider Declaration ---
-    property var appSearchProvider: Providers.AppSearchProvider {}
+    property var appSearchProvider: Providers.AppSearchProvider {
+        onReady: {
+            console.log("[SearchService] AppSearchProvider is ready. Triggering initial query.");
+            // If the search is currently empty (e.g., on startup), we want to
+            // immediately populate the app list.
+            if (searchText === "") {
+                queryProvider(appSearchProvider.toString(), "", searchGeneration);
+            }
+        }
+    }
     property var calculatorProvider: Providers.CalculatorProvider {}
     property var fileSearchProvider: Providers.FileSearchProvider {}
     property var systemActionProvider: Providers.SystemActionProvider {}
