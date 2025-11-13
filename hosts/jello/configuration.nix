@@ -3,6 +3,7 @@
 {
   imports = [
     ./hardware-configuration.nix
+    ./hardware-specific.nix
   ];
 
   # Define the hosstname

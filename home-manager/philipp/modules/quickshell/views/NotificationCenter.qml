@@ -5,6 +5,7 @@ import qs.services
 import qs.core
 import QtQuick.Controls.Basic
 import Quickshell.Io
+import qs.views
 
 Modal {
     id: notificationCenterModal
@@ -130,120 +131,11 @@ Modal {
                 }
             }
 
-            Rectangle {
-                id: quickSettingsContainer
-                color: ColorService.palette.m3SurfaceContainerHigh
-                width: parent.width
-                radius: 15
+            QuickSettings {
                 Layout.fillWidth: true
-                Layout.preferredHeight: settingsLayout.implicitHeight + 30
-
-                ColumnLayout {
-                    id: settingsLayout
-                    anchors.fill: parent
-                    anchors.margins: 15
-                    spacing: 15
-
-                    M3Slider {
-                        Layout.fillWidth: true
-                        icon: "brightness_6"
-                        from: 0.0
-                        to: 1.0
-                        value: BrightnessService.currentBrightness
-                        onValueChanged: {
-                            BrightnessService.setBrightness(value)
-                        }
-                    }
-
-                    M3Slider {
-                        Layout.fillWidth: true
-                        icon: AudioService.muted ? "volume_off" : "volume_up"
-                        from: 0.0
-                        to: 1.0
-                        value: AudioService.volume
-                        toggled: !AudioService.muted
-
-                        onValueChanged: {
-                            AudioService.setVolume(value)
-                            if (AudioService.muted && value > 0) {
-                                AudioService.toggleMute()
-                            }
-                        }
-                        onIconClicked: {
-                            AudioService.toggleMute()
-                        }
-                    }
-
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: 4
-                        columnSpacing: 10
-                        rowSpacing: 10
-
-                        QuickSettingButton {
-                            icon: "wifi"
-                            label: "WLAN"
-                            toggled: NetworkService.wifiEnabled
-                            onClicked: NetworkService.toggleWifi()
-                        }
-
-                        QuickSettingButton {
-                            icon: "bluetooth"
-                            label: "Bluetooth"
-                            toggled: BluetoothService.enabled
-                            onClicked: BluetoothService.togglePower()
-                        }
-
-                        QuickSettingButton {
-                            icon: "night_sight_auto"
-                            label: "Nachtlicht"
-                            toggled: NightlightService.enabled
-                            onClicked: NightlightService.toggle()
-                        }
-
-                        QuickSettingButton {
-                            icon: StateManager.dndEnabled ? "notifications_off" : "notifications"
-                            label: "Nicht stören"
-                            toggled: StateManager.dndEnabled
-                            onClicked: StateManager.dndEnabled = !StateManager.dndEnabled
-                        }
-
-                        QuickSettingButton {
-                            icon: "lock"
-                            label: "Sperren"
-                            onClicked: sessionLocker.locked = true
-                        }
-
-                        QuickSettingButton {
-                            icon: "screenshot"
-                            label: "Screenshot"
-                            onClicked: {
-                                screenshotProcess.command = ["niri", "msg", "action", "screenshot"]
-                                screenshotProcess.running = true
-                            }
-                        }
-                    }
-                }
             }
         }
     }
 
-    Process {
-        id: screenshotProcess
-        onExited: (exitCode) => {
-            if (exitCode !== 0) {
-                NotificationService.send(
-                    "Screenshot fehlgeschlagen",
-                    `Der Screenshot-Befehl ist mit Exit-Code ${exitCode} fehlgeschlagen.`,
-                    "dialog-error"
-                )
-            } else {
-                NotificationService.send(
-                    "Screenshot erstellt",
-                    "Der Screenshot wurde erfolgreich erstellt.",
-                    "image"
-                )
-            }
-        }
-    }
+
 }
