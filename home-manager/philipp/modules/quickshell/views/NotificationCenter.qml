@@ -206,6 +206,12 @@ Modal {
                             toggled: StateManager.dndEnabled
                             onClicked: StateManager.dndEnabled = !StateManager.dndEnabled
                         }
+
+                        QuickSettingButton {
+                            icon: "lock"
+                            label: "Sperren"
+                            onClicked: sessionLocker.locked = true
+                        }
                     }
                 }
             }
