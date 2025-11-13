@@ -50,9 +50,7 @@ Item {
         // Wenn sich der Wert des internen Sliders ändert (z.B. durch Benutzerinteraktion),
         // aktualisieren wir die öffentliche 'value'-Eigenschaft, was das Signal auslöst.
         onValueChanged: {
-            if (slider.pressed) {
-                root.value = value // Das alleinige Setzen der Eigenschaft löst das Signal aus.
-            }
+            root.value = value
         }
 
         background: Rectangle {
