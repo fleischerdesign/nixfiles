@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell.Services.Notifications
 import Quickshell
 import Quickshell.Io // Import Process component
+import qs.core
 
 // REINE Business Logic - keine UI-Abhängigkeiten
 Singleton {
@@ -118,6 +119,11 @@ Singleton {
         
         // Markiere als tracked für NotificationCenter
         notification.tracked = true;
+
+        if (StateManager.dndEnabled) {
+            console.log("[NotificationService] DND enabled, suppressing popup.");
+            return;
+        }
         
         // Füge zum Popup-Model hinzu
         popupsModel.append({

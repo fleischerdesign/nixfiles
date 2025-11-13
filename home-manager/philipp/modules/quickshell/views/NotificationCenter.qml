@@ -199,6 +199,13 @@ Modal {
                             toggled: NightlightService.enabled
                             onClicked: NightlightService.toggle()
                         }
+
+                        QuickSettingButton {
+                            icon: StateManager.dndEnabled ? "notifications_off" : "notifications"
+                            label: "Nicht stören"
+                            toggled: StateManager.dndEnabled
+                            onClicked: StateManager.dndEnabled = !StateManager.dndEnabled
+                        }
                     }
                 }
             }

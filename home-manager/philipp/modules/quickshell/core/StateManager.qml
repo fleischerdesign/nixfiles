@@ -7,6 +7,7 @@ import Quickshell.Services.Notifications
 Singleton {
     property bool notificationCenterOpened: false
     property bool appLauncherOpened: false
+    property bool dndEnabled: false
     
     property NotificationServer notificationServer: NotificationServer {
         actionsSupported: true
