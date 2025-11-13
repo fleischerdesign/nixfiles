@@ -6,8 +6,6 @@ Item {
     id: root
 
     // --- Public API ---
-    // 'value' ist jetzt eine normale Eigenschaft, nicht mehr ein Alias.
-    // Dies ermöglicht uns, die Aktualisierungen zu steuern.
     property real value
     property alias from: slider.from
     property alias to: slider.to
@@ -24,8 +22,10 @@ Item {
     readonly property color iconColor: toggled ? ColorService.palette.m3OnPrimary : ColorService.palette.m3OnSurfaceVariant
 
     // --- Interne Logik ---
-    // Wenn sich die externe 'value'-Eigenschaft ändert, aktualisieren wir den Wert des internen Sliders,
-    // aber nur, wenn der Benutzer ihn nicht gerade zieht.
+    // Diese Eigenschaft steuert die visuelle Position des Sliders.
+    // Wenn 'toggled' false ist (d.h. stummgeschaltet), ist die Position 0.
+    readonly property real displayPosition: toggled ? slider.position : 0
+
     onValueChanged: {
         if (!slider.pressed) {
             slider.value = value
@@ -63,10 +63,10 @@ Item {
             color: ColorService.palette.m3SurfaceContainerHighest
             anchors.verticalCenter: parent.verticalCenter
 
-            // Die Breite des Fortschrittsbalkens wird direkt vom slider.position gesteuert.
+            // Die Breite des Fortschrittsbalkens wird jetzt durch 'displayPosition' gesteuert.
             Rectangle {
                 id: progressBar
-                width: backgroundTrack.width * slider.position
+                width: backgroundTrack.width * root.displayPosition
                 height: parent.height
                 radius: 15
                 color: ColorService.palette.m3Primary

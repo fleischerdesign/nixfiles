@@ -192,6 +192,13 @@ Modal {
                             toggled: BluetoothService.enabled
                             onClicked: BluetoothService.togglePower()
                         }
+
+                        QuickSettingButton {
+                            icon: "night_sight_auto"
+                            label: "Nachtlicht"
+                            toggled: NightlightService.enabled
+                            onClicked: NightlightService.toggle()
+                        }
                     }
                 }
             }

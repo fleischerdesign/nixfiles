@@ -9,6 +9,7 @@
     home.packages = [
       pkgs.material-symbols
       pkgs.wl-clipboard
+      pkgs.wlsunset
     ];
 
     home.sessionVariables = {
