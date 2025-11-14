@@ -89,6 +89,7 @@ Modal {
                 }
 
                 M3Button {
+                    id: deleteButton
                     style: M3Button.Style.Filled
                     colorRole: M3Button.ColorRole.Primary
                     onClicked: {
@@ -100,7 +101,7 @@ Modal {
 
                     Text {
                         text: "delete_sweep"
-                        color: parent.autoContentColor
+                        color: deleteButton.autoContentColor
                         font.family: "Material Symbols Rounded"
                         font.pixelSize: 20
                     }

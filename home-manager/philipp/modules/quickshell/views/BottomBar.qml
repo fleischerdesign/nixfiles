@@ -131,8 +131,7 @@ PanelWindow {
                     Layout.alignment: Qt.AlignBottom // Changed from Qt.AlignVCenter
                     style: appLauncherOpened ? M3Button.Style.Filled : M3Button.Style.FilledTonal
                     colorRole: appLauncherOpened ? M3Button.ColorRole.Primary : M3Button.ColorRole.Surface
-		    icon: "apps"
-                    fixedWidth: true
+                    implicitWidth: 55
                     implicitHeight: 55
                     shadowEnabled: true // Shadow enabled
                     onClicked: bottomBarWindow.appLauncherClicked()
@@ -142,6 +141,14 @@ PanelWindow {
                         function onAppLauncherOpenedChanged() {
                             appLauncherButton.appLauncherOpened = StateManager.appLauncherOpened
                         }
+                    }
+
+                    Text {
+                        text: "apps"
+                        font.family: "Material Symbols Rounded"
+                        font.pixelSize: 24
+                        color: appLauncherButton.autoContentColor
+                        anchors.centerIn: parent
                     }
                 }
                 
@@ -154,7 +161,7 @@ PanelWindow {
                     Layout.alignment: Qt.AlignBottom // Changed from Qt.AlignVCenter
                     style: M3Button.Style.FilledTonal
                     colorRole: M3Button.ColorRole.Surface
-                    fixedWidth: true
+                    implicitWidth: 55
                     implicitHeight: 55
                     shadowEnabled: true // Shadow enabled
                     
@@ -164,7 +171,6 @@ PanelWindow {
                         color: ColorService.palette.m3OnSurface
                         font.pixelSize: 12
                         font.family: "Roboto"
-                        anchors.fill: parent
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         

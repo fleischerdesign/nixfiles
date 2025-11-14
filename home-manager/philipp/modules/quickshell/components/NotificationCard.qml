@@ -129,13 +129,11 @@ Rectangle {
                 : M3Button.ColorRole.Surface
 
             M3Button {
+                id: expandButton
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
                 style: M3Button.Style.Text
                 colorRole: parent.buttonColorRole
-                icon: root.expanded ? "expand_less" : "expand_more"
-                iconOnly: true
-                iconSize: 18
                 opacity: popupHover.hovered ? 1 : 0
                 onClicked: {
                    root.expanded = !root.expanded
@@ -146,20 +144,26 @@ Rectangle {
                         duration: 200
                     }
                 }
+
+                Text {
+                    text: root.expanded ? "expand_less" : "expand_more"
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 18
+                    color: expandButton.autoContentColor
+                    anchors.centerIn: parent
+                }
             }
         
 
             // Close Button
             M3Button {
+                id: closeButton
                 Layout.preferredWidth: 24
                 Layout.preferredHeight: 24
                 style: M3Button.Style.Text
                 colorRole: root.notification && root.notification.urgency === 2 
                     ? M3Button.ColorRole.Error 
                     : M3Button.ColorRole.Surface
-                icon: "close"
-                iconOnly: true
-                iconSize: 18
                 opacity: popupHover.hovered ? 1 : 0
                 onClicked: {
                     root.dismissRequested()
@@ -169,6 +173,14 @@ Rectangle {
                     NumberAnimation {
                         duration: 200
                     }
+                }
+
+                Text {
+                    text: "close"
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 18
+                    color: closeButton.autoContentColor
+                    anchors.centerIn: parent
                 }
             }
         }
@@ -215,12 +227,12 @@ Rectangle {
                     model: (root.notification && root.notification.actions) ? root.notification.actions : []
 
                     M3Button {
+                        id: actionButton
                         implicitHeight: 32
                         style: M3Button.Style.Filled
                         colorRole: root.notification && root.notification.urgency === 2 
                             ? M3Button.ColorRole.Error 
                             : M3Button.ColorRole.Primary
-                        text: modelData ? modelData.text : ""
                         
                         onClicked: {
                             if (modelData) {
@@ -229,6 +241,13 @@ Rectangle {
                             if (root.notification && !root.notification.resident) {
                                 root.dismissRequested();
                             }
+                        }
+
+                        Text {
+                            text: modelData ? modelData.text : ""
+                            color: actionButton.autoContentColor
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
                         }
                     }
                 }

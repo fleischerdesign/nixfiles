@@ -1,10 +1,10 @@
 // home-manager/philipp/modules/quickshell/components/M3Button.qml
-// Material 3 Button Component mit vollständiger State Layer Integration
+// Material 3 Button Component - Simple Container Approach
 
 import QtQuick
 import qs.components
 import qs.services
-import QtQuick.Effects // Added for RectangularShadow
+import QtQuick.Effects
 
 Rectangle {
     id: root
@@ -15,11 +15,11 @@ Rectangle {
     
     // --- M3 Button Styles ---
     enum Style {
-        Filled,        // Primärer Button mit voller Farbe
-        FilledTonal,   // Sekundärer Button mit Container-Farbe
-        Elevated,      // Button mit Elevation (Shadow)
-        Outlined,      // Button mit Outline
-        Text           // Text-only Button
+        Filled,
+        FilledTonal,
+        Elevated,
+        Outlined,
+        Text
     }
     
     property int style: M3Button.Style.Filled
@@ -34,40 +34,27 @@ Rectangle {
     }
     
     property int colorRole: M3Button.ColorRole.Primary
-    property bool shadowEnabled: style === M3Button.Style.Elevated // Added shadowEnabled property
+    property bool shadowEnabled: style === M3Button.Style.Elevated
     
-    // --- Icon Support ---
-    property string icon: ""
-    property string iconFont: "Material Symbols Rounded"
-    property int iconSize: 24
-    property bool iconOnly: false
-    
-    // --- Content ---
-    property alias text: labelText.text
-    default property alias content: contentItem.data
+    // --- Content Container ---
+    default property alias content: contentContainer.data
     
     // --- Sizing ---
-    property bool fixedWidth: false
-    implicitWidth: {
-        if (fixedWidth) return 55;
-        if (iconOnly) return implicitHeight;
-        return Math.max(55, contentItem.implicitWidth + (icon ? 48 : 40));
-    }
-    implicitHeight: 40  // M3 Standard Button Height
+    implicitWidth: contentContainer.implicitWidth + 40
+    implicitHeight: 40
     
-    // M3 Shape Token
-    radius: 20  // M3 Full Corner Radius für Buttons
+    radius: 20
     clip: false
     
     RectangularShadow {
         anchors.fill: root
         visible: root.shadowEnabled && root.enabled
-        color: Qt.rgba(0, 0, 0, 0.1) // MD3-like shadow color
-        blur: 10 // Subtle blur for buttons
-        radius: root.radius // Match button's corner radius
+        color: Qt.rgba(0, 0, 0, 0.1)
+        blur: 10
+        radius: root.radius
         antialiasing: true
         cached: true
-        z: -1 // Ensure shadow is behind the button
+        z: -1
     }
     
     // --- Enabled State ---
@@ -84,19 +71,15 @@ Rectangle {
     // PRIVATE PROPERTIES
     // ========================================
     
-    // Automatische Farbberechnung basierend auf Style & Role
     readonly property color autoBackgroundColor: {
-        // Transparent für Text und Outlined
         if (style === M3Button.Style.Text || style === M3Button.Style.Outlined) {
             return "transparent";
         }
         
-        // Elevated nutzt Surface
         if (style === M3Button.Style.Elevated) {
             return ColorService.layer(ColorService.palette.m3SurfaceContainerLow, 1);
         }
         
-        // Filled und FilledTonal
         const isTonal = style === M3Button.Style.FilledTonal;
         
         switch (colorRole) {
@@ -115,7 +98,6 @@ Rectangle {
     }
     
     readonly property color autoContentColor: {
-        // Text und Outlined verwenden Akzentfarbe als Text
         if (style === M3Button.Style.Text || style === M3Button.Style.Outlined) {
             switch (colorRole) {
                 case M3Button.ColorRole.Primary:
@@ -131,12 +113,10 @@ Rectangle {
             }
         }
         
-        // Elevated nutzt Primary als Text
         if (style === M3Button.Style.Elevated) {
             return ColorService.palette.m3Primary;
         }
         
-        // Filled und FilledTonal
         const isTonal = style === M3Button.Style.FilledTonal;
         
         switch (colorRole) {
@@ -159,68 +139,23 @@ Rectangle {
     // ========================================
     
     color: autoBackgroundColor
-    
-    // Outline für Outlined Style
     border.width: style === M3Button.Style.Outlined ? 1 : 0
     border.color: ColorService.palette.m3Outline
     
-    // Elevation Shadow für Elevated Style
-    
-    // Smooth Transitions
-    Behavior on color {
-        ColorAnimation { duration: 150 }
-    }
-    
-    Behavior on border.color {
-        ColorAnimation { duration: 150 }
-    }
+    Behavior on color { ColorAnimation { duration: 150 } }
+    Behavior on border.color { ColorAnimation { duration: 150 } }
     
     // ========================================
-    // CONTENT LAYOUT
+    // CONTENT CONTAINER
     // ========================================
     
     Item {
-        id: contentItem
+        id: contentContainer
+        anchors.centerIn: parent
         implicitWidth: childrenRect.width
         implicitHeight: childrenRect.height
-        anchors.centerIn: parent
         z: 3
-        
-        Row {
-            id: contentRow
-            visible: (root.text !== "" || root.icon !== "") && contentItem.children.length === 1
-            spacing: 8
-            
-            // Icon
-            Text {
-                id: iconText
-                visible: root.icon !== ""
-                text: root.icon
-                font.family: root.iconFont
-                font.pixelSize: root.iconSize
-                color: root.autoContentColor
-                anchors.verticalCenter: parent.verticalCenter
-                
-                Behavior on color {
-                    ColorAnimation { duration: 150 }
-                }
-            }
-            
-            // Label
-            Text {
-                id: labelText
-                visible: !root.iconOnly && text !== ""
-                font.pixelSize: 14
-                font.weight: Font.Medium
-                font.family: "Roboto"
-                color: root.autoContentColor
-                anchors.verticalCenter: parent.verticalCenter
-                
-                Behavior on color {
-                    ColorAnimation { duration: 150 }
-                }
-            }
-        }
+        // Content goes here via default property
     }
     
     // ========================================
@@ -246,8 +181,6 @@ Rectangle {
             }
         }
 
-        // onTapped: root.clicked()
-
         onLongPressed: root.longPressed()
     }
     
@@ -258,7 +191,6 @@ Rectangle {
     M3StateLayer {
         z: 1
         colorRole: {
-            // State Layer nutzt immer "On"-Farbe des Buttons
             if (root.style === M3Button.Style.Text || 
                 root.style === M3Button.Style.Outlined ||
                 root.style === M3Button.Style.Elevated) {
@@ -298,7 +230,3 @@ Rectangle {
         parentRadius: root.radius
     }
 }
-
-// Hilfsmethode für DropShadow (falls nicht verfügbar)
-// In QML benötigt man normalerweise: import QtGraphicalEffects 1.15
-// Falls nicht verfügbar, kann man das layer.effect weglassen
