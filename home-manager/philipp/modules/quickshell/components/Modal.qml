@@ -49,8 +49,12 @@ PanelWindow {
     WlrLayershell.layer: WlrLayershell.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-    Keys.onEscapePressed: {
-        backgroundClicked()
+    FocusScope {
+        anchors.fill: parent
+        focus: true
+        Keys.onEscapePressed: {
+            modal.backgroundClicked()
+        }
     }
 
     MouseArea {
