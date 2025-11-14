@@ -95,7 +95,7 @@ Singleton {
     // --- Dateibetrachtung für Farbschema (Annahme für Pfad) ---
     FileView {
         // path: `${Paths.state}/scheme.json` // Annahme: Paths.state ist definiert
-        path: System.getenv("QS_CONFIG_PATH") + "material-theme.json"
+        path: Quickshell.env("QS_CONFIG_PATH") + "material-theme.json"
         watchChanges: true
         onFileChanged: reload()
         onLoaded: root.load(text(), false)

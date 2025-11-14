@@ -12,7 +12,7 @@ Singleton {
     readonly property bool enabled: Bluetooth.defaultAdapter?.enabled ?? false
 
     // The number of currently connected Bluetooth devices.
-    readonly property int connectedDeviceCount: Bluetooth.devices.count
+    readonly property int connectedDeviceCount: Bluetooth.devices?.count ?? 0
 
     // True if at least one device is connected.
     readonly property bool devicesConnected: connectedDeviceCount > 0
