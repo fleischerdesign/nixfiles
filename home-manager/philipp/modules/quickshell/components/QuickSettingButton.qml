@@ -21,7 +21,6 @@ M3Button {
     // Override default content (which is a Row) with a Column
     content: Column {
         spacing: 4
-        anchors.centerIn: parent
 
         Text {
             text: root.icon

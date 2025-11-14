@@ -2,6 +2,7 @@
 // Material 3 Button Component - Simple Container Approach
 
 import QtQuick
+import QtQuick.Layouts
 import qs.components
 import qs.services
 import QtQuick.Effects
@@ -40,7 +41,7 @@ Rectangle {
     default property alias content: contentContainer.data
     
     // --- Sizing ---
-    implicitWidth: contentContainer.implicitWidth + 40
+    implicitWidth: Math.max(55, contentContainer.width + 40)
     implicitHeight: 40
     
     radius: 20
@@ -149,11 +150,9 @@ Rectangle {
     // CONTENT CONTAINER
     // ========================================
     
-    Item {
+    RowLayout {
         id: contentContainer
         anchors.centerIn: parent
-        implicitWidth: childrenRect.width
-        implicitHeight: childrenRect.height
         z: 3
         // Content goes here via default property
     }
