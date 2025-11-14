@@ -18,6 +18,7 @@ Rectangle {
 
         BrightnessSlider {
             Layout.fillWidth: true
+            visible: BrightnessService.available
         }
 
         VolumeSlider {

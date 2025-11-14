@@ -7,11 +7,13 @@ Singleton {
     id: root
 
     // --- Properties ---
+    readonly property bool available: p_available
     readonly property real currentBrightness: p_currentBrightness
     readonly property int maxBrightness: p_maxBrightness
     property real brightnessStep: 0.05
 
     // --- Private Properties ---
+    property bool p_available: false
     property real p_currentBrightness: 0.0
     property int p_maxBrightness: 1
 
@@ -100,7 +102,22 @@ Singleton {
         stdout: StdioCollector {}
     }
 
+    Process {
+        id: checkAvailabilityProcess
+        command: ["brightnessctl", "info"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (parent.exitCode === 0 && this.text.includes("class 'backlight'")) {
+                    p_available = true;
+                    getBrightness();
+                } else {
+                    p_available = false;
+                }
+            }
+        }
+    }
+
     Component.onCompleted: {
-        getBrightness();
+        checkAvailabilityProcess.running = true;
     }
 }
