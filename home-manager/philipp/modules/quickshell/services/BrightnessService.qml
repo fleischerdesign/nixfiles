@@ -16,6 +16,8 @@ Singleton {
     property bool p_available: false
     property real p_currentBrightness: 0.0
     property int p_maxBrightness: 1
+    property string p_infoOutput: ""
+
 
     // --- IPC Handler for external calls (e.g., from Niri) ---
     IpcHandler {
@@ -107,14 +109,17 @@ Singleton {
         command: ["brightnessctl", "info"]
         stdout: StdioCollector {
             onStreamFinished: {
-                console.log("BrightnessService: checking availability. Exit code: " + checkAvailabilityProcess.exitCode);
-                console.log("BrightnessService: brightnessctl info output: " + this.text);
-                if (checkAvailabilityProcess.exitCode === 0 && this.text.includes("class 'backlight'")) {
-                    p_available = true;
-                    getBrightness();
-                } else {
-                    p_available = false;
-                }
+                p_infoOutput = this.text;
+            }
+        }
+        onExited: (exitCode) => {
+            console.log("BrightnessService: checking availability. Exit code: " + exitCode);
+            console.log("BrightnessService: brightnessctl info output: " + p_infoOutput);
+            if (exitCode === 0 && p_infoOutput.includes("class 'backlight'")) {
+                p_available = true;
+                getBrightness();
+            } else {
+                p_available = false;
             }
         }
     }
