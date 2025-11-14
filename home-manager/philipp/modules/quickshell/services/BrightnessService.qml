@@ -107,7 +107,9 @@ Singleton {
         command: ["brightnessctl", "info"]
         stdout: StdioCollector {
             onStreamFinished: {
-                if (parent.exitCode === 0 && this.text.includes("class 'backlight'")) {
+                console.log("BrightnessService: checking availability. Exit code: " + checkAvailabilityProcess.exitCode);
+                console.log("BrightnessService: brightnessctl info output: " + this.text);
+                if (checkAvailabilityProcess.exitCode === 0 && this.text.includes("class 'backlight'")) {
                     p_available = true;
                     getBrightness();
                 } else {
