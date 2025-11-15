@@ -202,7 +202,7 @@ Modal {
                             if (currentIndex >= 0) {
                                 const item = model.get(currentIndex)
                                 if (item.entryObject) {
-                                    item.entryObject.execute()
+                                    Quickshell.execDetached({ command: item.entryObject.command, workingDirectory: item.entryObject.workingDirectory })
                                 } else if (item.actionObject) {
                                     Search.ActionRegistry.execute(item.actionObject)
                                 }
@@ -333,7 +333,9 @@ Modal {
                         TapHandler {
                             id: tapHandler
                             onTapped: {
-                                if (model.actionObject) {
+                                if (model.entryObject) {
+                                    Quickshell.execDetached({ command: model.entryObject.command, workingDirectory: model.entryObject.workingDirectory })
+                                } else if (model.actionObject) {
                                     Search.ActionRegistry.execute(model.actionObject)
                                 }
                                 StateManager.appLauncherOpened = false
