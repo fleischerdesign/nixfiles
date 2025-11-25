@@ -6,6 +6,13 @@ import Quickshell.Bluetooth
 Singleton {
     id: root
 
+    // --- Connection States Enum ---
+    readonly property int stateConnected: BluetoothDeviceState.Connected
+    readonly property int stateDisconnected: BluetoothDeviceState.Disconnected
+    readonly property int stateConnecting: BluetoothDeviceState.Connecting
+    readonly property int stateDisconnecting: BluetoothDeviceState.Disconnecting
+
+
     // --- Read-only Properties for Status ---
 
     // True if the default adapter is enabled.

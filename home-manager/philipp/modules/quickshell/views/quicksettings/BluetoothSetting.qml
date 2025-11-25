@@ -73,7 +73,7 @@ QuickSettingButton {
                     delegate: Item {
                         id: delegateRoot
                         width: parent.width
-                        height: modelData.bonded ? 52 : 0 // Increased height for better spacing
+                        height: modelData.bonded ? 52 : 0
                         visible: modelData.bonded
 
                         Rectangle {
@@ -82,30 +82,9 @@ QuickSettingButton {
                             radius: 8
 
                             M3StateLayer {
-                                isHovered: delegateMouseArea.containsMouse
+                                isHovered: delegateMouseArea.containsMouse && !disconnectButton.hovered && !forgetButton.hovered
                                 isPressed: delegateMouseArea.pressed
                                 customStateColor: ColorService.palette.m3OnSurface
-                            }
-                        }
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 16
-                            anchors.rightMargin: 16
-
-                            Text {
-                                text: modelData.name
-                                color: ColorService.palette.m3OnSurface
-                                font.pixelSize: 14
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
-                            }
-                            
-                            Text {
-                                text: modelData.connected ? "Connected" : ""
-                                color: ColorService.palette.m3Primary
-                                font.pixelSize: 12
-                                opacity: 0.8
                             }
                         }
 
@@ -114,12 +93,73 @@ QuickSettingButton {
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: {
-                                if (modelData.connected) {
-                                    BluetoothService.disconnectFromDevice(modelData)
-                                } else {
+                                if (!modelData.connected) {
                                     BluetoothService.connectToDevice(modelData)
                                 }
-                                deviceMenu.close()
+                            }
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 16
+                            anchors.rightMargin: 8
+                            spacing: 8
+                            
+                            Text {
+                                text: modelData.name
+                                color: ColorService.palette.m3OnSurface
+                                font.pixelSize: 14
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            BusyIndicator {
+                                running: modelData.state === BluetoothService.stateConnecting
+                                visible: running
+                                width: 20
+                                height: 20
+                                Layout.alignment: Qt.AlignVCenter
+                            }
+
+                            // Disconnect Button
+                            M3Button {
+                                id: disconnectButton
+                                visible: modelData.connected
+                                style: M3Button.Style.Text
+                                implicitWidth: 40
+                                implicitHeight: 40
+                                radius: 20
+                                Layout.alignment: Qt.AlignVCenter
+                                onClicked: {
+                                    BluetoothService.disconnectFromDevice(modelData)
+                                }
+                                Text {
+                                    text: "link_off"
+                                    font.family: "Material Symbols Rounded"
+                                    font.pixelSize: 20
+                                    color: disconnectButton.autoContentColor
+                                }
+                            }
+
+                            // Forget Button
+                            M3Button {
+                                id: forgetButton
+                                style: M3Button.Style.Text
+                                enabled: true
+                                implicitWidth: 40
+                                implicitHeight: 40
+                                radius: 20
+                                Layout.alignment: Qt.AlignVCenter
+                                onClicked: {
+                                    BluetoothService.forgetDevice(modelData)
+                                }
+                                Text {
+                                    text: "delete"
+                                    font.family: "Material Symbols Rounded"
+                                    font.pixelSize: 20
+                                    color: forgetButton.autoContentColor
+                                }
                             }
                         }
                     }
