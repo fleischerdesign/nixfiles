@@ -109,7 +109,16 @@ QuickSettingButton {
                             anchors.rightMargin: 8
                             spacing: 8
                             
-                            Text {
+                            Text { // The new icon
+                                text: BluetoothIconMapping.getMaterialIcon(modelData.icon)
+                                font.family: "Material Symbols Rounded"
+                                font.pixelSize: 20
+                                color: ColorService.palette.m3OnSurface
+                                verticalAlignment: Text.AlignVCenter
+                                width: 20 // Fixed width for consistent spacing
+                            }
+
+                            Text { // Device name
                                 text: modelData.name
                                 color: ColorService.palette.m3OnSurface
                                 font.pixelSize: 14
