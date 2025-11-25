@@ -125,7 +125,7 @@ QuickSettingButton {
                             // Disconnect Button
                             M3Button {
                                 id: disconnectButton
-                                visible: modelData.connected
+                                visible: modelData.connected && delegateMouseArea.containsMouse
                                 style: M3Button.Style.Text
                                 implicitWidth: 40
                                 implicitHeight: 40
@@ -147,6 +147,7 @@ QuickSettingButton {
                                 id: forgetButton
                                 style: M3Button.Style.Text
                                 enabled: true
+                                visible: delegateMouseArea.containsMouse
                                 implicitWidth: 40
                                 implicitHeight: 40
                                 radius: 20
