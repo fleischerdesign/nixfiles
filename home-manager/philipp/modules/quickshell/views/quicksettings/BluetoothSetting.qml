@@ -76,13 +76,17 @@ QuickSettingButton {
                         height: modelData.bonded ? 52 : 0
                         visible: modelData.bonded
 
+                        HoverHandler {
+                            id: itemHoverHandler
+                        }
+
                         Rectangle {
                             anchors.fill: parent
                             color: "transparent"
                             radius: 8
 
                             M3StateLayer {
-                                isHovered: delegateMouseArea.containsMouse && !disconnectButton.hovered && !forgetButton.hovered
+                                isHovered: itemHoverHandler.hovered && !disconnectButton.hovered && !forgetButton.hovered
                                 isPressed: delegateMouseArea.pressed
                                 customStateColor: ColorService.palette.m3OnSurface
                             }
@@ -91,7 +95,7 @@ QuickSettingButton {
                         MouseArea {
                             id: delegateMouseArea
                             anchors.fill: parent
-                            hoverEnabled: true
+                            hoverEnabled: false
                             onClicked: {
                                 if (!modelData.connected) {
                                     BluetoothService.connectToDevice(modelData)
@@ -125,7 +129,7 @@ QuickSettingButton {
                             // Disconnect Button
                             M3Button {
                                 id: disconnectButton
-                                visible: modelData.connected && delegateMouseArea.containsMouse
+                                visible: modelData.connected && itemHoverHandler.hovered
                                 style: M3Button.Style.Text
                                 implicitWidth: 40
                                 implicitHeight: 40
@@ -139,6 +143,7 @@ QuickSettingButton {
                                     font.family: "Material Symbols Rounded"
                                     font.pixelSize: 20
                                     color: disconnectButton.autoContentColor
+                                    anchors.centerIn: parent
                                 }
                             }
 
@@ -147,7 +152,7 @@ QuickSettingButton {
                                 id: forgetButton
                                 style: M3Button.Style.Text
                                 enabled: true
-                                visible: delegateMouseArea.containsMouse
+                                visible: itemHoverHandler.hovered
                                 implicitWidth: 40
                                 implicitHeight: 40
                                 radius: 20
@@ -160,6 +165,14 @@ QuickSettingButton {
                                     font.family: "Material Symbols Rounded"
                                     font.pixelSize: 20
                                     color: forgetButton.autoContentColor
+                                    anchors.centerIn: parent
+                                }
+
+                                // Eat clicks when disabled
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: !forgetButton.enabled
+                                    onClicked: (mouse) => { mouse.accepted = true; }
                                 }
                             }
                         }
