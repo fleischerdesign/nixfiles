@@ -1,106 +1,185 @@
-# lib/helper.nix - Snowfall-inspirierte Optimierungen
+# lib/helper.nix
+# Utility functions for NixOS and Home Manager configurations.
 { pkgs-unstable, home-manager-unstable, ... }:
 
 let
   lib = pkgs-unstable.lib;
 
-  # === FILE SYSTEM UTILITIES (Snowfall-Style) ===
+  # =========================================================================
+  # SNOWFALL OPTIMIZATION 1: Context-Stripped Paths
+  # =========================================================================
+  # Strips string context for O(1) lookups instead of O(n).
+  stripContext = str: builtins.unsafeDiscardStringContext str;
+
+  # =========================================================================
+  # SNOWFALL OPTIMIZATION 2: Smart Directory Scanning
+  # =========================================================================
   
-  # Read directory safely
+  # Safely read directory with a pathExists check.
   safeReadDir = dir:
     if builtins.pathExists dir
     then builtins.readDir dir
     else {};
-
-  # Snowfall-style: filterAttrs DANN map (weniger Allokationen)
-  getFilesRecursive = dir:
+  
+  # Separates directories and files (Snowfall pattern).
+  getDirEntries = dir:
     let
       entries = safeReadDir dir;
-      # Filter ZUERST (reduziert Map-Aufrufe)
-      filtered = lib.filterAttrs 
-        (name: type: type == "directory" || type == "regular") 
-        entries;
-      
-      # Map über gefilterte Einträge
-      mapFile = name: type:
-        let path = dir + "/${name}";
+      dirs = lib.filterAttrs (n: v: v == "directory") entries;
+      files = lib.filterAttrs (n: v: v == "regular") entries;
+    in
+    { inherit dirs files; };
+
+  # =========================================================================
+  # SNOWFALL OPTIMIZATION 3: Two-Pass Metadata Loading
+  # =========================================================================
+  
+  # Pass 1: Collects metadata (lightweight, no import).
+  getFileMetadata = baseDir:
+    let
+      scanDir = dir:
+        let
+          entries = getDirEntries dir;
+          
+          # Recursively scan subdirectories.
+          subFiles = lib.concatMap 
+            (name: scanDir (dir + "/${name}"))
+            (builtins.attrNames entries.dirs);
+          
+          # Create metadata for all files in the current directory.
+          currentFiles = lib.mapAttrsToList
+            (name: _: 
+              let
+                fullPath = dir + "/${name}";
+                # Strip context for performance.
+                relPath = stripContext (
+                  lib.removePrefix (toString baseDir + "/") (toString fullPath)
+                );
+              in {
+                path = fullPath;
+                name = stripContext name;
+                inherit relPath;
+              })
+            entries.files;
         in
-        if type == "directory" then
-          getFilesRecursive path
-        else
-          [ { inherit name type path; } ];
+        currentFiles ++ subFiles;
       
-      # Snowfall's map-concat-attrs-to-list Pattern
-      files = lib.flatten (lib.mapAttrsToList mapFile filtered);
+      allFiles = scanDir baseDir;
+      
+      # Filter .nix files (excluding home.nix).
+      nixFiles = builtins.filter 
+        (f: lib.hasSuffix ".nix" f.name && f.name != "home.nix") 
+        allFiles;
     in
-    files;
+    nixFiles;
 
-  # Filter für .nix Dateien
-  filterNixFiles = files:
-    builtins.filter (f: 
-      lib.hasSuffix ".nix" f.name && f.name != "home.nix"
-    ) files;
-
-  # Get nix files - EINMAL scannen, dann filtern
-  getNixFiles = dir:
+  # =========================================================================
+  # ATTR PATH GENERATION (with Context Stripping)
+  # =========================================================================
+  
+  # Converts metadata to an attribute path.
+  metadataToAttrPath = metadata:
     let
-      allFiles = getFilesRecursive dir;
-      nixFiles = filterNixFiles allFiles;
-    in
-    map (f: f.path) nixFiles;
-
-  # === OPTION GENERATION ===
-
-  pathToAttrPath = baseDir: filePath:
-    let
-      relativePath = lib.removePrefix (toString baseDir + "/") (toString filePath);
-      pathWithoutNix = lib.removeSuffix ".nix" relativePath;
-      pathWithoutDefault = if lib.hasSuffix "/default" pathWithoutNix
-                         then lib.removeSuffix "/default" pathWithoutNix
-                         else pathWithoutNix;
+      # Remove .nix extension.
+      pathWithoutNix = lib.removeSuffix ".nix" metadata.relPath;
+      
+      # Remove /default suffix.
+      pathWithoutDefault = 
+        if lib.hasSuffix "/default" pathWithoutNix
+        then lib.removeSuffix "/default" pathWithoutNix
+        else pathWithoutNix;
     in
     lib.splitString "/" pathWithoutDefault;
 
-  # Optimiert: Direkte Optionsgenerierung
-  mkOptions = attrPaths:
+  # =========================================================================
+  # OPTION GENERATION (Optimized with Metadata)
+  # =========================================================================
+  
+  # Generates a single option from metadata.
+  mkOptionFromMetadata = namespace: metadata:
     let
-      mkSingleOption = path: {
-        path = path;
-        option = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Enable module '${lib.concatStringsSep "." path}'";
-        };
-      };
-      
-      # Baue verschachtelte Struktur
-      setAtPath = acc: item:
-        lib.setAttrByPath item.path { enable = item.option; } // acc;
-      
-      options = map mkSingleOption attrPaths;
+      attrPath = metadataToAttrPath metadata;
+      fullPath = namespace ++ attrPath ++ ["enable"];
     in
-    lib.foldl' (acc: item: lib.recursiveUpdate acc (setAtPath {} item)) {} options;
+    lib.setAttrByPath fullPath (lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Enable module '${lib.concatStringsSep "." (namespace ++ attrPath)}'";
+    });
+  
+  # Batch generation of all options (using fold for performance).
+  mkAllOptions = namespace: metadataList:
+    lib.foldl' 
+      (acc: meta: lib.recursiveUpdate acc (mkOptionFromMetadata namespace meta))
+      {}
+      metadataList;
 
-  # === MODULE SYSTEM ===
-
+  # =========================================================================
+  # MODULE SYSTEM (Metadata-based)
+  # =========================================================================
+  
   mkModuleOptions = { baseDir, optionPath }:
     let
-      files = getNixFiles baseDir;
-      attrPaths = map (pathToAttrPath baseDir) files;
-      options = mkOptions attrPaths;
+      metadata = getFileMetadata baseDir;
+      options = mkAllOptions optionPath metadata;
     in
-    { options = lib.setAttrByPath optionPath options; };
-
+    { options = options; };
+  
   mkModuleSet = { baseDir, optionPath }:
     let
-      files = getNixFiles baseDir;
-      modules = map (file: import file) files;
+      metadata = getFileMetadata baseDir;
+      
+      # Pass 2: Lazily import modules.
+      modules = map (meta: import meta.path) metadata;
+      
       optionsModule = mkModuleOptions { inherit baseDir optionPath; };
     in
     [ optionsModule ] ++ modules;
 
-  # === SYSTEM BUILDER ===
+  # =========================================================================
+  # HOME MANAGER USER CONFIG (Optimized)
+  # =========================================================================
+  
+  mkHomeManagerUserConfig = homeManagerDir: user:
+    let
+      globalModulesDir = homeManagerDir + "/default";
+      userModulesDir = homeManagerDir + "/${user.name}";
+      
+      # Metadata-based scans (no immediate import).
+      globalMeta = getFileMetadata globalModulesDir;
+      userMeta = getFileMetadata userModulesDir;
+      
+      # Load modules from metadata.
+      globalModules = map (meta: import meta.path) globalMeta;
+      
+      # Generate user options.
+      userOptions = mkAllOptions ["my" "homeManager"] userMeta;
+      userOptionsModule = { options = userOptions; };
+      
+      # User-specific modules.
+      userModules = map (meta: import meta.path) userMeta;
+      
+      # Check if user home.nix exists.
+      userHomeConfig = 
+        let homeFile = userModulesDir + "/home.nix";
+        in if builtins.pathExists homeFile
+           then [ (import homeFile) ]
+           else [];
+    in
+    {
+      name = user.name;
+      value = {
+        imports = 
+          [ userOptionsModule ]
+          ++ globalModules
+          ++ userModules 
+          ++ userHomeConfig
+          ++ (user.homeModules or []);
+      };
+    };
 
+  # =========================================================================
+  # Main entry point for system configuration.
   mkSystem = {
     system,
     hostname,
@@ -112,57 +191,36 @@ let
     hostsDir = toString ../hosts;
     modulesDir = toString ../modules/nixos;
     homeManagerDir = toString ../home-manager;
-
-    # Scanne alle User-Verzeichnisse EINMAL
-    userDirs = lib.filterAttrs (n: t: t == "directory" && n != "default") 
-      (safeReadDir homeManagerDir);
-
-    mkHomeManagerUserConfig = user:
-      let
-        globalModulesDir = homeManagerDir + "/default";
-        userModulesDir = homeManagerDir + "/${user.name}";
-
-        # Einmal scannen
-        globalFiles = getNixFiles globalModulesDir;
-        userFiles = getNixFiles userModulesDir;
-        
-        globalModules = map (f: import f) globalFiles;
-        
-        userAttrPaths = map (pathToAttrPath userModulesDir) userFiles;
-        userOptions = mkOptions userAttrPaths;
-        userOptionsModule = { 
-          options = lib.setAttrByPath ["my" "homeManager"] userOptions; 
-        };
-        userModules = map (f: import f) userFiles;
-      in
-      {
-        name = user.name;
-        value = {
-          imports = 
-            [ userOptionsModule ]
-            ++ globalModules
-            ++ userModules 
-            ++ [ (import (userModulesDir + "/home.nix")) ]
-            ++ (user.homeModules or []);
-        };
-      };
-
-    homeManagerUsers = lib.listToAttrs (map mkHomeManagerUserConfig users);
+    
+    # Optimized user configuration generation.
+    homeManagerUsers = lib.listToAttrs 
+      (map (mkHomeManagerUserConfig homeManagerDir) users);
+    
+    # NixOS module set with metadata-based scan.
     nixosModuleSet = mkModuleSet { 
       baseDir = modulesDir; 
       optionPath = ["my" "nixos"]; 
     };
-
+    
+    # Host-specific configuration.
+    hostConfig = hostsDir + "/${hostname}/configuration.nix";
   in
   pkgs-unstable.lib.nixosSystem {
     inherit system;
     specialArgs = { inherit inputs; };
     modules = [
+      # Nixpkgs Config
       { nixpkgs = { inherit overlays; config.allowUnfree = true; }; }
-      (import (hostsDir + "/base.nix"))
-    ] ++ nixosModuleSet ++ [
-      (import (hostsDir + "/${hostname}/configuration.nix"))
       
+      # Base Config
+      (import (hostsDir + "/base.nix"))
+    ] 
+    ++ nixosModuleSet 
+    ++ [
+      # Host-spezifische Config
+      (import hostConfig)
+      
+      # Home Manager Integration
       home-manager-unstable.nixosModules.home-manager
       {
         home-manager = {
@@ -176,5 +234,9 @@ let
   };
 
 in {
-  inherit mkModuleOptions mkModuleSet mkSystem getNixFiles;
+  # Public API
+  inherit mkModuleOptions mkModuleSet mkSystem;
+  
+  # Expose für Testing/Debugging
+  inherit getFileMetadata metadataToAttrPath;
 }
