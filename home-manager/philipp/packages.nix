@@ -27,6 +27,7 @@
       pkgs.gnome-disk-utility
       pkgs.firefox
       pkgs.bluetuith
+      pkgs.yazi
       (pkgs.callPackage ../../packages/lychee-slicer { })
       (pkgs.callPackage ../../packages/ficsit { })
       (pkgs.callPackage ../../packages/karere { })
