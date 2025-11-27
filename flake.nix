@@ -64,11 +64,12 @@
           system = "x86_64-linux";
           hostname = "yorke";
           inputs = inputs;
+          extraModules = [ inputs.niri.nixosModules.niri ];
           overlays = [ (import ./overlays/pip-on-top) inputs.nix-vscode-extensions.overlays.default ];
           users = [
             {
               name = "philipp";
-              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeModules.nixvim inputs.spicetify-nix.homeManagerModules.default ];
+              homeModules = [ inputs.nixcord.homeModules.nixcord inputs.spicetify-nix.homeManagerModules.default inputs.nixvim.homeModules.nixvim ];
             }
           ];
         };
@@ -76,11 +77,12 @@
           system = "x86_64-linux";
           hostname = "jello";
           inputs = inputs;
+          extraModules = [ inputs.niri.nixosModules.niri ];
           overlays = [ (import ./overlays/pip-on-top) inputs.nix-vscode-extensions.overlays.default ];
           users = [
             {
               name = "philipp";
-              homeModules = [ inputs.nixcord.homeModules.nixcord nixvim.homeModules.nixvim inputs.spicetify-nix.homeManagerModules.default ];
+              homeModules = [ inputs.nixcord.homeModules.nixcord inputs.spicetify-nix.homeManagerModules.default inputs.nixvim.homeModules.nixvim ];
             }
           ];
         };

@@ -74,153 +74,65 @@ let
     nixFiles;
 
   # =========================================================================
-  # ATTR PATH GENERATION (with Context Stripping)
+  # UNIFIED FEATURE SYSTEM
   # =========================================================================
-  
-  # Converts metadata to an attribute path.
-  metadataToAttrPath = metadata:
-    let
-      # Remove .nix extension.
-      pathWithoutNix = lib.removeSuffix ".nix" metadata.relPath;
-      
-      # Remove /default suffix.
-      pathWithoutDefault = 
-        if lib.hasSuffix "/default" pathWithoutNix
-        then lib.removeSuffix "/default" pathWithoutNix
-        else pathWithoutNix;
-    in
-    lib.splitString "/" pathWithoutDefault;
 
-  # =========================================================================
-  # OPTION GENERATION (Optimized with Metadata)
-  # =========================================================================
-  
-  # Generates a single option from metadata.
-  mkOptionFromMetadata = namespace: metadata:
-    let
-      attrPath = metadataToAttrPath metadata;
-      fullPath = namespace ++ attrPath ++ ["enable"];
-    in
-    lib.setAttrByPath fullPath (lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Enable module '${lib.concatStringsSep "." (namespace ++ attrPath)}'";
-    });
-  
-  # Batch generation of all options (using fold for performance).
-  mkAllOptions = namespace: metadataList:
-    lib.foldl' 
-      (acc: meta: lib.recursiveUpdate acc (mkOptionFromMetadata namespace meta))
-      {}
-      metadataList;
-
-  # =========================================================================
-  # MODULE SYSTEM (Metadata-based)
-  # =========================================================================
-  
-  mkModuleOptions = { baseDir, optionPath }:
-    let
-      metadata = getFileMetadata baseDir;
-      options = mkAllOptions optionPath metadata;
-    in
-    { options = options; };
-  
-  mkModuleSet = { baseDir, optionPath }:
-    let
-      metadata = getFileMetadata baseDir;
-      
-      # Pass 2: Lazily import modules.
-      modules = map (meta: import meta.path) metadata;
-      
-      optionsModule = mkModuleOptions { inherit baseDir optionPath; };
-    in
-    [ optionsModule ] ++ modules;
-
-  # =========================================================================
-  # HOME MANAGER USER CONFIG (Optimized)
-  # =========================================================================
-  
-  mkHomeManagerUserConfig = homeManagerDir: user:
-    let
-      globalModulesDir = homeManagerDir + "/default";
-      userModulesDir = homeManagerDir + "/${user.name}";
-      
-      # Metadata-based scans (no immediate import).
-      globalMeta = getFileMetadata globalModulesDir;
-      userMeta = getFileMetadata userModulesDir;
-      
-      # Load modules from metadata.
-      globalModules = map (meta: import meta.path) globalMeta;
-      
-      # Generate user options.
-      userOptions = mkAllOptions ["my" "homeManager"] userMeta;
-      userOptionsModule = { options = userOptions; };
-      
-      # User-specific modules.
-      userModules = map (meta: import meta.path) userMeta;
-      
-      # Check if user home.nix exists.
-      userHomeConfig = 
-        let homeFile = userModulesDir + "/home.nix";
-        in if builtins.pathExists homeFile
-           then [ (import homeFile) ]
-           else [];
-    in
-    {
-      name = user.name;
-      value = {
-        imports = 
-          [ userOptionsModule ]
-          ++ globalModules
-          ++ userModules 
-          ++ userHomeConfig
-          ++ (user.homeModules or []);
-      };
-    };
-
-  # =========================================================================
-  # Main entry point for system configuration.
   mkSystem = {
     system,
     hostname,
     inputs,
     users ? [],
-    overlays ? []
+    overlays ? [],
+    extraModules ? []
   }:
   let
-    hostsDir = toString ../hosts;
-    modulesDir = toString ../modules/nixos;
-    homeManagerDir = toString ../home-manager;
-    
-    # Optimized user configuration generation.
-    homeManagerUsers = lib.listToAttrs 
-      (map (mkHomeManagerUserConfig homeManagerDir) users);
-    
-    # NixOS module set with metadata-based scan.
-    nixosModuleSet = mkModuleSet { 
-      baseDir = modulesDir; 
-      optionPath = ["my" "nixos"]; 
+    hostsDir = ../hosts;
+    rolesDir = ../roles;
+    featuresDir = ../features;
+    userDir = ../user;
+
+    hostMetadata = import (hostsDir + "/${hostname}/metadata.nix");
+
+    allFeatureFiles = getFileMetadata featuresDir;
+    allFeatureModules = map (meta: import meta.path) allFeatureFiles;
+
+    roleModule = import (rolesDir + "/${hostMetadata.role}.nix");
+
+    # Dynamically build the `my.features` attribute set from metadata.
+    # This allows `metadata.nix` to use simple booleans for most features,
+    # but also attribute sets for features with more complex options.
+    featureFlagsModule = {
+      my.features = lib.mapAttrs
+        (name: value:
+          if lib.isAttrs value then value
+          else { enable = value; }
+        )
+        hostMetadata.features;
     };
-    
-    # Host-specific configuration.
-    hostConfig = hostsDir + "/${hostname}/configuration.nix";
+
+    homeManagerUsers = lib.listToAttrs (map (user: {
+      name = user.name;
+      value = {
+        imports = 
+          [ (import (userDir + "/${user.name}/home.nix")) ]
+          ++ (user.homeModules or []); 
+      };
+    }) users);
+
   in
   pkgs-unstable.lib.nixosSystem {
     inherit system;
-    specialArgs = { inherit inputs; };
+    specialArgs = { inherit inputs hostname; };
     modules = [
-      # Nixpkgs Config
       { nixpkgs = { inherit overlays; config.allowUnfree = true; }; }
-      
-      # Base Config
       (import (hostsDir + "/base.nix"))
-    ] 
-    ++ nixosModuleSet 
+    ]
+    ++ extraModules
     ++ [
-      # Host-spezifische Config
-      (import hostConfig)
-      
-      # Home Manager Integration
+      roleModule
+    ] ++ allFeatureModules ++ [
+      featureFlagsModule
+      (import (hostsDir + "/${hostname}/configuration.nix"))
       home-manager-unstable.nixosModules.home-manager
       {
         home-manager = {
@@ -235,8 +147,8 @@ let
 
 in {
   # Public API
-  inherit mkModuleOptions mkModuleSet mkSystem;
+  inherit mkSystem;
   
-  # Expose für Testing/Debugging
-  inherit getFileMetadata metadataToAttrPath;
+  # Expose for testing/debugging
+  inherit getFileMetadata;
 }

@@ -26,9 +26,6 @@
 
   system.stateVersion = "24.05";
 
-  my.nixos = {
-    audio.pipewire.enable = true;
-    desktop.gnome.enable = false;
-    desktop.niri.enable = true;
-  };
+  # Features are enabled in `metadata.nix`.
+  # This file is for host-specific overrides.
 }

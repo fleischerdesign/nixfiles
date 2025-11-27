@@ -20,13 +20,8 @@
     ];
   };
 
-  programs.adb.enable = true;
-
-  my.nixos = {
-    audio.pipewire.enable = true;
-    desktop.niri.enable = true;
-    gaming.enable = true;
-  };
+  # Features are enabled in `metadata.nix`.
+  # This file is for host-specific overrides.
 
   # State version setting
   system.stateVersion = "24.05"; # Keep this to match your initial install

@@ -1,8 +1,15 @@
+# features/gaming.nix
 { config, lib, pkgs, ... }:
-{
-  # options.my.nixos.gaming.enable = lib.mkEnableOption "Gaming packages and services";
 
-  config = lib.mkIf config.my.nixos.gaming.enable {
+let
+  cfg = config.my.features.gaming;
+in
+{
+  options.my.features.gaming = {
+    enable = lib.mkEnableOption "Gaming packages and services (Steam, Lutris, Sunshine)";
+  };
+
+  config = lib.mkIf cfg.enable {
     programs.steam = {
       enable = true;
       remotePlay.openFirewall = true;
@@ -21,7 +28,6 @@
       winetricks
       wine
       (lutris.override {
-        # Adding libadwaita and gtk4 as extra libraries, so that winetricks will launch without errors inside lutris
         extraLibraries = pkgs: with pkgs; [
           libadwaita
           gtk4

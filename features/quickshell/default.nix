@@ -1,0 +1,30 @@
+# features/quickshell/default.nix
+{ config, lib, pkgs, ... }:
+
+let
+  cfg = config.my.features.quickshell;
+in
+{
+  options.my.features.quickshell = {
+    enable = lib.mkEnableOption "Quickshell configuration";
+  };
+
+  config = lib.mkIf cfg.enable {
+    home-manager.sharedModules = [{
+      home.packages = [
+        pkgs.material-symbols
+        pkgs.wl-clipboard
+        pkgs.wlsunset
+      ];
+
+      home.sessionVariables = {
+        QS_CONFIG_PATH = "${./.}"; # Point to this directory
+      };
+
+      programs.quickshell = {
+        enable = true;
+        systemd.enable = true;
+      };
+    }];
+  };
+}
