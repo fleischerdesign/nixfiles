@@ -124,8 +124,8 @@ let
     inherit system;
     specialArgs = { inherit inputs hostname; };
     modules = [
+      # Base Nixpkgs config
       { nixpkgs = { inherit overlays; config.allowUnfree = true; }; }
-      (import (hostsDir + "/base.nix"))
     ]
     ++ extraModules
     ++ [
