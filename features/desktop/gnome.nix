@@ -1,11 +1,11 @@
-# features/gnome.nix
+# features/desktop/gnome.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.gnome;
+  cfg = config.my.features.desktop.gnome;
 in
 {
-  options.my.features.gnome = {
+  options.my.features.desktop.gnome = {
     enable = lib.mkEnableOption "GNOME Desktop Environment configuration (dconf settings and extensions)";
   };
 
@@ -21,7 +21,7 @@ in
 
           "org/gnome/desktop/background" = let
             # Path to the wallpaper, relative to the flake root.
-            bg = ../media/wallpaper.jpg;
+            bg = ../../media/wallpaper.jpg;
           in {
             picture-uri = "file://${bg}";
             picture-uri-dark = "file://${bg}";

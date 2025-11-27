@@ -1,11 +1,11 @@
-# features/codium.nix
+# features/dev/codium.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.codium;
+  cfg = config.my.features.dev.codium;
 in
 {
-  options.my.features.codium = {
+  options.my.features.dev.codium = {
     enable = lib.mkEnableOption "VSCodium with extensions";
   };
 

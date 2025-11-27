@@ -1,11 +1,11 @@
-# features/gaming.nix
+# features/media/gaming.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.gaming;
+  cfg = config.my.features.media.gaming;
 in
 {
-  options.my.features.gaming = {
+  options.my.features.media.gaming = {
     enable = lib.mkEnableOption "Gaming packages and services (Steam, Lutris, Sunshine)";
   };
 

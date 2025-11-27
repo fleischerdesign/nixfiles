@@ -1,11 +1,11 @@
-# features/kernel.nix
+# features/system/kernel.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.kernel;
+  cfg = config.my.features.system.kernel;
 in
 {
-  options.my.features.kernel = {
+  options.my.features.system.kernel = {
     enable = lib.mkEnableOption "Kernel configuration (e.g., linuxPackages_testing)";
   };
 

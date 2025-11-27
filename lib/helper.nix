@@ -98,16 +98,10 @@ let
 
     roleModule = import (rolesDir + "/${hostMetadata.role}.nix");
 
-    # Dynamically build the `my.features` attribute set from metadata.
-    # This allows `metadata.nix` to use simple booleans for most features,
-    # but also attribute sets for features with more complex options.
+    # Assign feature flags directly from metadata. The metadata file is expected
+    # to contain the full NixOS option structure, e.g. `{ enable = true; }`.
     featureFlagsModule = {
-      my.features = lib.mapAttrs
-        (name: value:
-          if lib.isAttrs value then value
-          else { enable = value; }
-        )
-        hostMetadata.features;
+      my.features = hostMetadata.features;
     };
 
     homeManagerUsers = lib.listToAttrs (map (user: {

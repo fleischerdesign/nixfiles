@@ -1,11 +1,11 @@
-# features/containers.nix
+# features/dev/containers.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.containers;
+  cfg = config.my.features.dev.containers;
 in
 {
-  options.my.features.containers = {
+  options.my.features.dev.containers = {
     enable = lib.mkEnableOption "Containerization tools (Docker)";
 
     users = lib.mkOption {

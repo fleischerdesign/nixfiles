@@ -1,11 +1,11 @@
-# features/nixvim.nix
+# features/dev/nixvim.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.nixvim;
+  cfg = config.my.features.dev.nixvim;
 in
 {
-  options.my.features.nixvim = {
+  options.my.features.dev.nixvim = {
     enable = lib.mkEnableOption "NixVim configuration";
   };
 

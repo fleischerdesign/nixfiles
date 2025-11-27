@@ -5,12 +5,14 @@
 {
   # It enables a baseline set of features common to all graphical systems.
   my.features = {
-    common.enable = lib.mkDefault true;
-    audio.enable = lib.mkDefault true;
-    bootloader.enable = lib.mkDefault true;
-    kernel.enable = lib.mkDefault true;
-    wayland.enable = lib.mkDefault true;
-    fish-shell.enable = lib.mkDefault true;
-    printing.enable = lib.mkDefault true;
+    system = {
+      common.enable = lib.mkDefault true;
+      audio.enable = lib.mkDefault true;
+      bootloader.enable = lib.mkDefault true;
+      kernel.enable = lib.mkDefault true;
+      wayland.enable = lib.mkDefault true;
+      fish-shell.enable = lib.mkDefault true;
+      printing.enable = lib.mkDefault true;
+    };
   };
 }

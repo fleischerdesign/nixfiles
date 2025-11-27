@@ -1,11 +1,11 @@
-# features/printing.nix
+# features/system/printing.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.printing;
+  cfg = config.my.features.system.printing;
 in
 {
-  options.my.features.printing = {
+  options.my.features.system.printing = {
     enable = lib.mkEnableOption "CUPS printing services";
   };
 

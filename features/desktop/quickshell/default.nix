@@ -1,11 +1,11 @@
-# features/quickshell/default.nix
+# features/desktop/quickshell/default.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.quickshell;
+  cfg = config.my.features.desktop.quickshell;
 in
 {
-  options.my.features.quickshell = {
+  options.my.features.desktop.quickshell = {
     enable = lib.mkEnableOption "Quickshell configuration";
   };
 

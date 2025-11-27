@@ -1,11 +1,11 @@
-# features/bootloader.nix
+# features/system/bootloader.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.bootloader;
+  cfg = config.my.features.system.bootloader;
 in
 {
-  options.my.features.bootloader = {
+  options.my.features.system.bootloader = {
     enable = lib.mkEnableOption "Bootloader configuration (GRUB for EFI)";
   };
 

@@ -1,11 +1,11 @@
-# features/audio.nix
+# features/system/audio.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.audio;
+  cfg = config.my.features.system.audio;
 in
 {
-  options.my.features.audio = {
+  options.my.features.system.audio = {
     enable = lib.mkEnableOption "Audio configuration (Pipewire and related tools)";
   };
 

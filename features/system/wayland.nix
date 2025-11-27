@@ -1,11 +1,11 @@
-# features/wayland.nix
+# features/system/wayland.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.wayland;
+  cfg = config.my.features.system.wayland;
 in
 {
-  options.my.features.wayland = {
+  options.my.features.system.wayland = {
     enable = lib.mkEnableOption "General Wayland settings";
   };
 

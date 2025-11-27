@@ -1,12 +1,12 @@
-# features/common.nix
+# features/system/common.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.common;
+  cfg = config.my.features.system.common;
   deLocale = "de_DE.UTF-8";
 in
 {
-  options.my.features.common = {
+  options.my.features.system.common = {
     enable = lib.mkEnableOption "Common system-wide settings (nix, network, time, locale, keyboard)";
   };
 

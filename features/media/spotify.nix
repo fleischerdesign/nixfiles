@@ -1,12 +1,12 @@
-# features/spotify.nix
+# features/media/spotify.nix
 { config, lib, pkgs, inputs, ... }:
 
 let
-  cfg = config.my.features.spotify;
+  cfg = config.my.features.media.spotify;
   spicePkgs = inputs.spicetify-nix.legacyPackages.${pkgs.stdenv.system};
 in
 {
-  options.my.features.spotify = {
+  options.my.features.media.spotify = {
     enable = lib.mkEnableOption "Spotify with Spicetify";
   };
 

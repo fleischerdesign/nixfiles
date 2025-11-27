@@ -1,11 +1,11 @@
-# features/fish-shell.nix
+# features/system/fish-shell.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.fish-shell;
+  cfg = config.my.features.system.fish-shell;
 in
 {
-  options.my.features.fish-shell = {
+  options.my.features.system.fish-shell = {
     enable = lib.mkEnableOption "Fish shell as default shell";
   };
 

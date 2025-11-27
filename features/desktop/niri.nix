@@ -2,10 +2,10 @@
 { config, lib, pkgs, inputs, ... }:
 
 let
-  cfg = config.my.features.niri;
+  cfg = config.my.features.desktop.niri;
 in
 {
-  options.my.features.niri = {
+  options.my.features.desktop.niri = {
     enable = lib.mkEnableOption "Niri desktop environment";
   };
 

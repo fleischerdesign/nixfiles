@@ -1,11 +1,11 @@
-# features/android.nix
+# features/dev/android.nix
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.android;
+  cfg = config.my.features.dev.android;
 in
 {
-  options.my.features.android = {
+  options.my.features.dev.android = {
     enable = lib.mkEnableOption "Android Debug Bridge (ADB) tools";
   };
 
