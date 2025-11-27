@@ -2,11 +2,11 @@
 {
   role = "desktop";
   features = {
-    audio = true;
-    common = true;
-    bootloader = true;
-    kernel = true;
-    wayland = true;
     gaming = true;
+    spotify = true;
+    containers = { enable = true; users = [ "philipp" ]; };
+    android = true;
+    codium = true;
+    niri = true;
   };
 }

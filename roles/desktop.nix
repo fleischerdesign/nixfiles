@@ -1,8 +1,12 @@
 # roles/desktop.nix
-{ ... }:
+# This role defines the default features for a stationary desktop PC.
+{ lib, ... }:
 
 {
-  # This is a base role for a desktop system.
-  # It contains no configuration itself but serves as a logical foundation
-  # upon which features are added.
+  imports = [
+    ./pc.nix # Inherit common PC features
+  ];
+
+  # Add desktop-specific feature defaults here if any, e.g.:
+  # my.features.large-monitor-support.enable = lib.mkDefault true;
 }
