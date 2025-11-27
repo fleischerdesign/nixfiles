@@ -9,7 +9,7 @@
     dev.containers.users = [ "philipp" ];
     dev.android.enable = true;
     dev.codium.enable = true;
-
+    dev.nixvim.enable = true;
     desktop.niri.enable = true;
   };
 }
