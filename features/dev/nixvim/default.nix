@@ -110,6 +110,8 @@ in
               nil_ls.enable = true;
               # QML
               qmlls.enable = true;
+	      # Java
+	      jdtls.enable = true;
             };
           };
 
