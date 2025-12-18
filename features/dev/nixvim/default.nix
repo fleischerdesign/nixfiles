@@ -147,7 +147,7 @@ in
             options = {
               noremap = true;
               silent = true;
-              desc = "Find files";
+              desc = "Telescope find files";
             };
           }
           {
@@ -156,9 +156,28 @@ in
             options = {
               noremap = true;
               silent = true;
-              desc = "Live grep";
+              desc = "Telescope live grep";
             };
           }
+          {
+            key = "<leader>fb";
+            action = "<cmd>Telescope buffers<cr>";
+            options = {
+              noremap = true;
+              silent = true;
+              desc = "Telescope buffers";
+            };
+          }
+          {
+            key = "<leader>fh";
+            action = "<cmd>Telescope help_tags<cr>";
+            options = {
+              noremap = true;
+              silent = true;
+              desc = "Telescope help tags";
+            };
+          }
+
           {
             key = "<leader>gs";
             action = "<cmd>Git<cr>";
