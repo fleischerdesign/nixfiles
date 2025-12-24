@@ -6,30 +6,40 @@ let
 in
 {
   options.my.features.system.bootloader = {
-    enable = lib.mkEnableOption "Bootloader configuration (GRUB for EFI)";
+    enable = lib.mkEnableOption "Bootloader configuration";
+    provider = lib.mkOption {
+      type = lib.types.enum [ "grub" "systemd-boot" ];
+      default = "grub";
+      description = "Which bootloader to use. Can be 'grub' or 'systemd-boot'.";
+    };
   };
 
-  config = lib.mkIf cfg.enable {
-    boot.loader = {
-      # GRUB for EFI systems
-      grub = {
+  config = lib.mkIf cfg.enable (lib.mkMerge [
+    # Common settings for all bootloaders
+    {
+      boot.loader.efi.canTouchEfiVariables = true;
+      boot.kernelParams = [ "quiet" ];
+    }
+
+    # GRUB configuration
+    (lib.mkIf (cfg.provider == "grub") {
+      boot.loader.grub = {
         enable = true;
         device = "nodev"; # Universal for all EFI systems
         efiSupport = true;
         useOSProber = true; # Automatically find other OSes
-
-        # Optional: Nicer theme
         theme = pkgs.nixos-grub2-theme;
       };
+      boot.loader.systemd-boot.enable = lib.mkForce false;
+    })
 
-      efi = {
-        canTouchEfiVariables = true;
+    # systemd-boot configuration
+    (lib.mkIf (cfg.provider == "systemd-boot") {
+      boot.loader.systemd-boot = {
+        enable = true;
+        configurationLimit = 5; # Optional: Keep last 5 generations
       };
-
-      # Disable systemd-boot if you want to be sure
-      systemd-boot.enable = lib.mkForce false;
-    };
-
-    boot.kernelParams = [ "quiet" ];
-  };
+      boot.loader.grub.enable = lib.mkForce false;
+    })
+  ]);
 }

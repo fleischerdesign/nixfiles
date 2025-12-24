@@ -10,6 +10,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    boot.kernelPackages = pkgs.linuxPackages_testing;
+    boot.kernelPackages = pkgs.linuxPackages;
   };
 }
