@@ -1,4 +1,10 @@
-{ config, lib, pkgs, inputs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}:
 {
   home.packages = [
     (pkgs.google-chrome.override {
@@ -27,6 +33,7 @@
     pkgs.firefox
     pkgs.bluetuith
     pkgs.yazi
+    pkgs.claude-code
     (pkgs.callPackage ../../packages/lychee-slicer { })
     (pkgs.callPackage ../../packages/ficsit { })
     (pkgs.callPackage ../../packages/karere { })
