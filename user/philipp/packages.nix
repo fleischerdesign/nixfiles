@@ -52,8 +52,4 @@
       ];
     };
   };
-
-  programs.vesktop = {
-    enable = true;
-  };
 }
