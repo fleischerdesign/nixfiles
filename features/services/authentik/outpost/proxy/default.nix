@@ -34,8 +34,8 @@ in
       after = [ "network.target" ];
       
       serviceConfig = {
-        # Use the package from nixpkgs
-        ExecStart = "${pkgs.authentik-outposts.proxy}/bin/authentik-proxy-outpost";
+        # Use lib.getExe to resolve the binary name automatically
+        ExecStart = lib.getExe pkgs.authentik-outposts.proxy;
         
         # Load the token from the sops template
         EnvironmentFile = config.sops.templates."authentik-outpost.env".path;
