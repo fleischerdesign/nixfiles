@@ -42,8 +42,8 @@ in
         
         # Configure connection to Authentik Core
         Environment = [
-            "AUTHENTIK_HOST=https://auth.igy.ancoris.ovh"
-            "AUTHENTIK_HOST_BROWSER=https://auth.igy.ancoris.ovh"
+            "AUTHENTIK_HOST=https://auth.ancoris.ovh"
+            "AUTHENTIK_HOST_BROWSER=https://auth.ancoris.ovh"
             "AUTHENTIK_INSECURE_SKIP_VERIFY=false"
             # Listen on localhost:9000
             "AUTHENTIK_HTTP_ADDRESS=127.0.0.1:9000"
