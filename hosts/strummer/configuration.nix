@@ -21,6 +21,11 @@
     ];
   };
 
+  services.caddy.virtualHosts = {
+    "hass.fls.ancoris.ovh".extraConfig = "reverse_proxy 127.0.0.1:8123";
+    "esphome.fls.ancoris.ovh".extraConfig = "reverse_proxy 127.0.0.1:6052";
+  };
+
   # State version setting
   system.stateVersion = "24.11"; 
 

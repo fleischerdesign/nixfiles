@@ -4,5 +4,8 @@
   features = {
     dev.containers.enable = true;
     dev.containers.users = [ "philipp" ];
+    services.home-assistant.enable = true;
+    services.esphome.enable = true;
+    services.caddy.enable = true;
   };
 }
