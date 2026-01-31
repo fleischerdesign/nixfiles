@@ -23,5 +23,5 @@
     };
   };
 
-  sops.age.keyFile = "/etc/ssh/ssh_host_ed25519_key";
+  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 }
