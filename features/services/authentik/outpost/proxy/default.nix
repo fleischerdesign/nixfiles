@@ -6,22 +6,50 @@ in
   options.my.features.services.authentik.outpost.proxy.enable = lib.mkEnableOption "Authentik Proxy Outpost";
 
   config = lib.mkIf cfg.enable {
-    # Specify the secrets file
+    # 1. Secrets Setup
     sops.defaultSopsFile = ../../../../../secrets/secrets.yaml;
-
-    # Define the secret for the outpost
     sops.secrets."authentik_token" = {
       owner = "authentik-outpost";
+      # Restart service when secret changes
+      restartUnits = [ "authentik-outpost-proxy.service" ];
     };
 
-    services.authentik-outpost = {
-      enable = true;
-      type = "proxy";
-      protocolConfig = {
-        authentik_host = "https://auth.igy.ancoris.ovh";
-        authentik_host_browser = "https://auth.igy.ancoris.ovh";
-        authentik_insecure_skip_verify = false;
-        authentik_token_file = config.sops.secrets."authentik_token".path;
+    # 2. Template to format the token as Environment Variable
+    # Creates a file with: AUTHENTIK_TOKEN=value
+    sops.templates."authentik-outpost.env".content = ''
+      AUTHENTIK_TOKEN=${config.sops.placeholder."authentik_token"}
+    '';
+
+    # 3. Systemd Service Definition
+    systemd.services.authentik-outpost-proxy = {
+      description = "Authentik Proxy Outpost";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network.target" ];
+      
+      serviceConfig = {
+        # Use the package from nixpkgs
+        ExecStart = "${pkgs.authentik-outposts.proxy}/bin/authentik-proxy-outpost";
+        
+        # Load the token from the sops template
+        EnvironmentFile = config.sops.templates."authentik-outpost.env".path;
+        
+        # Configure connection to Authentik Core
+        Environment = [
+            "AUTHENTIK_HOST=https://auth.igy.ancoris.ovh"
+            "AUTHENTIK_HOST_BROWSER=https://auth.igy.ancoris.ovh"
+            "AUTHENTIK_INSECURE_SKIP_VERIFY=false"
+            # Listen on localhost:9000
+            "AUTHENTIK_HTTP_ADDRESS=127.0.0.1:9000"
+            "AUTHENTIK_METRICS_ADDRESS=127.0.0.1:9300"
+        ];
+        
+        Restart = "always";
+        
+        # Security: Run as dynamic user
+        DynamicUser = true;
+        User = "authentik-outpost";
+        Group = "authentik-outpost";
+        StateDirectory = "authentik-outpost-proxy"; 
       };
     };
   };
