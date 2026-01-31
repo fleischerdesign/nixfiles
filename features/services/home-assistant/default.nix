@@ -14,6 +14,7 @@ in
         "met"
         "radio_browser"
         "mobile_app"
+        "zha" # Zigbee Home Automation
       ];
       config = {
         # This generates the configuration.yaml
@@ -28,5 +29,10 @@ in
 
     # Open firewall port
     networking.firewall.allowedTCPPorts = [ 8123 ];
+
+    # Allow Home Assistant to access Zigbee USB sticks
+    users.users.hass = {
+      extraGroups = [ "dialout" "tty" ];
+    };
   };
 }
