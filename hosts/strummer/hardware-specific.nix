@@ -1,0 +1,4 @@
+{ ... }:
+{
+  # Host-specific hardware tweaks
+}

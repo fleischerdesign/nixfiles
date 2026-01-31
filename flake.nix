@@ -86,6 +86,17 @@
             }
           ];
         };
+        strummer = helpers.mkSystem {
+          system = "x86_64-linux";
+          hostname = "strummer";
+          inputs = inputs;
+          users = [
+            {
+              name = "philipp";
+              homeModules = [ inputs.nixvim.homeModules.nixvim ];
+            }
+          ];
+        };
       };
     };
 }
