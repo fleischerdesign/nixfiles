@@ -3,43 +3,46 @@
   lib,
   pkgs,
   inputs,
+  role,
   ...
 }:
 {
-  home.packages = [
-    (pkgs.google-chrome.override {
+  home.packages = with pkgs; [
+    # --- CLI / Server Safe ---
+    gemini-cli
+    yazi
+  ] ++ lib.optionals (role != "server") [
+    # --- Desktop Only ---
+    (google-chrome.override {
       commandLineArgs = [
         "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoEncoder,VaapiIgnoreDriverChecks,VaapiVideoDecoder,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo"
       ];
     })
-    pkgs.nerd-fonts.jetbrains-mono
-    # pkgs.gimp
-    pkgs.obsidian
-    pkgs.orca-slicer
-    pkgs.endeavour
-    pkgs.resources
-    pkgs.moonlight-qt
-    pkgs.packet
-    pkgs.freecad-wayland
-    pkgs.yaak
-    pkgs.penpot-desktop
-    pkgs.gemini-cli
-    pkgs.deskflow
-    pkgs.delfin
-    pkgs.inkscape
-    pkgs.evince
-    pkgs.nautilus
-    pkgs.gnome-disk-utility
-    pkgs.firefox
-    pkgs.bluetuith
-    pkgs.yazi
-    pkgs.claude-code
-    (pkgs.callPackage ../../packages/lychee-slicer { })
-    (pkgs.callPackage ../../packages/ficsit { })
-    (pkgs.callPackage ../../packages/karere { })
+    nerd-fonts.jetbrains-mono
+    # gimp
+    obsidian
+    orca-slicer
+    endeavour
+    resources
+    moonlight-qt
+    packet
+    freecad-wayland
+    yaak
+    penpot-desktop
+    deskflow
+    delfin
+    inkscape
+    evince
+    nautilus
+    gnome-disk-utility
+    firefox
+    bluetuith
+    (callPackage ../../packages/lychee-slicer { })
+    (callPackage ../../packages/ficsit { })
+    (callPackage ../../packages/karere { })
   ];
 
-  programs.ghostty = {
+  programs.ghostty = lib.mkIf (role != "server") {
     enable = true;
     enableFishIntegration = true;
     settings = {

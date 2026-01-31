@@ -126,6 +126,7 @@ let
 
     hostMetadata = import (hostsDir + "/${hostname}/metadata.nix");
     roleModule = import (rolesDir + "/${hostMetadata.role}.nix");
+    role = hostMetadata.role;
 
     allFeatureFiles = getFileMetadata featuresDir;
     allFeatureModules = map (meta: import meta.path) allFeatureFiles;
@@ -237,7 +238,7 @@ let
   in
   pkgs-unstable.lib.nixosSystem {
     inherit system;
-    specialArgs = { inherit inputs hostname; };
+    specialArgs = { inherit inputs hostname role; };
     modules = [
       # Base Nixpkgs config
       { nixpkgs = { inherit overlays; config.allowUnfree = true; }; }
@@ -253,7 +254,7 @@ let
         home-manager = {
           useGlobalPkgs = true;
           useUserPackages = true;
-          extraSpecialArgs = { inherit inputs hostname; };
+          extraSpecialArgs = { inherit inputs hostname role; };
           users = homeManagerUsers;
         };
       }
