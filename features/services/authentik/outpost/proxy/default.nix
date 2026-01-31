@@ -20,6 +20,13 @@ in
       AUTHENTIK_TOKEN=${config.sops.placeholder."authentik_token"}
     '';
 
+    # Create system user and group for the service
+    users.users.authentik-outpost = {
+      isSystemUser = true;
+      group = "authentik-outpost";
+    };
+    users.groups.authentik-outpost = {};
+
     # 3. Systemd Service Definition
     systemd.services.authentik-outpost-proxy = {
       description = "Authentik Proxy Outpost";
@@ -43,14 +50,24 @@ in
             "AUTHENTIK_METRICS_ADDRESS=127.0.0.1:9300"
         ];
         
-        Restart = "always";
+                Restart = "always";
         
-        # Security: Run as dynamic user
-        DynamicUser = true;
-        User = "authentik-outpost";
-        Group = "authentik-outpost";
-        StateDirectory = "authentik-outpost-proxy"; 
-      };
-    };
-  };
-}
+                
+        
+                # Security: Run as dedicated user
+        
+                User = "authentik-outpost";
+        
+                Group = "authentik-outpost";
+        
+                StateDirectory = "authentik-outpost-proxy"; 
+        
+              };
+        
+            };
+        
+          };
+        
+        }
+        
+        
