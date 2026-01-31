@@ -15,6 +15,8 @@ in
         "radio_browser"
         "mobile_app"
         "zha" # Zigbee Home Automation
+        "cast" # Google Cast / Chromecast
+        "ipp" # Internet Printing Protocol (Printers)
       ];
       config = {
         # This generates the configuration.yaml
@@ -33,6 +35,17 @@ in
     # Allow Home Assistant to access Zigbee USB sticks
     users.users.hass = {
       extraGroups = [ "dialout" "tty" ];
+    };
+
+    # mDNS for device discovery (Cast, IPP, ESPHome)
+    services.avahi = {
+      enable = true;
+      nssmdns4 = true;
+      publish = {
+        enable = true;
+        addresses = true;
+        userServices = true;
+      };
     };
   };
 }
