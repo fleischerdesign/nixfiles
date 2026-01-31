@@ -1,13 +1,13 @@
 { config, lib, pkgs, ... }:
 let
-  cfg = config.my.features.services.authentik.proxy;
+  cfg = config.my.features.services.authentik.outpost.proxy;
 in
 {
-  options.my.features.services.authentik.proxy.enable = lib.mkEnableOption "Authentik Proxy Outpost";
+  options.my.features.services.authentik.outpost.proxy.enable = lib.mkEnableOption "Authentik Proxy Outpost";
 
   config = lib.mkIf cfg.enable {
     # Specify the secrets file
-    sops.defaultSopsFile = ../../../../secrets/secrets.yaml;
+    sops.defaultSopsFile = ../../../../../secrets/secrets.yaml;
 
     # Define the secret for the outpost
     sops.secrets."authentik_token" = {

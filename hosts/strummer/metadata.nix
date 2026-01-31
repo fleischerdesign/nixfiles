@@ -7,6 +7,6 @@
     services.home-assistant.enable = true;
     services.esphome.enable = true;
     services.caddy.enable = true;
-    services.authentik.proxy.enable = true;
+    services.authentik.outpost.proxy.enable = true;
   };
 }
