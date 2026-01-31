@@ -1,0 +1,12 @@
+# .sops.yaml
+keys:
+  - &philipp age1t2z30qm3c9x7n75nwsra7l97609fkmvz7wjqlsz9ahwsz4a50cwsvjly7j
+  - &strummer age15vu7hfhm9ccprhrae3y59gx5dpx7k09ngt6zqynehjrlkhegzpsqk3ltth
+
+creation_rules:
+  - path_regex: secrets/.*\.yaml$
+    key_groups:
+      - pgp: []
+        age:
+          - *philipp
+          - *strummer

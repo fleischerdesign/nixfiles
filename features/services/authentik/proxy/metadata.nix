@@ -1,0 +1,3 @@
+{
+  description = "Authentik Proxy Outpost";
+}

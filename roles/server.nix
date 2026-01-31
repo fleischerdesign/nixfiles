@@ -22,4 +22,6 @@
       PasswordAuthentication = false;
     };
   };
+
+  sops.age.keyFile = "/etc/ssh/ssh_host_ed25519_key";
 }

@@ -242,6 +242,7 @@ let
     modules = [
       # Base Nixpkgs config
       { nixpkgs = { inherit overlays; config.allowUnfree = true; }; }
+      inputs.sops-nix.nixosModules.sops
     ]
     ++ extraModules
     ++ [ roleModule ] # roleModule must be present to define config.my.features defaults
