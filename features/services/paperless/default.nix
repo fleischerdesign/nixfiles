@@ -46,6 +46,7 @@ in
         PAPERLESS_USE_X_FORWARDED_HOST = "true";
         PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
         FORWARDED_ALLOW_IPS = "*";
+        PAPERLESS_DEBUG = "true";
         
         # Fix SSL/Connectivity in Sandbox
         SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
@@ -67,17 +68,31 @@ in
       ];
     };
 
-    # Relax Sandbox for Debugging (web) and basic connectivity (others)
+    # Radically relax sandbox for debugging
     systemd.services.paperless-web.serviceConfig = {
       RestrictAddressFamilies = lib.mkForce [ ];
       SystemCallFilter = lib.mkForce [ ];
       PrivateUsers = lib.mkForce false;
       RestrictNamespaces = lib.mkForce false;
+      PrivateDevices = lib.mkForce false;
+      PrivateMounts = lib.mkForce false;
+      PrivateTmp = lib.mkForce false;
+      ProtectSystem = lib.mkForce "none";
+      ProtectHome = lib.mkForce false;
+      ProtectHostname = lib.mkForce false;
+      ProtectKernelLogs = lib.mkForce false;
+      ProtectKernelModules = lib.mkForce false;
+      ProtectKernelTunables = lib.mkForce false;
+      ProtectControlGroups = lib.mkForce false;
+      RestrictRealtime = lib.mkForce false;
+      LockPersonality = lib.mkForce false;
+      MemoryDenyWriteExecute = lib.mkForce false;
     };
 
-    systemd.services.paperless-consumer.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
-    systemd.services.paperless-task-queue.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
-    systemd.services.paperless-scheduler.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+    # Mirror relaxation to other components that share namespaces or are linked
+    systemd.services.paperless-consumer.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
+    systemd.services.paperless-task-queue.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
+    systemd.services.paperless-scheduler.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
 
     # Inject the complex OIDC config via EnvironmentFile to all Paperless services
     systemd.services.paperless-web.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
