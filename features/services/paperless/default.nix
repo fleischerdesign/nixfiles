@@ -46,6 +46,8 @@ in
         PAPERLESS_USE_X_FORWARDED_HOST = "true";
         PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
         FORWARDED_ALLOW_IPS = "*";
+        PAPERLESS_DEBUG = "true";
+        PAPERLESS_OIDC_TIMEOUT = "30";
         
         # Fix SSL/Connectivity in Sandbox
         SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
@@ -67,30 +69,46 @@ in
       ];
     };
 
-    # Fix Networking and Systemd structure
+    # Radically relax sandbox for debugging
     systemd.services = 
       let
-        netConfig = {
+        debugConfig = {
           PrivateNetwork = lib.mkForce false;
-          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+          RestrictAddressFamilies = lib.mkForce [ ];
+          SystemCallFilter = lib.mkForce [ ];
+          PrivateUsers = lib.mkForce false;
+          RestrictNamespaces = lib.mkForce false;
+          PrivateDevices = lib.mkForce false;
+          PrivateMounts = lib.mkForce false;
+          PrivateTmp = lib.mkForce false;
+          ProtectSystem = lib.mkForce "none";
+          ProtectHome = lib.mkForce false;
+          ProtectHostname = lib.mkForce false;
+          ProtectKernelLogs = lib.mkForce false;
+          ProtectKernelModules = lib.mkForce false;
+          ProtectKernelTunables = lib.mkForce false;
+          ProtectControlGroups = lib.mkForce false;
+          RestrictRealtime = lib.mkForce false;
+          LockPersonality = lib.mkForce false;
+          MemoryDenyWriteExecute = lib.mkForce false;
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
       {
         paperless-web = {
-          serviceConfig = netConfig;
+          serviceConfig = debugConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce "";
         };
         paperless-consumer = {
-          serviceConfig = netConfig;
+          serviceConfig = debugConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce "";
         };
         paperless-task-queue = {
-          serviceConfig = netConfig;
+          serviceConfig = debugConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce "";
         };
         paperless-scheduler = {
-          serviceConfig = netConfig;
+          serviceConfig = debugConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce "";
         };
       };
