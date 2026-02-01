@@ -42,6 +42,13 @@ in
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
         
+        # Network / Proxy Configuration
+        PAPERLESS_USE_X_FORWARDED_HOST = "true";
+        PAPERLESS_PROXY_SSL_HEADER = "['HTTP_X_FORWARDED_PROTO', 'https']";
+        # Fix SSL/Connectivity in Sandbox
+        SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+        REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
       };
