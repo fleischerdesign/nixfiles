@@ -48,10 +48,6 @@
 
   my.features.services.cloudflare-dyndns.domains = [ "ancoris.ovh" ];
 
-  networking.extraHosts = ''
-    37.114.55.91 auth.ancoris.ovh
-  '';
-
   # State version setting
   system.stateVersion = "24.11"; 
 
