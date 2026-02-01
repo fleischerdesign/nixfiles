@@ -13,6 +13,14 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Ensure media group exists
+    users.groups.media = { };
+
+    # Explicitly define user to avoid SOPS evaluation issues
+    users.users.prowlarr = {
+      extraGroups = [ "media" ];
+    };
+
     # SOPS Secret for API Key
     sops.secrets.prowlarr_api_key = { owner = "prowlarr"; };
     sops.templates."prowlarr.env" = {
