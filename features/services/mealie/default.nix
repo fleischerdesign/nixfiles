@@ -21,9 +21,9 @@ in
     # 2. Create a template file that combines them into ENV format
     sops.templates."mealie.env" = {
       content = ''
-        SMTP_PASSWORD=${config.sops.secrets.mealie_smtp_password.placeholder}
-        OIDC_CLIENT_SECRET=${config.sops.secrets.mealie_oidc_secret.placeholder}
-        OPENAI_API_KEY=${config.sops.secrets.mealie_openai_key.placeholder}
+        SMTP_PASSWORD=${config.sops.placeholder.mealie_smtp_password}
+        OIDC_CLIENT_SECRET=${config.sops.placeholder.mealie_oidc_secret}
+        OPENAI_API_KEY=${config.sops.placeholder.mealie_openai_key}
       '';
     };
 
