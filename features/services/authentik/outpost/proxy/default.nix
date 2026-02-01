@@ -8,7 +8,7 @@ in
   config = lib.mkIf cfg.enable {
     # 1. Secrets Setup
     sops.defaultSopsFile = ../../../../../secrets/secrets.yaml;
-    sops.secrets."authentik_token" = {
+    sops.secrets."authentik_outpost_proxy_token" = {
       owner = "authentik-outpost";
       # Restart service when secret changes
       restartUnits = [ "authentik-outpost-proxy.service" ];
@@ -17,7 +17,7 @@ in
     # 2. Template to format the token as Environment Variable
     # Creates a file with: AUTHENTIK_TOKEN=value
     sops.templates."authentik-outpost.env".content = ''
-      AUTHENTIK_TOKEN=${config.sops.placeholder."authentik_token"}
+      AUTHENTIK_TOKEN=${config.sops.placeholder."authentik_outpost_proxy_token"}
     '';
 
     # Create system user and group for the service

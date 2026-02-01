@@ -8,5 +8,6 @@
     services.esphome.enable = true;
     services.caddy.enable = true;
     services.authentik.outpost.proxy.enable = true;
+    services.authentik.outpost.ldap.enable = true;
   };
 }
