@@ -46,8 +46,6 @@ in
         PAPERLESS_USE_X_FORWARDED_HOST = "true";
         PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
         FORWARDED_ALLOW_IPS = "*";
-        PAPERLESS_DEBUG = "true";
-        PAPERLESS_OIDC_TIMEOUT = "30";
         
         # Fix SSL/Connectivity in Sandbox
         SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
@@ -69,36 +67,21 @@ in
       ];
     };
 
-    # Radically relax sandbox for debugging AND fix the PrivateNetwork namespace issue
+    # Fix Networking by breaking Namespace joins and forcing PrivateNetwork=false
     systemd.services = 
       let
-        debugOptions = {
-          PrivateNetwork = lib.mkForce false; # CRITICAL FIX: Webserver shares namespace with isolated components
-          RestrictAddressFamilies = lib.mkForce [ ];
-          SystemCallFilter = lib.mkForce [ ];
-          PrivateUsers = lib.mkForce false;
-          RestrictNamespaces = lib.mkForce false;
-          PrivateDevices = lib.mkForce false;
-          PrivateMounts = lib.mkForce false;
-          PrivateTmp = lib.mkForce false;
-          ProtectSystem = lib.mkForce "none";
-          ProtectHome = lib.mkForce false;
-          ProtectHostname = lib.mkForce false;
-          ProtectKernelLogs = lib.mkForce false;
-          ProtectKernelModules = lib.mkForce false;
-          ProtectKernelTunables = lib.mkForce false;
-          ProtectControlGroups = lib.mkForce false;
-          RestrictRealtime = lib.mkForce false;
-          LockPersonality = lib.mkForce false;
-          MemoryDenyWriteExecute = lib.mkForce false;
+        netConfig = {
+          PrivateNetwork = lib.mkForce false;
+          JoinsNamespaceOf = lib.mkForce ""; # Don't share namespace with restricted services
+          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
       {
-        paperless-web.serviceConfig = debugOptions;
-        paperless-consumer.serviceConfig = debugOptions;
-        paperless-task-queue.serviceConfig = debugOptions;
-        paperless-scheduler.serviceConfig = debugOptions;
+        paperless-web.serviceConfig = netConfig;
+        paperless-consumer.serviceConfig = netConfig;
+        paperless-task-queue.serviceConfig = netConfig;
+        paperless-scheduler.serviceConfig = netConfig;
       };
 
     # Scanner Service (OCI Container)
