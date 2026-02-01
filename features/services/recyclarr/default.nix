@@ -21,21 +21,19 @@ in
       '';
     };
 
-    # 3. Recyclarr Service Configuration - Fixed Object Structure
+    # 3. Recyclarr Service Configuration - Renaming instances to avoid "Duplicate Instances" error
     services.recyclarr = {
       enable = true;
       schedule = "daily";
       
       configuration = {
-        # Radarr Configuration (Movies)
-        radarr.main = {
+        # Radarr Instance
+        radarr.radarr-instance = {
           base_url = "http://localhost:7878";
           api_key = "!env_var RADARR_API_KEY";
           
-          # Fix: quality_definition must be an object with a 'type' property
           quality_definition.type = "movie";
 
-          # Prioritize German audio using TRaSH IDs
           custom_formats = [
             {
               trash_ids = [ "86bc3115eb4e9873ac96904a4a68e19e" ]; # German (Language Profile)
@@ -46,15 +44,13 @@ in
           ];
         };
 
-        # Sonarr Configuration (TV Shows)
-        sonarr.main = {
+        # Sonarr Instance
+        sonarr.sonarr-instance = {
           base_url = "http://localhost:8989";
           api_key = "!env_var SONARR_API_KEY";
 
-          # Fix: quality_definition must be an object with a 'type' property
           quality_definition.type = "series";
 
-          # Prioritize German audio using TRaSH IDs
           custom_formats = [
             {
               trash_ids = [ "8a9fcdbb445f2add0505926df3bb7b8a" ]; # German (Language Profile)
