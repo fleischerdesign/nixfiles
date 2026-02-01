@@ -8,11 +8,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # 1. SOPS secrets for API keys (must be owned by recyclarr)
-    sops.secrets.radarr_api_key = { owner = "recyclarr"; };
-    sops.secrets.sonarr_api_key = { owner = "recyclarr"; };
+    # 1. SOPS secrets for API keys
+    # We don't set an owner here to avoid conflicts with the actual services (radarr/sonarr).
+    # The template below will still be able to use the values via placeholders.
+    sops.secrets.radarr_api_key = { };
+    sops.secrets.sonarr_api_key = { };
 
-    # 2. Create environment file for Recyclarr to use the secrets
+    # 2. Create environment file for Recyclarr
     sops.templates."recyclarr.env" = {
       owner = "recyclarr";
       content = ''
