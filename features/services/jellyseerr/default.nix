@@ -20,7 +20,6 @@ let
     nativeBuildInputs = [ pkgs.undocker pkgs.makeWrapper ];
 
     unpackPhase = ''
-      mkdir rootfs
       undocker $src rootfs
     '';
 
