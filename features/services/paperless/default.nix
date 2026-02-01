@@ -47,7 +47,6 @@ in
         PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
         FORWARDED_ALLOW_IPS = "*";
         PAPERLESS_DEBUG = "true";
-        PAPERLESS_OIDC_TIMEOUT = "30";
         
         # Fix SSL/Connectivity in Sandbox
         SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
@@ -81,7 +80,7 @@ in
           PrivateDevices = lib.mkForce false;
           PrivateMounts = lib.mkForce false;
           PrivateTmp = lib.mkForce false;
-          ProtectSystem = lib.mkForce "none";
+          ProtectSystem = lib.mkForce false;
           ProtectHome = lib.mkForce false;
           ProtectHostname = lib.mkForce false;
           ProtectKernelLogs = lib.mkForce false;
@@ -95,22 +94,10 @@ in
         };
       in
       {
-        paperless-web = {
-          serviceConfig = debugConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
-        paperless-consumer = {
-          serviceConfig = debugConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
-        paperless-task-queue = {
-          serviceConfig = debugConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
-        paperless-scheduler = {
-          serviceConfig = debugConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
+        paperless-web.serviceConfig = debugConfig;
+        paperless-consumer.serviceConfig = debugConfig;
+        paperless-task-queue.serviceConfig = debugConfig;
+        paperless-scheduler.serviceConfig = debugConfig;
       };
 
     # Scanner Service (OCI Container)
