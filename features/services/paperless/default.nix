@@ -28,6 +28,7 @@ in
                 secret = config.sops.placeholder.paperless_oidc_secret;
                 settings = {
                   server_url = "https://auth.ancoris.ovh/application/o/paperless/.well-known/openid-configuration";
+                  timeout = 30;
                 };
               }
             ];
@@ -35,7 +36,7 @@ in
           };
         }}
         PAPERLESS_USE_X_FORWARD_HOST=true
-        PAPERLESS_USE_X_FORWARDED_PORT=true
+        PAPERLESS_USE_X_FORWARD_PORT=true
         PAPERLESS_FORWARDED_ALLOW_IPS=*
         PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
       '';
@@ -78,12 +79,12 @@ in
       ];
     };
 
-    # Radically relax sandbox for ALL components
+    # Relax sandbox for ALL components to debug connectivity
     systemd.services = 
       let
         debugConfig = {
           PrivateNetwork = lib.mkForce false;
-          RestrictAddressFamilies = lib.mkForce [ ];
+          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
           SystemCallFilter = lib.mkForce [ ];
           PrivateUsers = lib.mkForce false;
           RestrictNamespaces = lib.mkForce false;
