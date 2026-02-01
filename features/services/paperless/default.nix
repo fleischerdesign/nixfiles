@@ -47,6 +47,7 @@ in
         PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
         FORWARDED_ALLOW_IPS = "*";
         PAPERLESS_DEBUG = "true";
+        PAPERLESS_OIDC_TIMEOUT = "30";
         
         # Fix SSL/Connectivity in Sandbox
         SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
