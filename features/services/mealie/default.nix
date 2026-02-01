@@ -25,7 +25,6 @@ in
         OIDC_CLIENT_SECRET=${config.sops.secrets.mealie_oidc_secret.placeholder}
         OPENAI_API_KEY=${config.sops.secrets.mealie_openai_key.placeholder}
       '';
-      owner = "mealie";
     };
 
     services.mealie = {
