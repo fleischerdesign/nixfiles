@@ -16,6 +16,7 @@ in
     sops.secrets.paperless_oidc_secret = { };
 
     # 2. Template for the complex JSON Auth variable
+    # We provide explicit endpoints to bypass the discovery (.well-known) timeout issues.
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -27,7 +28,11 @@ in
                 client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
                 secret = config.sops.placeholder.paperless_oidc_secret;
                 settings = {
-                  server_url = "https://auth.ancoris.ovh/application/o/paperless/.well-known/openid-configuration";
+                  server_url = "https://auth.ancoris.ovh/application/o/paperless/";
+                  authorization_url = "https://auth.ancoris.ovh/application/o/authorize/";
+                  token_url = "https://auth.ancoris.ovh/application/o/token/";
+                  userinfo_url = "https://auth.ancoris.ovh/application/o/userinfo/";
+                  jwks_url = "https://auth.ancoris.ovh/application/o/paperless/jwks/";
                 };
               }
             ];
@@ -35,7 +40,7 @@ in
           };
         }}
         PAPERLESS_USE_X_FORWARD_HOST=true
-        PAPERLESS_USE_X_FORWARDED_PORT=true
+        PAPERLESS_USE_X_FORWARD_PORT=true
         PAPERLESS_FORWARDED_ALLOW_IPS=*
         PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
       '';
@@ -78,12 +83,11 @@ in
       ];
     };
 
-    # Systemd services configuration
+    # Systemd services configuration - Open network access for all components
     systemd.services = 
       let
         debugConfig = {
           PrivateNetwork = lib.mkForce false;
-          # Force IPv4 only to avoid the 5s IPv6 timeout hang in the sandbox
           RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_NETLINK" ];
           SystemCallFilter = lib.mkForce [ ];
           PrivateUsers = lib.mkForce false;
