@@ -36,7 +36,7 @@ in
       ensureUsers = [
         {
           name = "radarr";
-          ensureDBOwnership = true;
+          ensureDBOwnership = false;
           # Superuser is often needed by *arr apps for initial schema migrations/extensions
           ensureClauses.superuser = true;
         }
