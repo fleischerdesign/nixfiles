@@ -15,8 +15,7 @@ in
     # 1. SOPS Secret for OIDC
     sops.secrets.paperless_oidc_secret = { };
 
-    # 2. Template for the complex JSON Auth variable
-    # REMOVED server_url to completely bypass OIDC discovery and its connection timeouts.
+    # 2. Template for the complex JSON Auth variable - NO trailing slash in server_url
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -28,10 +27,7 @@ in
                 client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
                 secret = config.sops.placeholder.paperless_oidc_secret;
                 settings = {
-                  authorization_url = "https://auth.ancoris.ovh/application/o/authorize/";
-                  token_url = "https://auth.ancoris.ovh/application/o/token/";
-                  userinfo_url = "https://auth.ancoris.ovh/application/o/userinfo/";
-                  jwks_url = "https://auth.ancoris.ovh/application/o/paperless/jwks/";
+                  server_url = "https://auth.ancoris.ovh/application/o/paperless";
                 };
               }
             ];
@@ -39,7 +35,7 @@ in
           };
         }}
         PAPERLESS_USE_X_FORWARD_HOST=true
-        PAPERLESS_USE_X_FORWARD_PORT=true
+        PAPERLESS_USE_X_FORWARDED_PORT=true
         PAPERLESS_FORWARDED_ALLOW_IPS=*
         PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
       '';
@@ -82,36 +78,43 @@ in
       ];
     };
 
-    # Systemd services configuration - Explicitly breaking namespace coupling to fix network isolation
+    # Systemd services configuration - Consolidated and hardened-off for discovery
     systemd.services = 
       let
-        netConfig = {
+        debugConfig = {
           PrivateNetwork = lib.mkForce false;
-          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
+          RestrictAddressFamilies = lib.mkForce [ ]; 
+          SystemCallFilter = lib.mkForce [ ];
+          PrivateUsers = lib.mkForce false;
+          RestrictNamespaces = lib.mkForce false;
+          PrivateDevices = lib.mkForce false;
+          PrivateMounts = lib.mkForce false;
+          PrivateTmp = lib.mkForce false;
+          ProtectSystem = lib.mkForce false;
+          ProtectHome = lib.mkForce false;
+          ProtectHostname = lib.mkForce false;
+          ProtectKernelLogs = lib.mkForce false;
+          ProtectKernelModules = lib.mkForce false;
+          ProtectKernelTunables = lib.mkForce false;
+          ProtectControlGroups = lib.mkForce false;
+          RestrictRealtime = lib.mkForce false;
+          LockPersonality = lib.mkForce false;
+          MemoryDenyWriteExecute = lib.mkForce false;
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
       {
         paperless-web = {
-          serviceConfig = netConfig;
+          serviceConfig = debugConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce ""; 
           environment = {
             SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
             REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
           };
         };
-        paperless-consumer = {
-          serviceConfig = netConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
-        paperless-task-queue = {
-          serviceConfig = netConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
-        paperless-scheduler = {
-          serviceConfig = netConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
+        paperless-consumer.serviceConfig = debugConfig;
+        paperless-task-queue.serviceConfig = debugConfig;
+        paperless-scheduler.serviceConfig = debugConfig;
       };
 
     # Scanner Service (OCI Container)
