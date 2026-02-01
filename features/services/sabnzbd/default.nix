@@ -54,10 +54,10 @@ in
           displayname = "Newsgroup Ninja";
           host = "news.newsgroup.ninja";
           port = 563;
-          ssl = 1;
+          ssl = true;
           connections = 50;
           username = "Butchey";
-          enable = 1;
+          enable = true;
         };
       };
     };
