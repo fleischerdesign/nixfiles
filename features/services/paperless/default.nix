@@ -80,6 +80,7 @@ in
     };
 
     # Restore Hardening but keep the Breakthrough Network Fixes
+    # Consolidating all systemd service tweaks into one block to avoid duplicate definitions
     systemd.services = 
       let
         netConfig = {
@@ -89,17 +90,17 @@ in
         };
       in
       {
-        paperless-web.serviceConfig = netConfig;
+        paperless-web = {
+          serviceConfig = netConfig;
+          environment = {
+            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+          };
+        };
         paperless-consumer.serviceConfig = netConfig;
         paperless-task-queue.serviceConfig = netConfig;
         paperless-scheduler.serviceConfig = netConfig;
       };
-
-    # Provide SSL certs to the web process environment (essential for OIDC)
-    systemd.services.paperless-web.environment = {
-      SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-      REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-    };
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
