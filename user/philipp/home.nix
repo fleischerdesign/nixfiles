@@ -51,6 +51,9 @@
       shellAliases = {
         c = "codium";
       };
+      interactiveShellInit = ''
+        set -gx SOPS_AGE_KEY_FILE /home/philipp/.config/sops/age/keys.txt
+      '';
     };
 
     home-manager.enable = true;
