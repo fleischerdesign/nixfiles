@@ -15,6 +15,12 @@ in
   config = lib.mkIf cfg.enable {
     services.prowlarr = {
       enable = true;
+      settings = {
+        auth = {
+          # Disable internal authentication as we use Authentik Forward Auth
+          authenticationmethod = "External";
+        };
+      };
     };
 
     # Register with Caddy Feature
