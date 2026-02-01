@@ -40,8 +40,8 @@ in
         misc = {
           port = 8080;
           host = "0.0.0.0";
-          # FIX: Allow access via proxy and localhost
-          host_whitelist = [ domain "localhost" "127.0.0.1" ];
+          # FIX: Allow access via proxy and localhost (String, not list!)
+          host_whitelist = "${domain}, localhost, 127.0.0.1";
           # FIX: 2 = Allow access from any IP (needed when behind Caddy)
           inet_exposure = 2; 
           
