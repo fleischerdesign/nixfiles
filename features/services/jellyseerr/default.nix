@@ -5,9 +5,9 @@ let
   # 1. Pull the Docker image with the OIDC PR
   jellyseerr-image = pkgs.dockerTools.pullImage {
     imageName = "fallenbagel/jellyseerr";
-    imageTag = "preview-OIDC";
     imageDigest = "sha256:9f3195998306da6548fc3b2420d114dda64a6e904f41e911168788fb410a7972";
     sha256 = "sha256-6Indg47u6rhCPvYBTRU3UXFug0D+NmGnZLiyv+jPL4A=";
+    finalImageTag = "preview-OIDC";
   };
 
   # 2. Export the image to a flat tarball of the rootfs
