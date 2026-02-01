@@ -39,6 +39,11 @@
     auth = true;
   };
 
+  my.features.services.mealie.expose = {
+    enable = true;
+    auth = true;
+  };
+
   # State version setting
   system.stateVersion = "24.11"; 
 
