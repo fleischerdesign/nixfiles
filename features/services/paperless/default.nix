@@ -18,10 +18,11 @@ in
     # 2. Template for the complex JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
-        PAPERLESS_SOCIALACCOUNT_PROVIDERS={"openid_connect":{"APPS":[{"provider_id":"authentik","name":"Authentik","client_id":"INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2","secret":"${config.sops.placeholder.paperless_oidc_secret}","settings":{"server_url":"https://auth.ancoris.ovh/application/o/paperless/.well-known/openid-configuration"}}],"OAUTH_PKCE_ENABLED":"True"}}
-        PAPERLESS_USE_X_FORWARDED_HOST=true
+        PAPERLESS_SOCIALACCOUNT_PROVIDERS={"openid_connect":{"APPS":[{"provider_id":"authentik","name":"Authentik","client_id":"INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2","secret":"${config.sops.placeholder.paperless_oidc_secret}","settings":{"server_url":"https://auth.ancoris.ovh/application/o/paperless/.well-known/openid-configuration"}}]}"}
+        PAPERLESS_USE_X_FORWARD_HOST=true
         PAPERLESS_USE_X_FORWARDED_PORT=true
         PAPERLESS_FORWARDED_ALLOW_IPS=*
+        PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
       '';
     };
 
@@ -47,6 +48,7 @@ in
         
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
+        PAPERLESS_DEBUG = "true";
       };
     };
 
@@ -61,22 +63,37 @@ in
       ];
     };
 
-    # Systemd Overrides (One-by-one to avoid conflicts)
-    systemd.services.paperless-web.serviceConfig.PrivateNetwork = lib.mkForce false;
-    systemd.services.paperless-web.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
-    systemd.services.paperless-web.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-
-    systemd.services.paperless-consumer.serviceConfig.PrivateNetwork = lib.mkForce false;
-    systemd.services.paperless-consumer.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
-    systemd.services.paperless-consumer.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-
-    systemd.services.paperless-task-queue.serviceConfig.PrivateNetwork = lib.mkForce false;
-    systemd.services.paperless-task-queue.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
-    systemd.services.paperless-task-queue.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-
-    systemd.services.paperless-scheduler.serviceConfig.PrivateNetwork = lib.mkForce false;
-    systemd.services.paperless-scheduler.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
-    systemd.services.paperless-scheduler.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
+    # Radically relax sandbox for debugging
+    systemd.services = 
+      let
+        debugConfig = {
+          PrivateNetwork = lib.mkForce false;
+          RestrictAddressFamilies = lib.mkForce [ ];
+          SystemCallFilter = lib.mkForce [ ];
+          PrivateUsers = lib.mkForce false;
+          RestrictNamespaces = lib.mkForce false;
+          PrivateDevices = lib.mkForce false;
+          PrivateMounts = lib.mkForce false;
+          PrivateTmp = lib.mkForce false;
+          ProtectSystem = lib.mkForce false;
+          ProtectHome = lib.mkForce false;
+          ProtectHostname = lib.mkForce false;
+          ProtectKernelLogs = lib.mkForce false;
+          ProtectKernelModules = lib.mkForce false;
+          ProtectKernelTunables = lib.mkForce false;
+          ProtectControlGroups = lib.mkForce false;
+          RestrictRealtime = lib.mkForce false;
+          LockPersonality = lib.mkForce false;
+          MemoryDenyWriteExecute = lib.mkForce false;
+          EnvironmentFile = config.sops.templates."paperless.env".path;
+        };
+      in
+      {
+        paperless-web.serviceConfig = debugConfig;
+        paperless-consumer.serviceConfig = debugConfig;
+        paperless-task-queue.serviceConfig = debugConfig;
+        paperless-scheduler.serviceConfig = debugConfig;
+      };
 
     # Provide SSL certs to the web process environment
     systemd.services.paperless-web.environment = {
