@@ -2,7 +2,7 @@
 let
   cfg = config.my.features.services.jellyseerr;
 
-  # 1. Pull the Docker image (produces a .tar file)
+  # 1. Pull the Docker image with the OIDC PR
   jellyseerr-image = pkgs.dockerTools.pullImage {
     imageName = "fallenbagel/jellyseerr";
     imageDigest = "sha256:9f3195998306da6548fc3b2420d114dda64a6e904f41e911168788fb410a7972";
@@ -10,26 +10,33 @@ let
     finalImageTag = "preview-OIDC";
   };
 
-  # 2. Extract the app using 'undocker' instead of 'exportImage' (avoids VM disk space issues)
+  # 2. Export the image to a flat tarball (with enough disk space in the build VM)
+  jellyseerr-rootfs = pkgs.dockerTools.exportImage {
+    fromImage = jellyseerr-image;
+    diskSize = 2048; # 2 GB to accommodate the large image
+  };
+
+  # 3. Extract the app from the rootfs and wrap it
   jellyseerr-oidc = pkgs.stdenv.mkDerivation {
     pname = "jellyseerr-oidc";
     version = "preview-OIDC";
 
-    src = jellyseerr-image;
+    src = jellyseerr-rootfs;
 
-    nativeBuildInputs = [ pkgs.undocker pkgs.makeWrapper ];
+    nativeBuildInputs = [ pkgs.makeWrapper pkgs.gnutar pkgs.gzip ];
 
+    # The exportImage produced a tar, we need to unpack it
     unpackPhase = ''
-      undocker $src rootfs
+      mkdir rootfs
+      tar -xf $src -C rootfs
     '';
 
     installPhase = ''
       mkdir -p $out/share/jellyseerr
-      # Copy the /app directory from the extracted rootfs (using . to include hidden files)
+      # Copy the /app directory from the image rootfs
       if [ -d rootfs/app ]; then
         cp -r rootfs/app/. $out/share/jellyseerr/
       else
-        # Fallback in case the structure is slightly different
         cp -r rootfs/. $out/share/jellyseerr/
       fi
 
