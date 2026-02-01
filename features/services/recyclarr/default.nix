@@ -32,10 +32,10 @@ in
           base_url = "http://localhost:7878";
           api_key = "!env_var RADARR_API_KEY";
           
-          # Prioritize German audio using TRaSH ID
+          # Prioritize German audio using your server's TRaSH ID
           custom_formats = [
             {
-              trash_ids = [ "9b6a2b695ca61047fa3930f85524eb27" ]; # German
+              trash_ids = [ "86bc3115eb4e9873ac96904a4a68e19e" ]; # German (Language Profile)
               assign_scores_to = [
                 { name = "HD - 1080p"; score = 100; }
               ];
@@ -43,8 +43,7 @@ in
           ];
 
           include = [
-            { template = "radarr-quality-definition-movie"; }
-            { template = "radarr-custom-formats-movie"; }
+            { template = "hd-bluray-web"; }
           ];
         };
 
@@ -53,10 +52,10 @@ in
           base_url = "http://localhost:8989";
           api_key = "!env_var SONARR_API_KEY";
 
-          # Prioritize German audio using TRaSH ID
+          # Prioritize German audio using your server's TRaSH ID
           custom_formats = [
             {
-              trash_ids = [ "5893f30ca06ed66df00be0bd00efcf95" ]; # German
+              trash_ids = [ "8a9fcdbb445f2add0505926df3bb7b8a" ]; # German (Language Profile)
               assign_scores_to = [
                 { name = "HD - 1080p"; score = 100; }
               ];
@@ -64,8 +63,7 @@ in
           ];
 
           include = [
-            { template = "sonarr-quality-definition-series"; }
-            { template = "sonarr-custom-formats-series"; }
+            { template = "web-1080p-v4"; }
           ];
         };
       };
@@ -74,7 +72,7 @@ in
     # Inject environment variables into the systemd service
     systemd.services.recyclarr.serviceConfig.EnvironmentFile = config.sops.templates."recyclarr.env".path;
 
-    # Explicitly define user and group to avoid evaluation issues
+    # Explicitly define user and group
     users.users.recyclarr = {
       isSystemUser = true;
       group = "recyclarr";
