@@ -78,7 +78,7 @@ in
       ];
     };
 
-    # Radically relax sandbox AND force IPv4 (by removing AF_INET6)
+    # Systemd services configuration
     systemd.services = 
       let
         debugConfig = {
@@ -105,17 +105,17 @@ in
         };
       in
       {
-        paperless-web.serviceConfig = debugConfig;
+        paperless-web = {
+          serviceConfig = debugConfig;
+          environment = {
+            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+          };
+        };
         paperless-consumer.serviceConfig = debugConfig;
         paperless-task-queue.serviceConfig = debugConfig;
         paperless-scheduler.serviceConfig = debugConfig;
       };
-
-    # Provide SSL certs to the web process environment
-    systemd.services.paperless-web.environment = {
-      SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-      REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-    };
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
