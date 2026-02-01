@@ -12,6 +12,7 @@ in
     sops.secrets.radarr_api_key = { };
     sops.secrets.sonarr_api_key = { };
 
+    # 2. Create environment file for Recyclarr
     sops.templates."recyclarr.env" = {
       owner = "recyclarr";
       content = ''
@@ -20,19 +21,19 @@ in
       '';
     };
 
-    # 3. Recyclarr Service Configuration - Direct properties instead of broken templates
+    # 3. Recyclarr Service Configuration - Fixed Object Structure
     services.recyclarr = {
       enable = true;
       schedule = "daily";
       
       configuration = {
-        # Radarr Configuration
+        # Radarr Configuration (Movies)
         radarr.main = {
           base_url = "http://localhost:7878";
           api_key = "!env_var RADARR_API_KEY";
           
-          # Use TRaSH Quality Definition for Movies
-          quality_definition = "movie";
+          # Fix: quality_definition must be an object with a 'type' property
+          quality_definition.type = "movie";
 
           # Prioritize German audio using TRaSH IDs
           custom_formats = [
@@ -45,13 +46,13 @@ in
           ];
         };
 
-        # Sonarr Configuration
+        # Sonarr Configuration (TV Shows)
         sonarr.main = {
           base_url = "http://localhost:8989";
           api_key = "!env_var SONARR_API_KEY";
 
-          # Use TRaSH Quality Definition for Series
-          quality_definition = "series";
+          # Fix: quality_definition must be an object with a 'type' property
+          quality_definition.type = "series";
 
           # Prioritize German audio using TRaSH IDs
           custom_formats = [
@@ -66,8 +67,10 @@ in
       };
     };
 
+    # Inject environment variables into the systemd service
     systemd.services.recyclarr.serviceConfig.EnvironmentFile = config.sops.templates."recyclarr.env".path;
 
+    # Explicitly define user and group
     users.users.recyclarr = {
       isSystemUser = true;
       group = "recyclarr";
