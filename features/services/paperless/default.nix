@@ -15,7 +15,7 @@ in
     # 1. SOPS Secret for OIDC
     sops.secrets.paperless_oidc_secret = { };
 
-    # 2. Template for the sensitive JSON Auth variable
+    # 2. Template for the complex JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -34,6 +34,10 @@ in
             OAUTH_PKCE_ENABLED = "True";
           };
         }}
+        PAPERLESS_USE_X_FORWARD_HOST=true
+        PAPERLESS_USE_X_FORWARDED_PORT=true
+        PAPERLESS_FORWARDED_ALLOW_IPS=*
+        PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
       '';
     };
 
@@ -57,15 +61,9 @@ in
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
         
-        # Reverse Proxy Configuration
-        PAPERLESS_USE_X_FORWARD_HOST = "true";
-        PAPERLESS_USE_X_FORWARDED_PORT = "true";
-        PAPERLESS_FORWARDED_ALLOW_IPS = "*";
-        PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
-
-        # OIDC Configuration
+        # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
-        PAPERLESS_OIDC_TIMEOUT = "30"; # Increase timeout to avoid the 5s hang issue
+        PAPERLESS_DEBUG = "true";
       };
     };
 
@@ -80,30 +78,36 @@ in
       ];
     };
 
-    # Systemd services configuration
+    # Systemd services configuration - Restoring the Turn 84 logic that worked
     systemd.services = 
       let
         netConfig = {
           PrivateNetwork = lib.mkForce false;
-          # Force IPv4 by excluding AF_INET6, preventing the 5s IPv6 timeout hang.
-          # Also allow AF_NETLINK for DNS resolution.
-          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_NETLINK" ];
-          # Relax syscall filter to ensure all network-related calls are allowed
-          SystemCallFilter = lib.mkForce [ ];
+          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
       {
         paperless-web = {
           serviceConfig = netConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce ""; 
           environment = {
             SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
             REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
           };
         };
-        paperless-consumer.serviceConfig = netConfig;
-        paperless-task-queue.serviceConfig = netConfig;
-        paperless-scheduler.serviceConfig = netConfig;
+        paperless-consumer = {
+          serviceConfig = netConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
+        paperless-task-queue = {
+          serviceConfig = netConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
+        paperless-scheduler = {
+          serviceConfig = netConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
       };
 
     # Scanner Service (OCI Container)
