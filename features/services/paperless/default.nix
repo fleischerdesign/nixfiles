@@ -45,6 +45,8 @@ in
         # Network / Proxy Configuration
         PAPERLESS_USE_X_FORWARDED_HOST = "true";
         PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
+        FORWARDED_ALLOW_IPS = "*";
+        
         # Fix SSL/Connectivity in Sandbox
         SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
         REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
@@ -65,8 +67,14 @@ in
       ];
     };
 
-    # Relax Sandbox slightly to allow IPv6 and ensure connectivity
-    systemd.services.paperless-web.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+    # Relax Sandbox for Debugging (web) and basic connectivity (others)
+    systemd.services.paperless-web.serviceConfig = {
+      RestrictAddressFamilies = lib.mkForce [ ];
+      SystemCallFilter = lib.mkForce [ ];
+      PrivateUsers = lib.mkForce false;
+      RestrictNamespaces = lib.mkForce false;
+    };
+
     systemd.services.paperless-consumer.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
     systemd.services.paperless-task-queue.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
     systemd.services.paperless-scheduler.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
@@ -91,7 +99,7 @@ in
       ];
     };
 
-    # Register with Caddy
+    # Register with Caddy Feature
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "paperless" = {
         port = 28981;
