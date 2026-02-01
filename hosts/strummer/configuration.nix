@@ -46,6 +46,11 @@
 
   my.features.services.paperless.expose.enable = true;
 
+  my.features.services.prowlarr.expose = {
+    enable = true;
+    auth = true;
+  };
+
   my.features.services.cloudflare-dyndns.domains = [ "ancoris.ovh" ];
 
   # State version setting
