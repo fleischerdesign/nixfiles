@@ -16,8 +16,7 @@ in
     sops.secrets.paperless_oidc_secret = { };
 
     # 2. Template for the complex JSON Auth variable
-    # We use the local Authentik Outpost (Port 9000) for server-to-server traffic
-    # to bypass internet connectivity issues with the vServer.
+    # FIX: No trailing slash in server_url to prevent double-slash discovery errors.
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -29,14 +28,7 @@ in
                 client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
                 secret = config.sops.placeholder.paperless_oidc_secret;
                 settings = {
-                  # Public URL for identity
                   server_url = "https://auth.ancoris.ovh/application/o/paperless";
-                  # Public URL for Browser Redirect
-                  authorization_url = "https://auth.ancoris.ovh/application/o/authorize/";
-                  # Local URLs for Server-to-Server traffic (via Outpost)
-                  token_url = "http://127.0.0.1:9000/application/o/token/";
-                  userinfo_url = "http://127.0.0.1:9000/application/o/userinfo/";
-                  jwks_url = "http://127.0.0.1:9000/application/o/paperless/jwks/";
                 };
               }
             ];
@@ -86,30 +78,37 @@ in
       ];
     };
 
-    # Restore Hardening but keep the breakthrough network fixes
+    # Systemd services configuration - Consolidated to prevent duplicate attribute errors
+    # We break namespace coupling and ensure network access for OIDC stability.
     systemd.services = 
       let
-        # Secure networking defaults that worked
-        netConfig = {
+        commonConfig = {
           PrivateNetwork = lib.mkForce false;
-          # We need AF_NETLINK for DNS and AF_INET6/4 for connectivity
           RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
       {
         paperless-web = {
-          serviceConfig = netConfig;
+          serviceConfig = commonConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce ""; 
           environment = {
             SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
             REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
           };
         };
-        # For other services, we just apply the network fixes
-        paperless-consumer.serviceConfig = netConfig;
-        paperless-task-queue.serviceConfig = netConfig;
-        paperless-scheduler.serviceConfig = netConfig;
+        paperless-consumer = {
+          serviceConfig = commonConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
+        paperless-task-queue = {
+          serviceConfig = commonConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
+        paperless-scheduler = {
+          serviceConfig = commonConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
       };
 
     # Scanner Service (OCI Container)
