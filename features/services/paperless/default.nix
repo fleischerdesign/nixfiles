@@ -16,7 +16,6 @@ in
     sops.secrets.paperless_oidc_secret = { };
 
     # 2. Template for the complex JSON Auth variable
-    # FIX: No trailing slash in server_url to prevent double-slash discovery errors.
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -35,6 +34,9 @@ in
             OAUTH_PKCE_ENABLED = "True";
           };
         }}
+        # Critical: Overriding the default 5s timeout of django-allauth
+        PAPERLESS_SOCIALACCOUNT_REQUESTS_TIMEOUT=30
+        # Exact variable names from Paperless documentation (no 'ED' on FORWARD)
         PAPERLESS_USE_X_FORWARD_HOST=true
         PAPERLESS_USE_X_FORWARDED_PORT=true
         PAPERLESS_FORWARDED_ALLOW_IPS=*
@@ -64,6 +66,7 @@ in
         
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
+        PAPERLESS_DEBUG = "true";
       };
     };
 
@@ -78,11 +81,11 @@ in
       ];
     };
 
-    # Systemd services configuration - Consolidated to prevent duplicate attribute errors
-    # We break namespace coupling and ensure network access for OIDC stability.
+    # Systemd services configuration - Consolidated to avoid duplicate definitions
+    # Breaking namespace coupling is essential to fix network isolation.
     systemd.services = 
       let
-        commonConfig = {
+        netConfig = {
           PrivateNetwork = lib.mkForce false;
           RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
@@ -90,7 +93,7 @@ in
       in
       {
         paperless-web = {
-          serviceConfig = commonConfig;
+          serviceConfig = netConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce ""; 
           environment = {
             SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
@@ -98,15 +101,15 @@ in
           };
         };
         paperless-consumer = {
-          serviceConfig = commonConfig;
+          serviceConfig = netConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce "";
         };
         paperless-task-queue = {
-          serviceConfig = commonConfig;
+          serviceConfig = netConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce "";
         };
         paperless-scheduler = {
-          serviceConfig = commonConfig;
+          serviceConfig = netConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce "";
         };
       };
