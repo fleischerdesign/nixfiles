@@ -68,10 +68,11 @@ in
       ];
     };
 
-    # Radically relax sandbox for debugging without overwriting ExecStart
+    # Radically relax sandbox for debugging AND fix the PrivateNetwork namespace issue
     systemd.services = 
       let
         debugOptions = {
+          PrivateNetwork = lib.mkForce false; # CRITICAL FIX: Webserver shares namespace with isolated components
           RestrictAddressFamilies = lib.mkForce [ ];
           SystemCallFilter = lib.mkForce [ ];
           PrivateUsers = lib.mkForce false;
