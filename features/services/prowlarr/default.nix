@@ -38,7 +38,26 @@ in
         auth = {
           method = "External";
         };
+        # PostgreSQL Configuration
+        postgres = {
+          host = "/run/postgresql";
+          maindb = "prowlarr-main";
+          logdb = "prowlarr-log";
+          user = "prowlarr";
+        };
       };
+    };
+
+    # Ensure PostgreSQL database and user exist for Prowlarr
+    services.postgresql = {
+      ensureDatabases = [ "prowlarr-main" "prowlarr-log" ];
+      ensureUsers = [
+        {
+          name = "prowlarr";
+          ensureDBOwnership = false;
+          ensureClauses.superuser = true;
+        }
+      ];
     };
 
     # Register with Caddy Feature
