@@ -42,18 +42,11 @@ in
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
         
-        # Network / Proxy Configuration
+        # Network / Proxy Configuration (Corrected with PAPERLESS_ prefix)
         PAPERLESS_USE_X_FORWARDED_HOST = "true";
-        PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
-        FORWARDED_ALLOW_IPS = "*";
+        PAPERLESS_USE_X_FORWARDED_PORT = "true";
+        PAPERLESS_FORWARDED_ALLOW_IPS = "*";
         PAPERLESS_DEBUG = "true";
-        
-        # Fix SSL/Connectivity in Sandbox
-        SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-        REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-
-        # Enable OIDC
-        PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
       };
     };
 
@@ -68,37 +61,33 @@ in
       ];
     };
 
-    # Radically relax sandbox for debugging
-    systemd.services = 
-      let
-        debugConfig = {
-          PrivateNetwork = lib.mkForce false;
-          RestrictAddressFamilies = lib.mkForce [ ];
-          SystemCallFilter = lib.mkForce [ ];
-          PrivateUsers = lib.mkForce false;
-          RestrictNamespaces = lib.mkForce false;
-          PrivateDevices = lib.mkForce false;
-          PrivateMounts = lib.mkForce false;
-          PrivateTmp = lib.mkForce false;
-          ProtectSystem = lib.mkForce false;
-          ProtectHome = lib.mkForce false;
-          ProtectHostname = lib.mkForce false;
-          ProtectKernelLogs = lib.mkForce false;
-          ProtectKernelModules = lib.mkForce false;
-          ProtectKernelTunables = lib.mkForce false;
-          ProtectControlGroups = lib.mkForce false;
-          RestrictRealtime = lib.mkForce false;
-          LockPersonality = lib.mkForce false;
-          MemoryDenyWriteExecute = lib.mkForce false;
-          EnvironmentFile = config.sops.templates."paperless.env".path;
-        };
-      in
-      {
-        paperless-web.serviceConfig = debugConfig;
-        paperless-consumer.serviceConfig = debugConfig;
-        paperless-task-queue.serviceConfig = debugConfig;
-        paperless-scheduler.serviceConfig = debugConfig;
-      };
+    # Apply network fix to all components individually to avoid overwriting other serviceConfig keys
+    systemd.services.paperless-web.serviceConfig = {
+      PrivateNetwork = lib.mkForce false;
+      RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+      EnvironmentFile = config.sops.templates."paperless.env".path;
+    };
+    systemd.services.paperless-consumer.serviceConfig = {
+      PrivateNetwork = lib.mkForce false;
+      RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+      EnvironmentFile = config.sops.templates."paperless.env".path;
+    };
+    systemd.services.paperless-task-queue.serviceConfig = {
+      PrivateNetwork = lib.mkForce false;
+      RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+      EnvironmentFile = config.sops.templates."paperless.env".path;
+    };
+    systemd.services.paperless-scheduler.serviceConfig = {
+      PrivateNetwork = lib.mkForce false;
+      RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+      EnvironmentFile = config.sops.templates."paperless.env".path;
+    };
+
+    # Provide SSL certs to the web process environment
+    systemd.services.paperless-web.environment = {
+      SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+      REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+    };
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
