@@ -14,44 +14,52 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # 1. SOPS Secret for the Newsgroup Server
+    # 1. SOPS Secret for the password
     sops.secrets.newsgroup_ninja_password = { owner = "sabnzbd"; };
 
-    # 2. Template for the SABnzbd configuration
-    sops.templates."sabnzbd.ini" = {
+    # 2. A template that creates a small INI snippet for the password
+    sops.templates."sabnzbd-secret.ini" = {
       owner = "sabnzbd";
       content = ''
-        [misc]
-        port = 8080
-        host = 0.0.0.0
-        permissions = 775
-        # Security: Allow access via the proxy domain
-        host_whitelist = ${domain}, localhost, 127.0.0.1
-        
-        # Aligned with your storage structure
-        download_dir = /data/storage/downloads/incomplete
-        complete_dir = /data/storage/downloads/complete
-        
         [servers]
         [[ninja]]
-        name = Newsgroup Ninja
-        displayname = Newsgroup Ninja
-        host = news.newsgroup.ninja
-        port = 563
-        ssl = 1
-        connections = 50
-        username = Butchey
         password = ${config.sops.placeholder.newsgroup_ninja_password}
-        enable = 1
       '';
     };
 
-    # 3. SABnzbd Service
+    # 3. SABnzbd using native settings
     services.sabnzbd = {
       enable = true;
       user = "sabnzbd";
       group = "media";
-      configFile = config.sops.templates."sabnzbd.ini".path;
+      
+      # This option merges our secret password into the config at runtime
+      secretFiles = [ config.sops.templates."sabnzbd-secret.ini".path ];
+
+      settings = {
+        misc = {
+          port = 8080;
+          host = "0.0.0.0";
+          # FIX: Allow access via proxy and localhost
+          host_whitelist = [ domain "localhost" "127.0.0.1" ];
+          # FIX: 2 = Allow access from any IP (needed when behind Caddy)
+          inet_exposure = 2; 
+          
+          download_dir = "/data/storage/downloads/incomplete";
+          complete_dir = "/data/storage/downloads/complete";
+          permissions = "775";
+        };
+        servers.ninja = {
+          name = "Newsgroup Ninja";
+          displayname = "Newsgroup Ninja";
+          host = "news.newsgroup.ninja";
+          port = 563;
+          ssl = 1;
+          connections = 50;
+          username = "Butchey";
+          enable = 1;
+        };
+      };
     };
 
     # Ensure media group and directories exist
