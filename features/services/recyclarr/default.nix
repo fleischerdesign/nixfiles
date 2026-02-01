@@ -8,11 +8,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # 1. SOPS secrets for API keys
+    # 1. SOPS secrets
     sops.secrets.radarr_api_key = { };
     sops.secrets.sonarr_api_key = { };
 
-    # 2. Create environment file for Recyclarr
     sops.templates."recyclarr.env" = {
       owner = "recyclarr";
       content = ''
@@ -21,18 +20,21 @@ in
       '';
     };
 
-    # 3. Recyclarr Service Configuration
+    # 3. Recyclarr Service Configuration - Direct properties instead of broken templates
     services.recyclarr = {
       enable = true;
       schedule = "daily";
       
       configuration = {
-        # Radarr Configuration (Movies)
+        # Radarr Configuration
         radarr.main = {
           base_url = "http://localhost:7878";
           api_key = "!env_var RADARR_API_KEY";
           
-          # Prioritize German audio using your server's TRaSH ID
+          # Use TRaSH Quality Definition for Movies
+          quality_definition = "movie";
+
+          # Prioritize German audio using TRaSH IDs
           custom_formats = [
             {
               trash_ids = [ "86bc3115eb4e9873ac96904a4a68e19e" ]; # German (Language Profile)
@@ -41,18 +43,17 @@ in
               ];
             }
           ];
-
-          include = [
-            { template = "hd-bluray-web"; }
-          ];
         };
 
-        # Sonarr Configuration (TV Shows)
+        # Sonarr Configuration
         sonarr.main = {
           base_url = "http://localhost:8989";
           api_key = "!env_var SONARR_API_KEY";
 
-          # Prioritize German audio using your server's TRaSH ID
+          # Use TRaSH Quality Definition for Series
+          quality_definition = "series";
+
+          # Prioritize German audio using TRaSH IDs
           custom_formats = [
             {
               trash_ids = [ "8a9fcdbb445f2add0505926df3bb7b8a" ]; # German (Language Profile)
@@ -61,18 +62,12 @@ in
               ];
             }
           ];
-
-          include = [
-            { template = "web-1080p-v4"; }
-          ];
         };
       };
     };
 
-    # Inject environment variables into the systemd service
     systemd.services.recyclarr.serviceConfig.EnvironmentFile = config.sops.templates."recyclarr.env".path;
 
-    # Explicitly define user and group
     users.users.recyclarr = {
       isSystemUser = true;
       group = "recyclarr";
