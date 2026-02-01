@@ -39,6 +39,9 @@ in
       user = "sabnzbd";
       group = "media";
       
+      # Ensure NixOS is the single source of truth (read-only config)
+      allowConfigWrite = false;
+      
       # This option merges our secret values into the config at runtime
       secretFiles = [ config.sops.templates."sabnzbd-secret.ini".path ];
 
