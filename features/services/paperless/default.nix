@@ -68,6 +68,8 @@ in
     # Relax Sandbox slightly to allow IPv6 and ensure connectivity
     systemd.services.paperless-web.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
     systemd.services.paperless-consumer.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+    systemd.services.paperless-task-queue.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
+    systemd.services.paperless-scheduler.serviceConfig.RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
 
     # Inject the complex OIDC config via EnvironmentFile to all Paperless services
     systemd.services.paperless-web.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
