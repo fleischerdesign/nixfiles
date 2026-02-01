@@ -2,52 +2,31 @@
 let
   cfg = config.my.features.services.jellyseerr;
 
-  # 1. Pull the Docker image with the OIDC PR
-  jellyseerr-image = pkgs.dockerTools.pullImage {
-    imageName = "fallenbagel/jellyseerr";
-    imageDigest = "sha256:9f3195998306da6548fc3b2420d114dda64a6e904f41e911168788fb410a7972";
-    sha256 = "sha256-6Indg47u6rhCPvYBTRU3UXFug0D+NmGnZLiyv+jPL4A=";
-    finalImageTag = "preview-OIDC";
-  };
-
-  # 2. Export the image to a flat tarball (with enough disk space in the build VM)
-  jellyseerr-rootfs = pkgs.dockerTools.exportImage {
-    fromImage = jellyseerr-image;
-    diskSize = 2048; # 2 GB to accommodate the large image
-  };
-
-  # 3. Extract the app from the rootfs and wrap it
-  jellyseerr-oidc = pkgs.stdenv.mkDerivation {
+  # Build Jellyseerr from the OIDC PR branch
+  jellyseerr-oidc = pkgs.jellyseerr.overrideAttrs (oldAttrs: {
     pname = "jellyseerr-oidc";
-    version = "preview-OIDC";
+    version = "2.6.0-oidc-preview";
 
-    src = jellyseerr-rootfs;
+    src = pkgs.fetchFromGitHub {
+      owner = "Fallenbagel";
+      repo = "jellyseerr";
+      rev = "feat/oidc"; # This is the branch with OIDC support
+      hash = "sha256-6Indg47u6rhCPvYBTRU3UXFug0D+NmGnZLiyv+jPL4A="; # Temporary hash
+    };
 
-    nativeBuildInputs = [ pkgs.makeWrapper pkgs.gnutar pkgs.gzip ];
-
-    # The exportImage produced a tar, we need to unpack it
-    unpackPhase = ''
-      mkdir rootfs
-      tar -xf $src -C rootfs
-    '';
-
-    installPhase = ''
-      mkdir -p $out/share/jellyseerr
-      # Copy the /app directory from the image rootfs
-      if [ -d rootfs/app ]; then
-        cp -r rootfs/app/. $out/share/jellyseerr/
-      else
-        cp -r rootfs/. $out/share/jellyseerr/
-      fi
-
-      mkdir -p $out/bin
-      makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/jellyseerr \
-        --add-flags "$out/share/jellyseerr/dist/index.js" \
-        --chdir "$out/share/jellyseerr" \
-        --set NODE_ENV production \
-        --set CONFIG_DIRECTORY /var/lib/jellyseerr
-    '';
-  };
+    # We need to update the pnpm dependencies hash as well since the branch changed
+    pnpmDeps = oldAttrs.pnpmDeps.overrideAttrs (oldDeps: {
+      inherit (oldAttrs) pname;
+      version = "2.6.0-oidc-preview";
+      src = pkgs.fetchFromGitHub {
+        owner = "Fallenbagel";
+        repo = "jellyseerr";
+        rev = "feat/oidc";
+        hash = "sha256-6Indg47u6rhCPvYBTRU3UXFug0D+NmGnZLiyv+jPL4A=";
+      };
+      hash = lib.fakeHash; # Nix will tell us the correct hash
+    });
+  });
 in
 {
   options.my.features.services.jellyseerr = {
@@ -60,30 +39,17 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.services.jellyseerr = {
-      description = "Jellyseerr Media Request Manager (OIDC Preview)";
-      after = [ "network.target" ];
-      wantedBy = [ "multi-user.target" ];
-
-      serviceConfig = {
-        ExecStart = "${jellyseerr-oidc}/bin/jellyseerr";
-        User = "jellyseerr";
-        Group = "jellyseerr";
-        StateDirectory = "jellyseerr";
-        Restart = "always";
-        ProtectSystem = "full";
-        ProtectHome = "true";
-        NoNewPrivileges = "true";
-      };
+    services.jellyseerr = {
+      enable = true;
+      package = jellyseerr-oidc;
     };
 
-    users.users.jellyseerr = {
-      isSystemUser = true;
-      group = "jellyseerr";
-      home = "/var/lib/jellyseerr";
-    };
-    users.groups.jellyseerr = { };
+    # Ensure the config directory exists
+    systemd.tmpfiles.rules = [
+      "d /var/lib/jellyseerr 0750 jellyseerr jellyseerr -"
+    ];
 
+    # Register with Caddy
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "jellyseerr" = {
         port = 5055;
