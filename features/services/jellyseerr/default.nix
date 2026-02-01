@@ -25,8 +25,13 @@ let
 
     installPhase = ''
       mkdir -p $out/share/jellyseerr
-      # Copy the /app directory from the extracted rootfs
-      cp -r rootfs/app/* $out/share/jellyseerr/
+      # Copy the /app directory from the extracted rootfs (using . to include hidden files)
+      if [ -d rootfs/app ]; then
+        cp -r rootfs/app/. $out/share/jellyseerr/
+      else
+        # Fallback in case the structure is slightly different
+        cp -r rootfs/. $out/share/jellyseerr/
+      fi
 
       mkdir -p $out/bin
       makeWrapper ${pkgs.nodejs_22}/bin/node $out/bin/jellyseerr \
