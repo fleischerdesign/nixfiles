@@ -9,8 +9,6 @@ in
 
   config = lib.mkIf cfg.enable {
     # 1. SOPS secrets for API keys
-    # We don't set an owner here to avoid conflicts with the actual services (radarr/sonarr).
-    # The template below will still be able to use the values via placeholders.
     sops.secrets.radarr_api_key = { };
     sops.secrets.sonarr_api_key = { };
 
@@ -34,18 +32,18 @@ in
           base_url = "http://localhost:7878";
           api_key = "!env_var RADARR_API_KEY";
           
-          # Prioritize German audio but allow English fallback
+          # Prioritize German audio using TRaSH ID
           custom_formats = [
             {
-              names = [ "German" ];
-              score = 100;
+              trash_ids = [ "9b6a2b695ca61047fa3930f85524eb27" ]; # German
+              assign_scores_to = [
+                { name = "HD - 1080p"; score = 100; }
+              ];
             }
           ];
 
           include = [
-            # Standard TRaSH Quality Definitions
             { template = "radarr-quality-definition-movie"; }
-            # Custom Formats for better releases (Removes CAMs, fake releases etc.)
             { template = "radarr-custom-formats-movie"; }
           ];
         };
@@ -55,18 +53,18 @@ in
           base_url = "http://localhost:8989";
           api_key = "!env_var SONARR_API_KEY";
 
-          # Prioritize German audio but allow English fallback
+          # Prioritize German audio using TRaSH ID
           custom_formats = [
             {
-              names = [ "German" ];
-              score = 100;
+              trash_ids = [ "5893f30ca06ed66df00be0bd00efcf95" ]; # German
+              assign_scores_to = [
+                { name = "HD - 1080p"; score = 100; }
+              ];
             }
           ];
 
           include = [
-            # Standard TRaSH Quality Definitions for Series
             { template = "sonarr-quality-definition-series"; }
-            # Custom Formats for Series (V3/V4 templates)
             { template = "sonarr-custom-formats-series"; }
           ];
         };
