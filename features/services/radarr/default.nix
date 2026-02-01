@@ -17,8 +17,8 @@ in
       enable = true;
       settings = {
         auth = {
-          # Disable internal authentication as we use Authentik Forward Auth
-          authenticationmethod = "External";
+          # Correct internal property name for environment variable override
+          method = "External";
         };
       };
     };
