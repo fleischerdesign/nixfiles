@@ -48,6 +48,7 @@ in
           download_dir = "/data/storage/downloads/incomplete";
           complete_dir = "/data/storage/downloads/complete";
           permissions = "775";
+          cache_limit = "512M";
         };
         servers.ninja = {
           name = "Newsgroup Ninja";
