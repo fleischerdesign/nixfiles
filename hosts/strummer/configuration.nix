@@ -41,7 +41,7 @@
 
   my.features.services.mealie.expose = {
     enable = true;
-    auth = true;
+    auth = false;
   };
 
   # State version setting
