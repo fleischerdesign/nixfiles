@@ -64,6 +64,7 @@ in
 
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
+        PAPERLESS_DEBUG = "false";
       };
     };
 

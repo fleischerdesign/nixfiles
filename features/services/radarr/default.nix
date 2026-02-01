@@ -13,11 +13,24 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Create a common media group for sharing files between services
+    users.groups.media = { };
+
+    # Add radarr user to the media group
+    users.users.radarr = {
+      extraGroups = [ "media" ];
+    };
+
+    # Ensure media directories on big storage exist with correct permissions
+    systemd.tmpfiles.rules = [
+      "d /data/storage/movies 0775 root media -"
+      "d /data/storage/downloads 0775 root media -"
+    ];
+
     services.radarr = {
       enable = true;
       settings = {
         auth = {
-          # Correct internal property name for environment variable override
           method = "External";
         };
         # PostgreSQL Configuration
@@ -37,10 +50,20 @@ in
         {
           name = "radarr";
           ensureDBOwnership = false;
-          # Superuser is often needed by *arr apps for initial schema migrations/extensions
           ensureClauses.superuser = true;
         }
       ];
+    };
+
+    # Systemd hardening adjustment: 
+    # 1. Allow writing to the movie and download directories
+    # 2. Set UMask so created files are group-writable (media group)
+    systemd.services.radarr.serviceConfig = {
+      ReadWritePaths = [ 
+        "/data/storage/movies" 
+        "/data/storage/downloads"
+      ];
+      UMask = "0002";
     };
 
     # Register with Caddy Feature
