@@ -18,7 +18,7 @@ in
     # 2. Template for the complex JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
-        PAPERLESS_SOCIALACCOUNT_PROVIDERS={"openid_connect":{"APPS":[{"provider_id":"authentik","name":"Authentik","client_id":"INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2","secret":"${config.sops.placeholder.paperless_oidc_secret}","settings":{"server_url":"https://auth.ancoris.ovh/application/o/paperless/.well-known/openid-configuration"}}],"OAUTH_PKCE_ENABLED":"True"}}
+        PAPERLESS_SOCIALACCOUNT_PROVIDERS={"openid_connect":{"APPS":[{"provider_id":"authentik","name":"Authentik","client_id":"INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2","secret":"${config.sops.placeholder.paperless_oidc_secret}","settings":{"server_url":"https://auth.ancoris.ovh/application/o/paperless/"}}],"OAUTH_PKCE_ENABLED":"True"}}
       '';
     };
 
