@@ -13,16 +13,25 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Hoheit über den Serien-Ordner
+    # SOPS Secret for API Key
+    sops.secrets.sonarr_api_key = { owner = "sonarr"; };
+    sops.templates."sonarr.env" = {
+      owner = "sonarr";
+      content = "SONARR__AUTH__APIKEY=${config.sops.placeholder.sonarr_api_key}";
+    };
+
+    # Ensure media group exists
     users.groups.media = { };
     users.users.sonarr.extraGroups = [ "media" ];
 
+    # Ownership management for storage
     systemd.tmpfiles.rules = [
       "d /data/storage/tv 0775 sonarr media -"
     ];
 
     services.sonarr = {
       enable = true;
+      environmentFiles = [ config.sops.templates."sonarr.env".path ];
       settings = {
         auth.method = "External";
         postgres = {
@@ -44,7 +53,6 @@ in
     };
 
     systemd.services.sonarr.serviceConfig = {
-      # Darf in TV (Besitzer) und Downloads (Gruppe) schreiben
       ReadWritePaths = [ "/data/storage/tv" "/data/storage/downloads" ];
       UMask = "0002";
     };

@@ -13,16 +13,25 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Hoheit über den Movie-Ordner
+    # SOPS Secret for API Key
+    sops.secrets.radarr_api_key = { owner = "radarr"; };
+    sops.templates."radarr.env" = {
+      owner = "radarr";
+      content = "RADARR__AUTH__APIKEY=${config.sops.placeholder.radarr_api_key}";
+    };
+
+    # Ensure media group exists
     users.groups.media = { };
     users.users.radarr.extraGroups = [ "media" ];
 
+    # Ownership management for storage
     systemd.tmpfiles.rules = [
       "d /data/storage/movies 0775 radarr media -"
     ];
 
     services.radarr = {
       enable = true;
+      environmentFiles = [ config.sops.templates."radarr.env".path ];
       settings = {
         auth.method = "External";
         postgres = {
@@ -44,7 +53,6 @@ in
     };
 
     systemd.services.radarr.serviceConfig = {
-      # Darf in Movies (Besitzer) und Downloads (Gruppe) schreiben
       ReadWritePaths = [ "/data/storage/movies" "/data/storage/downloads" ];
       UMask = "0002";
     };

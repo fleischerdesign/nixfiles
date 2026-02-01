@@ -13,11 +13,18 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # SOPS Secret for API Key
+    sops.secrets.prowlarr_api_key = { owner = "prowlarr"; };
+    sops.templates."prowlarr.env" = {
+      owner = "prowlarr";
+      content = "PROWLARR__AUTH__APIKEY=${config.sops.placeholder.prowlarr_api_key}";
+    };
+
     services.prowlarr = {
       enable = true;
+      environmentFiles = [ config.sops.templates."prowlarr.env".path ];
       settings = {
         auth = {
-          # Correct internal property name for environment variable override
           method = "External";
         };
       };
