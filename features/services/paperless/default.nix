@@ -15,7 +15,7 @@ in
     # 1. SOPS Secret for OIDC
     sops.secrets.paperless_oidc_secret = { };
 
-    # 2. Template for the complex JSON Auth variable - Using builtins.toJSON for reliability
+    # 2. Template for the complex JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -63,6 +63,7 @@ in
         
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
+        PAPERLESS_DEBUG = "true";
       };
     };
 
@@ -77,7 +78,7 @@ in
       ];
     };
 
-    # Radically relax sandbox for ALL components to debug connectivity
+    # Radically relax sandbox for ALL components
     systemd.services = 
       let
         debugConfig = {
@@ -101,21 +102,19 @@ in
           MemoryDenyWriteExecute = lib.mkForce false;
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
-      let # Correcting let-in nesting
-        serviceOverrides = {
-          paperless-web.serviceConfig = debugConfig;
-          paperless-consumer.serviceConfig = debugConfig;
-          paperless-task-queue.serviceConfig = debugConfig;
-          paperless-scheduler.serviceConfig = debugConfig;
-        };
       in
-      serviceOverrides;
-
-    # Provide SSL certs to the web process environment
-    systemd.services.paperless-web.environment = {
-      SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-      REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-    };
+      {
+        paperless-web = {
+          serviceConfig = debugConfig;
+          environment = {
+            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+          };
+        };
+        paperless-consumer.serviceConfig = debugConfig;
+        paperless-task-queue.serviceConfig = debugConfig;
+        paperless-scheduler.serviceConfig = debugConfig;
+      };
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
