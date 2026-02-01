@@ -12,9 +12,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # 1. SOPS Secret for OIDC
     sops.secrets.paperless_oidc_secret = { };
 
-    # Template only for the sensitive JSON block
+    # 2. Template for the sensitive JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -54,44 +55,40 @@ in
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
         
-        # Reverse Proxy & OIDC Stability
+        # Stability and Proxy Fixes
+        PAPERLESS_SOCIALACCOUNT_REQUESTS_TIMEOUT = "30";
         PAPERLESS_USE_X_FORWARD_HOST = "true";
         PAPERLESS_USE_X_FORWARDED_PORT = "true";
         PAPERLESS_FORWARDED_ALLOW_IPS = "*";
         PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
-        PAPERLESS_SOCIALACCOUNT_REQUESTS_TIMEOUT = "30";
-        
+
+        # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
       };
     };
 
+    # Ensure PostgreSQL database and user exist for Paperless
     services.postgresql = {
       ensureDatabases = [ "paperless" ];
-      ensureUsers = [{ name = "paperless"; ensureDBOwnership = true; }];
+      ensureUsers = [
+        {
+          name = "paperless";
+          ensureDBOwnership = true;
+        }
+      ];
     };
 
-    # Essential Network Fixes (Minimal Overrides)
-    systemd.services = 
-      let
-        netConfig = {
-          PrivateNetwork = lib.mkForce false;
-          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
-          EnvironmentFile = config.sops.templates."paperless.env".path;
-        };
-      in
-      {
-        paperless-web = {
-          serviceConfig = netConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce ""; 
-          environment = {
-            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-          };
-        };
-        paperless-consumer.serviceConfig = netConfig;
-        paperless-task-queue.serviceConfig = netConfig;
-        paperless-scheduler.serviceConfig = netConfig;
+    # Only minimal systemd overrides: Environment file and SSL certs
+    systemd.services.paperless-web = {
+      serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
+      environment = {
+        SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+        REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
       };
+    };
+    systemd.services.paperless-consumer.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
+    systemd.services.paperless-task-queue.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
+    systemd.services.paperless-scheduler.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
 
     # Scanner Service
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
@@ -102,13 +99,16 @@ in
         TZ = "Europe/Berlin";
         PATTERN = "\"scan\"_dd-mm-yyyy_hh-MM-ss";
       };
-      volumes = [ "/data/storage/media/docs/consume:/scan" ];
+      volumes = [
+        "/data/storage/media/docs/consume:/scan"
+      ];
     };
 
+    # Register with Caddy Feature
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "paperless" = {
         port = 28981;
-        auth = false;
+        auth = false; # Native OIDC
         subdomain = cfg.expose.subdomain;
       };
     };
