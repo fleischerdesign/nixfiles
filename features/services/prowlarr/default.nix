@@ -16,10 +16,13 @@ in
     # Ensure media group exists
     users.groups.media = { };
 
-    # Explicitly define user to avoid SOPS evaluation issues
+    # Explicitly define user and group to avoid SOPS evaluation issues
     users.users.prowlarr = {
+      isSystemUser = true;
+      group = "prowlarr";
       extraGroups = [ "media" ];
     };
+    users.groups.prowlarr = { };
 
     # SOPS Secret for API Key
     sops.secrets.prowlarr_api_key = { owner = "prowlarr"; };

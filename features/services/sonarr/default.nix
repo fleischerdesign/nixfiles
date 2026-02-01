@@ -13,16 +13,23 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Ensure media group exists
+    users.groups.media = { };
+
+    # Explicitly define user and group to avoid SOPS evaluation issues
+    users.users.sonarr = {
+      isSystemUser = true;
+      group = "sonarr";
+      extraGroups = [ "media" ];
+    };
+    users.groups.sonarr = { };
+
     # SOPS Secret for API Key
     sops.secrets.sonarr_api_key = { owner = "sonarr"; };
     sops.templates."sonarr.env" = {
       owner = "sonarr";
       content = "SONARR__AUTH__APIKEY=${config.sops.placeholder.sonarr_api_key}";
     };
-
-    # Ensure media group exists
-    users.groups.media = { };
-    users.users.sonarr.extraGroups = [ "media" ];
 
     # Ownership management for storage
     systemd.tmpfiles.rules = [

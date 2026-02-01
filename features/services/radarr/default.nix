@@ -13,16 +13,23 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Ensure media group exists
+    users.groups.media = { };
+
+    # Explicitly define user and group to avoid SOPS evaluation issues
+    users.users.radarr = {
+      isSystemUser = true;
+      group = "radarr";
+      extraGroups = [ "media" ];
+    };
+    users.groups.radarr = { };
+
     # SOPS Secret for API Key
     sops.secrets.radarr_api_key = { owner = "radarr"; };
     sops.templates."radarr.env" = {
       owner = "radarr";
       content = "RADARR__AUTH__APIKEY=${config.sops.placeholder.radarr_api_key}";
     };
-
-    # Ensure media group exists
-    users.groups.media = { };
-    users.users.radarr.extraGroups = [ "media" ];
 
     # Ownership management for storage
     systemd.tmpfiles.rules = [
