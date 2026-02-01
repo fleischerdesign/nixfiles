@@ -3,7 +3,14 @@ let
   cfg = config.my.features.services.home-assistant;
 in
 {
-  options.my.features.services.home-assistant.enable = lib.mkEnableOption "Home Assistant";
+  options.my.features.services.home-assistant = {
+    enable = lib.mkEnableOption "Home Assistant";
+    expose = {
+      enable = lib.mkEnableOption "Expose via Caddy";
+      subdomain = lib.mkOption { type = lib.types.str; default = "hass"; };
+      auth = lib.mkEnableOption "Protect with Authentik";
+    };
+  };
 
   config = lib.mkIf cfg.enable {
     services.home-assistant = {
@@ -45,6 +52,15 @@ in
         enable = true;
         addresses = true;
         userServices = true;
+      };
+    };
+
+    # Register with Caddy Feature
+    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
+      "home-assistant" = {
+        port = 8123;
+        auth = cfg.expose.auth;
+        subdomain = cfg.expose.subdomain;
       };
     };
   };

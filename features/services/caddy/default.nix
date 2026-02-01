@@ -3,11 +3,35 @@ let
   cfg = config.my.features.services.caddy;
 in
 {
-  options.my.features.services.caddy.enable = lib.mkEnableOption "Caddy Web Server";
+  options.my.features.services.caddy = {
+    enable = lib.mkEnableOption "Caddy Web Server";
+    
+    baseDomain = lib.mkOption {
+      type = lib.types.str;
+      description = "Base domain for exposed services (e.g. fls.ancoris.ovh)";
+    };
+
+    exposedServices = lib.mkOption {
+      description = "Services to expose via Caddy";
+      default = {};
+      type = lib.types.attrsOf (lib.types.submodule ({ name, ... }: {
+        options = {
+          port = lib.mkOption { type = lib.types.int; };
+          auth = lib.mkEnableOption "Protect with Authentik";
+          subdomain = lib.mkOption {
+            type = lib.types.str;
+            default = name; # Default: Use the attribute name
+          };
+        };
+      }));
+    };
+  };
 
   config = lib.mkIf cfg.enable {
     services.caddy = {
       enable = true;
+      
+      # Authentik Snippet
       extraConfig = ''
         (authentik) {
           reverse_proxy /outpost.goauthentik.io/* 127.0.0.1:9000
@@ -18,6 +42,21 @@ in
           }
         }
       '';
+
+      # Generate virtualHosts from exposedServices
+      virtualHosts = 
+        let
+          mkVHost = name: conf: {
+            name = "${conf.subdomain}.${cfg.baseDomain}";
+            value = {
+              extraConfig = ''
+                reverse_proxy 127.0.0.1:${toString conf.port}
+                ${lib.optionalString conf.auth "import authentik"}
+              '';
+            };
+          };
+        in
+        lib.listToAttrs (lib.mapAttrsToList mkVHost cfg.exposedServices);
     };
 
     networking.firewall.allowedTCPPorts = [ 80 443 ];
