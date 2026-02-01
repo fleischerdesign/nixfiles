@@ -14,13 +14,19 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # 1. SOPS Secret for the password
+    # 1. SOPS Secrets for the password and keys
     sops.secrets.newsgroup_ninja_password = { owner = "sabnzbd"; };
+    sops.secrets.sabnzbd_api_key = { owner = "sabnzbd"; };
+    sops.secrets.sabnzbd_nzb_key = { owner = "sabnzbd"; };
 
-    # 2. A template that creates a small INI snippet for the password
+    # 2. A template that creates a small INI snippet for sensitive values
     sops.templates."sabnzbd-secret.ini" = {
       owner = "sabnzbd";
       content = ''
+        [misc]
+        api_key = ${config.sops.placeholder.sabnzbd_api_key}
+        nzb_key = ${config.sops.placeholder.sabnzbd_nzb_key}
+
         [servers]
         [[ninja]]
         password = ${config.sops.placeholder.newsgroup_ninja_password}
@@ -33,7 +39,7 @@ in
       user = "sabnzbd";
       group = "media";
       
-      # This option merges our secret password into the config at runtime
+      # This option merges our secret values into the config at runtime
       secretFiles = [ config.sops.templates."sabnzbd-secret.ini".path ];
 
       settings = {
