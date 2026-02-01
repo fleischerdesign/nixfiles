@@ -37,13 +37,25 @@ in
       '';
     };
 
+    # Ensure media group exists and paperless user is part of it
+    users.groups.media = { };
+    users.users.paperless.extraGroups = [ "media" ];
+
+    # Create the correct directories on the storage drive
+    systemd.tmpfiles.rules = [
+      "d /data/storage/docs 0775 paperless media -"
+      "d /data/storage/docs/media 0775 paperless media -"
+      "d /data/storage/docs/consume 0775 paperless media -"
+    ];
+
     services.paperless = {
       enable = true;
       port = 28981;
       address = "127.0.0.1";
       
-      mediaDir = "/data/storage/media/docs/media";
-      consumptionDir = "/data/storage/media/docs/consume";
+      # Corrected Paths
+      mediaDir = "/data/storage/docs/media";
+      consumptionDir = "/data/storage/docs/consume";
 
       settings = {
         PAPERLESS_REDIS = "redis://localhost:6379";
@@ -79,7 +91,7 @@ in
       ];
     };
 
-    # Only minimal systemd overrides: Environment file and SSL certs
+    # Systemd overrides
     systemd.services.paperless-web = {
       serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
       environment = {
@@ -101,7 +113,7 @@ in
         PATTERN = "\"scan\"_dd-mm-yyyy_hh-MM-ss";
       };
       volumes = [
-        "/data/storage/media/docs/consume:/scan"
+        "/data/storage/docs/consume:/scan"
       ];
     };
 
