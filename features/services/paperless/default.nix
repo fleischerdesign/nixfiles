@@ -57,14 +57,15 @@ in
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
         
-        # Reverse Proxy Configuration (Fixed names)
+        # Reverse Proxy Configuration
         PAPERLESS_USE_X_FORWARD_HOST = "true";
         PAPERLESS_USE_X_FORWARDED_PORT = "true";
         PAPERLESS_FORWARDED_ALLOW_IPS = "*";
         PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
 
-        # Enable OIDC
+        # OIDC Configuration
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
+        PAPERLESS_OIDC_TIMEOUT = "30"; # Increase timeout to avoid the 5s hang issue
       };
     };
 
@@ -79,13 +80,16 @@ in
       ];
     };
 
-    # Restore Hardening but keep the Breakthrough Network Fixes
-    # Consolidating all systemd service tweaks into one block to avoid duplicate definitions
+    # Systemd services configuration
     systemd.services = 
       let
         netConfig = {
           PrivateNetwork = lib.mkForce false;
-          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
+          # Force IPv4 by excluding AF_INET6, preventing the 5s IPv6 timeout hang.
+          # Also allow AF_NETLINK for DNS resolution.
+          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_NETLINK" ];
+          # Relax syscall filter to ensure all network-related calls are allowed
+          SystemCallFilter = lib.mkForce [ ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
