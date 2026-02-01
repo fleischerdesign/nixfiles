@@ -66,10 +66,6 @@ in
       ];
     };
 
-    # Dependencies: Ensure Postgres & Redis are enabled
-    my.features.services.postgresql.enable = lib.mkDefault true;
-    my.features.services.redis.enable = lib.mkDefault true;
-
     # Register with Caddy
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "paperless" = {
