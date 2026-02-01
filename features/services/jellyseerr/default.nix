@@ -6,6 +6,7 @@ let
   jellyseerr-image = pkgs.dockerTools.pullImage {
     imageName = "fallenbagel/jellyseerr";
     imageTag = "preview-OIDC";
+    imageDigest = "sha256:9f3195998306da6548fc3b2420d114dda64a6e904f41e911168788fb410a7972";
     sha256 = "sha256-6Indg47u6rhCPvYBTRU3UXFug0D+NmGnZLiyv+jPL4A=";
   };
 
@@ -47,7 +48,7 @@ in
     enable = lib.mkEnableOption "Jellyseerr Media Request Manager";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "requests"; };
+      subdomain = lib.mkOption { type = lib.types.str; default = "seerr"; };
       auth = lib.mkEnableOption "Protect with Authentik" // { default = false; };
     };
   };
@@ -85,7 +86,7 @@ in
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "jellyseerr" = {
         port = 5055;
-        auth = cfg.expose.auth; # User likely wants native OIDC
+        auth = cfg.expose.auth; 
         subdomain = cfg.expose.subdomain;
       };
     };
