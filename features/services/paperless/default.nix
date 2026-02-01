@@ -46,7 +46,11 @@ in
         PAPERLESS_USE_X_FORWARDED_HOST = "true";
         PAPERLESS_USE_X_FORWARDED_PORT = "true";
         PAPERLESS_FORWARDED_ALLOW_IPS = "*";
+        PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
         PAPERLESS_DEBUG = "true";
+
+        # Enable OIDC
+        PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
       };
     };
 
