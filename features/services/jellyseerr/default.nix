@@ -2,7 +2,7 @@
 let
   cfg = config.my.features.services.jellyseerr;
 
-  # 1. Pull the Docker image with the OIDC PR
+  # 1. Pull the Docker image (produces a .tar file)
   jellyseerr-image = pkgs.dockerTools.pullImage {
     imageName = "fallenbagel/jellyseerr";
     imageDigest = "sha256:9f3195998306da6548fc3b2420d114dda64a6e904f41e911168788fb410a7972";
@@ -10,28 +10,23 @@ let
     finalImageTag = "preview-OIDC";
   };
 
-  # 2. Export the image to a flat tarball of the rootfs
-  jellyseerr-rootfs = pkgs.dockerTools.exportImage {
-    fromImage = jellyseerr-image;
-  };
-
-  # 3. Extract the app from the rootfs and wrap it
+  # 2. Extract the app using 'undocker' instead of 'exportImage' (avoids VM disk space issues)
   jellyseerr-oidc = pkgs.stdenv.mkDerivation {
     pname = "jellyseerr-oidc";
     version = "preview-OIDC";
 
-    src = jellyseerr-rootfs;
+    src = jellyseerr-image;
 
-    nativeBuildInputs = [ pkgs.makeWrapper ];
+    nativeBuildInputs = [ pkgs.undocker pkgs.makeWrapper ];
 
     unpackPhase = ''
       mkdir rootfs
-      tar -xf $src -C rootfs
+      undocker $src rootfs
     '';
 
     installPhase = ''
       mkdir -p $out/share/jellyseerr
-      # Copy the /app directory from the image rootfs
+      # Copy the /app directory from the extracted rootfs
       cp -r rootfs/app/* $out/share/jellyseerr/
 
       mkdir -p $out/bin
@@ -54,7 +49,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Systemd service for Jellyseerr
     systemd.services.jellyseerr = {
       description = "Jellyseerr Media Request Manager (OIDC Preview)";
       after = [ "network.target" ];
@@ -66,15 +60,12 @@ in
         Group = "jellyseerr";
         StateDirectory = "jellyseerr";
         Restart = "always";
-        
-        # Hardening
         ProtectSystem = "full";
         ProtectHome = "true";
         NoNewPrivileges = "true";
       };
     };
 
-    # Define user and group
     users.users.jellyseerr = {
       isSystemUser = true;
       group = "jellyseerr";
@@ -82,7 +73,6 @@ in
     };
     users.groups.jellyseerr = { };
 
-    # Register with Caddy
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "jellyseerr" = {
         port = 5055;
