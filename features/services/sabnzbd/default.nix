@@ -62,6 +62,16 @@ in
           username = "Butchey";
           enable = true;
         };
+        categories = {
+          movies = {
+            name = "movies";
+            order = 0;
+          };
+          tv = {
+            name = "tv";
+            order = 0;
+          };
+        };
       };
     };
 
