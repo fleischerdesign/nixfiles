@@ -31,12 +31,13 @@ in
       mediaDir = "/data/storage/media/docs/media";
       consumptionDir = "/data/storage/media/docs/consume";
 
-      # Database: Use central PostgreSQL 18
-      database.type = "postgres";
-      
+      # Database Configuration
       settings = {
         PAPERLESS_REDIS = "redis://localhost:6379";
         PAPERLESS_DBHOST = "/run/postgresql";
+        PAPERLESS_DBENGINE = "django.db.backends.postgresql";
+        PAPERLESS_DBNAME = "paperless";
+        PAPERLESS_DBUSER = "paperless";
         PAPERLESS_URL = "https://${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}";
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
@@ -44,6 +45,17 @@ in
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
       };
+    };
+
+    # Ensure PostgreSQL database and user exist for Paperless
+    services.postgresql = {
+      ensureDatabases = [ "paperless" ];
+      ensureUsers = [
+        {
+          name = "paperless";
+          ensureDBOwnership = true;
+        }
+      ];
     };
 
     # Inject the complex OIDC config via EnvironmentFile to all Paperless services
