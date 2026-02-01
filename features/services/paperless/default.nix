@@ -37,15 +37,22 @@ in
       '';
     };
 
-    # Ensure media group exists and paperless user is part of it
+    # Ensure media group exists
     users.groups.media = { };
-    users.users.paperless.extraGroups = [ "media" ];
 
-    # Create the correct directories on the storage drive
+    # Explicitly define user to avoid ownership issues
+    users.users.paperless = {
+      isSystemUser = true;
+      group = "paperless";
+      extraGroups = [ "media" ];
+    };
+    users.groups.paperless = { };
+
+    # Create and enforce permissions recursively (Z)
     systemd.tmpfiles.rules = [
       "d /data/storage/docs 0775 paperless media -"
-      "d /data/storage/docs/media 0775 paperless media -"
-      "d /data/storage/docs/consume 0775 paperless media -"
+      "Z /data/storage/docs/media 0775 paperless media -"
+      "Z /data/storage/docs/consume 0775 paperless media -"
     ];
 
     services.paperless = {
@@ -53,7 +60,6 @@ in
       port = 28981;
       address = "127.0.0.1";
       
-      # Corrected Paths
       mediaDir = "/data/storage/docs/media";
       consumptionDir = "/data/storage/docs/consume";
 
