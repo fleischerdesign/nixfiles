@@ -27,6 +27,7 @@ in
                 client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
                 secret = config.sops.placeholder.paperless_oidc_secret;
                 settings = {
+                  # NO trailing slash to prevent double slash errors
                   server_url = "https://auth.ancoris.ovh/application/o/paperless";
                 };
               }
@@ -34,11 +35,11 @@ in
             OAUTH_PKCE_ENABLED = "True";
           };
         }}
-        # Critical: Overriding the default 5s timeout of django-allauth
+        # Critical: Override allauth's 5s timeout
         PAPERLESS_SOCIALACCOUNT_REQUESTS_TIMEOUT=30
-        # Exact variable names from Paperless documentation (no 'ED' on FORWARD)
+        # Reverse Proxy Support
         PAPERLESS_USE_X_FORWARD_HOST=true
-        PAPERLESS_USE_X_FORWARDED_PORT=true
+        PAPERLESS_USE_X_FORWARD_PORT=true
         PAPERLESS_FORWARDED_ALLOW_IPS=*
         PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
       '';
@@ -66,7 +67,6 @@ in
         
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
-        PAPERLESS_DEBUG = "true";
       };
     };
 
@@ -81,11 +81,10 @@ in
       ];
     };
 
-    # Systemd services configuration - Consolidated to avoid duplicate definitions
-    # Breaking namespace coupling is essential to fix network isolation.
+    # Systemd configuration - Breaking namespaces and fixing network access
     systemd.services = 
       let
-        netConfig = {
+        commonConfig = {
           PrivateNetwork = lib.mkForce false;
           RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
@@ -93,25 +92,16 @@ in
       in
       {
         paperless-web = {
-          serviceConfig = netConfig;
+          serviceConfig = commonConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce ""; 
           environment = {
             SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
             REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
           };
         };
-        paperless-consumer = {
-          serviceConfig = netConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
-        paperless-task-queue = {
-          serviceConfig = netConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
-        paperless-scheduler = {
-          serviceConfig = netConfig;
-          unitConfig.JoinsNamespaceOf = lib.mkForce "";
-        };
+        paperless-consumer.serviceConfig = commonConfig;
+        paperless-task-queue.serviceConfig = commonConfig;
+        paperless-scheduler.serviceConfig = commonConfig;
       };
 
     # Scanner Service (OCI Container)
