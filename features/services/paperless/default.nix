@@ -63,7 +63,6 @@ in
         
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
-        PAPERLESS_DEBUG = "true";
       };
     };
 
@@ -78,43 +77,30 @@ in
       ];
     };
 
-    # Systemd services configuration - Consolidated and hardened-off for discovery
+    # Restore Hardening but keep the breakthrough network fixes
     systemd.services = 
       let
-        debugConfig = {
+        # Secure networking defaults that worked
+        netConfig = {
           PrivateNetwork = lib.mkForce false;
-          RestrictAddressFamilies = lib.mkForce [ ]; 
-          SystemCallFilter = lib.mkForce [ ];
-          PrivateUsers = lib.mkForce false;
-          RestrictNamespaces = lib.mkForce false;
-          PrivateDevices = lib.mkForce false;
-          PrivateMounts = lib.mkForce false;
-          PrivateTmp = lib.mkForce false;
-          ProtectSystem = lib.mkForce false;
-          ProtectHome = lib.mkForce false;
-          ProtectHostname = lib.mkForce false;
-          ProtectKernelLogs = lib.mkForce false;
-          ProtectKernelModules = lib.mkForce false;
-          ProtectKernelTunables = lib.mkForce false;
-          ProtectControlGroups = lib.mkForce false;
-          RestrictRealtime = lib.mkForce false;
-          LockPersonality = lib.mkForce false;
-          MemoryDenyWriteExecute = lib.mkForce false;
+          # We need AF_NETLINK for DNS and AF_INET6/4 for connectivity
+          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
       {
         paperless-web = {
-          serviceConfig = debugConfig;
+          serviceConfig = netConfig;
           unitConfig.JoinsNamespaceOf = lib.mkForce ""; 
           environment = {
             SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
             REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
           };
         };
-        paperless-consumer.serviceConfig = debugConfig;
-        paperless-task-queue.serviceConfig = debugConfig;
-        paperless-scheduler.serviceConfig = debugConfig;
+        # For other services, we just apply the network fixes
+        paperless-consumer.serviceConfig = netConfig;
+        paperless-task-queue.serviceConfig = netConfig;
+        paperless-scheduler.serviceConfig = netConfig;
       };
 
     # Scanner Service (OCI Container)
