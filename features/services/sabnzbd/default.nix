@@ -1,6 +1,7 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.my.features.services.sabnzbd;
+  domain = "${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}";
 in
 {
   options.my.features.services.sabnzbd = {
@@ -17,7 +18,6 @@ in
     sops.secrets.newsgroup_ninja_password = { owner = "sabnzbd"; };
 
     # 2. Template for the SABnzbd configuration
-    # This ensures the password is never in the Nix Store.
     sops.templates."sabnzbd.ini" = {
       owner = "sabnzbd";
       content = ''
@@ -25,6 +25,9 @@ in
         port = 8080
         host = 0.0.0.0
         permissions = 775
+        # Security: Allow access via the proxy domain
+        host_whitelist = ${domain}, localhost, 127.0.0.1
+        
         # Aligned with your storage structure
         download_dir = /data/storage/downloads/incomplete
         complete_dir = /data/storage/downloads/complete
@@ -48,7 +51,6 @@ in
       enable = true;
       user = "sabnzbd";
       group = "media";
-      # Use the template-generated config file
       configFile = config.sops.templates."sabnzbd.ini".path;
     };
 
