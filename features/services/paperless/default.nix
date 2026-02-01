@@ -68,32 +68,36 @@ in
       ];
     };
 
-    # Radically relax sandbox for debugging
-    systemd.services.paperless-web.serviceConfig = {
-      RestrictAddressFamilies = lib.mkForce [ ];
-      SystemCallFilter = lib.mkForce [ ];
-      PrivateUsers = lib.mkForce false;
-      RestrictNamespaces = lib.mkForce false;
-      PrivateDevices = lib.mkForce false;
-      PrivateMounts = lib.mkForce false;
-      PrivateTmp = lib.mkForce false;
-      ProtectSystem = lib.mkForce "none";
-      ProtectHome = lib.mkForce false;
-      ProtectHostname = lib.mkForce false;
-      ProtectKernelLogs = lib.mkForce false;
-      ProtectKernelModules = lib.mkForce false;
-      ProtectKernelTunables = lib.mkForce false;
-      ProtectControlGroups = lib.mkForce false;
-      RestrictRealtime = lib.mkForce false;
-      LockPersonality = lib.mkForce false;
-      MemoryDenyWriteExecute = lib.mkForce false;
-      EnvironmentFile = config.sops.templates."paperless.env".path;
-    };
-
-    # Apply the same relaxed config to all Paperless services
-    systemd.services.paperless-consumer.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
-    systemd.services.paperless-task-queue.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
-    systemd.services.paperless-scheduler.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
+    # Radically relax sandbox for debugging without overwriting ExecStart
+    systemd.services = 
+      let
+        debugOptions = {
+          RestrictAddressFamilies = lib.mkForce [ ];
+          SystemCallFilter = lib.mkForce [ ];
+          PrivateUsers = lib.mkForce false;
+          RestrictNamespaces = lib.mkForce false;
+          PrivateDevices = lib.mkForce false;
+          PrivateMounts = lib.mkForce false;
+          PrivateTmp = lib.mkForce false;
+          ProtectSystem = lib.mkForce "none";
+          ProtectHome = lib.mkForce false;
+          ProtectHostname = lib.mkForce false;
+          ProtectKernelLogs = lib.mkForce false;
+          ProtectKernelModules = lib.mkForce false;
+          ProtectKernelTunables = lib.mkForce false;
+          ProtectControlGroups = lib.mkForce false;
+          RestrictRealtime = lib.mkForce false;
+          LockPersonality = lib.mkForce false;
+          MemoryDenyWriteExecute = lib.mkForce false;
+          EnvironmentFile = config.sops.templates."paperless.env".path;
+        };
+      in
+      {
+        paperless-web.serviceConfig = debugOptions;
+        paperless-consumer.serviceConfig = debugOptions;
+        paperless-task-queue.serviceConfig = debugOptions;
+        paperless-scheduler.serviceConfig = debugOptions;
+      };
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
