@@ -61,6 +61,11 @@
     auth = true;
   };
 
+  my.features.services.sonarr.expose = {
+    enable = true;
+    auth = true;
+  };
+
   my.features.services.cloudflare-dyndns.domains = [ "ancoris.ovh" ];
 
   # State version setting

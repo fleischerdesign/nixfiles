@@ -14,12 +14,12 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # 1. SOPS Secrets for the password and keys
+    # 1. SOPS Secrets
     sops.secrets.newsgroup_ninja_password = { owner = "sabnzbd"; };
     sops.secrets.sabnzbd_api_key = { owner = "sabnzbd"; };
     sops.secrets.sabnzbd_nzb_key = { owner = "sabnzbd"; };
 
-    # 2. A template that creates a small INI snippet for sensitive values
+    # 2. Template for sensitive values
     sops.templates."sabnzbd-secret.ini" = {
       owner = "sabnzbd";
       content = ''
@@ -33,27 +33,20 @@ in
       '';
     };
 
-    # 3. SABnzbd using native settings
+    # 3. SABnzbd Service
     services.sabnzbd = {
       enable = true;
       user = "sabnzbd";
       group = "media";
-      
-      # Ensure NixOS is the single source of truth (read-only config)
       allowConfigWrite = false;
-      
-      # This option merges our secret values into the config at runtime
       secretFiles = [ config.sops.templates."sabnzbd-secret.ini".path ];
 
       settings = {
         misc = {
           port = 8080;
           host = "0.0.0.0";
-          # FIX: Allow access via proxy and localhost (String, not list!)
           host_whitelist = "${domain}, localhost, 127.0.0.1";
-          # FIX: 2 = Allow access from any IP (needed when behind Caddy)
           inet_exposure = 2; 
-          
           download_dir = "/data/storage/downloads/incomplete";
           complete_dir = "/data/storage/downloads/complete";
           permissions = "775";
@@ -72,22 +65,22 @@ in
       };
     };
 
-    # Ensure media group and directories exist
+    # Hoheit über den Download-Ordner
     users.groups.media = { };
     users.users.sabnzbd.extraGroups = [ "media" ];
 
     systemd.tmpfiles.rules = [
-      "d /data/storage/downloads/incomplete 0775 root media -"
-      "d /data/storage/downloads/complete 0775 root media -"
+      "d /data/storage/downloads 0775 sabnzbd media -"
+      "d /data/storage/downloads/incomplete 0775 sabnzbd media -"
+      "d /data/storage/downloads/complete 0775 sabnzbd media -"
     ];
 
-    # Systemd permissions for the storage drive
     systemd.services.sabnzbd.serviceConfig = {
       ReadWritePaths = [ "/data/storage/downloads" ];
       UMask = "0002";
     };
 
-    # 4. Caddy Integration
+    # Caddy Integration
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "sabnzbd" = {
         port = 8080;

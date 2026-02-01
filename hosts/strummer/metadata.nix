@@ -11,6 +11,7 @@
     services.prowlarr.enable = true;
     services.radarr.enable = true;
     services.sabnzbd.enable = true;
+    services.sonarr.enable = true;
     services.cloudflare-dyndns.enable = true;
     services.caddy.enable = true;
     services.authentik.outpost.proxy.enable = true;
