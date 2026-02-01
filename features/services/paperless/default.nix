@@ -67,21 +67,32 @@ in
       ];
     };
 
-    # Fix Networking by breaking Namespace joins and forcing PrivateNetwork=false
+    # Fix Networking and Systemd structure
     systemd.services = 
       let
         netConfig = {
           PrivateNetwork = lib.mkForce false;
-          JoinsNamespaceOf = lib.mkForce ""; # Don't share namespace with restricted services
           RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
       {
-        paperless-web.serviceConfig = netConfig;
-        paperless-consumer.serviceConfig = netConfig;
-        paperless-task-queue.serviceConfig = netConfig;
-        paperless-scheduler.serviceConfig = netConfig;
+        paperless-web = {
+          serviceConfig = netConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
+        paperless-consumer = {
+          serviceConfig = netConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
+        paperless-task-queue = {
+          serviceConfig = netConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
+        paperless-scheduler = {
+          serviceConfig = netConfig;
+          unitConfig.JoinsNamespaceOf = lib.mkForce "";
+        };
       };
 
     # Scanner Service (OCI Container)
