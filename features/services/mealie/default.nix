@@ -58,10 +58,14 @@ in
         OIDC_PROVIDER_NAME = "Authentik";
         OIDC_USER_CLAIM = "email";
         OIDC_NAME_CLAIM = "name";
+        OIDC_REMEMBER_ME = "True";
 
         # OpenAI Configuration
         OPENAI_BASE_URL = "https://openrouter.ai/api/v1";
         OPENAI_MODEL = "gpt-5-mini";
+
+        # Proxy Configuration
+        FORWARDED_ALLOW_IPS = "*";
       };
     };
 
