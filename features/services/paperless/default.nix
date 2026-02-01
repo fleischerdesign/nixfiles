@@ -44,7 +44,7 @@ in
         
         # Network / Proxy Configuration
         PAPERLESS_USE_X_FORWARDED_HOST = "true";
-        PAPERLESS_PROXY_SSL_HEADER = "['HTTP_X_FORWARDED_PROTO', 'https']";
+        PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
         # Fix SSL/Connectivity in Sandbox
         SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
         REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
