@@ -87,18 +87,13 @@ in
       RestrictRealtime = lib.mkForce false;
       LockPersonality = lib.mkForce false;
       MemoryDenyWriteExecute = lib.mkForce false;
+      EnvironmentFile = config.sops.templates."paperless.env".path;
     };
 
-    # Mirror relaxation to other components that share namespaces or are linked
+    # Apply the same relaxed config to all Paperless services
     systemd.services.paperless-consumer.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
     systemd.services.paperless-task-queue.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
     systemd.services.paperless-scheduler.serviceConfig = config.systemd.services.paperless-web.serviceConfig;
-
-    # Inject the complex OIDC config via EnvironmentFile to all Paperless services
-    systemd.services.paperless-web.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-    systemd.services.paperless-consumer.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-    systemd.services.paperless-task-queue.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-    systemd.services.paperless-scheduler.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
