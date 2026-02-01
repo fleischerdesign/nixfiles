@@ -15,7 +15,7 @@ in
     # 1. SOPS Secret for OIDC
     sops.secrets.paperless_oidc_secret = { };
 
-    # 2. Template for the complex JSON Auth variable - FIX: Removed trailing slash in server_url
+    # 2. Template for the complex JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -27,7 +27,8 @@ in
                 client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
                 secret = config.sops.placeholder.paperless_oidc_secret;
                 settings = {
-                  server_url = "https://auth.ancoris.ovh/application/o/paperless";
+                  server_url = "https://auth.ancoris.ovh/application/o/paperless/.well-known/openid-configuration";
+                  timeout = 30;
                 };
               }
             ];
@@ -38,7 +39,6 @@ in
         PAPERLESS_USE_X_FORWARDED_PORT=true
         PAPERLESS_FORWARDED_ALLOW_IPS=*
         PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
-        PAPERLESS_TRUSTED_PROXIES=127.0.0.1
       '';
     };
 
@@ -64,7 +64,6 @@ in
         
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
-        PAPERLESS_DEBUG = "true";
       };
     };
 
@@ -79,44 +78,33 @@ in
       ];
     };
 
-    # Systemd services configuration
-    systemd.services = 
-      let
-        debugConfig = {
-          PrivateNetwork = lib.mkForce false;
-          # Force IPv4 only to avoid the 5s IPv6 timeout hang in the sandbox
-          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_NETLINK" ];
-          SystemCallFilter = lib.mkForce [ ];
-          PrivateUsers = lib.mkForce false;
-          RestrictNamespaces = lib.mkForce false;
-          PrivateDevices = lib.mkForce false;
-          PrivateMounts = lib.mkForce false;
-          PrivateTmp = lib.mkForce false;
-          ProtectSystem = lib.mkForce false;
-          ProtectHome = lib.mkForce false;
-          ProtectHostname = lib.mkForce false;
-          ProtectKernelLogs = lib.mkForce false;
-          ProtectKernelModules = lib.mkForce false;
-          ProtectKernelTunables = lib.mkForce false;
-          ProtectControlGroups = lib.mkForce false;
-          RestrictRealtime = lib.mkForce false;
-          LockPersonality = lib.mkForce false;
-          MemoryDenyWriteExecute = lib.mkForce false;
-          EnvironmentFile = config.sops.templates."paperless.env".path;
-        };
-      in
-      {
-        paperless-web = {
-          serviceConfig = debugConfig;
-          environment = {
-            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-          };
-        };
-        paperless-consumer.serviceConfig = debugConfig;
-        paperless-task-queue.serviceConfig = debugConfig;
-        paperless-scheduler.serviceConfig = debugConfig;
-      };
+    # SYSTEMD NETWORK FIX: Individual overrides to keep ExecStart intact
+    systemd.services.paperless-web.serviceConfig = {
+      PrivateNetwork = lib.mkForce false;
+      RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_NETLINK" ];
+      EnvironmentFile = config.sops.templates."paperless.env".path;
+    };
+    systemd.services.paperless-consumer.serviceConfig = {
+      PrivateNetwork = lib.mkForce false;
+      RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_NETLINK" ];
+      EnvironmentFile = config.sops.templates."paperless.env".path;
+    };
+    systemd.services.paperless-task-queue.serviceConfig = {
+      PrivateNetwork = lib.mkForce false;
+      RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_NETLINK" ];
+      EnvironmentFile = config.sops.templates."paperless.env".path;
+    };
+    systemd.services.paperless-scheduler.serviceConfig = {
+      PrivateNetwork = lib.mkForce false;
+      RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_NETLINK" ];
+      EnvironmentFile = config.sops.templates."paperless.env".path;
+    };
+
+    # Provide SSL certs to the web process environment
+    systemd.services.paperless-web.environment = {
+      SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+      REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+    };
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
