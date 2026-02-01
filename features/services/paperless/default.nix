@@ -18,7 +18,7 @@ in
     # 2. Template for the complex JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
-        PAPERLESS_SOCIALACCOUNT_PROVIDERS={"openid_connect":{"APPS":[{"provider_id":"authentik","name":"Authentik","client_id":"INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2","secret":"${config.sops.placeholder.paperless_oidc_secret}","settings":{"server_url":"https://auth.ancoris.ovh/application/o/paperless/.well-known/openid-configuration"}}]}"}
+        PAPERLESS_SOCIALACCOUNT_PROVIDERS={"openid_connect":{"APPS":[{"provider_id":"authentik","name":"Authentik","client_id":"INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2","secret":"${config.sops.placeholder.paperless_oidc_secret}","settings":{"server_url":"https://auth.ancoris.ovh/application/o/paperless/.well-known/openid-configuration"}}]}}
         PAPERLESS_USE_X_FORWARD_HOST=true
         PAPERLESS_USE_X_FORWARDED_PORT=true
         PAPERLESS_FORWARDED_ALLOW_IPS=*
@@ -89,17 +89,17 @@ in
         };
       in
       {
-        paperless-web.serviceConfig = debugConfig;
+        paperless-web = {
+          serviceConfig = debugConfig;
+          environment = {
+            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+          };
+        };
         paperless-consumer.serviceConfig = debugConfig;
         paperless-task-queue.serviceConfig = debugConfig;
         paperless-scheduler.serviceConfig = debugConfig;
       };
-
-    # Provide SSL certs to the web process environment
-    systemd.services.paperless-web.environment = {
-      SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-      REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-    };
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
