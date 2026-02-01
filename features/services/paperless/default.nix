@@ -15,7 +15,7 @@ in
     # 1. SOPS Secret for OIDC
     sops.secrets.paperless_oidc_secret = { };
 
-    # 2. Template for the complex JSON Auth variable
+    # 2. Template for the sensitive JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
         PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
@@ -34,10 +34,6 @@ in
             OAUTH_PKCE_ENABLED = "True";
           };
         }}
-        PAPERLESS_USE_X_FORWARD_HOST=true
-        PAPERLESS_USE_X_FORWARDED_PORT=true
-        PAPERLESS_FORWARDED_ALLOW_IPS=*
-        PAPERLESS_PROXY_SSL_HEADER=["HTTP_X_FORWARDED_PROTO", "https"]
       '';
     };
 
@@ -61,9 +57,14 @@ in
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
         
+        # Reverse Proxy Configuration (Fixed names)
+        PAPERLESS_USE_X_FORWARD_HOST = "true";
+        PAPERLESS_USE_X_FORWARDED_PORT = "true";
+        PAPERLESS_FORWARDED_ALLOW_IPS = "*";
+        PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
+
         # Enable OIDC
         PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
-        PAPERLESS_DEBUG = "true";
       };
     };
 
@@ -78,43 +79,27 @@ in
       ];
     };
 
-    # Systemd overrides for all paperless components
+    # Restore Hardening but keep the Breakthrough Network Fixes
     systemd.services = 
       let
-        debugConfig = {
+        netConfig = {
           PrivateNetwork = lib.mkForce false;
-          RestrictAddressFamilies = lib.mkForce [ ]; # Allow all families to prevent IPv6/IPv4 selection issues
-          SystemCallFilter = lib.mkForce [ ];
-          PrivateUsers = lib.mkForce false;
-          RestrictNamespaces = lib.mkForce false;
-          PrivateDevices = lib.mkForce false;
-          PrivateMounts = lib.mkForce false;
-          PrivateTmp = lib.mkForce false;
-          ProtectSystem = lib.mkForce false;
-          ProtectHome = lib.mkForce false;
-          ProtectHostname = lib.mkForce false;
-          ProtectKernelLogs = lib.mkForce false;
-          ProtectKernelModules = lib.mkForce false;
-          ProtectKernelTunables = lib.mkForce false;
-          ProtectControlGroups = lib.mkForce false;
-          RestrictRealtime = lib.mkForce false;
-          LockPersonality = lib.mkForce false;
-          MemoryDenyWriteExecute = lib.mkForce false;
+          RestrictAddressFamilies = lib.mkForce [ "AF_UNIX" "AF_INET" "AF_INET6" "AF_NETLINK" ];
           EnvironmentFile = config.sops.templates."paperless.env".path;
         };
       in
       {
-        paperless-web = {
-          serviceConfig = debugConfig;
-          environment = {
-            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-          };
-        };
-        paperless-consumer.serviceConfig = debugConfig;
-        paperless-task-queue.serviceConfig = debugConfig;
-        paperless-scheduler.serviceConfig = debugConfig;
+        paperless-web.serviceConfig = netConfig;
+        paperless-consumer.serviceConfig = netConfig;
+        paperless-task-queue.serviceConfig = netConfig;
+        paperless-scheduler.serviceConfig = netConfig;
       };
+
+    # Provide SSL certs to the web process environment (essential for OIDC)
+    systemd.services.paperless-web.environment = {
+      SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+      REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+    };
 
     # Scanner Service (OCI Container)
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
