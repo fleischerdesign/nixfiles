@@ -64,5 +64,8 @@ in
       duf
       ripgrep
     ];
+
+    # Global Sops Configuration
+    sops.defaultSopsFile = ../../../secrets/secrets.yaml;
   };
 }

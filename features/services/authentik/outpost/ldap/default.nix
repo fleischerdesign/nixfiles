@@ -7,7 +7,6 @@ in
 
   config = lib.mkIf cfg.enable {
     # Secrets Setup
-    sops.defaultSopsFile = ../../../../../secrets/secrets.yaml;
     sops.secrets."authentik_outpost_ldap_token" = {
       owner = "authentik-outpost-ldap";
       restartUnits = [ "authentik-outpost-ldap.service" ];

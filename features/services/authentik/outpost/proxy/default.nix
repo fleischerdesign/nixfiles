@@ -7,7 +7,6 @@ in
 
   config = lib.mkIf cfg.enable {
     # 1. Secrets Setup
-    sops.defaultSopsFile = ../../../../../secrets/secrets.yaml;
     sops.secrets."authentik_outpost_proxy_token" = {
       owner = "authentik-outpost";
       # Restart service when secret changes
