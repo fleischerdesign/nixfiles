@@ -44,6 +44,8 @@
     auth = false;
   };
 
+  my.features.services.cloudflare-dyndns.domains = [ "ancoris.ovh" ];
+
   # State version setting
   system.stateVersion = "24.11"; 
 
