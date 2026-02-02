@@ -15,6 +15,7 @@
     services.jellyfin.enable = true;
     services.recyclarr.enable = true;
     services.blocky.enable = true;
+    services.bazarr.enable = true;
     services.jellyseerr.enable = true;
     services.cloudflare-dyndns.enable = true;
     services.caddy.enable = true;

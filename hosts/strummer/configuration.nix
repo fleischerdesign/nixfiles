@@ -73,6 +73,10 @@
 
   my.features.services.recyclarr.enable = true;
 
+  my.features.services.blocky.enable = true;
+
+  my.features.services.bazarr.expose.enable = true;
+
   my.features.services.jellyseerr.expose.enable = true;
 
   my.features.services.cloudflare-dyndns.domains = [ "ancoris.ovh" ];
