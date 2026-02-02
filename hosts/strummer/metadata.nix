@@ -13,6 +13,7 @@
     services.sabnzbd.enable = true;
     services.sonarr.enable = true;
     services.recyclarr.enable = true;
+    services.blocky.enable = true;
     services.jellyseerr.enable = true;
     services.cloudflare-dyndns.enable = true;
     services.caddy.enable = true;
