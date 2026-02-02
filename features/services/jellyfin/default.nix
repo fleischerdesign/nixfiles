@@ -20,7 +20,7 @@ in
       # Native Hardware Acceleration (New in NixOS 24.11/25.05+)
       hardwareAcceleration = {
         enable = true;
-        type = "qsv"; # Intel QuickSync - the best choice for your Intel CPU
+        type = "vaapi"; # Use VAAPI directly instead of QSV to avoid MFX session errors
         device = "/dev/dri/renderD128";
       };
 
