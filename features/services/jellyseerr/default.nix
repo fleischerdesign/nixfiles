@@ -21,7 +21,6 @@ in
       ];
       volumes = [
         "/var/lib/jellyseerr:/app/config"
-        "/etc/ssl/certs/ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro"
       ];
       environment = {
         TZ = "Europe/Berlin";
