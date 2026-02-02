@@ -37,7 +37,7 @@ in
             quality_profiles:
               - name: HD-1080p
                 upgrade:
-                  default: true
+                  allowed: true
                   until_score: 150
                 min_format_score: 0
 
@@ -62,7 +62,7 @@ in
             quality_profiles:
               - name: HD-1080p
                 upgrade:
-                  default: true
+                  allowed: true
                   until_score: 150
                 min_format_score: 0
       '';
