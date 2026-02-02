@@ -27,7 +27,7 @@ in
       # Transcoding optimizations
       transcoding = {
         enableHardwareEncoding = true;
-        enableIntelLowPowerEncoding = true; # Improves efficiency on newer Intel CPUs
+        enableIntelLowPowerEncoding = false; # Skylake/Gen9 does not support Low Power encoding
         enableToneMapping = true; # Essential for watching HDR content on non-HDR screens
       };
     };
@@ -38,6 +38,7 @@ in
       extraPackages = with pkgs; [
         intel-media-driver # Modern Intel driver (Broadwell and newer)
         intel-vaapi-driver # Older Intel driver
+        intel-compute-runtime # OpenCL support for Tone Mapping
         libvdpau-va-gl
       ];
     };
