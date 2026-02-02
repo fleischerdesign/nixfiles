@@ -34,6 +34,13 @@ in
                   - name: HD-1080p
                     score: 150
 
+            quality_profiles:
+              - name: HD-1080p
+                upgrade:
+                  default: true
+                  until_score: 150
+                min_format_score: 0
+
         sonarr:
           sonarr-instance:
             base_url: http://localhost:8989
@@ -51,6 +58,13 @@ in
                 assign_scores_to:
                   - name: HD-1080p
                     score: 150
+
+            quality_profiles:
+              - name: HD-1080p
+                upgrade:
+                  default: true
+                  until_score: 150
+                min_format_score: 0
       '';
     };
 
