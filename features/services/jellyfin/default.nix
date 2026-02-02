@@ -16,24 +16,33 @@ in
     services.jellyfin = {
       enable = true;
       openFirewall = true;
+
+      # Native Hardware Acceleration (New in NixOS 24.11/25.05+)
+      hardwareAcceleration = {
+        enable = true;
+        type = "qsv"; # Intel QuickSync - the best choice for your Intel CPU
+        device = "/dev/dri/renderD128";
+      };
+
+      # Transcoding optimizations
+      transcoding = {
+        enableHardwareEncoding = true;
+        enableIntelLowPowerEncoding = true; # Improves efficiency on newer Intel CPUs
+        enableToneMapping = true; # Essential for watching HDR content on non-HDR screens
+      };
     };
 
-    # Hardware acceleration for Intel (QuickSync)
-    nixpkgs.config.packageOverrides = pkgs: {
-      vaapiIntel = pkgs.vaapiIntel.override { enableHybridCodec = true; };
-    };
-    
+    # System-level graphics support
     hardware.graphics = {
       enable = true;
       extraPackages = with pkgs; [
-        intel-media-driver
-        intel-vaapi-driver
-        vaapiVdpau
+        intel-media-driver # Modern Intel driver (Broadwell and newer)
+        intel-vaapi-driver # Older Intel driver
         libvdpau-va-gl
       ];
     };
 
-    # Add jellyfin to media group to read movies and tv shows
+    # Permissions
     users.groups.media = { };
     users.users.jellyfin.extraGroups = [ "media" "video" "render" ];
 
@@ -41,7 +50,7 @@ in
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "jellyfin" = {
         port = 8096;
-        auth = cfg.expose.auth; # Usually false because Jellyfin has its own auth/OIDC
+        auth = cfg.expose.auth; 
         subdomain = cfg.expose.subdomain;
       };
     };
