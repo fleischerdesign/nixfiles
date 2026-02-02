@@ -25,7 +25,6 @@ in
       environment = {
         TZ = "Europe/Berlin";
         NODE_ENV = "production";
-        LOG_LEVEL = "debug";
       };
     };
 
