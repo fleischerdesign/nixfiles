@@ -29,6 +29,10 @@ in
                 assign_scores_to:
                   - name: HD-1080p
                     score: 100
+              - trash_ids: [f845be10da4f442654c13e1f2c3d6cd5] # German DL
+                assign_scores_to:
+                  - name: HD-1080p
+                    score: 150
 
         sonarr:
           sonarr-instance:
@@ -43,6 +47,10 @@ in
                 assign_scores_to:
                   - name: HD-1080p
                     score: 100
+              - trash_ids: [ed51973a811f51985f14e2f6f290e47a] # German DL
+                assign_scores_to:
+                  - name: HD-1080p
+                    score: 150
       '';
     };
 
