@@ -16,9 +16,8 @@ in
     # Run Jellyseerr as an OCI Container
     virtualisation.oci-containers.containers."jellyseerr" = {
       image = "docker.io/fallenbagel/jellyseerr:preview-OIDC";
-      ports = [ "127.0.0.1:5055:5055" ];
       extraOptions = [
-        "--add-host=host.containers.internal:host-gateway"
+        "--network=host"
       ];
       volumes = [
         "/var/lib/jellyseerr:/app/config"
