@@ -66,7 +66,10 @@
     auth = true;
   };
 
-  my.features.services.jellyfin.expose.enable = true;
+  my.features.services.jellyfin.expose = {
+    enable = true;
+    subdomain = "jellyfin";
+  };
 
   my.features.services.recyclarr.enable = true;
 
