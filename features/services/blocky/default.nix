@@ -11,9 +11,8 @@ in
     services.blocky = {
       enable = true;
       settings = {
-        # Network configuration
-        ports.dns = 53; # Standard DNS port
-        host = "0.0.0.0";
+        # Network configuration - Blocky expects the port or address:port
+        ports.dns = 53; 
 
         # Upstream DNS (using DNS-over-HTTPS for privacy)
         upstream.default = [
@@ -31,12 +30,10 @@ in
           clientGroupsBlock = {
             default = [ "ads" ];
           };
-          # If a site is blocked, return an IP that simply doesn't respond
-          # instead of 0.0.0.0 (often faster for browsers)
           blockType = "zeroIp";
         };
 
-        # Redis Caching (using your existing Redis feature)
+        # Redis Caching
         redis = {
           address = "localhost:6379";
           database = 0;
@@ -49,7 +46,7 @@ in
           prefetching = true;
         };
 
-        # Enable Prometheus metrics (handy for future dashboards)
+        # Enable Prometheus metrics
         prometheus = {
           enable = true;
           path = "/metrics";
