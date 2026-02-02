@@ -66,6 +66,8 @@
     auth = true;
   };
 
+  my.features.services.jellyfin.expose.enable = true;
+
   my.features.services.recyclarr.enable = true;
 
   my.features.services.jellyseerr.expose.enable = true;

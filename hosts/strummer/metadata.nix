@@ -12,6 +12,7 @@
     services.radarr.enable = true;
     services.sabnzbd.enable = true;
     services.sonarr.enable = true;
+    services.jellyfin.enable = true;
     services.recyclarr.enable = true;
     services.blocky.enable = true;
     services.jellyseerr.enable = true;
