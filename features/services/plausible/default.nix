@@ -12,6 +12,13 @@ in
     # ClickHouse Database (Required for Plausible)
     services.clickhouse.enable = true;
 
+    # Create user/group explicitly so sops can assign secrets
+    users.users.plausible = {
+      isSystemUser = true;
+      group = "plausible";
+    };
+    users.groups.plausible = {};
+
     services.plausible = {
       enable = true;
       
