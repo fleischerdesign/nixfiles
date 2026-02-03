@@ -4,6 +4,7 @@
   imports = [
     ./hardware-configuration.nix
     ./hardware-specific.nix
+    ./disk-config.nix
   ];
 
   networking.hostName = "mackaye";

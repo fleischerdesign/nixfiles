@@ -13,16 +13,7 @@
   boot.kernelModules = [ ];
   boot.extraModulePackages = [ ];
 
-  fileSystems."/" =
-    { device = "/dev/disk/by-label/nixos";
-      fsType = "ext4";
-    };
-
-  fileSystems."/boot" =
-    { device = "/dev/disk/by-label/boot";
-      fsType = "vfat";
-    };
-
+  # File systems are managed by Disko (disk-config.nix)
   swapDevices = [ ];
 
   networking.useDHCP = lib.mkDefault true;

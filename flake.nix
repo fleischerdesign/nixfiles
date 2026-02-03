@@ -44,6 +44,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
   };
 
   outputs =
@@ -55,6 +60,7 @@
       home-manager-unstable,
       nixvim,
       spicetify-nix,
+      disko,
       ...
     }@inputs:
     let
@@ -106,6 +112,7 @@
           system = "x86_64-linux";
           hostname = "mackaye";
           inputs = inputs;
+          extraModules = [ inputs.disko.nixosModules.disko ];
           users = [
             {
               name = "philipp";
