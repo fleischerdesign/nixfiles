@@ -20,6 +20,13 @@ in
           "https://dns.google/dns-query"
         ];
 
+        # Custom DNS Mapping (Split DNS)
+        customDNS = {
+          mapping = {
+            "fls.ancoris.ovh" = "192.168.178.27";
+          };
+        };
+
         # Ad-blocking configuration
         blocking = {
           blackLists = {
