@@ -9,13 +9,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # SOPS Secret for OIDC
-    sops.secrets.grafana_oidc_client_secret = {
-      owner = "grafana";
-    };
+    # SOPS Secrets for OIDC
+    sops.secrets.grafana_oidc_client_secret = { owner = "grafana"; };
+    sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
 
-    # Template to provide the secret as an environment variable
+    # Template to provide secrets as environment variables
     sops.templates."grafana.env".content = ''
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
     '';
 
@@ -34,14 +34,13 @@ in
           enabled = true;
           name = "Authentik";
           allow_sign_up = true;
-          client_id = "grafana"; # Make sure this matches your Authentik setup
+          client_id = "$__ENV{GF_AUTH_GENERIC_OAUTH_CLIENT_ID}";
           client_secret = "$__ENV{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}";
           scopes = "openid profile email";
           auth_url = "https://auth.ancoris.ovh/application/o/authorize/";
           token_url = "https://auth.ancoris.ovh/application/o/token/";
           api_url = "https://auth.ancoris.ovh/application/o/userinfo/";
           # Map Authentik groups to Grafana roles
-          # Requires a group named "Grafana Admins" in Authentik for Admin access
           role_attribute_path = "contains(groups, 'Grafana Admins') && 'Admin' || 'Viewer'";
         };
       };
