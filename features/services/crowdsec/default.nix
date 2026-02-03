@@ -11,13 +11,21 @@ in
     services.crowdsec = {
       enable = true;
 
-      localConfig.acquisitions = [
-        {
-          filenames = [ "/var/lib/caddy/access-*.log" ];
-          labels.type = "caddy";
-        }
-        {
-          source = "journalctl";
+          localConfig.acquisitions = [
+
+            {
+
+              filenames = [ "/var/log/caddy/access-*.log" ];
+
+              labels.type = "caddy";
+
+            }
+
+            {
+
+              source = "journalctl";
+
+      
           journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
           labels.type = "syslog";
         }
@@ -40,7 +48,7 @@ in
     };
 
     # Manually grant journal access to crowdsec
-    users.users.crowdsec.extraGroups = [ "systemd-journal" ];
+    users.users.crowdsec.extraGroups = [ "systemd-journal" "caddy" ];
 
     services.crowdsec-firewall-bouncer = {
       enable = true;
