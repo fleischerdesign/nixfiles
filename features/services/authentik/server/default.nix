@@ -83,11 +83,11 @@ in
       ];
     };
 
-    # 5. Reverse Proxy
+    # Reverse Proxy
     my.features.services.caddy.exposedServices = {
       "authentik" = {
         port = 9000;
-        fullDomain = "auth.ancoris.ovh";
+        subdomain = "authentik";
       };
     };
 
