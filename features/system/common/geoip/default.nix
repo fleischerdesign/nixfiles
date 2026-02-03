@@ -13,16 +13,11 @@ in
       enable = true;
       settings = {
         AccountID = 1180469;
-        LicenseKey = "000000000000"; # Dummy value, overridden by EnvironmentFile
+        LicenseKey = config.sops.secrets.geoip_license_key.path;
         EditionIDs = [ "GeoLite2-City" ];
       };
     };
 
-    # geoipupdate expects GEOIPUPDATE_ACCOUNT_ID and GEOIPUPDATE_LICENSE_KEY in this file
-    systemd.services.geoipupdate.serviceConfig.EnvironmentFile = [
-      config.sops.secrets.geoip_env.path
-    ];
-
-    sops.secrets.geoip_env = { };
+    sops.secrets.geoip_license_key = { };
   };
 }
