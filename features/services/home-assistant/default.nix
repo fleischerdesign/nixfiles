@@ -25,6 +25,7 @@ in
         "cast" # Google Cast / Chromecast
         "ipp" # Internet Printing Protocol (Printers)
         "androidtv_remote" # Fix for ModuleNotFoundError: No module named 'androidtvremote2'
+        "mqtt"
       ];
       config = {
         # This generates the configuration.yaml
