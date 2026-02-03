@@ -10,7 +10,6 @@ in
   config = lib.mkIf cfg.enable {
     services.crowdsec = {
       enable = true;
-      allowLocalJournalAccess = true;
 
       localConfig.acquisitions = [
         {
@@ -30,6 +29,9 @@ in
         };
       };
     };
+
+    # Manually grant journal access to crowdsec
+    users.users.crowdsec.extraGroups = [ "systemd-journal" ];
 
     services.crowdsec-firewall-bouncer = {
       enable = true;
