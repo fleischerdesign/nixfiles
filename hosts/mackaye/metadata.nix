@@ -3,6 +3,7 @@
   features = {
     # Basic Infrastructure
     system.networking.tailscale.enable = true;
+    system.common.geoip.enable = true;
     services.caddy.enable = true;
     services.monitoring.node-exporter.enable = true;
         # Core Services

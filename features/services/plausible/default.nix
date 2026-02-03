@@ -27,7 +27,7 @@ in
         secretKeybaseFile = config.sops.secrets.plausible_secret_key_base.path;
         port = 8000;
         listenAddress = "127.0.0.1";
-        disableRegistration = false; # Enable initially to create admin user
+        disableRegistration = false; 
       };
 
       database = {
@@ -38,6 +38,11 @@ in
         };
       };
     };
+
+    # Inject GeoIP path from the central geoipupdate service
+    systemd.services.plausible.serviceConfig.Environment = [
+      "IP_GEOLOCATION_DB=/var/lib/GeoIP/GeoLite2-City.mmdb"
+    ];
 
     # Ensure Postgres DB exists in the central instance
     services.postgresql = {
@@ -54,7 +59,7 @@ in
     my.features.services.caddy.exposedServices = {
       "plausible" = {
         port = 8000;
-        subdomain = "plausible"; # Result: plausible.mky.ancoris.ovh
+        subdomain = "plausible";
       };
     };
 
