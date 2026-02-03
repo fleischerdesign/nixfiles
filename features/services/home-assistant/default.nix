@@ -26,6 +26,7 @@ in
         "ipp" # Internet Printing Protocol (Printers)
         "androidtv_remote" # Fix for ModuleNotFoundError: No module named 'androidtvremote2'
         "mqtt"
+        "google_translate" # gTTS
       ];
       config = {
         # This generates the configuration.yaml
