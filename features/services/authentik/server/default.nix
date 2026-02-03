@@ -1,10 +1,10 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.my.features.services.authentik;
+  cfg = config.my.features.services.authentik.server;
 in
 {
-  options.my.features.services.authentik = {
+  options.my.features.services.authentik.server = {
     enable = lib.mkEnableOption "Authentik Identity Provider (Server)";
   };
 
