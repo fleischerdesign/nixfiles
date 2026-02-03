@@ -31,6 +31,12 @@ in
       config = {
         # This generates the configuration.yaml
         default_config = {};
+        
+        # Enable UI editing
+        "automation ui" = "!include automations.yaml";
+        "script ui" = "!include scripts.yaml";
+        "scene ui" = "!include scenes.yaml";
+
         http = {
           server_port = 8123;
           use_x_forwarded_for = true;
