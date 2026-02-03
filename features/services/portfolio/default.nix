@@ -50,6 +50,11 @@ in
       "d /var/lib/portfolio/.data/applications 0750 portfolio portfolio -"
       "d /var/lib/portfolio/.data/content 0750 portfolio portfolio -"
       "d /var/lib/portfolio/.data/uploads 0750 portfolio portfolio -"
+      
+      # Link migrations from the store to the working directory
+      "d /var/lib/portfolio/server 0750 portfolio portfolio -"
+      "d /var/lib/portfolio/server/db 0750 portfolio portfolio -"
+      "L+ /var/lib/portfolio/server/db/migrations - - - - ${inputs.portfolio.packages.${pkgs.system}.default}/lib/portfolio/server/db/migrations"
     ];
 
     # Define user and group
