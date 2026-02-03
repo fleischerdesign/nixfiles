@@ -49,9 +49,11 @@ in
         api_key_file = config.sops.secrets.crowdsec_bouncer_api_key.path;
       };
     };
+
+    # Fix permission issues with sops secrets by disabling DynamicUser
+    systemd.services.crowdsec-firewall-bouncer.serviceConfig.DynamicUser = lib.mkForce false;
     
-    sops.secrets.crowdsec_bouncer_api_key = { 
-        restartUnits = [ "crowdsec-firewall-bouncer.service" ];
-    };
+    # Secret definition - restart units if secret changes
+    sops.secrets.crowdsec_bouncer_api_key = {
   };
 }
