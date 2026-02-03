@@ -20,7 +20,7 @@ in
         };
       };
 
-      provisioning = {
+      provision = {
         datasources.settings.datasources = [
           {
             name = "Prometheus";
