@@ -23,6 +23,9 @@ in
         # Database URL for Drizzle/Libsql (Absolute Path)
         NUXT_DB_URL = "file:/var/lib/portfolio/.data/db.sqlite";
         
+        # Plausible Integration
+        NUXT_PUBLIC_PLAUSIBLE_API_HOST = "https://plausible.mky.ancoris.ovh";
+        
         # Puppeteer runtime fix: Use system chromium
         PUPPETEER_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
       };
