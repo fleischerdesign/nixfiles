@@ -7,12 +7,17 @@ in
     enable = lib.mkEnableOption "CrowdSec IPS";
   };
 
-  config = lib.mkIf cfg.enable {
-    services.crowdsec = {
-      enable = true;
-
-          localConfig.acquisitions = [
-
+    config = lib.mkIf cfg.enable {
+      services.crowdsec = {
+        enable = true;
+        
+        # Install required collections
+        hub.collections = [
+          "crowdsecurity/linux"
+          "crowdsecurity/caddy"
+        ];
+  
+        localConfig.acquisitions = [
             {
 
               filenames = [ "/var/log/caddy/access-*.log" ];
