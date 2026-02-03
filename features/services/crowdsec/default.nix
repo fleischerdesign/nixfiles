@@ -22,16 +22,6 @@ in
           labels.type = "syslog";
         }
       ];
-
-      settings = {
-        general = {
-          api = {
-            server = {
-              listen_uri = "127.0.0.1:8085";
-            };
-          };
-        };
-      };
     };
 
     # Manually grant journal access to crowdsec
@@ -40,7 +30,7 @@ in
     services.crowdsec-firewall-bouncer = {
       enable = true;
       settings = {
-        api_url = "http://127.0.0.1:8085/";
+        api_url = "http://127.0.0.1:8080/";
         api_key_file = config.sops.secrets.crowdsec_bouncer_api_key.path;
       };
     };
