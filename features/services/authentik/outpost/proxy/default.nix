@@ -41,7 +41,7 @@ in
         
         # Configure connection to Authentik Core via Tailscale
         Environment = [
-            "AUTHENTIK_HOST=http://100.120.39.68:9000"
+            "AUTHENTIK_HOST=http://100.120.39.68:9005"
             "AUTHENTIK_HOST_BROWSER=https://auth.ancoris.ovh"
             "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
             # Listen on localhost:9000

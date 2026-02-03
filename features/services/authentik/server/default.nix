@@ -39,7 +39,8 @@ in
           "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
           "AUTHENTIK_POSTGRESQL__NAME=authentik"
           "AUTHENTIK_POSTGRESQL__USER=authentik"
-          "AUTHENTIK_LISTEN__HTTP=0.0.0.0:9000"
+          # Listen on 9005 (to avoid conflict with ClickHouse on 9000)
+          "AUTHENTIK_LISTEN__HTTP=0.0.0.0:9005"
           "AUTHENTIK_LISTEN__METRICS=0.0.0.0:9300"
           "AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS=127.0.0.0/8,100.64.0.0/10"
           "AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true"
@@ -84,10 +85,10 @@ in
       ];
     };
 
-    # Reverse Proxy using the fixed domain
+    # 5. Reverse Proxy
     my.features.services.caddy.exposedServices = {
       "authentik" = {
-        port = 9000;
+        port = 9005;
         fullDomain = "auth.ancoris.ovh";
       };
     };
