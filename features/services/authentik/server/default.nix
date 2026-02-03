@@ -36,7 +36,7 @@ in
         Environment = [
           "AUTHENTIK_REDIS__HOST=127.0.0.1"
           "AUTHENTIK_REDIS__PORT=6379"
-          "AUTHENTIK_POSTGRESQL__HOST=localhost" # or socket dir
+          "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
           "AUTHENTIK_POSTGRESQL__NAME=authentik"
           "AUTHENTIK_POSTGRESQL__USER=authentik"
           # Listen on localhost:9000 (Caddy proxies to this)
@@ -64,7 +64,7 @@ in
         Environment = [
           "AUTHENTIK_REDIS__HOST=127.0.0.1"
           "AUTHENTIK_REDIS__PORT=6379"
-          "AUTHENTIK_POSTGRESQL__HOST=localhost"
+          "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
           "AUTHENTIK_POSTGRESQL__NAME=authentik"
           "AUTHENTIK_POSTGRESQL__USER=authentik"
         ];
