@@ -77,6 +77,8 @@
 
   my.features.services.blocky.enable = true;
 
+  my.features.services.crowdsec.enable = true;
+
   my.features.services.bazarr.expose.enable = true;
 
   my.features.services.jellyseerr.expose.enable = true;
