@@ -39,11 +39,11 @@ in
         # Load the token from the sops template
         EnvironmentFile = config.sops.templates."authentik-outpost.env".path;
         
-        # Configure connection to Authentik Core
+        # Configure connection to Authentik Core via Tailscale
         Environment = [
-            "AUTHENTIK_HOST=https://auth.ancoris.ovh"
+            "AUTHENTIK_HOST=http://100.120.39.68:9000"
             "AUTHENTIK_HOST_BROWSER=https://auth.ancoris.ovh"
-            "AUTHENTIK_INSECURE_SKIP_VERIFY=false"
+            "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
             # Listen on localhost:9000
             "AUTHENTIK_HTTP_ADDRESS=127.0.0.1:9000"
             "AUTHENTIK_METRICS_ADDRESS=127.0.0.1:9300"

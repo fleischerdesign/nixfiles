@@ -34,9 +34,13 @@ in
         ExecStart = lib.getExe pkgs.authentik-outposts.ldap;
         EnvironmentFile = config.sops.templates."authentik-outpost-ldap.env".path;
         
+        # Configure connection to Authentik Core via Tailscale
         Environment = [
-            "AUTHENTIK_HOST=https://auth.ancoris.ovh"
-            "AUTHENTIK_INSECURE_SKIP_VERIFY=false"
+            "AUTHENTIK_HOST=http://100.120.39.68:9000"
+            "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
+            # Listen on all interfaces for LDAP
+            "AUTHENTIK_LDAP__LISTEN__0_0_0_0=389"
+            "AUTHENTIK_LDAP__LISTEN__METRICS=127.0.0.1:9301"
         ];
         
         Restart = "always";
