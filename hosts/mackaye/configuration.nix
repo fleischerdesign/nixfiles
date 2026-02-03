@@ -28,6 +28,16 @@
   # Tailscale (Mesh VPN)
   my.features.system.networking.tailscale.enable = true;
 
+  # Network Configuration (Static IP)
+  networking.useDHCP = false;
+  networking.interfaces.ens18.useDHCP = false;
+  networking.defaultGateway = "37.114.55.1";
+  networking.nameservers = [ "1.1.1.1" "8.8.8.8" ];
+  networking.interfaces.ens18.ipv4.addresses = [ {
+    address = "37.114.55.91";
+    prefixLength = 24;
+  } ];
+
   # Monitoring Client
   my.features.services.monitoring.node-exporter.enable = true;
 
