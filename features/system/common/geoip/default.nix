@@ -12,6 +12,8 @@ in
     services.geoipupdate = {
       enable = true;
       settings = {
+        AccountID = 1180469;
+        LicenseKey = "000000000000"; # Dummy value, overridden by EnvironmentFile
         EditionIDs = [ "GeoLite2-City" ];
       };
     };
