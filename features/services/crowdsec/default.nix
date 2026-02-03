@@ -48,6 +48,12 @@ in
               enable = true; 
             };
           };
+          prometheus = {
+            enabled = true;
+            level = "full";
+            listen_addr = "0.0.0.0";
+            listen_port = 6060;
+          };
         };
       };
     };
