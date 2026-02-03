@@ -85,6 +85,10 @@
 
   my.features.services.cloudflare-dyndns.domains = [ "ancoris.ovh" ];
 
+  my.features.system.networking.tailscale.enable = true;
+
+  my.features.services.monitoring.node-exporter.enable = true;
+
   # State version setting
   system.stateVersion = "24.11"; 
 
