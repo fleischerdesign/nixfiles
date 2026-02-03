@@ -83,11 +83,11 @@ in
       ];
     };
 
-    # Reverse Proxy
+    # Reverse Proxy using the fixed domain
     my.features.services.caddy.exposedServices = {
       "authentik" = {
         port = 9000;
-        subdomain = "authentik";
+        fullDomain = "auth.ancoris.ovh";
       };
     };
 
