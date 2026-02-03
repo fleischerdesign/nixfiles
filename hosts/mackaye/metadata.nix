@@ -5,7 +5,11 @@
     system.networking.tailscale.enable = true;
     system.common.geoip.enable = true;
     services.caddy.enable = true;
-    services.monitoring.node-exporter.enable = true;
+        services.monitoring.node-exporter.enable = true;
+        services.monitoring.prometheus.enable = true;
+        services.monitoring.loki.enable = true;
+        services.monitoring.grafana.enable = true;
+        
         # Core Services
     services.postgresql.enable = true;
     services.redis.enable = true;
