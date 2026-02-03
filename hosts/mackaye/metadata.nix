@@ -11,6 +11,7 @@
     services.redis.enable = true;
     services.authentik.server.enable = true;
     services.plausible.enable = true;
+    services.portfolio.enable = true;
     
     # Dev Tools
     dev.nixvim.enable = true;

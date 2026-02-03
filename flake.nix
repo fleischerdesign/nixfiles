@@ -49,6 +49,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    portfolio = {
+      url = "github:fleischerdesign/portfolio";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
   };
 
   outputs =
@@ -61,6 +66,7 @@
       nixvim,
       spicetify-nix,
       disko,
+      portfolio,
       ...
     }@inputs:
     let
