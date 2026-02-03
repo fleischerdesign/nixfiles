@@ -55,5 +55,7 @@ in
     
     # Secret definition - restart units if secret changes
     sops.secrets.crowdsec_bouncer_api_key = {
+        restartUnits = [ "crowdsec-firewall-bouncer.service" ];
+    };
   };
 }
