@@ -13,14 +13,16 @@ in
     systemd.services.portfolio = {
       description = "Nuxt Portfolio Service";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" ];
+      after = [ "network.target" "postgresql.service" ];
 
       environment = {
         PORT = "3005";
         NITRO_PORT = "3005";
         NODE_ENV = "production";
-        # Path to your SQLite DBs
-        DATA_DIR = "/var/lib/portfolio/.data";
+        
+        # Database URL for Drizzle/Libsql (Absolute Path)
+        NUXT_DB_URL = "file:/var/lib/portfolio/.data/db.sqlite";
+        
         # Puppeteer runtime fix: Use system chromium
         PUPPETEER_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
       };
@@ -30,20 +32,31 @@ in
         ExecStart = "${inputs.portfolio.packages.${pkgs.system}.default}/bin/portfolio";
         User = "portfolio";
         Group = "portfolio";
+        
+        # Persistent state directory
         StateDirectory = "portfolio";
         WorkingDirectory = "/var/lib/portfolio";
+        
         Restart = "always";
-        # Load sensitive environment variables from sops
+        # Load all variables from the .env backup
         EnvironmentFile = config.sops.secrets.portfolio_env.path;
       };
     };
+
+    # Ensure all required data directories exist
+    systemd.tmpfiles.rules = [
+      "d /var/lib/portfolio 0750 portfolio portfolio -"
+      "d /var/lib/portfolio/.data 0750 portfolio portfolio -"
+      "d /var/lib/portfolio/.data/applications 0750 portfolio portfolio -"
+      "d /var/lib/portfolio/.data/content 0750 portfolio portfolio -"
+      "d /var/lib/portfolio/.data/uploads 0750 portfolio portfolio -"
+    ];
 
     # Define user and group
     users.users.portfolio = {
       isSystemUser = true;
       group = "portfolio";
       home = "/var/lib/portfolio";
-      createHome = true;
     };
     users.groups.portfolio = {};
 
