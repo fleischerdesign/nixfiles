@@ -12,7 +12,7 @@ in
       enable = true;
       allowLocalJournalAccess = true;
 
-      acquisitions = [
+      localConfig.acquisitions = [
         {
           filenames = [ "/var/lib/caddy/access-*.log" ];
           labels.type = "caddy";
