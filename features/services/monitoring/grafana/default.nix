@@ -9,6 +9,16 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # SOPS Secret for OIDC
+    sops.secrets.grafana_oidc_client_secret = {
+      owner = "grafana";
+    };
+
+    # Template to provide the secret as an environment variable
+    sops.templates."grafana.env".content = ''
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
+    '';
+
     services.grafana = {
       enable = true;
       settings = {
@@ -17,6 +27,22 @@ in
           http_port = 3000;
           domain = "grafana.mky.ancoris.ovh";
           root_url = "https://grafana.mky.ancoris.ovh";
+        };
+        
+        # OIDC Authentication with Authentik
+        "auth.generic_oauth" = {
+          enabled = true;
+          name = "Authentik";
+          allow_sign_up = true;
+          client_id = "grafana"; # Make sure this matches your Authentik setup
+          client_secret = "$__ENV{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}";
+          scopes = "openid profile email";
+          auth_url = "https://auth.ancoris.ovh/application/o/authorize/";
+          token_url = "https://auth.ancoris.ovh/application/o/token/";
+          api_url = "https://auth.ancoris.ovh/application/o/userinfo/";
+          # Map Authentik groups to Grafana roles
+          # Requires a group named "Grafana Admins" in Authentik for Admin access
+          role_attribute_path = "contains(groups, 'Grafana Admins') && 'Admin' || 'Viewer'";
         };
       };
 
@@ -36,6 +62,11 @@ in
         ];
       };
     };
+
+    # Load the environment file into the Grafana service
+    systemd.services.grafana.serviceConfig.EnvironmentFile = [
+      config.sops.templates."grafana.env".path
+    ];
 
     # Reverse Proxy
     my.features.services.caddy.exposedServices = {
