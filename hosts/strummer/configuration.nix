@@ -71,6 +71,8 @@
     subdomain = "jellyfin";
   };
 
+  my.features.dev.nixvim.enable = true;
+
   my.features.services.recyclarr.enable = true;
 
   my.features.services.blocky.enable = true;
