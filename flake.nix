@@ -102,6 +102,17 @@
             }
           ];
         };
+        mackaye = helpers.mkSystem {
+          system = "x86_64-linux";
+          hostname = "mackaye";
+          inputs = inputs;
+          users = [
+            {
+              name = "philipp";
+              homeModules = [ inputs.nixvim.homeModules.nixvim ];
+            }
+          ];
+        };
       };
     };
 }

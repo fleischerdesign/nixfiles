@@ -1,0 +1,4 @@
+{
+  description = "Plausible Analytics";
+  features = {};
+}

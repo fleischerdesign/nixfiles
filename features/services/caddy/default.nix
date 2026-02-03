@@ -22,6 +22,11 @@ in
             type = lib.types.str;
             default = name; # Default: Use the attribute name
           };
+          fullDomain = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Override the entire domain (bypasses subdomain and baseDomain)";
+          };
         };
       }));
     };
@@ -47,7 +52,7 @@ in
       virtualHosts = 
         let
           mkVHost = name: conf: {
-            name = "${conf.subdomain}.${cfg.baseDomain}";
+            name = if conf.fullDomain != null then conf.fullDomain else "${conf.subdomain}.${cfg.baseDomain}";
             value = {
               extraConfig = ''
                 reverse_proxy 127.0.0.1:${toString conf.port}
