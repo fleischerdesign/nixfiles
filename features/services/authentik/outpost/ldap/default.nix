@@ -38,9 +38,6 @@ in
         Environment = [
             "AUTHENTIK_HOST=http://100.120.39.68:9000"
             "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
-            # Listen on all interfaces for LDAP
-            "AUTHENTIK_LDAP__LISTEN__0_0_0_0=389"
-            "AUTHENTIK_LDAP__LISTEN__METRICS=127.0.0.1:9301"
         ];
         
         Restart = "always";
