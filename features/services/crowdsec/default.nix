@@ -23,10 +23,8 @@ in
         }
       ];
 
-      settings.general = {
-        api.server = {
-          listen_uri = "127.0.0.1:8085";
-        };
+      settings = {
+        lapi.listen_uri = "127.0.0.1:8085";
       };
     };
 
