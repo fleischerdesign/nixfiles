@@ -29,7 +29,7 @@ in
 
       serviceConfig = {
         # Use the package from the flake input
-        ExecStart = "${inputs.portfolio.packages.${pkgs.system}.default}/bin/portfolio";
+        ExecStart = "${inputs.portfolio.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/portfolio";
         User = "portfolio";
         Group = "portfolio";
         
@@ -54,7 +54,7 @@ in
       # Link migrations from the store to the working directory
       "d /var/lib/portfolio/server 0750 portfolio portfolio -"
       "d /var/lib/portfolio/server/db 0750 portfolio portfolio -"
-      "L+ /var/lib/portfolio/server/db/migrations - - - - ${inputs.portfolio.packages.${pkgs.system}.default}/lib/portfolio/server/db/migrations"
+      "L+ /var/lib/portfolio/server/db/migrations - - - - ${inputs.portfolio.packages.${pkgs.stdenv.hostPlatform.system}.default}/lib/portfolio/server/db/migrations"
     ];
 
     # Define user and group
