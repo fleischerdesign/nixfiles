@@ -43,7 +43,7 @@ in
 
       settings = {
         misc = {
-          port = 8081;
+          port = 8080;
           host = "0.0.0.0";
           host_whitelist = "${domain}, localhost, 127.0.0.1";
           inet_exposure = 2; 
@@ -93,7 +93,7 @@ in
     # Caddy Integration
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "sabnzbd" = {
-        port = 8081;
+        port = 8080;
         auth = cfg.expose.auth;
         subdomain = cfg.expose.subdomain;
       };
