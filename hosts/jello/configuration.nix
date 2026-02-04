@@ -1,15 +1,13 @@
 { pkgs, inputs, ... }:
-
 {
   imports = [
     ./hardware-configuration.nix
     ./hardware-specific.nix
+    ../../roles/desktop.nix
   ];
 
-  # Define the hosstname
   networking.hostName = "jello";
 
-  # Define the user account
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Fleischer";
@@ -20,10 +18,16 @@
     ];
   };
 
-  # Features are enabled in `metadata.nix`.
-  # This file is for host-specific overrides.
+  # Features
+  my.features.media.gaming.enable = true;
+  my.features.media.spotify.enable = true;
 
-  # State version setting
-  system.stateVersion = "24.05"; # Keep this to match your initial install
+  my.features.dev.containers.enable = true;
+  my.features.dev.containers.users = [ "philipp" ];
+  my.features.dev.android.enable = true;
+  my.features.dev.codium.enable = true;
+  my.features.dev.nixvim.enable = true;
+  my.features.desktop.niri.enable = true;
 
+  system.stateVersion = "24.05";
 }

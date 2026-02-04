@@ -1,15 +1,9 @@
-# /etc/nixos/hosts/yorke/configuration.nix
-{
-  inputs,
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ inputs, config, lib, pkgs, ... }:
 {
   imports = [
     ./hardware-configuration.nix
     ./hardware-specific.nix
+    ../../roles/notebook.nix
   ];
 
   networking.hostName = "yorke";
@@ -24,8 +18,17 @@
     ];
   };
 
-  system.stateVersion = "24.05";
+  # Features
+  my.features.desktop.niri.enable = true;
+  my.features.desktop.quickshell.enable = true;
 
-  # Features are enabled in `metadata.nix`.
-  # This file is for host-specific overrides.
+  my.features.dev.containers.enable = true;
+  my.features.dev.containers.users = [ "philipp" ];
+  my.features.dev.android.enable = true;
+  my.features.dev.codium.enable = true;
+  my.features.dev.nixvim.enable = true;
+
+  my.features.media.spotify.enable = true;
+
+  system.stateVersion = "24.05";
 }

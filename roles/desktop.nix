@@ -7,6 +7,8 @@
     ./pc.nix # Inherit common PC features
   ];
 
+  my.role = "desktop";
+
   # Add desktop-specific feature defaults here if any, e.g.:
   # my.features.large-monitor-support.enable = lib.mkDefault true;
 }

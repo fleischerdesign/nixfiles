@@ -3,6 +3,8 @@
 { lib, ... }:
 
 {
+  my.role = "server";
+  
   my.features = {
     system = {
       common.enable = lib.mkDefault true;

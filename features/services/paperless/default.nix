@@ -12,6 +12,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Dependencies
+    my.features.services.postgresql.enable = true;
+    my.features.services.redis.enable = true;
+
     # 1. SOPS Secret for OIDC
     sops.secrets.paperless_oidc_secret = { };
 

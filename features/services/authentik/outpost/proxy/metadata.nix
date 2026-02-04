@@ -1,3 +1,0 @@
-{
-  description = "Authentik Proxy Outpost";
-}

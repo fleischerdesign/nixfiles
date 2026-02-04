@@ -11,6 +11,9 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    my.features.system.audio.enable = true;
+    my.features.system.wayland.enable = true;
+
     # This feature is purely for Home Manager.
     # It injects its configuration into all users that get this feature.
     home-manager.sharedModules = [{

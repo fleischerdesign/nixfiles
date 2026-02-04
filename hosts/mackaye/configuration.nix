@@ -1,15 +1,14 @@
 { pkgs, inputs, ... }:
-
 {
   imports = [
     ./hardware-configuration.nix
     ./hardware-specific.nix
     ./disk-config.nix
+    ../../roles/server.nix
   ];
 
   networking.hostName = "mackaye";
 
-  # Define the user account
   users.users.philipp = {
     isNormalUser = true;
     description = "Philipp Fleischer";
@@ -22,13 +21,13 @@
     ];
   };
 
-  # Configure Features
+  # Features
+  my.features.services.caddy.enable = true;
   my.features.services.caddy.baseDomain = "mky.ancoris.ovh";
 
-  # Tailscale (Mesh VPN)
   my.features.system.networking.tailscale.enable = true;
+  my.features.system.common.geoip.enable = true;
 
-  # Network Configuration (Static IP)
   networking.useDHCP = false;
   networking.interfaces.ens18.useDHCP = false;
   networking.defaultGateway = "37.114.55.1";
@@ -38,19 +37,27 @@
     prefixLength = 24;
   } ];
 
-  # Monitoring Client
   my.features.services.monitoring.node-exporter.enable = true;
   my.features.services.monitoring.promtail = {
     enable = true;
     lokiHost = "127.0.0.1";
   };
+  my.features.services.monitoring.prometheus.enable = true;
+  my.features.services.monitoring.loki.enable = true;
+  my.features.services.monitoring.grafana.enable = true;
 
-  # CrowdSec Role
+  my.features.services.crowdsec.enable = true;
   my.features.services.crowdsec.role = "master";
 
-  # Native Authentik
-  # my.features.services.authentik.enable = true;
+  my.features.services.postgresql.enable = true;
+  my.features.services.redis.enable = true;
+  my.features.services.authentik.server.enable = true;
+  my.features.services.plausible.enable = true;
+  my.features.services.portfolio.enable = true;
+  my.features.services.couchdb.enable = true;
+  my.features.services.homarr.enable = true;
+  
+  my.features.dev.nixvim.enable = true;
 
-  # State version setting (Initial install)
   system.stateVersion = "24.11"; 
 }

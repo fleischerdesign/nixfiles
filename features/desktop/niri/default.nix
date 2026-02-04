@@ -10,6 +10,19 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Dependencies
+    my.features.system.wayland.enable = true;
+    my.features.system.audio.enable = true;
+    my.features.desktop.quickshell.enable = true;
+
+    # Conflicts
+    assertions = [
+      {
+        assertion = !config.my.features.desktop.gnome.enable;
+        message = "Niri cannot be enabled alongside Gnome.";
+      }
+    ];
+
     # System-level configuration for Niri
 
     # Disable X server for a pure Wayland setup

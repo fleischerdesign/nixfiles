@@ -1,1 +1,0 @@
-{ description = "Authentik LDAP Outpost"; }

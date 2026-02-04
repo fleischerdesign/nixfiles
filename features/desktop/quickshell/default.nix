@@ -10,6 +10,8 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    my.features.system.audio.enable = true;
+
     home-manager.sharedModules = [{
       home.packages = [
         pkgs.material-symbols

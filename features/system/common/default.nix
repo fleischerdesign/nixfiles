@@ -10,6 +10,12 @@ in
     enable = lib.mkEnableOption "Common system-wide settings (nix, network, time, locale, keyboard)";
   };
 
+  options.my.role = lib.mkOption {
+    type = lib.types.enum [ "server" "desktop" "notebook" ];
+    default = "server";
+    description = "The role of this machine (server, desktop, notebook).";
+  };
+
   config = lib.mkIf cfg.enable {
     # Enable experimental features
     nix.settings.experimental-features = [

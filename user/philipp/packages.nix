@@ -3,9 +3,12 @@
   lib,
   pkgs,
   inputs,
-  role,
+  osConfig,
   ...
 }:
+let
+  role = osConfig.my.role;
+in
 {
   home.packages = with pkgs; [
     # --- CLI / Server Safe ---
