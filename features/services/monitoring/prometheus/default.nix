@@ -34,6 +34,10 @@ in
           job_name = "crowdsec_strummer";
           static_configs = [{ targets = [ "100.125.253.108:6060" ]; }];
         }
+        {
+          job_name = "authentik";
+          static_configs = [{ targets = [ "localhost:9300" ]; }];
+        }
       ];
     };
   };
