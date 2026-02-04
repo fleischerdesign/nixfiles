@@ -25,7 +25,7 @@ in
         REDIS_HOST=127.0.0.1
         REDIS_PORT=6379
         
-        # Database
+        # Database - Use absolute path within container
         DB_DRIVER=better-sqlite3
         DB_DIALECT=sqlite
         DB_URL=/data/db.sqlite
@@ -39,15 +39,15 @@ in
       '';
     };
 
-    # 3. Create persistent directory
+    # 3. Create persistent directory with correct UID for the container
     systemd.tmpfiles.rules = [
-      "d /var/lib/homarr 0777 root root -" 
+      "d /var/lib/homarr 0750 1000 1000 -" 
     ];
 
     # 4. Homarr Container
     virtualisation.oci-containers.containers."homarr" = {
       image = "ghcr.io/homarr-labs/homarr:latest";
-      extraOptions = [ "--network=host" ]; # Native performance, works because REDIS_IS_EXTERNAL=true
+      extraOptions = [ "--network=host" ];
       environmentFiles = [ config.sops.templates."homarr.env".path ];
       volumes = [
         "/var/lib/homarr:/data"
@@ -57,7 +57,7 @@ in
     # 5. Reverse Proxy via Caddy
     my.features.services.caddy.exposedServices = {
       "homarr" = {
-        port = 7575; # Standard Homarr port
+        port = 7575;
         fullDomain = "ancoris.ovh";
       };
     };
