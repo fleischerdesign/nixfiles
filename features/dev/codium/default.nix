@@ -18,6 +18,7 @@ in
 
         profiles.default = {
           extensions = with pkgs.vscode-marketplace; [
+            rooveterinaryinc.roo-cline
             prisma.prisma
             bradlc.vscode-tailwindcss
             vue.volar
