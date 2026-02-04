@@ -41,6 +41,7 @@ in
         AUTH_OIDC_SCOPE_OVERWRITE=openid email profile groups
         AUTH_OIDC_GROUPS_ATTRIBUTE=groups
         AUTH_LOGOUT_REDIRECT_URL=https://auth.ancoris.ovh/application/o/homarr/end-session/
+        ADMIN_GROUP="Homarr Admins"
       '';
     };
 
