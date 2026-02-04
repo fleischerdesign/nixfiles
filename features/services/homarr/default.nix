@@ -9,7 +9,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # 1. SOPS Secrets for Homarr
+    # 1. SOPS Secrets
     sops.secrets.homarr_auth_secret = { };
     sops.secrets.homarr_encryption_key = { };
     sops.secrets.homarr_oidc_client_secret = { };
@@ -24,8 +24,8 @@ in
         REDIS_HOST=127.0.0.1
         REDIS_PORT=6379
         
-        # Database
-        DB_URL=file:///data/db.sqlite
+        # Database - Correct format for Homarr v1
+        DB_URL="file:/data/db.sqlite"
         
         # OIDC Authentication (Authentik)
         AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
@@ -33,18 +33,21 @@ in
         AUTH_OIDC_ISSUER=https://auth.ancoris.ovh/application/o/homarr/
         AUTH_OIDC_SCOPE="openid profile email"
         AUTH_OIDC_ADMIN_GROUP="Homarr Admins"
+        
+        # Disable internal redis startup if supported by image
+        RUN_REDIS=false
       '';
     };
 
-    # 3. Create persistent directory
+    # 3. Create persistent directory with open permissions for the container
     systemd.tmpfiles.rules = [
-      "d /var/lib/homarr 0750 1000 1000 -" # Homarr container usually runs as UID 1000
+      "d /var/lib/homarr 0777 root root -" 
     ];
 
     # 4. Homarr Container
     virtualisation.oci-containers.containers."homarr" = {
       image = "ghcr.io/homarr-labs/homarr:latest";
-      extraOptions = [ "--network=host" ]; # To reach host redis easily
+      extraOptions = [ "--network=host" ];
       environmentFiles = [ config.sops.templates."homarr.env".path ];
       volumes = [
         "/var/lib/homarr:/data"
