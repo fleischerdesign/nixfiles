@@ -49,6 +49,14 @@ in
 
             "security.workspace.trust.enabled" = true;
 
+            "editor.bracketPairColorization.enabled" = true;
+            "editor.guides.bracketPairs" = "active";
+            "editor.minimap.enabled" = false;
+            "editor.smoothScrolling" = true;
+            "terminal.integrated.smoothScrolling" = true;
+            "explorer.confirmDragAndDrop" = false;
+            "explorer.confirmDelete" = false;
+
             "C_Cpp.default.compilerPath" = "gcc";
 
             "direnv.restart.automatic" = true;
