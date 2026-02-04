@@ -25,11 +25,6 @@ in
         REDIS_HOST=127.0.0.1
         REDIS_PORT=6379
         
-        # Database - Using the official default path structure
-        DB_DRIVER=better-sqlite3
-        DB_DIALECT=sqlite
-        DB_URL=/appdata/db/db.sqlite
-        
         # OIDC Authentication (Authentik)
         AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
         AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder.homarr_oidc_client_secret}
@@ -39,10 +34,9 @@ in
       '';
     };
 
-    # 3. Create persistent directory structure
+    # 3. Create persistent directory with correct UID for the container
     systemd.tmpfiles.rules = [
       "d /var/lib/homarr 0755 1000 1000 -" 
-      "d /var/lib/homarr/db 0755 1000 1000 -" 
     ];
 
     # 4. Homarr Container
