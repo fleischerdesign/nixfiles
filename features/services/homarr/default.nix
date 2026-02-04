@@ -17,8 +17,13 @@ in
     # 2. Template for environment variables based on latest Homarr docs
     sops.templates."homarr.env" = {
       content = ''
+        # Security
         AUTH_SECRET=${config.sops.placeholder.homarr_auth_secret}
         SECRET_ENCRYPTION_KEY=${config.sops.placeholder.homarr_encryption_key}
+        
+        # URLs
+        BASE_URL=https://ancoris.ovh
+        NEXTAUTH_URL=https://ancoris.ovh
         
         # Redis (Using Mackaye's native redis)
         REDIS_IS_EXTERNAL=true
@@ -32,9 +37,10 @@ in
         AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
         AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder.homarr_oidc_client_secret}
         AUTH_OIDC_ISSUER=https://auth.ancoris.ovh/application/o/homarr/
-        AUTH_OIDC_SCOPE_OVERWRITE="openid profile email groups"
+        AUTH_OIDC_URI=https://auth.ancoris.ovh/application/o/authorize
+        AUTH_OIDC_SCOPE_OVERWRITE=openid email profile groups
         AUTH_OIDC_GROUPS_ATTRIBUTE=groups
-        AUTH_OIDC_ADMIN_GROUP="Homarr Admins"
+        AUTH_LOGOUT_REDIRECT_URL=https://auth.ancoris.ovh/application/o/homarr/end-session/
       '';
     };
 
