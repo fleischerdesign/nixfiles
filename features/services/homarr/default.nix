@@ -31,8 +31,8 @@ in
         REDIS_PORT=6379
         
         # Authentication Configuration
-        AUTH_PROVIDERS=credentials
-        AUTH_OIDC_AUTO_LOGIN=false
+        AUTH_PROVIDERS=oidc
+        AUTH_OIDC_AUTO_LOGIN=true
         AUTH_OIDC_CLIENT_NAME=Authentik
         AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
         AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder.homarr_oidc_client_secret}
