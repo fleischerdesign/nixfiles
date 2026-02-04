@@ -38,6 +38,10 @@ in
           job_name = "authentik";
           static_configs = [{ targets = [ "localhost:9300" ]; }];
         }
+        {
+          job_name = "blocky_strummer";
+          static_configs = [{ targets = [ "100.125.253.108:4000" ]; }];
+        }
       ];
     };
   };

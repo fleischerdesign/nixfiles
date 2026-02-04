@@ -13,6 +13,7 @@ in
       settings = {
         # Network configuration - Blocky expects the port or address:port
         ports.dns = 53; 
+        ports.http = 4000; # Port for metrics and API
 
         # Upstream DNS (using DNS-over-HTTPS for privacy)
         upstream.default = [
