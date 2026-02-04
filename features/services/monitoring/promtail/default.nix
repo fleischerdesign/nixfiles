@@ -37,5 +37,10 @@ in
         }];
       };
     };
+
+    # Grant journal access to promtail
+    users.users.promtail = {
+      extraGroups = [ "systemd-journal" ];
+    };
   };
 }
