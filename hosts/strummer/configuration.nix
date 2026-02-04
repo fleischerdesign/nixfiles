@@ -86,7 +86,7 @@
 
   my.features.services.jellyseerr.expose.enable = true;
 
-  my.features.services.cloudflare-dyndns.domains = [ "ancoris.ovh" ];
+  my.features.services.cloudflare-dyndns.domains = [ "fls.ancoris.ovh" ];
 
   my.features.system.networking.tailscale.enable = true;
 
