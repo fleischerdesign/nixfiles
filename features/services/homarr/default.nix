@@ -14,7 +14,7 @@ in
     sops.secrets.homarr_encryption_key = { };
     sops.secrets.homarr_oidc_client_secret = { };
 
-    # 2. Template for environment variables
+    # 2. Template for environment variables based on latest Homarr docs
     sops.templates."homarr.env" = {
       content = ''
         AUTH_SECRET=${config.sops.placeholder.homarr_auth_secret}
@@ -25,11 +25,15 @@ in
         REDIS_HOST=127.0.0.1
         REDIS_PORT=6379
         
-        # OIDC Authentication (Authentik)
+        # Authentication Configuration
+        AUTH_PROVIDERS=oidc
+        AUTH_OIDC_AUTO_LOGIN=true
+        AUTH_OIDC_CLIENT_NAME=Authentik
         AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
         AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder.homarr_oidc_client_secret}
         AUTH_OIDC_ISSUER=https://auth.ancoris.ovh/application/o/homarr/
-        AUTH_OIDC_SCOPE="openid profile email"
+        AUTH_OIDC_SCOPE_OVERWRITE="openid profile email groups"
+        AUTH_OIDC_GROUPS_ATTRIBUTE=groups
         AUTH_OIDC_ADMIN_GROUP="Homarr Admins"
       '';
     };
