@@ -61,6 +61,8 @@ in
     # Firewall-Bouncer
     services.crowdsec-firewall-bouncer = {
       enable = true;
+      # Disable auto-registration, we provide the key via SOPS
+      registerBouncer.enable = false; 
       settings = {
         api_url = "http://${masterIP}:8085/";
         api_key_file = config.sops.secrets.crowdsec_bouncer_key.path;
