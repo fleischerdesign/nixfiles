@@ -16,6 +16,7 @@
     services.authentik.server.enable = true;
     services.plausible.enable = true;
     services.portfolio.enable = true;
+    services.crowdsec.enable = true;
     
     # Dev Tools
     dev.nixvim.enable = true;

@@ -41,6 +41,9 @@
   # Monitoring Client
   my.features.services.monitoring.node-exporter.enable = true;
 
+  # CrowdSec Role
+  my.features.services.crowdsec.role = "master";
+
   # Native Authentik
   # my.features.services.authentik.enable = true;
 

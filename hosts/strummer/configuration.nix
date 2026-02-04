@@ -77,7 +77,10 @@
 
   my.features.services.blocky.enable = true;
 
-  my.features.services.crowdsec.enable = true;
+  my.features.services.crowdsec = {
+    enable = true;
+    role = "agent";
+  };
 
   my.features.services.bazarr.expose.enable = true;
 
