@@ -71,8 +71,8 @@ in
     systemd.services.caddy.serviceConfig.UMask = "0027";
 
     systemd.tmpfiles.rules = [
-      "d /var/log/caddy 0750 caddy caddy -"
-      "Z /var/log/caddy 0640 caddy caddy -"
+      "d /var/log/caddy 0755 caddy caddy -"
+      "z /var/log/caddy/*.log 0640 caddy caddy -"
     ];
   };
 }
