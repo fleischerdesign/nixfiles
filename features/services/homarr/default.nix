@@ -51,7 +51,7 @@ in
 
     # 4. Homarr Container
     virtualisation.oci-containers.containers."homarr" = {
-      image = "ghcr.io/homarr-labs/homarr:latest";
+      image = "ghcr.io/homarr-labs/homarr:dev";
       extraOptions = [ "--network=host" ];
       environmentFiles = [ config.sops.templates."homarr.env".path ];
       volumes = [
