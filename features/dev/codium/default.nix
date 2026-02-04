@@ -49,6 +49,8 @@ in
 
             "security.workspace.trust.enabled" = true;
 
+            "editor.fontFamily" = "'JetBrainsMono Nerd Font', 'monospace', monospace";
+            "editor.fontLigatures" = true;
             "editor.bracketPairColorization.enabled" = true;
             "editor.guides.bracketPairs" = "active";
             "editor.minimap.enabled" = false;
