@@ -63,9 +63,11 @@ in
       enable = true;
       # Disable auto-registration, we provide the key via SOPS
       registerBouncer.enable = false; 
+      # Official NixOS option for the API key path
+      secrets.apiKeyPath = config.sops.secrets.crowdsec_bouncer_key.path;
       settings = {
         api_url = "http://${masterIP}:8085/";
-        api_key_file = config.sops.secrets.crowdsec_bouncer_key.path;
+        # api_key_file is automatically set by the module if apiKeyPath is used
       };
     };
 
