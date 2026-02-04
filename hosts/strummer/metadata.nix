@@ -21,5 +21,9 @@
     services.caddy.enable = true;
     services.authentik.outpost.proxy.enable = true;
     services.authentik.outpost.ldap.enable = true;
+    services.monitoring.node-exporter.enable = true;
+    services.monitoring.promtail.enable = true;
+    system.networking.tailscale.enable = true;
+    services.crowdsec.enable = true;
   };
 }

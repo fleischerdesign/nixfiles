@@ -5,16 +5,16 @@ let
 in
 {
   options.my.features.services.monitoring.loki = {
-    enable = lib.mkEnableOption "Loki and Promtail";
+    enable = lib.mkEnableOption "Loki Log Server";
   };
 
   config = lib.mkIf cfg.enable {
-    # Loki Server
     services.loki = {
       enable = true;
       configuration = {
         auth_enabled = false;
         server.http_listen_port = 3100;
+        server.http_listen_address = "0.0.0.0"; # Allow remote log shipping via Tailscale
         
         common.instance_addr = "127.0.0.1";
         common.path_prefix = "/var/lib/loki";
@@ -33,32 +33,6 @@ in
           schema = "v13";
           index.prefix = "index_";
           index.period = "24h";
-        }];
-      };
-    };
-
-    # Promtail (Local Log Shipper)
-    services.promtail = {
-      enable = true;
-      configuration = {
-        server = {
-          http_listen_port = 9080;
-          grpc_listen_port = 0;
-        };
-        clients = [{ url = "http://127.0.0.1:3100/loki/api/v1/push"; }];
-        scrape_configs = [{
-          job_name = "journal";
-          journal = {
-            max_age = "12h";
-            labels = {
-              job = "systemd-journal";
-              host = config.networking.hostName;
-            };
-          };
-          relabel_configs = [{
-            source_labels = [ "__journal__systemd_unit" ];
-            target_label = "unit";
-          }];
         }];
       };
     };
