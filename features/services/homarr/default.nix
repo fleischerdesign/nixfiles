@@ -25,10 +25,10 @@ in
         REDIS_HOST=127.0.0.1
         REDIS_PORT=6379
         
-        # Database - Use absolute path within container
+        # Database - Use absolute path within container with file: prefix
         DB_DRIVER=better-sqlite3
         DB_DIALECT=sqlite
-        DB_URL=/data/db.sqlite
+        DB_URL=file:/data/db.sqlite
         
         # OIDC Authentication (Authentik)
         AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
