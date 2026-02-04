@@ -40,7 +40,7 @@ in
         # Master-spezifische Server-Einstellungen
         general = lib.mkIf isMaster {
           api.server = {
-            listen_uri = "0.0.0.0:8085"; # Auf allen Interfaces lauschen (Tailscale!)
+            listen_uri = "0.0.0.0:8085"; 
             enable = true;
           };
           prometheus = {
@@ -51,14 +51,14 @@ in
           };
         };
 
-        # Agent-Konfiguration: Wo ist der Master?
+        # Agent-Konfiguration: Nutzt das generierte Template
         lapi.credentialsFile = if isMaster 
           then "/etc/crowdsec/local_api_credentials.yaml"
-          else config.sops.secrets.crowdsec_agent_credentials.path;
+          else config.sops.templates."crowdsec_lapi.yaml".path;
       };
     };
 
-    # Firewall-Bouncer: Verbindet sich immer zur LAPI (lokal oder remote)
+    # Firewall-Bouncer
     services.crowdsec-firewall-bouncer = {
       enable = true;
       settings = {
@@ -77,10 +77,19 @@ in
       restartUnits = [ "crowdsec-firewall-bouncer.service" ];
     };
 
-    # Nur Agents brauchen die Credentials für den Master
-    sops.secrets.crowdsec_agent_credentials = lib.mkIf (!isMaster) {
+    # Nur Agents brauchen das Passwort für den Master
+    sops.secrets.crowdsec_agent_password = lib.mkIf (!isMaster) {
       owner = "crowdsec";
-      restartUnits = [ "crowdsec.service" ];
+    };
+
+    # Generiere die Credentials-Datei dynamisch
+    sops.templates."crowdsec_lapi.yaml" = lib.mkIf (!isMaster) {
+      owner = "crowdsec";
+      content = ''
+        url: http://${masterIP}:8085/
+        login: ${config.networking.hostName}
+        password: ${config.sops.placeholder.crowdsec_agent_password}
+      '';
     };
   };
 }
