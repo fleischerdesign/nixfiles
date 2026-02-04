@@ -91,6 +91,10 @@
   my.features.system.networking.tailscale.enable = true;
 
   my.features.services.monitoring.node-exporter.enable = true;
+  my.features.services.monitoring.promtail = {
+    enable = true;
+    lokiHost = "100.120.39.68";
+  };
 
   # State version setting
   system.stateVersion = "24.11"; 

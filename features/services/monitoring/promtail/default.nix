@@ -8,7 +8,6 @@ in
     enable = lib.mkEnableOption "Promtail Log Agent";
     lokiHost = lib.mkOption {
       type = lib.types.str;
-      default = "100.120.39.68"; # Default to Mackaye
       description = "The hostname or IP of the Loki server to push logs to.";
     };
   };

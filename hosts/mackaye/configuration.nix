@@ -40,6 +40,10 @@
 
   # Monitoring Client
   my.features.services.monitoring.node-exporter.enable = true;
+  my.features.services.monitoring.promtail = {
+    enable = true;
+    lokiHost = "127.0.0.1";
+  };
 
   # CrowdSec Role
   my.features.services.crowdsec.role = "master";
