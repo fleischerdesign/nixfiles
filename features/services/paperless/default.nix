@@ -112,6 +112,7 @@ in
     # Scanner Service
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
       image = "docker.io/manuc66/node-hp-scan-to:latest";
+      user = "315:987"; # paperless:media
       environment = {
         IP = "192.168.178.62";
         LABEL = "paperless";
