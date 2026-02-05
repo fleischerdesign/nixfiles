@@ -9,7 +9,7 @@ in
       enable = lib.mkEnableOption "Expose Fluidd via Caddy";
       subdomain = lib.mkOption {
         type = lib.types.str;
-        default = "printer";
+        default = "fluidd";
         description = "Subdomain to use";
       };
       auth = lib.mkEnableOption "Protect with Authentik (Forward Auth)";
@@ -119,7 +119,7 @@ in
       outputPlugin = "output_http.so -p 8080";
     };
 
-    # 4. Fluidd (Static Site) and Webcam via Caddy
+    # 4. Fluidd, Moonraker and Webcam via Caddy
     services.caddy.virtualHosts = {
       "${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.expose.enable {
         extraConfig = ''
@@ -138,7 +138,6 @@ in
       "cam.moonraker.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.expose.enable {
         extraConfig = ''
           reverse_proxy 127.0.0.1:8080
-          ${lib.optionalString cfg.expose.auth "import authentik"}
         '';
       };
     };
