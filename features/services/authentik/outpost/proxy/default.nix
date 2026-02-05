@@ -1,9 +1,16 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.authentik.outpost.proxy;
+  authentikHost = config.my.features.system.networking.topology.mackaye.tailscaleIp;
 in
 {
-  options.my.features.services.authentik.outpost.proxy.enable = lib.mkEnableOption "Authentik Proxy Outpost";
+  options.my.features.services.authentik.outpost.proxy.enable =
+    lib.mkEnableOption "Authentik Proxy Outpost";
 
   config = lib.mkIf cfg.enable {
     # 1. Secrets Setup
@@ -24,49 +31,45 @@ in
       isSystemUser = true;
       group = "authentik-outpost";
     };
-    users.groups.authentik-outpost = {};
+    users.groups.authentik-outpost = { };
 
     # 3. Systemd Service Definition
     systemd.services.authentik-outpost-proxy = {
       description = "Authentik Proxy Outpost";
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
-      
+
       serviceConfig = {
         # Use lib.getExe to resolve the binary name automatically
         ExecStart = lib.getExe pkgs.authentik-outposts.proxy;
-        
+
         # Load the token from the sops template
         EnvironmentFile = config.sops.templates."authentik-outpost.env".path;
-        
+
         # Configure connection to Authentik Core via Tailscale
         Environment = [
-            "AUTHENTIK_HOST=http://100.120.39.68:9055"
-            "AUTHENTIK_HOST_BROWSER=https://auth.ancoris.ovh"
-            "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
-            # Listen on localhost:9000
-            "AUTHENTIK_HTTP_ADDRESS=127.0.0.1:9000"
-            "AUTHENTIK_METRICS_ADDRESS=127.0.0.1:9300"
+          "AUTHENTIK_HOST=http://${authentikHost}:9055"
+          "AUTHENTIK_HOST_BROWSER=https://auth.ancoris.ovh"
+          "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
+          # Listen on localhost:9000
+          "AUTHENTIK_HTTP_ADDRESS=127.0.0.1:9000"
+          "AUTHENTIK_METRICS_ADDRESS=127.0.0.1:9300"
         ];
-        
-                Restart = "always";
-        
-                
-        
-                # Security: Run as dedicated user
-        
-                User = "authentik-outpost";
-        
-                Group = "authentik-outpost";
-        
-                StateDirectory = "authentik-outpost-proxy"; 
-        
-              };
-        
-            };
-        
-          };
-        
-        }
-        
-        
+
+        Restart = "always";
+
+        # Security: Run as dedicated user
+
+        User = "authentik-outpost";
+
+        Group = "authentik-outpost";
+
+        StateDirectory = "authentik-outpost-proxy";
+
+      };
+
+    };
+
+  };
+
+}
