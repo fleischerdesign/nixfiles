@@ -141,6 +141,7 @@ in
       "moonraker.${baseDomain}" = {
         extraConfig = ''
           reverse_proxy 127.0.0.1:7125
+          ${lib.optionalString cfg.expose.auth "import authentik"}
         '';
       };
 
