@@ -101,6 +101,9 @@
   my.features.services.crowdsec.enable = true;
   my.features.services.crowdsec.role = "agent";
 
+  my.features.services.klipper.enable = true;
+  my.features.services.klipper.expose.enable = true;
+
   my.features.dev.nixvim.enable = true;
   my.features.dev.containers.enable = true;
   my.features.dev.containers.users = [ "philipp" ];
