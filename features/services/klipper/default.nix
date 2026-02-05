@@ -52,7 +52,6 @@ in
       address = "0.0.0.0";
       port = 7125;
       allowSystemControl = true;
-      configDir = "/var/lib/klipper";
       
       settings = {
         authorization = {
@@ -91,6 +90,12 @@ in
         };
       };
     };
+
+    # Bridge Klipper and Moonraker directories
+    # This makes Moonraker look into /var/lib/klipper for configs
+    systemd.tmpfiles.rules = [
+      "L+ /var/lib/moonraker/config - - - - /var/lib/klipper"
+    ];
 
     # Open firewall port for Moonraker (for slicers and direct LAN access)
     networking.firewall.allowedTCPPorts = [ 7125 ];
