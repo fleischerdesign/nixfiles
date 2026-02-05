@@ -125,9 +125,18 @@ in
       "${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.expose.enable {
         extraConfig = ''
           root * ${pkgs.fluidd}/share/fluidd/htdocs
-          file_server
           
-          reverse_proxy /websocket /printer/* /api/* /access/* /machine/* /server/* 127.0.0.1:7125
+          # Moonraker API Proxy
+          reverse_proxy /websocket 127.0.0.1:7125
+          reverse_proxy /printer/* 127.0.0.1:7125
+          reverse_proxy /api/* 127.0.0.1:7125
+          reverse_proxy /access/* 127.0.0.1:7125
+          reverse_proxy /machine/* 127.0.0.1:7125
+          reverse_proxy /server/* 127.0.0.1:7125
+
+          # Static File Server for Fluidd
+          file_server
+          try_files {path} /index.html
 
           ${lib.optionalString cfg.expose.auth "import authentik"}
         '';
