@@ -75,6 +75,8 @@ in
         };
         file_manager = {
             enable_object_processing = true;
+            config_path = "/var/lib/klipper";
+            log_path = "/var/lib/klipper/logs";
         };
         octoprint_compat = {};
         history = {};
