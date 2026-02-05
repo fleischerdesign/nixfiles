@@ -123,7 +123,7 @@ in
     services.caddy.virtualHosts = {
       "${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.expose.enable {
         extraConfig = ''
-          root * ${pkgs.fluidd}/share/fluidd
+          root * ${pkgs.fluidd}/share/fluidd/htdocs
           file_server
           
           reverse_proxy /websocket /printer/* /api/* /access/* /machine/* /server/* 127.0.0.1:7125
