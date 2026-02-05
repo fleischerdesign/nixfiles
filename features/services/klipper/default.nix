@@ -116,14 +116,14 @@ in
     services.mjpg-streamer = {
       enable = true;
       inputPlugin = "input_uvc.so -d /dev/video0 -r 1280x720 -f 30";
-      outputPlugin = "output_http.so -p 8081";
+      outputPlugin = "output_http.so -p 8081 -w ${pkgs.mjpg-streamer}/share/mjpg-streamer/www";
     };
 
     # 4. Fluidd, Moonraker and Webcam via Caddy
     services.caddy.virtualHosts = {
       "${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.expose.enable {
         extraConfig = ''
-          root * ${pkgs.fluidd}
+          root * ${pkgs.fluidd}/share/fluidd
           file_server
           
           reverse_proxy /websocket /printer/* /api/* /access/* /machine/* /server/* 127.0.0.1:7125
