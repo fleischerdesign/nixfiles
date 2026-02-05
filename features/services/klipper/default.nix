@@ -126,10 +126,7 @@ in
           root * ${pkgs.fluidd}
           file_server
           
-          @klipper_api {
-              path /websocket /printer/* /api/* /access/* /machine/* /server/*
-          }
-          reverse_proxy @klipper_api 127.0.0.1:7125
+          reverse_proxy /websocket /printer/* /api/* /access/* /machine/* /server/* 127.0.0.1:7125
 
           ${lib.optionalString cfg.expose.auth "import authentik"}
         '';
