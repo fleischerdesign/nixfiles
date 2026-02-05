@@ -113,9 +113,9 @@ in
       content = ''
         [power homeassistant_switch]
         type: homeassistant
-        protocol: https
-        address: hass.${baseDomain}
-        port: 443
+        protocol: http
+        address: 127.0.0.1
+        port: 8123
         device: switch.sonoff_basic_ender_sonoff_basic_relay
         token: ${config.sops.placeholder.moonraker_hass_token}
         domain: switch
