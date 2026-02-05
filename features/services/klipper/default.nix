@@ -35,8 +35,13 @@ in
       '';
     };
 
-    # Allow access to serial ports
-    users.users.klipper.extraGroups = [ "dialout" ];
+    # Explicitly define user and group to avoid assertion errors
+    users.groups.klipper = {};
+    users.users.klipper = {
+      isSystemUser = true;
+      group = "klipper";
+      extraGroups = [ "dialout" ];
+    };
 
     # 2. Moonraker Service
     services.moonraker = {
