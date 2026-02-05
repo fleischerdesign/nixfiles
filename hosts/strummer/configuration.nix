@@ -104,7 +104,7 @@
   my.features.services.klipper.enable = true;
   my.features.services.klipper.expose = {
     enable = true;
-    auth = true;
+    auth = false;
   };
 
   my.features.dev.nixvim.enable = true;
