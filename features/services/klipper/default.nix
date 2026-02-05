@@ -52,6 +52,7 @@ in
       address = "0.0.0.0";
       port = 7125;
       allowSystemControl = true;
+      configDir = "/var/lib/klipper";
       
       settings = {
         authorization = {
@@ -75,8 +76,6 @@ in
         };
         file_manager = {
             enable_object_processing = true;
-            config_path = "/var/lib/klipper";
-            log_path = "/var/lib/klipper/logs";
         };
         octoprint_compat = {};
         history = {};
