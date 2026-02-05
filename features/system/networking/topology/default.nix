@@ -39,17 +39,6 @@
   };
 
   config = lib.mkIf config.my.features.system.networking.topology.enable {
-    # Exportiere IPs für andere Module
-    # Zugriff über config.my.features.system.networking.topology.mackaye.tailscaleIp
-    exports = {
-      mackaye = {
-        tailscaleIp = config.my.features.system.networking.topology.mackaye.tailscaleIp;
-        localIp = config.my.features.system.networking.topology.mackaye.localIp;
-      };
-      strummer = {
-        tailscaleIp = config.my.features.system.networking.topology.strummer.tailscaleIp;
-        localIp = config.my.features.system.networking.topology.strummer.localIp;
-      };
-    };
+    # Hier können zukünftig weitere Netzwerkeinstellungen hinzugefügt werden
   };
 }
