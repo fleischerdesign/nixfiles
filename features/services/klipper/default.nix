@@ -104,7 +104,7 @@ in
         address: hass.fls.ancoris.ovh
         port: 443
         device: switch.sonoff_basic_ender_sonoff_basic_relay
-        token: ${config.sops.secrets.moonraker_hass_token.placeholder}
+        token: ${config.sops.placeholder.moonraker_hass_token}
         domain: switch
         on_when_job_queued: True
         locked_while_printing: True
