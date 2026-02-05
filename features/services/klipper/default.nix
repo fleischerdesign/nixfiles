@@ -116,7 +116,7 @@ in
     services.mjpg-streamer = {
       enable = true;
       inputPlugin = "input_uvc.so -d /dev/video0 -r 1280x720 -f 30";
-      outputPlugin = "output_http.so -p 8080";
+      outputPlugin = "output_http.so -p 8081";
     };
 
     # 4. Fluidd, Moonraker and Webcam via Caddy
@@ -126,10 +126,10 @@ in
           root * ${pkgs.fluidd}
           file_server
           
-          @moonraker {
+          @klipper_api {
               path /websocket /printer/* /api/* /access/* /machine/* /server/*
           }
-          reverse_proxy @moonraker 127.0.0.1:7125
+          reverse_proxy @klipper_api 127.0.0.1:7125
 
           ${lib.optionalString cfg.expose.auth "import authentik"}
         '';
@@ -137,7 +137,7 @@ in
 
       "cam.moonraker.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.expose.enable {
         extraConfig = ''
-          reverse_proxy 127.0.0.1:8080
+          reverse_proxy 127.0.0.1:8081
         '';
       };
     };
