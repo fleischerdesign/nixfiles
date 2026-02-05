@@ -7,13 +7,13 @@ in
   options.my.features.services.klipper = {
     enable = lib.mkEnableOption "Klipper 3D Printing Stack";
     expose = {
-      enable = lib.mkEnableOption "Expose Fluidd and Moonraker via Caddy";
+      enable = lib.mkEnableOption "Expose Mainsail and Moonraker via Caddy";
       subdomain = lib.mkOption {
         type = lib.types.str;
-        default = "fluidd";
-        description = "Subdomain for the Fluidd web interface";
+        default = "mainsail";
+        description = "Subdomain for the Mainsail web interface";
       };
-      auth = lib.mkEnableOption "Protect Fluidd with Authentik (Forward Auth)";
+      auth = lib.mkEnableOption "Protect Mainsail with Authentik (Forward Auth)";
     };
   };
 
@@ -63,6 +63,8 @@ in
             "http://127.0.0.1"
             "https://app.fluidd.xyz"
             "http://app.fluidd.xyz"
+            "https://my.mainsail.xyz"
+            "http://my.mainsail.xyz"
           ];
           trusted_clients = [
             "10.0.0.0/8"
@@ -127,10 +129,10 @@ in
 
     # 4. Caddy Exposure - Separate Domains Strategy
     services.caddy.virtualHosts = lib.mkIf cfg.expose.enable {
-      # Fluidd Web Interface
+      # Mainsail Web Interface
       "${cfg.expose.subdomain}.${baseDomain}" = {
         extraConfig = ''
-          root * ${pkgs.fluidd}/share/fluidd/htdocs
+          root * ${pkgs.mainsail}/share/mainsail
           file_server
           try_files {path} /index.html
           ${lib.optionalString cfg.expose.auth "import authentik"}
