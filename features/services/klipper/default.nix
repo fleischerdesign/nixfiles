@@ -57,6 +57,7 @@ in
           force_logins = false;
           cors_domains = [
             "*.fls.ancoris.ovh"
+            "https://fluidd.fls.ancoris.ovh"
             "http://localhost"
             "http://127.0.0.1"
             "https://app.fluidd.xyz"
