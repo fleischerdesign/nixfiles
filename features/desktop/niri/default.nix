@@ -74,6 +74,7 @@ in
         pkgs.brightnessctl
         pkgs.libnotify
         pkgs.sushi
+        pkgs.polkit_gnome # Authentication Agent
       ];
 
       programs.niri.settings = with config.lib.niri.actions; {
@@ -119,6 +120,12 @@ in
               "swww"
               "img"
               "/etc/nixos/media/wallpaper.jpg"
+            ];
+          }
+          # Start Polkit Agent
+          {
+            argv = [
+              "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1"
             ];
           }
         ];
