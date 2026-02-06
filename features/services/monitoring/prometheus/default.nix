@@ -7,7 +7,7 @@
 
 let
   cfg = config.my.features.services.monitoring.prometheus;
-  strummerTailscaleIp = config.my.features.system.networking.topology.strummer.tailscaleIp;
+  strummerTailscaleIp = config.my.features.system.networking.topology.hosts.strummer.tailscaleIp;
 in
 {
   options.my.features.services.monitoring.prometheus = {

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import qs.services
 import qs.components
 import Quickshell
@@ -8,31 +9,21 @@ import Quickshell.Widgets
 import qs.core
 import qs.services.search as Search
 
-// AppLauncher.qml
-// A self-contained Modal component for the application launcher.
-// This view is now a "dumb" component. All logic is handled by the
-// SearchService and its providers.
-
+// AppLauncher.qml - Frame Shell Edition
 Modal {
     id: appLauncherModal
 
     // --- Behavior ---
-
     property bool shouldBeVisible: false
-
     visible: false
 
-    onBackgroundClicked: {
-        StateManager.appLauncherOpened = false
-    }
+    onBackgroundClicked: StateManager.appLauncherOpened = false
 
     Connections {
         target: StateManager
         function onAppLauncherOpenedChanged() {
             shouldBeVisible = StateManager.appLauncherOpened
             if (shouldBeVisible) {
-                // Clear search on open. This will trigger the service
-                // to query providers for default results.
                 Search.SearchService.searchText = ""
                 searchInput.forceActiveFocus()
             }
@@ -41,12 +32,9 @@ Modal {
 
     onShouldBeVisibleChanged: {
         if (shouldBeVisible) {
-            // Modal sichtbar machen (Slide-In Animation startet)
             visible = true
         } else {
-            // Breche laufende Suchen ab BEVOR Animation startet
             Search.SearchService.cancelSearch()
-            // Delay hiding the modal to allow the slide-out animation to finish
             hideDelayTimer.start()
         }
     }
@@ -57,333 +45,236 @@ Modal {
         onTriggered: appLauncherModal.visible = false
     }
 
-    // --- Functions & Signals ---
-
     signal appLaunched(string appName)
 
     function toggle() {
         StateManager.appLauncherOpened = !StateManager.appLauncherOpened
     }
 
-    // --- Visual Content Definition ---
-
+    // --- Visual Content ---
     contentItem: launcherContent
 
-    // --- Visual Content Definition ---
+    Rectangle {
+        id: launcherContent
+        
+        width: 420
+        height: 550
+        radius: FrameTheme.radius
+        color: FrameTheme.popover
+        border.width: FrameTheme.borderWidth
+        border.color: FrameTheme.border
+        
+        // Position: Bottom Left, aligned with start button
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 70
+        anchors.left: parent.left
+        anchors.leftMargin: 20
+        
+        // Animation
+        opacity: shouldBeVisible ? 1 : 0
+        transform: Translate {
+            y: shouldBeVisible ? 0 : 10
+            Behavior on y { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
+        }
+        Behavior on opacity { NumberAnimation { duration: 200 } }
 
-        Rectangle {
-            id: launcherContent
-    
-            width: 510
-            height: 600
-            radius: 15
-            color: ColorService.palette.m3SurfaceContainerHigh
-            clip: true
-            opacity: shouldBeVisible ? 1.0 : 0
-    
-            Component.onCompleted: {
-                // Set initial position off-screen to the left without animation
-                x = -width
-            }
-    
-            // Position using x for animation
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 75 // 65 (bar height) + 10 (spacing)
-            anchors.leftMargin: 10 // Keep the left margin for the visible state
-            x: shouldBeVisible
-                ? 10 // Visible: 10px from the left edge (parent.left + leftMargin)
-                : -width // Hidden: completely off-screen to the left
-    
-            // Animate the x property
-            Behavior on x {
-                NumberAnimation {
-                    duration: 200
-                    easing.type: Easing.InOutQuad
-                }
-            }
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 200
-                    easing.type: Easing.InOutQuad
-                }
-            }
-            layer.enabled: true
+        // Shadow
+        RectangularShadow {
+            width: parent.width; height: parent.height
+            y: 4; z: -1
+            color: Qt.rgba(0, 0, 0, 0.3); blur: 20; radius: parent.radius
+        }
+
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 15
-            spacing: 15
+            anchors.margins: 12
+            spacing: 12
 
-            Timer {
-                id: animationEnableTimer
-                interval: 50
-                onTriggered: appListView.animationsEnabled = true
-            }
-
-            Connections {
-                target: Search.SearchService
-                function onSearchInProgressChanged() {
-                    if (Search.SearchService.searchInProgress) {
-                        appListView.animationsEnabled = false
-                    } else {
-                        animationEnableTimer.restart()
-                    }
-                }
-            }
-
-            // 1. Search Bar
+            // 1. Search Input
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 50
-                radius: 25
-                color: ColorService.palette.m3SurfaceContainerLowest
+                Layout.preferredHeight: 40
+                radius: FrameTheme.radius
+                color: "transparent"
+                border.width: 1
+                border.color: searchInput.activeFocus ? FrameTheme.ring : FrameTheme.input
                 
-                TextField {
-                    id: searchInput
+                RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 20
-                    anchors.rightMargin: 20
-                    font.pixelSize: 18
-                    placeholderText: "Suche"
-                    placeholderTextColor: ColorService.palette.m3OnSurfaceVariant
-                    background: null
-                    color: ColorService.palette.m3OnSurface
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    spacing: 8
                     
-                    // Bind the text to the central search service
-                    text: Search.SearchService.searchText
-                    onTextChanged: Search.SearchService.searchText = text
+                    Text {
+                        text: "search"
+                        font.family: "Material Symbols Rounded"
+                        font.pixelSize: 18
+                        color: FrameTheme.mutedForeground
+                    }
 
-                    Keys.onPressed: (event) => {
-                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (appListView.currentIndex >= 0) {
-                                const item = Search.SearchService.results.get(appListView.currentIndex)
-                                if (item.actionObject) {
-                                    Search.ActionRegistry.execute(item.actionObject)
+                    TextField {
+                        id: searchInput
+                        Layout.fillWidth: true
+                        font.family: FrameTheme.fontFamily
+                        font.pixelSize: 14
+                        placeholderText: "Type a command or search..."
+                        placeholderTextColor: FrameTheme.mutedForeground
+                        background: null
+                        color: FrameTheme.foreground
+                        selectByMouse: true
+                        
+                        text: Search.SearchService.searchText
+                        onTextChanged: Search.SearchService.searchText = text
+
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                if (appListView.currentIndex >= 0) {
+                                    const item = Search.SearchService.results.get(appListView.currentIndex)
+                                    if (item.actionObject) Search.ActionRegistry.execute(item.actionObject)
+                                    else if (item.entryObject) Quickshell.execDetached({ command: item.entryObject.command, workingDirectory: item.entryObject.workingDirectory })
+                                    StateManager.appLauncherOpened = false
                                 }
+                                event.accepted = true
+                            } else if (event.key === Qt.Key_Down) {
+                                appListView.incrementCurrentIndex()
+                                event.accepted = true
+                            } else if (event.key === Qt.Key_Up) {
+                                appListView.decrementCurrentIndex()
+                                event.accepted = true
+                            } else if (event.key === Qt.Key_Escape) {
                                 StateManager.appLauncherOpened = false
+                                event.accepted = true
                             }
-                            event.accepted = true
-                        } else if (event.key === Qt.Key_Down) {
-                            if (appListView.currentIndex < appListView.count - 1) {
-                                appListView.currentIndex++
-                            }
-                            event.accepted = true
-                        } else if (event.key === Qt.Key_Up) {
-                            if (appListView.currentIndex > 0) {
-                                appListView.currentIndex--
-                            }
-                            event.accepted = true
-                        } else if (event.key === Qt.Key_Escape) {
-                            StateManager.appLauncherOpened = false
-                            event.accepted = true
                         }
                     }
                 }
             }
-
-            // 2. App Grid
+            
+            // Separator
             Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: FrameTheme.border
+            }
+
+            // 2. App List
+            ListView {
+                id: appListView
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                color: "transparent"
-
-                ListView {
-                    id: appListView
-                    property bool animationsEnabled: true
-                    focus: true // Allow the list to receive keyboard focus
-                    anchors.fill: parent
-                    spacing: 4
-
-                    // Bind the model to the central search service results
-                    model: Search.SearchService.results
-
-                    Keys.onPressed: (event) => {
-                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                            if (currentIndex >= 0) {
-                                const item = model.get(currentIndex)
-                                if (item.entryObject) {
-                                    Quickshell.execDetached({ command: item.entryObject.command, workingDirectory: item.entryObject.workingDirectory })
-                                } else if (item.actionObject) {
-                                    Search.ActionRegistry.execute(item.actionObject)
-                                }
-                                StateManager.appLauncherOpened = false
-                            }
-                            event.accepted = true
-                        } else if (event.key === Qt.Key_Escape) {
-                            StateManager.appLauncherOpened = false
-                            event.accepted = true
-                        } else if (event.key === Qt.Key_Backspace && searchInput.text.length > 0) {
-                            searchInput.forceActiveFocus()
-                            searchInput.backspace()
-                            event.accepted = true
-                        } else if (event.text.length > 0) {
-                            searchInput.forceActiveFocus()
-                            searchInput.insert(searchInput.cursorPosition, event.text)
-                            event.accepted = true
-                        }
+                spacing: 2
+                
+                model: Search.SearchService.results
+                
+                ScrollBar.vertical: ScrollBar {
+                    width: 4
+                    active: appListView.moving || appListView.flickableItem.contentHeight > appListView.height
+                    background: Rectangle { color: "transparent" }
+                    contentItem: Rectangle {
+                        radius: 2
+                        color: FrameTheme.mutedForeground
+                        opacity: 0.5
                     }
+                }
 
-                    ScrollBar.vertical: ScrollBar {
-                        policy: ScrollBar.AsNeeded
-                        width: 8
-                        background: Rectangle { color: "transparent" }
-                        contentItem: Rectangle {
-                            id: scrollbarIndicator
-                            implicitWidth: 8
-                            radius: 4
-                            color: ColorService.palette.m3Outline
-                            property bool scrollbarVisible: false
-                            opacity: scrollbarVisible ? 0.75 : 0
+                delegate: Rectangle {
+                    id: delegateRoot
+                    width: appListView.width
+                    height: 48
+                    radius: FrameTheme.radius
+                    color: ListView.isCurrentItem || hoverHandler.hovered ? FrameTheme.accent : "transparent"
+                    
+                    Behavior on color { ColorAnimation { duration: 100 } }
 
-                            Behavior on opacity {
-                                NumberAnimation {
-                                    duration: 200
-                                }
-                            }
-
-                            Timer {
-                                id: hideScrollbarTimer
-                                interval: 500 // 500ms delay
-                                onTriggered: scrollbarIndicator.scrollbarVisible = false
-                            }
-
-                            Connections {
-                                target: appListView
-                                function onMovingChanged() {
-                                    if (appListView.moving) {
-                                        scrollbarIndicator.scrollbarVisible = true
-                                        hideScrollbarTimer.stop()
-                                    } else {
-                                        hideScrollbarTimer.start()
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    delegate: Rectangle {
-                        id: delegateRoot
-                        width: appListView.width
-                        height: 55
-                        radius: 8
-                        color: "transparent" // Visual feedback is handled by the state layer
-                        clip: true
-
-                        property bool isCurrent: ListView.isCurrentItem
-
-                        // --- Content (on top) ---
+                    // Content
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 10
+                        
+                        // Icon
                         Item {
-                            anchors.fill: parent
-                            z: 2
-
-                            // Data-driven icon display
+                            implicitWidth: 24
+                            implicitHeight: 24
+                            
                             IconImage {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                implicitSize: 32
+                                anchors.fill: parent
                                 mipmap: true
                                 asynchronous: true
                                 visible: model.icon.type === "image"
                                 source: visible ? ("image://icon/" + model.icon.source) : ""
                             }
-
                             Text {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 32
-                                height: 32
-                                font.pixelSize: 32
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                color: ColorService.palette.m3OnSurface
-                                visible: model.icon.type === "fontIcon"
+                                anchors.centerIn: parent
+                                font.pixelSize: 20
                                 font.family: visible ? model.icon.fontFamily : ""
                                 text: visible ? model.icon.source : ""
-                            }
-
-                            ColumnLayout {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 10 + 32 + 15 // left margin + icon width + spacing
-                                anchors.right: parent.right
-                                anchors.rightMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Text {
-                                    text: model.name
-                                    font.pixelSize: 14
-                                    elide: Text.ElideRight
-                                    color: ColorService.palette.m3OnSurface
-                                }
-                                Text {
-                                    text: model.genericName
-                                    font.pixelSize: 11
-                                    elide: Text.ElideRight
-                                    visible: text !== ""
-                                    color: ColorService.palette.m3OnSurfaceVariant
-                                }
+                                color: FrameTheme.foreground
+                                visible: model.icon.type === "fontIcon"
                             }
                         }
-
-                        // --- Input Handlers (non-visual) ---
-                        HoverHandler { id: hoverHandler }
-
-                        TapHandler {
-                            id: tapHandler
-                            onTapped: {
-                                if (model.entryObject) {
-                                    Quickshell.execDetached({ command: model.entryObject.command, workingDirectory: model.entryObject.workingDirectory })
-                                } else if (model.actionObject) {
-                                    Search.ActionRegistry.execute(model.actionObject)
-                                }
-                                StateManager.appLauncherOpened = false
+                        
+                        // Text
+                        Column {
+                            Layout.fillWidth: true
+                            Text {
+                                text: model.name
+                                color: FrameTheme.foreground
+                                font.family: FrameTheme.fontFamily
+                                font.pixelSize: 14
+                                font.weight: Font.Medium
+                                elide: Text.ElideRight
+                                width: parent.width
                             }
                         }
+                        
+                        // Shortcut Hint (optional)
+                        Text {
+                            text: "↵"
+                            visible: delegateRoot.ListView.isCurrentItem
+                            color: FrameTheme.mutedForeground
+                            font.pixelSize: 12
+                        }
+                    }
 
-                        // --- Feedback Layer (in the back) ---
-                        M3StateLayer {
-                            anchors.fill: parent
-                            z: 1
-                            isHovered: hoverHandler.hovered
-                            isPressed: tapHandler.pressed || delegateRoot.isCurrent
-                            colorRole: M3StateLayer.ColorRole.Surface
-                            animationsEnabled: appListView.animationsEnabled
+                    HoverHandler { id: hoverHandler }
+                    TapHandler {
+                        onTapped: {
+                            if (model.entryObject) Quickshell.execDetached({ command: model.entryObject.command, workingDirectory: model.entryObject.workingDirectory })
+                            else if (model.actionObject) Search.ActionRegistry.execute(model.actionObject)
+                            StateManager.appLauncherOpened = false
                         }
                     }
                 }
-
-                // Fade out at the top
-                Rectangle {
-                    anchors.top: parent.top
-                    width: parent.width
-                    height: 15
-                    gradient: Gradient {
-                        GradientStop { position: 0.0; color: ColorService.palette.m3SurfaceContainerHigh }
-                        GradientStop { position: 1.0; color: "transparent" }
-                    }
-                    opacity: appListView.contentY > 0 ? 1 : 0
-                    Behavior on opacity {
-                        NumberAnimation { duration: 200 }
-                    }
-                    z: 3
+            }
+            
+            // Footer (Profile / Power)
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: FrameTheme.border
+            }
+            
+            RowLayout {
+                Layout.fillWidth: true
+                
+                FrameButton {
+                    variant: FrameButton.Variant.Ghost
+                    text: "Philipp"
+                    icon: "person"
                 }
-
-                // Fade out at the bottom
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 15
-                    gradient: Gradient {
-                        GradientStop { position: 0.0; color: "transparent" }
-                        GradientStop { position: 1.0; color: ColorService.palette.m3SurfaceContainerHigh }
+                
+                Item { Layout.fillWidth: true }
+                
+                FrameButton {
+                    variant: FrameButton.Variant.Ghost
+                    icon: "power_settings_new"
+                    onClicked: {
+                        // Trigger Logout/Power Menu (todo)
+                        Quickshell.execDetached({command: "systemctl", args: ["poweroff"]})
                     }
-                    opacity: appListView.contentY < (appListView.contentHeight - appListView.height) ? 1 : 0
-                    Behavior on opacity {
-                        NumberAnimation { duration: 200 }
-                    }
-                    z: 3
                 }
             }
         }

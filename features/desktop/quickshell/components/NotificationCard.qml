@@ -5,280 +5,146 @@ import qs.services
 
 Rectangle {
     id: root
-    width: 400
-    height: expanded ? contentColumn.height + 30 : 130
-    radius: 15
-    clip: true
     
     property var notification
     property bool isInNotificationCenter: false
     property bool expanded: false
 
-        readonly property color baseColor: root.isInNotificationCenter
-        ? ColorService.palette.m3SurfaceContainerHigh
-        : ColorService.palette.m3SurfaceContainer
-    
-    color: {
-        if (!root.notification)
-            return baseColor;
-
-        switch (root.notification.urgency) {
-        case 2: // Critical
-            return ColorService.palette.m3ErrorContainer;
-        default: // Low (0) und Normal (1)
-            return baseColor;
-        }
-    }
-
-    // Content-Farbe basierend auf Urgency
-    readonly property color onSurfaceColor: {
-        if (!root.notification)
-            return ColorService.palette.m3OnSurface;
-        
-        return root.notification.urgency === 2
-            ? ColorService.palette.m3OnErrorContainer
-            : ColorService.palette.m3OnSurface;
-    }
-
     signal dismissRequested
 
-    // Smooth height animation
-    Behavior on height {
-        NumberAnimation {
-            duration: 150
-            easing.type: Easing.OutCubic
-        }
-    }
-
-    RippleEffect {
-        id: rippleEffect
-        enabled: root.enabled
-        rippleColor: root.onSurfaceColor
-        parentRadius: root.radius
-    }
-
-    // State Layer mit neuer API
-    M3StateLayer {
-        colorRole: root.notification && root.notification.urgency === 2 
-            ? M3StateLayer.ColorRole.Error 
-            : M3StateLayer.ColorRole.Surface
-        customStateColor: root.onSurfaceColor
-        isHovered: popupHover.hovered
-    }
+    implicitWidth: 380
+    // Height logic: Auto-expand based on content
+    height: expanded ? contentColumn.implicitHeight + 24 : Math.min(contentColumn.implicitHeight + 24, 90)
     
-    HoverHandler {
-        id: popupHover
+    radius: FrameTheme.radius
+    color: FrameTheme.card
+    border.width: FrameTheme.borderWidth
+    border.color: notification && notification.urgency === 2 ? FrameTheme.destructive : FrameTheme.border
+    clip: true
+
+    Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+    // Hover Background
+    Rectangle {
+        anchors.fill: parent
+        color: FrameTheme.accent
+        opacity: hoverHandler.hovered ? 0.4 : 0
+        Behavior on opacity { NumberAnimation { duration: 150 } }
     }
 
+    HoverHandler { id: hoverHandler }
+    
     TapHandler {
         id: tapHandler
-        onTapped: {
-            root.expanded = !root.expanded;
-        }
-        onPressedChanged: {
-            if (pressed) {
-                rippleEffect.trigger(tapHandler.point.pressPosition.x, tapHandler.point.pressPosition.y);
-            }
-        }
+        onTapped: root.expanded = !root.expanded
     }
 
     ColumnLayout {
         id: contentColumn
-        anchors {
-            left: parent.left
-            right: parent.right
-            top: parent.top
-            margins: 15
-        }
-        spacing: 10
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: 12
+        spacing: 8
 
-        // Compact Header (immer sichtbar)
+        // Header: Icon + Title
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
-
+            
             // App Icon
-            Rectangle {
-                Layout.preferredWidth: 32
-                Layout.preferredHeight: 32
-                radius: 8
-                color: root.onSurfaceColor
+            Item {
+                Layout.preferredWidth: 20
+                Layout.preferredHeight: 20
                 visible: root.notification && root.notification.appIcon !== ""
-
+                
                 Image {
                     anchors.fill: parent
-                    anchors.margins: 4
                     source: root.notification ? root.notification.appIcon : ""
                     fillMode: Image.PreserveAspectFit
+                    mipmap: true
                 }
             }
 
-            // Summary (Title) - Compact
             Text {
                 text: root.notification ? root.notification.summary : ""
-                color: root.onSurfaceColor
+                color: FrameTheme.foreground
+                font.family: FrameTheme.fontFamily
                 font.pixelSize: 14
-                font.weight: Font.Medium
+                font.weight: Font.Bold
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
-
-            readonly property int buttonColorRole: root.notification && root.notification.urgency === 2 
-                ? M3Button.ColorRole.Error 
-                : M3Button.ColorRole.Surface
-
-            M3Button {
-                id: expandButton
-                Layout.preferredWidth: 24
-                Layout.preferredHeight: 24
-                style: M3Button.Style.Text
-                colorRole: parent.buttonColorRole
-                opacity: popupHover.hovered ? 1 : 0
-                onClicked: {
-                   root.expanded = !root.expanded
-                }
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 200
-                    }
-                }
-
-                Text {
-                    text: root.expanded ? "expand_less" : "expand_more"
-                    font.family: "Material Symbols Rounded"
-                    font.pixelSize: 18
-                    color: expandButton.autoContentColor
-                    anchors.centerIn: parent
-                }
-            }
+            
+            // Spacer for Close Button
+            Item { width: 20 }
+        }
         
-
-            // Close Button
-            M3Button {
-                id: closeButton
-                Layout.preferredWidth: 24
-                Layout.preferredHeight: 24
-                style: M3Button.Style.Text
-                colorRole: root.notification && root.notification.urgency === 2 
-                    ? M3Button.ColorRole.Error 
-                    : M3Button.ColorRole.Surface
-                opacity: popupHover.hovered ? 1 : 0
-                onClicked: {
-                    root.dismissRequested()
-                }
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 200
-                    }
-                }
-
-                Text {
-                    text: "close"
-                    font.family: "Material Symbols Rounded"
-                    font.pixelSize: 18
-                    color: closeButton.autoContentColor
-                    anchors.centerIn: parent
-                }
-            }
-        }
-
-        // Expanded Content
-        ColumnLayout {
+        // Body
+        Text {
+            text: root.notification ? root.notification.body : ""
+            color: FrameTheme.mutedForeground
+            font.family: FrameTheme.fontFamily
+            font.pixelSize: 13
             Layout.fillWidth: true
-            spacing: 10
+            wrapMode: Text.WordWrap
+            elide: root.expanded ? Text.ElideNone : Text.ElideRight
+            maximumLineCount: root.expanded ? 99 : 2
+            textFormat: Text.PlainText
+        }
 
-            // Body
-            Text {
-                text: root.notification ? root.notification.body : ""
-                color: root.onSurfaceColor
-                font.pixelSize: 14
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                visible: text !== ""
-                textFormat: Text.PlainText
+        // Image (Expanded only)
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 150
+            radius: FrameTheme.radius
+            color: FrameTheme.muted
+            visible: root.expanded && root.notification && root.notification.image !== ""
+            clip: true
+
+            Image {
+                anchors.fill: parent
+                source: root.notification ? root.notification.image : ""
+                fillMode: Image.PreserveAspectCrop
             }
+        }
 
-            // Image
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 150
-                radius: 8
-                color: root.onSurfaceColor
-                visible: root.notification && root.notification.image !== ""
-                clip: true
+        // Actions (Expanded only)
+        Flow {
+            Layout.fillWidth: true
+            spacing: 8
+            visible: root.expanded && root.notification && root.notification.actions && root.notification.actions.length > 0
 
-                Image {
-                    anchors.fill: parent
-                    source: root.notification ? root.notification.image : ""
-                    fillMode: Image.PreserveAspectCrop
-                }
-            }
+            Repeater {
+                model: (root.notification && root.notification.actions) ? root.notification.actions : []
 
-            // Actions
-            Flow {
-                Layout.fillWidth: true
-                spacing: 8
-                visible: root.notification && root.notification.actions && root.notification.actions.length > 0
-
-                Repeater {
-                    model: (root.notification && root.notification.actions) ? root.notification.actions : []
-
-                    M3Button {
-                        id: actionButton
-                        implicitHeight: 32
-                        style: M3Button.Style.Filled
-                        colorRole: root.notification && root.notification.urgency === 2 
-                            ? M3Button.ColorRole.Error 
-                            : M3Button.ColorRole.Primary
-                        
-                        onClicked: {
-                            if (modelData) {
-                                modelData.invoke();
-                            }
-                            if (root.notification && !root.notification.resident) {
-                                root.dismissRequested();
-                            }
-                        }
-
-                        Text {
-                            text: modelData ? modelData.text : ""
-                            color: actionButton.autoContentColor
-                            font.pixelSize: 14
-                            font.weight: Font.Medium
-                        }
+                FrameButton {
+                    variant: FrameButton.Variant.Outline
+                    text: modelData ? modelData.text : ""
+                    implicitHeight: 32
+                    onClicked: {
+                        if (modelData) modelData.invoke()
+                        if (root.notification && !root.notification.resident) root.dismissRequested()
                     }
                 }
             }
         }
     }
-    
-    // Smooth color transitions
-    Behavior on color {
-        ColorAnimation { duration: 200 }
-    }
-    
-    // Fade-out Gradient Overlay (nur wenn collapsed)
-    Rectangle {
-        anchors {
-            left: parent.left
-            right: parent.right
-            bottom: parent.bottom
-        }
-        height: 40
-        visible: !root.expanded
-        radius: root.radius
-        gradient: Gradient {
-            GradientStop { 
-                position: 0.0
-                color: Qt.rgba(root.color.r, root.color.g, root.color.b, 0)
-            }
-            GradientStop { 
-                position: 1.0
-                color: root.color
-            }
-        }
+
+    // Close Button (Top Right Overlay)
+    FrameButton {
+        width: 24
+        height: 24
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 8
+        variant: FrameButton.Variant.Ghost
+        icon: "close"
+        
+        // Visible on hover OR if expanded
+        visible: hoverHandler.hovered || root.expanded
+        
+        onClicked: root.dismissRequested()
     }
 }

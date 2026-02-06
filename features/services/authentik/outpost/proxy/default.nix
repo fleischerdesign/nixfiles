@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.my.features.services.authentik.outpost.proxy;
-  authentikHost = config.my.features.system.networking.topology.mackaye.tailscaleIp;
+  authentikHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
 in
 {
   options.my.features.services.authentik.outpost.proxy.enable =

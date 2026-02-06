@@ -8,7 +8,7 @@ let
   cfg = config.my.features.services.crowdsec;
   isMaster = cfg.role == "master";
   # Use topology host definitions for IPs
-  masterIP = config.my.features.system.networking.topology.mackaye.tailscaleIp;
+  masterIP = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
 in
 {
   options.my.features.services.crowdsec = {

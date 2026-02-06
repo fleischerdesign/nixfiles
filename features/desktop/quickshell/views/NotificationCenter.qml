@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Effects
 import qs.components
 import qs.services
 import qs.core
@@ -7,6 +8,7 @@ import QtQuick.Controls.Basic
 import Quickshell.Io
 import qs.views
 
+// NotificationCenter.qml - Frame Shell Edition
 Modal {
     id: notificationCenterModal
 
@@ -14,105 +16,108 @@ Modal {
 
     contentItem: contentRectangle
     visible: false
-    onBackgroundClicked: {
-        StateManager.notificationCenterOpened = false;
-    }
+    onBackgroundClicked: StateManager.notificationCenterOpened = false
 
     Connections {
         target: StateManager
         function onNotificationCenterOpenedChanged() {
-            shouldBeVisible = StateManager.notificationCenterOpened;
+            shouldBeVisible = StateManager.notificationCenterOpened
         }
     }
 
     onShouldBeVisibleChanged: {
         if (shouldBeVisible) {
-            visible = true;
-            NotificationService.dismissAll();
+            visible = true
         } else {
-            var timer = Qt.createQmlObject("import QtQuick; Timer {interval: 200; onTriggered: { notificationCenterModal.visible = false; } }", notificationCenterModal);
-            timer.start();
+            hideDelayTimer.start()
         }
+    }
+    
+    Timer {
+        id: hideDelayTimer
+        interval: 200
+        onTriggered: notificationCenterModal.visible = false
     }
 
     Rectangle {
         id: contentRectangle
         width: 400
-
-        Component.onCompleted: {
-            x = screen.width;
-        }
+        height: 500 // Max height
 
         anchors {
-            top: parent.top
             bottom: parent.bottom
-            bottomMargin: 65 + 10
-            topMargin: 10
+            right: parent.right
+            rightMargin: 20
+            bottomMargin: 70
         }
+        
+        // Visuals
+        radius: FrameTheme.radius
+        color: FrameTheme.background // Dark
+        border.width: FrameTheme.borderWidth
+        border.color: FrameTheme.border
+        
+        // Animation
         opacity: shouldBeVisible ? 1.0 : 0
-        x: shouldBeVisible ? (parent.width - width - 10) : parent.width
-
-        Behavior on x {
-            NumberAnimation {
-                duration: 200
-                easing.type: Easing.InOutQuad
-            }
+        transform: Translate {
+            y: shouldBeVisible ? 0 : 10
+            Behavior on y { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
         }
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 200
-                easing.type: Easing.InOutQuad
-            }
+        Behavior on opacity { NumberAnimation { duration: 200 } }
+
+        // Shadow
+        RectangularShadow {
+            width: parent.width; height: parent.height
+            y: 4; z: -1
+            color: Qt.rgba(0, 0, 0, 0.3); blur: 20; radius: parent.radius
         }
-
-        // Performance-Boost with true: render as gpu texture
-        layer.enabled: false
-
-        radius: 15
-        color: ColorService.palette.m3SurfaceContainer
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 15
-            spacing: 10
+            anchors.margins: 16
+            spacing: 12
 
+            // Header
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
 
                 Text {
-                    text: "Benachrichtigungen"
-                    color: "white"
-                    font.pixelSize: 18
+                    text: "Notifications"
+                    color: FrameTheme.foreground
+                    font.family: FrameTheme.fontFamily
+                    font.pixelSize: 16
                     font.weight: Font.Bold
                     Layout.fillWidth: true
                 }
 
-                M3Button {
-                    id: deleteButton
-                    style: M3Button.Style.Filled
-                    colorRole: M3Button.ColorRole.Primary
+                FrameButton {
+                    variant: FrameButton.Variant.Ghost
+                    icon: "delete_sweep"
+                    text: "Clear"
+                    visible: notificationList.count > 0
                     onClicked: {
                         const notifications = NotificationService.server.trackedNotifications.values;
                         for (let i = notifications.length - 1; i >= 0; i--) {
                             notifications[i].dismiss();
                         }
                     }
-
-                    Text {
-                        text: "delete_sweep"
-                        color: deleteButton.autoContentColor
-                        font.family: "Material Symbols Rounded"
-                        font.pixelSize: 20
-                    }
                 }
             }
+            
+            // Separator
+            Rectangle {
+                Layout.fillWidth: true
+                height: 1
+                color: FrameTheme.border
+            }
 
+            // List
             ListView {
                 id: notificationList
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 10
+                spacing: 8
                 clip: true
                 model: NotificationService.server.trackedNotifications
 
@@ -126,17 +131,23 @@ Modal {
                 Text {
                     anchors.centerIn: parent
                     visible: notificationList.count === 0
-                    text: "Keine Benachrichtigungen"
-                    color: "#888888"
+                    text: "No new notifications"
+                    color: FrameTheme.mutedForeground
+                    font.family: FrameTheme.fontFamily
                     font.pixelSize: 14
                 }
-            }
-
-            QuickSettings {
-                Layout.fillWidth: true
+                
+                ScrollBar.vertical: ScrollBar {
+                    width: 4
+                    active: notificationList.moving || notificationList.flickableItem.contentHeight > notificationList.height
+                    background: Rectangle { color: "transparent" }
+                    contentItem: Rectangle {
+                        radius: 2
+                        color: FrameTheme.mutedForeground
+                        opacity: 0.5
+                    }
+                }
             }
         }
     }
-
-
 }
