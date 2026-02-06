@@ -263,8 +263,7 @@ Modal {
                     variant: FrameButton.Variant.Ghost
                     icon: "power_settings_new"
                     onClicked: {
-                        // Trigger Logout/Power Menu (todo)
-                        Quickshell.execDetached({command: "systemctl", args: ["poweroff"]})
+                        Quickshell.execDetached(["systemctl", "poweroff"])
                     }
                 }
             }

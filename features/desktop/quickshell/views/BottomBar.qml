@@ -131,6 +131,7 @@ PanelWindow {
 
             // --- 2. Clock Island (Center) ---
             Rectangle {
+                id: clockIsland
                 anchors.centerIn: parent
                 
                 implicitWidth: clockText.implicitWidth + 32
@@ -164,6 +165,40 @@ PanelWindow {
                     Timer {
                         interval: 1000; running: true; repeat: true
                         onTriggered: parent.updateTime()
+                    }
+                }
+            }
+
+            // --- 2b. Workspace Island (Left of Clock) ---
+            Rectangle {
+                anchors.right: clockIsland.left
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                
+                implicitWidth: workspaceIndicator.implicitWidth + 24
+                implicitHeight: 50
+                radius: FrameTheme.radius
+                color: FrameTheme.background
+                border.width: FrameTheme.borderWidth
+                border.color: FrameTheme.border
+                
+                RectangularShadow {
+                    width: parent.width; height: parent.height
+                    y: 4; z: -1
+                    color: Qt.rgba(0, 0, 0, 0.2); blur: 12; radius: parent.radius
+                }
+
+                WorkspaceIndicator {
+                    id: workspaceIndicator
+                    anchors.centerIn: parent
+                }
+                
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: StateManager.togglePanel("workspaces")
+                    onWheel: (wheel) => {
+                        if (wheel.angleDelta.y > 0) WorkspaceService.focusPrevious();
+                        else WorkspaceService.focusNext();
                     }
                 }
             }

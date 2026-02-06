@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Services.Notifications
 
 Singleton {
-    property string activePanel: "" // "", "launcher", "notifications", "audio", "power", "network", "bluetooth"
+    property string activePanel: "" // "", "launcher", "notifications", "audio", "power", "network", "bluetooth", "workspaces"
     
     // Read-only aliases for backward compatibility in components
     readonly property bool appLauncherOpened: activePanel === "launcher"

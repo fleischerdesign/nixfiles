@@ -40,6 +40,10 @@ ShellRoot {
     BluetoothPanel {
         id: bluetoothPanel
     }
+    
+    WorkspacePanel {
+        id: workspacePanel
+    }
 
     WlSessionLock {
         id: sessionLocker
