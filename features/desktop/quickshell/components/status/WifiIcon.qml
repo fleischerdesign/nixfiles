@@ -13,9 +13,14 @@ Text {
     }
 
     text: {
+        if (NetworkService.ethernetConnected) {
+            return "settings_ethernet";
+        }
+        
         if (!_currentNetwork) {
             return "wifi_off";
         }
+        
         if (_currentNetwork.signal >= 50) {
             return "wifi";
         }

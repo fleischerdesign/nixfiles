@@ -93,6 +93,44 @@ Modal {
                 }
             }
             
+            // --- ETHERNET SECTION ---
+            Rectangle {
+                Layout.fillWidth: true
+                height: 44
+                radius: FrameTheme.radius
+                color: FrameTheme.secondary
+                visible: NetworkService.ethernetConnected
+                
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 10
+                    
+                    Text {
+                        text: "settings_ethernet"
+                        font.family: "Material Symbols Rounded"
+                        color: FrameTheme.foreground
+                        font.pixelSize: 20
+                    }
+                    
+                    Text {
+                        text: "Ethernet"
+                        color: FrameTheme.foreground
+                        font.family: FrameTheme.fontFamily
+                        font.weight: Font.Medium
+                        Layout.fillWidth: true
+                    }
+                    
+                    Text {
+                        text: "Connected"
+                        color: "#22c55e"
+                        font.family: FrameTheme.fontFamily
+                        font.pixelSize: 11
+                        font.weight: Font.Bold
+                    }
+                }
+            }
+            
             // --- WIFI TOGGLE ---
             Rectangle {
                 Layout.fillWidth: true
@@ -174,8 +212,8 @@ Modal {
                         Text {
                             text: {
                                 const s = modelData.signal
-                                if (s >= 75) return "wifi"
-                                if (s >= 50) return "wifi_2_bar"
+                                if (s >= 50) return "wifi"
+                                if (s >= 25) return "wifi_2_bar"
                                 return "wifi_1_bar"
                             }
                             font.family: "Material Symbols Rounded"
