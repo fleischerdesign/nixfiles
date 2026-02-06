@@ -182,15 +182,46 @@ Modal {
                             color: FrameTheme.foreground
                         }
                         
-                        // Name
-                        Text {
-                            text: modelData.name || modelData.address
-                            color: FrameTheme.foreground
-                            font.family: FrameTheme.fontFamily
-                            font.pixelSize: 13
-                            elide: Text.ElideRight
+                        // Name & Battery Info
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            font.weight: modelData.connected ? Font.Bold : Font.Normal
+                            spacing: 0
+                            
+                            Text {
+                                text: modelData.name || modelData.address
+                                color: FrameTheme.foreground
+                                font.family: FrameTheme.fontFamily
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                font.weight: modelData.connected ? Font.Bold : Font.Normal
+                            }
+                            
+                            // Battery Indicator
+                            RowLayout {
+                                spacing: 4
+                                visible: modelData.batteryAvailable
+                                
+                                Text {
+                                    text: {
+                                        const b = modelData.battery;
+                                        if (b > 0.8) return "battery_full";
+                                        if (b > 0.5) return "battery_5_bar";
+                                        if (b > 0.2) return "battery_2_bar";
+                                        return "battery_alert";
+                                    }
+                                    font.family: "Material Symbols Rounded"
+                                    font.pixelSize: 12
+                                    color: modelData.battery <= 0.2 ? FrameTheme.destructive : FrameTheme.mutedForeground
+                                }
+                                
+                                Text {
+                                    text: Math.round(modelData.battery * 100) + "%"
+                                    color: FrameTheme.mutedForeground
+                                    font.family: FrameTheme.fontFamily
+                                    font.pixelSize: 10
+                                }
+                            }
                         }
                         
                         // Connected Check
