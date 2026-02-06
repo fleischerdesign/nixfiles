@@ -26,18 +26,12 @@ PanelWindow {
 
     Connections {
         target: StateManager
-        function onNotificationCenterOpenedChanged() {
-            if (StateManager.notificationCenterOpened) {
+        function onActivePanelChanged() {
+            if (StateManager.activePanel !== "") {
                 bottomBarWindow.isOpen = true;
-            } else if (!StateManager.appLauncherOpened && !windowHover.hovered) {
-                bottomBarWindow.isOpen = false;
-            }
-        }
-        function onAppLauncherOpenedChanged() {
-            if (StateManager.appLauncherOpened) {
-                bottomBarWindow.isOpen = true;
-            } else if (!StateManager.notificationCenterOpened && !windowHover.hovered) {
-                bottomBarWindow.isOpen = false;
+            } else if (!windowHover.hovered) {
+                // If no panel is active and mouse is not hovering, start closing
+                closeTimer.start();
             }
         }
     }
@@ -56,7 +50,7 @@ PanelWindow {
         id: closeTimer
         interval: 300
         onTriggered: {
-            if (!StateManager.notificationCenterOpened && !StateManager.appLauncherOpened) {
+            if (StateManager.activePanel === "") {
                 bottomBarWindow.isOpen = false;
             }
         }

@@ -259,6 +259,60 @@ Modal {
                     }
                 }
             }
+
+            Rectangle { Layout.fillWidth: true; height: 1; color: FrameTheme.border }
+
+            // --- NIGHTLIGHT ---
+            Rectangle {
+                Layout.fillWidth: true
+                height: 44
+                radius: FrameTheme.radius
+                color: FrameTheme.secondary
+                
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 10
+                    
+                    Text {
+                        text: "nightlight"
+                        font.family: "Material Symbols Rounded"
+                        color: NightlightService.enabled ? "#fbbf24" : FrameTheme.foreground
+                        font.pixelSize: 20
+                    }
+                    
+                    Text {
+                        text: "Night Light"
+                        color: FrameTheme.foreground
+                        font.family: FrameTheme.fontFamily
+                        font.weight: Font.Medium
+                        Layout.fillWidth: true
+                    }
+                    
+                    // Toggle Switch
+                    Rectangle {
+                        width: 40
+                        height: 20
+                        radius: 10
+                        color: NightlightService.enabled ? FrameTheme.foreground : FrameTheme.muted
+                        
+                        Rectangle {
+                            x: NightlightService.enabled ? 22 : 2
+                            y: 2
+                            width: 16
+                            height: 16
+                            radius: 8
+                            color: NightlightService.enabled ? FrameTheme.background : FrameTheme.foreground
+                            Behavior on x { NumberAnimation { duration: 150 } }
+                        }
+                        
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: NightlightService.toggle()
+                        }
+                    }
+                }
+            }
         }
     }
 }
