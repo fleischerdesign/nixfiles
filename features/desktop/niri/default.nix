@@ -47,6 +47,7 @@ in
 
     # Power management service
     services.upower.enable = true;
+    services.power-profiles-daemon.enable = true; // Required for PowerPanel profiles
 
     # XDG portals for desktop integration (e.g., file pickers)
     xdg.portal = {

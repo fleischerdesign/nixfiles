@@ -28,6 +28,10 @@ ShellRoot {
     AudioPanel {
         id: audioPanel
     }
+    
+    PowerPanel {
+        id: powerPanel
+    }
 
     WlSessionLock {
         id: sessionLocker
@@ -74,5 +78,6 @@ ShellRoot {
         id: bottomBarWindow
         onAppLauncherClicked: appLauncher.toggle()
         onVolumeClicked: audioPanel.toggle()
+        onPowerClicked: powerPanel.toggle()
     }
 }

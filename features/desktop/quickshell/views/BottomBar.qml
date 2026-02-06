@@ -20,6 +20,7 @@ PanelWindow {
 
     signal appLauncherClicked()
     signal volumeClicked()
+    signal powerClicked()
 
     Connections {
         target: StateManager
@@ -221,12 +222,14 @@ PanelWindow {
                                         variant: FrameButton.Variant.Ghost
                                         implicitWidth: 36
                                         content: BatteryIcon {
-                                            iconColor: FrameTheme.foreground
-                                            anchors.centerIn: parent
-                                        }
-                                    }
-            
-                                    // Vertical Separator
+                                                                            iconColor: FrameTheme.foreground
+                                                                            anchors.centerIn: parent
+                                                                        }
+                                                                        onClicked: bottomBarWindow.powerClicked()
+                                                                    }
+                                            
+                                                                    // Vertical Separator
+                                            
                                     Rectangle {
                                         Layout.fillHeight: true
                                         Layout.topMargin: 12
