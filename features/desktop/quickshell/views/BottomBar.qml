@@ -23,6 +23,7 @@ PanelWindow {
     signal powerClicked()
     signal wifiClicked()
     signal bluetoothClicked()
+    signal notificationClicked()
 
     Connections {
         target: StateManager
@@ -315,17 +316,31 @@ PanelWindow {
             
                                                                                         
             
-                                                                                        showBadge: NotificationService.server.trackedNotifications.values.length > 0
+                                                                                                                                                showBadge: NotificationService.server.trackedNotifications.values.length > 0
             
                                                                                         
             
-                                                                                        onClicked: {
+                                                                                                                                                
             
-                                                                                            StateManager.notificationCenterOpened = !StateManager.notificationCenterOpened
+                                                                                        
             
-                                                                                        }
+                                                                                                                                                onClicked: {
             
-                                                                                    }
+                                                                                        
+            
+                                                                                                                                                    bottomBarWindow.notificationClicked()
+            
+                                                                                        
+            
+                                                                                                                                                }
+            
+                                                                                        
+            
+                                                                                                                                            }
+            
+                                                                                        
+            
+                                                                                        
             
                                                                                 }
             

@@ -93,5 +93,6 @@ ShellRoot {
         onPowerClicked: StateManager.togglePanel("power")
         onWifiClicked: StateManager.togglePanel("network")
         onBluetoothClicked: StateManager.togglePanel("bluetooth")
+        onNotificationClicked: StateManager.togglePanel("notifications")
     }
 }
