@@ -49,6 +49,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    quickshell = {
+      url = "github:quickshell-mirror/quickshell";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
     portfolio = {
       url = "github:fleischerdesign/portfolio";
       inputs.nixpkgs.follows = "nixpkgs-unstable";

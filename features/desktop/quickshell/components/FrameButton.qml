@@ -29,7 +29,8 @@ Rectangle {
     default property alias content: contentContainer.data
     
     property bool enabled: true
-    property bool showBadge: false // New property
+    property bool showBadge: false 
+    property bool centerContent: true // New property
     signal clicked()
     
     // ========================================
@@ -86,7 +87,10 @@ Rectangle {
     
     RowLayout {
         id: contentContainer
-        anchors.centerIn: parent
+        anchors.centerIn: root.centerContent ? parent : undefined
+        anchors.fill: root.centerContent ? undefined : parent
+        anchors.leftMargin: root.centerContent ? 0 : 12
+        anchors.rightMargin: root.centerContent ? 0 : 12
         spacing: 8
         
         // Internal Label logic if 'text' or 'icon' properties are used

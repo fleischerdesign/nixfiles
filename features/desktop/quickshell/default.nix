@@ -1,5 +1,5 @@
 # features/desktop/quickshell/default.nix
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, inputs, ... }:
 
 let
   cfg = config.my.features.desktop.quickshell;
@@ -25,6 +25,7 @@ in
 
       programs.quickshell = {
         enable = true;
+        package = inputs.quickshell.packages.${pkgs.system}.default;
         systemd.enable = true;
       };
     }];

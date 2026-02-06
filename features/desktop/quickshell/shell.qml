@@ -32,6 +32,14 @@ ShellRoot {
     PowerPanel {
         id: powerPanel
     }
+    
+    NetworkPanel {
+        id: networkPanel
+    }
+    
+    BluetoothPanel {
+        id: bluetoothPanel
+    }
 
     WlSessionLock {
         id: sessionLocker
@@ -79,5 +87,7 @@ ShellRoot {
         onAppLauncherClicked: appLauncher.toggle()
         onVolumeClicked: audioPanel.toggle()
         onPowerClicked: powerPanel.toggle()
+        onWifiClicked: networkPanel.toggle()
+        onBluetoothClicked: bluetoothPanel.toggle()
     }
 }

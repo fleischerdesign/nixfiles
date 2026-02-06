@@ -21,6 +21,8 @@ PanelWindow {
     signal appLauncherClicked()
     signal volumeClicked()
     signal powerClicked()
+    signal wifiClicked()
+    signal bluetoothClicked()
 
     Connections {
         target: StateManager
@@ -191,22 +193,54 @@ PanelWindow {
                                     color: Qt.rgba(0, 0, 0, 0.2); blur: 12; radius: parent.radius
                                 }
             
-                                RowLayout {
-                                    id: statusLayout
-                                    anchors.centerIn: parent
-                                    spacing: 2
-                                    
-                                    // Wifi Indicator
-                                    FrameButton {
+                                                    RowLayout {
+            
+                                                        id: statusLayout
+            
+                                                        anchors.centerIn: parent
+            
+                                                        spacing: 2
+            
+                                                        
+            
+                                                        // Bluetooth Indicator
+            
+                                                        FrameButton {
+            
+                                                            variant: FrameButton.Variant.Ghost
+            
+                                                            implicitWidth: 36
+            
+                                                            content: BluetoothIcon {
+            
+                                                                iconColor: FrameTheme.foreground
+            
+                                                                anchors.centerIn: parent
+            
+                                                            }
+            
+                                                            onClicked: bottomBarWindow.bluetoothClicked()
+            
+                                                        }
+            
+                                                        
+            
+                                                        // Wifi Indicator
+            
+                                                        FrameButton {
+            
+                                
                                         variant: FrameButton.Variant.Ghost
                                         implicitWidth: 36
                                         content: WifiIcon {
-                                            iconColor: FrameTheme.foreground
-                                            anchors.centerIn: parent
-                                        }
-                                    }
-            
-                                                            // Volume Indicator
+                                                                            iconColor: FrameTheme.foreground
+                                                                            anchors.centerIn: parent
+                                                                        }
+                                                                        onClicked: bottomBarWindow.wifiClicked()
+                                                                    }
+                                            
+                                                                    // Volume Indicator
+                                            
                                                             FrameButton {
                                                                 variant: FrameButton.Variant.Ghost
                                                                 implicitWidth: 36

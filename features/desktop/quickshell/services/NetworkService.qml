@@ -36,6 +36,12 @@ Singleton {
         toggleWifiProcess.running = true;
     }
 
+    function connect(ssid) {
+        console.log("NetworkService: Connecting to " + ssid);
+        connectProcess.command = ["nmcli", "dev", "wifi", "connect", ssid];
+        connectProcess.running = true;
+    }
+
     // --- Internal Processes ---
 
     // Long-running process to monitor for any network changes
@@ -157,6 +163,18 @@ Singleton {
             }
             // Refresh state after command execution
             root.refresh();
+        }
+    }
+
+    Process {
+        id: connectProcess
+        onExited: (exitCode) => {
+            if (exitCode !== 0) {
+                console.error("NetworkService: Connection attempt failed. (Exit Code: " + exitCode + ")");
+            } else {
+                console.log("NetworkService: Connected successfully.");
+                root.refresh();
+            }
         }
     }
 
