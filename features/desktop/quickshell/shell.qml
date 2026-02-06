@@ -72,22 +72,22 @@ ShellRoot {
     IpcHandler {
         target: "applauncher"
         function open(): void {
-            StateManager.appLauncherOpened = true;
+            StateManager.activePanel = "launcher";
         }
         function close(): void {
-            StateManager.appLauncherOpened = false;
+            if (StateManager.activePanel === "launcher") StateManager.activePanel = "";
         }
         function toggle(): void {
-            StateManager.appLauncherOpened = !StateManager.appLauncherOpened;
+            StateManager.togglePanel("launcher");
         }
     }
     
     BottomBar {
         id: bottomBarWindow
-        onAppLauncherClicked: appLauncher.toggle()
-        onVolumeClicked: audioPanel.toggle()
-        onPowerClicked: powerPanel.toggle()
-        onWifiClicked: networkPanel.toggle()
-        onBluetoothClicked: bluetoothPanel.toggle()
+        onAppLauncherClicked: StateManager.togglePanel("launcher")
+        onVolumeClicked: StateManager.togglePanel("audio")
+        onPowerClicked: StateManager.togglePanel("power")
+        onWifiClicked: StateManager.togglePanel("network")
+        onBluetoothClicked: StateManager.togglePanel("bluetooth")
     }
 }

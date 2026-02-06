@@ -5,11 +5,25 @@ import Quickshell
 import Quickshell.Services.Notifications
 
 Singleton {
-    property bool notificationCenterOpened: false
-    property bool appLauncherOpened: false
-    property bool bottomBarHovered: false // New property to track bar state
+    property string activePanel: "" // "", "launcher", "notifications", "audio", "power", "network", "bluetooth"
+    
+    // Read-only aliases for backward compatibility in components
+    readonly property bool appLauncherOpened: activePanel === "launcher"
+    readonly property bool notificationCenterOpened: activePanel === "notifications"
+    
+    property bool bottomBarHovered: false 
+    property int notificationCount: 0 
     property bool dndEnabled: false
     
+    function togglePanel(name) {
+        if (activePanel === name) activePanel = "";
+        else activePanel = name;
+    }
+
+    function closeAll() {
+        activePanel = "";
+    }
+
     property NotificationServer notificationServer: NotificationServer {
         actionsSupported: true
         bodySupported: true

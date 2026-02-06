@@ -14,25 +14,16 @@ Modal {
     id: appLauncherModal
 
     // --- Behavior ---
-    property bool shouldBeVisible: false
+    property bool shouldBeVisible: StateManager.activePanel === "launcher"
     visible: false
 
-    onBackgroundClicked: StateManager.appLauncherOpened = false
-
-    Connections {
-        target: StateManager
-        function onAppLauncherOpenedChanged() {
-            shouldBeVisible = StateManager.appLauncherOpened
-            if (shouldBeVisible) {
-                Search.SearchService.searchText = ""
-                searchInput.forceActiveFocus()
-            }
-        }
-    }
+    onBackgroundClicked: StateManager.activePanel = ""
 
     onShouldBeVisibleChanged: {
         if (shouldBeVisible) {
             visible = true
+            Search.SearchService.searchText = ""
+            searchInput.forceActiveFocus()
         } else {
             Search.SearchService.cancelSearch()
             hideDelayTimer.start()

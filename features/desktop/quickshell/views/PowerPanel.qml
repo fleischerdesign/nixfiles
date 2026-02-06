@@ -10,15 +10,25 @@ import qs.core
 
 Modal {
     id: powerPanelModal
-    property bool shouldBeVisible: false
+    property bool shouldBeVisible: StateManager.activePanel === "power"
 
     contentItem: contentRectangle
     visible: false
     
-    onBackgroundClicked: powerPanelModal.visible = false
+    onBackgroundClicked: StateManager.activePanel = ""
 
-    function toggle() {
-        visible = !visible
+    onShouldBeVisibleChanged: {
+        if (shouldBeVisible) {
+            visible = true
+        } else {
+            hideDelayTimer.start()
+        }
+    }
+    
+    Timer {
+        id: hideDelayTimer
+        interval: 200
+        onTriggered: powerPanelModal.visible = false
     }
 
     Rectangle {
@@ -39,9 +49,9 @@ Modal {
         border.color: FrameTheme.border
         
         // Animation
-        opacity: powerPanelModal.visible ? 1 : 0
+        opacity: shouldBeVisible ? 1 : 0
         transform: Translate {
-            y: powerPanelModal.visible ? 0 : 10
+            y: shouldBeVisible ? 0 : 10
             Behavior on y { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
         }
         Behavior on opacity { NumberAnimation { duration: 200 } }

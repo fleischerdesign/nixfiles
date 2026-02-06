@@ -9,16 +9,30 @@ import qs.core
 
 Modal {
     id: networkPanelModal
-    property bool shouldBeVisible: false
+    property bool shouldBeVisible: StateManager.activePanel === "network"
 
     contentItem: contentRectangle
     visible: false
     
-    onBackgroundClicked: networkPanelModal.visible = false
+    onBackgroundClicked: StateManager.activePanel = ""
 
     function toggle() {
-        visible = !visible
-        if (visible) NetworkService.scan() // Trigger Scan on open
+        StateManager.togglePanel("network")
+    }
+
+    onShouldBeVisibleChanged: {
+        if (shouldBeVisible) {
+            visible = true
+            NetworkService.scan()
+        } else {
+            hideDelayTimer.start()
+        }
+    }
+    
+    Timer {
+        id: hideDelayTimer
+        interval: 200
+        onTriggered: networkPanelModal.visible = false
     }
 
     Rectangle {
@@ -36,9 +50,10 @@ Modal {
         border.width: FrameTheme.borderWidth
         border.color: FrameTheme.border
         
-        opacity: networkPanelModal.visible ? 1 : 0
+        // Animation
+        opacity: shouldBeVisible ? 1 : 0
         transform: Translate {
-            y: networkPanelModal.visible ? 0 : 10
+            y: shouldBeVisible ? 0 : 10
             Behavior on y { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
         }
         Behavior on opacity { NumberAnimation { duration: 200 } }

@@ -10,16 +10,25 @@ import qs.core
 
 Modal {
     id: audioPanelModal
-    property bool shouldBeVisible: false
+    property bool shouldBeVisible: StateManager.activePanel === "audio"
 
     contentItem: contentRectangle
     visible: false
     
-    onBackgroundClicked: audioPanelModal.visible = false
+    onBackgroundClicked: StateManager.activePanel = ""
 
-    // Function to toggle visibility (called from BottomBar)
-    function toggle() {
-        visible = !visible
+    onShouldBeVisibleChanged: {
+        if (shouldBeVisible) {
+            visible = true
+        } else {
+            hideDelayTimer.start()
+        }
+    }
+    
+    Timer {
+        id: hideDelayTimer
+        interval: 200
+        onTriggered: audioPanelModal.visible = false
     }
 
     Rectangle {
@@ -40,9 +49,9 @@ Modal {
         border.color: FrameTheme.border
         
         // Animation
-        opacity: audioPanelModal.visible ? 1 : 0
+        opacity: shouldBeVisible ? 1 : 0
         transform: Translate {
-            y: audioPanelModal.visible ? 0 : 10
+            y: shouldBeVisible ? 0 : 10
             Behavior on y { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
         }
         Behavior on opacity { NumberAnimation { duration: 200 } }

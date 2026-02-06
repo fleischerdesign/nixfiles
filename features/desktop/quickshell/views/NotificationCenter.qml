@@ -12,18 +12,11 @@ import qs.views
 Modal {
     id: notificationCenterModal
 
-    property bool shouldBeVisible: false
+    property bool shouldBeVisible: StateManager.activePanel === "notifications"
 
     contentItem: contentRectangle
     visible: false
-    onBackgroundClicked: StateManager.notificationCenterOpened = false
-
-    Connections {
-        target: StateManager
-        function onNotificationCenterOpenedChanged() {
-            shouldBeVisible = StateManager.notificationCenterOpened
-        }
-    }
+    onBackgroundClicked: StateManager.activePanel = ""
 
     onShouldBeVisibleChanged: {
         if (shouldBeVisible) {
