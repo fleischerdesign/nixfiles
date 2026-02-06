@@ -19,6 +19,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
 
     signal appLauncherClicked()
+    signal volumeClicked()
 
     Connections {
         target: StateManager
@@ -204,17 +205,17 @@ PanelWindow {
                                         }
                                     }
             
-                                    // Volume Indicator
-                                    FrameButton {
-                                        variant: FrameButton.Variant.Ghost
-                                        implicitWidth: 36
-                                        content: VolumeIcon {
-                                            iconColor: FrameTheme.foreground
-                                            anchors.centerIn: parent
-                                        }
-                                    }
-            
-                                    // Battery Indicator (Only on laptops)
+                                                            // Volume Indicator
+                                                            FrameButton {
+                                                                variant: FrameButton.Variant.Ghost
+                                                                implicitWidth: 36
+                                                                content: VolumeIcon {
+                                                                    iconColor: FrameTheme.foreground
+                                                                    anchors.centerIn: parent
+                                                                }
+                                                                onClicked: bottomBarWindow.volumeClicked()
+                                                            }
+                                                                        // Battery Indicator (Only on laptops)
                                     FrameButton {
                                         visible: UPower.displayDevice && UPower.displayDevice.type === 2
                                         variant: FrameButton.Variant.Ghost
@@ -236,16 +237,32 @@ PanelWindow {
                                         color: FrameTheme.border
                                     }
             
-                                    // Notification Center
-                                    FrameButton {
-                                        variant: FrameButton.Variant.Ghost
-                                        implicitWidth: 36
-                                        icon: "notifications"
-                                        onClicked: {
-                                            StateManager.notificationCenterOpened = !StateManager.notificationCenterOpened
-                                        }
-                                    }
-                                }
-                            }        }
+                                                                                    // Notification Center
+            
+                                                                                    FrameButton {
+            
+                                                                                        variant: FrameButton.Variant.Ghost
+            
+                                                                                        implicitWidth: 36
+            
+                                                                                        icon: "notifications"
+            
+                                                                                        
+            
+                                                                                        showBadge: NotificationService.server.trackedNotifications.values.length > 0
+            
+                                                                                        
+            
+                                                                                        onClicked: {
+            
+                                                                                            StateManager.notificationCenterOpened = !StateManager.notificationCenterOpened
+            
+                                                                                        }
+            
+                                                                                    }
+            
+                                                                                }
+            
+                                                                            }        }
     }
 }

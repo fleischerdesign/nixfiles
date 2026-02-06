@@ -29,6 +29,7 @@ Rectangle {
     default property alias content: contentContainer.data
     
     property bool enabled: true
+    property bool showBadge: false // New property
     signal clicked()
     
     // ========================================
@@ -131,4 +132,21 @@ Rectangle {
     }
     
     Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutQuad } }
+
+    // Built-in Badge
+    Rectangle {
+        width: 8
+        height: 8
+        radius: 4
+        color: FrameTheme.destructive
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.topMargin: 4
+        anchors.rightMargin: 4
+        visible: root.showBadge
+        
+        // Cutout border
+        border.width: 1
+        border.color: FrameTheme.background
+    }
 }

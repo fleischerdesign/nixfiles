@@ -24,6 +24,10 @@ ShellRoot {
     NotificationCenter {
         id: nc
     }
+    
+    AudioPanel {
+        id: audioPanel
+    }
 
     WlSessionLock {
         id: sessionLocker
@@ -69,5 +73,6 @@ ShellRoot {
     BottomBar {
         id: bottomBarWindow
         onAppLauncherClicked: appLauncher.toggle()
+        onVolumeClicked: audioPanel.toggle()
     }
 }
