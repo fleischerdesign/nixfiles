@@ -13,7 +13,7 @@ ShellRoot {
         onAppLaunched: (appName) => {
             // TODO: Implement actual application launching logic
             console.log("Request to launch:", appName)
-            appLauncher.visible = false
+            StateManager.activePanel = ""
         }
     }
 

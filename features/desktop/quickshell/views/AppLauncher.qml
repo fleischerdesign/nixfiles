@@ -39,7 +39,7 @@ Modal {
     signal appLaunched(string appName)
 
     function toggle() {
-        StateManager.appLauncherOpened = !StateManager.appLauncherOpened
+        StateManager.togglePanel("launcher")
     }
 
     // --- Visual Content ---
@@ -123,7 +123,7 @@ Modal {
                                     const item = Search.SearchService.results.get(appListView.currentIndex)
                                     if (item.actionObject) Search.ActionRegistry.execute(item.actionObject)
                                     else if (item.entryObject) Quickshell.execDetached({ command: item.entryObject.command, workingDirectory: item.entryObject.workingDirectory })
-                                    StateManager.appLauncherOpened = false
+                                    StateManager.activePanel = ""
                                 }
                                 event.accepted = true
                             } else if (event.key === Qt.Key_Down) {
@@ -133,7 +133,7 @@ Modal {
                                 appListView.decrementCurrentIndex()
                                 event.accepted = true
                             } else if (event.key === Qt.Key_Escape) {
-                                StateManager.appLauncherOpened = false
+                                StateManager.activePanel = ""
                                 event.accepted = true
                             }
                         }
@@ -235,7 +235,7 @@ Modal {
                         onTapped: {
                             if (model.entryObject) Quickshell.execDetached({ command: model.entryObject.command, workingDirectory: model.entryObject.workingDirectory })
                             else if (model.actionObject) Search.ActionRegistry.execute(model.actionObject)
-                            StateManager.appLauncherOpened = false
+                            StateManager.activePanel = ""
                         }
                     }
                 }
