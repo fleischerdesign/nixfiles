@@ -83,18 +83,21 @@ in
         server.listener.smtp = {
           bind = [ "[::]:25" ];
           protocol = "smtp";
+          hostname = "mail.ancoris.ovh";
         };
 
         server.listener.submissions = {
           bind = [ "[::]:465" ];
           protocol = "smtp";
           tls.implicit = true;
+          hostname = "mail.ancoris.ovh";
         };
 
         server.listener.submission = {
           bind = [ "[::]:587" ];
           protocol = "smtp";
           tls.enable = true;
+          hostname = "mail.ancoris.ovh";
         };
 
         server.listener.imaps = {
