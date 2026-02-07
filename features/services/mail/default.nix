@@ -20,8 +20,8 @@ in
         
         # Use deployed certificates
         server.certificate.default = {
-          cert = "%{file:${certDir}/mail.crt}%";
-          privkey = "%{file:${certDir}/mail.key}%";
+          cert = "%{file:/var/lib/stalwart-mail/certs/mail.crt}%";
+          privkey = "%{file:/var/lib/stalwart-mail/certs/mail.key}%";
         };
 
         # 0.15 Store Definitions
@@ -138,8 +138,8 @@ in
         cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.crt ${certDir}/mail.crt
         cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.key ${certDir}/mail.key
         chown -R stalwart-mail:stalwart-mail ${certDir}
-        chmod 700 ${certDir}
-        chmod 600 ${certDir}/*
+        chmod 750 ${certDir}
+        chmod 640 ${certDir}/*
       '';
     };
 
