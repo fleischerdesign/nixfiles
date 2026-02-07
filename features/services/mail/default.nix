@@ -17,45 +17,46 @@ in
       settings = {
         server.hostname = "mackaye.ancoris.ovh";
         
-        # 1. Define Backends
-        storage.pg = {
+        # 0.15 Store Definitions
+        store.data = {
           type = "sql";
           driver = "postgres";
           url = dbUrl;
         };
-        storage.red = {
-          type = "redis";
-          url = "redis://127.0.0.1:6379";
+        store.lookup = {
+          type = "sql";
+          driver = "postgres";
+          url = dbUrl;
         };
-        storage.fs = {
+        store.directory = {
+          type = "sql";
+          driver = "postgres";
+          url = dbUrl;
+        };
+        store.blob = {
           type = "fs";
           path = "/var/lib/stalwart-mail/blobs";
         };
+        store.cache = {
+          type = "redis";
+          url = "redis://127.0.0.1:6379";
+        };
 
-        # 2. Map Purposes to Backends
-        storage.data = "pg";
-        storage.lookup = "pg";
-        storage.directory = "pg";
-        storage.queue = "pg";
-        storage.blob = "fs";
-        storage.cache = "red";
-        storage.spam = "pg";
-
-        # 3. Domains
+        # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-        # 4. Spam filter
-        spam.classifier.store = "pg";
-        spam.training.store = "pg";
+        # Spam filter
+        spam.classifier.store = "data";
+        spam.training.store = "data";
 
-        # 5. SMTP Relay (Brevo)
+        # SMTP Relay (Brevo)
         remote.relay.brevo = {
           host = "smtp-relay.brevo.com";
           port = 587;
         };
         session.rcpt.relay = "brevo";
 
-        # 6. Listeners
+        # Management Listener
         server.listener.management = {
           bind = [ "127.0.0.1:9081" ];
           protocol = "http";
