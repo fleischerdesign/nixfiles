@@ -61,13 +61,17 @@ in
           bind = [ "127.0.0.1:9081" ];
           protocol = "http";
         };
+
+        # Fallback Admin
+        authentication.fallback-admin = {
+          user = "admin";
+          secret = "%{file:${config.sops.secrets.mail_admin_password.path}}%";
+        };
       };
 
       credentials = {
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
-        "authentication.fallback-admin.user" = config.sops.secrets.mail_admin_user.path;
-        "authentication.fallback-admin.secret" = config.sops.secrets.mail_admin_password.path;
       };
     };
 
