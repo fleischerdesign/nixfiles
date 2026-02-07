@@ -25,6 +25,12 @@ in
           default = true;
         };
 
+        # Identity lookup for HELO
+        lookup.default = {
+          hostname = "mail.ancoris.ovh";
+          domain = "ancoris.ovh";
+        };
+
         # 0.15 Store Definitions
         store.data = {
           type = "sql";
