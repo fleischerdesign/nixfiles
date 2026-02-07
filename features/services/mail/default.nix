@@ -59,9 +59,36 @@ in
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-        # Use internal SQL directory for authentication and lookup
-        session.auth.directory = "internal";
-        session.rcpt.directory = "internal";
+        # Local Authentik LDAP Directory
+        directory.authentik = {
+          type = "ldap";
+          url = "ldap://127.0.0.1:389";
+          base-dn = "dc=ldap,dc=goauthentik,dc=io";
+          
+          # Bind credentials
+          bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
+          bind.secret = "%{
+file:${config.sops.secrets.stalwart_ldap_password.path}}%";
+
+          # Authentication Method
+          bind.auth.method = "lookup";
+
+          # Filters for Authentik
+          filter.name = "(&(objectClass=user)(cn=?))";
+          filter.email = "(&(objectClass=user)(mail=?))";
+
+          # Attribute Mapping
+          attributes = {
+            name = "cn";
+            email = "mail";
+            class = "objectClass";
+            groups = "memberOf";
+          };
+        };
+
+        # Use Authentik for authentication and lookup
+        session.auth.directory = "authentik";
+        session.rcpt.directory = "authentik";
 
         # Spam filter
         spam.classifier.store = "data";
@@ -183,5 +210,6 @@ in
     sops.secrets.mail_admin_password = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_id = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_secret = { owner = "stalwart-mail"; };
+    sops.secrets.stalwart_ldap_password = { owner = "stalwart-mail"; };
   };
 }
