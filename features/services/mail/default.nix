@@ -108,6 +108,11 @@ in
         };
         session.rcpt.relay = "brevo";
 
+        # Debug Logging
+        logger.default.level = "info";
+        logger.modules.directory = "trace";
+        logger.modules.session = "trace";
+
         # Listeners
         server.listener.management = {
           bind = [ "127.0.0.1:9081" ];
