@@ -145,6 +145,16 @@ in
     systemd.tmpfiles.rules = [
       "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
       "d /var/lib/stalwart-mail/blobs 0750 stalwart-mail stalwart-mail -"
+      
+      # Grant group read access to caddy certificates
+      "z /var/lib/caddy/.local 0750 caddy caddy -"
+      "z /var/lib/caddy/.local/share 0750 caddy caddy -"
+      "z /var/lib/caddy/.local/share/caddy 0750 caddy caddy -"
+      "z /var/lib/caddy/.local/share/caddy/certificates 0750 caddy caddy -"
+      "z /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory 0750 caddy caddy -"
+      "z /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh 0750 caddy caddy -"
+      "z /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/*.crt 0640 caddy caddy -"
+      "z /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/*.key 0640 caddy caddy -"
     ];
 
     # Secrets
