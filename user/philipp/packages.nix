@@ -20,6 +20,7 @@ in
     # gimp
     bitwarden-desktop
     bitwarden-cli
+    geary
     obsidian
     orca-slicer
     endeavour
