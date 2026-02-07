@@ -102,7 +102,6 @@ in
     # Secrets
     sops.secrets.brevo_smtp_user = { owner = "stalwart-mail"; };
     sops.secrets.brevo_smtp_key = { owner = "stalwart-mail"; };
-    sops.secrets.mail_admin_user = { owner = "stalwart-mail"; };
     sops.secrets.mail_admin_password = { owner = "stalwart-mail"; };
   };
 }
