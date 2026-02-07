@@ -18,8 +18,8 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Use deployed certificates
-        server.certificate.default = {
+        # 0.15 Certificate Definitions
+        certificate.default = {
           cert = "%{file:/var/lib/stalwart-mail/certs/mail.crt}%";
           privkey = "%{file:/var/lib/stalwart-mail/certs/mail.key}%";
         };
