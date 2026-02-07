@@ -2,6 +2,8 @@
 
 let
   cfg = config.my.features.services.mail;
+  # Common DB URL
+  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
 in
 {
   options.my.features.services.mail = {
@@ -16,64 +18,51 @@ in
       settings = {
         server.hostname = "mackaye.ancoris.ovh";
         
-        # Domains
-        directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
-
-        # Storage with PostgreSQL
-        storage.data = {
+        # 1. Define Backends
+        storage.pg = {
           type = "sql";
           driver = "postgres";
-          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+          url = dbUrl;
         };
-        storage.lookup = {
-          type = "sql";
-          driver = "postgres";
-          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
-        };
-        storage.directory = {
-          type = "sql";
-          driver = "postgres";
-          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
-        };
-        storage.queue = {
-          type = "sql";
-          driver = "postgres";
-          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
-        };
-        storage.blob = {
-          type = "fs";
-          path = "/var/lib/stalwart-mail/blobs";
-        };
-        storage.spam = {
-          type = "rocksdb";
-          path = "/var/lib/stalwart-mail/spam";
-        };
-
-        # Caching with Redis
-        storage.cache = {
+        storage.red = {
           type = "redis";
           url = "redis://127.0.0.1:6379";
         };
+        storage.fs = {
+          type = "fs";
+          path = "/var/lib/stalwart-mail/blobs";
+        };
 
-        # Spam filter configuration
-        spam.classifier.store = "spam";
-        spam.training.store = "spam";
+        # 2. Map Purposes to Backends
+        storage.data = "pg";
+        storage.lookup = "pg";
+        storage.directory = "pg";
+        storage.queue = "pg";
+        storage.blob = "fs";
+        storage.cache = "red";
 
-        # SMTP Relay (Brevo)
+        # 3. Domains
+        directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
+
+        # 4. Spam filter
+        spam.classifier.store = "pg";
+        spam.training.store = "pg";
+
+        # 5. SMTP Relay (Brevo)
         remote.relay.brevo = {
           host = "smtp-relay.brevo.com";
           port = 587;
         };
-
         session.rcpt.relay = "brevo";
 
-        # Management UI
+        # 6. Listeners
         server.listener.http = {
           bind = [ "127.0.0.1:9081" ];
           protocol = "http";
         };
       };
 
+      # Pass secrets as files (Stalwart reads them via %{file:path}%)
       credentials = {
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
@@ -101,11 +90,10 @@ in
       };
     };
 
+    # Directory Setup
     systemd.tmpfiles.rules = [
       "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
       "d /var/lib/stalwart-mail/blobs 0750 stalwart-mail stalwart-mail -"
-      "d /var/lib/stalwart-mail/spam 0750 stalwart-mail stalwart-mail -"
-      "d /var/lib/stalwart-mail/spam/training 0750 stalwart-mail stalwart-mail -"
     ];
 
     # Secrets
