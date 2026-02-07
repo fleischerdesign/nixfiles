@@ -21,7 +21,8 @@ in
         # 0.15 Certificate Definitions
         certificate.default = {
           cert = "%{file:/var/lib/stalwart-mail/certs/mail.crt}%";
-          privkey = "%{file:/var/lib/stalwart-mail/certs/mail.key}%";
+          private-key = "%{file:/var/lib/stalwart-mail/certs/mail.key}%";
+          default = true;
         };
 
         # 0.15 Store Definitions
