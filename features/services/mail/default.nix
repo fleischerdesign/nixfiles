@@ -44,6 +44,10 @@ in
           type = "fs";
           path = "/var/lib/stalwart-mail/blobs";
         };
+        storage.spam = {
+          type = "rocksdb";
+          path = "/var/lib/stalwart-mail/spam";
+        };
 
         # Caching with Redis
         storage.cache = {
@@ -52,8 +56,8 @@ in
         };
 
         # Spam filter configuration
-        spam.classifier.path = "/var/lib/stalwart-mail/spam/filter.classifier";
-        spam.training.path = "/var/lib/stalwart-mail/spam/training";
+        spam.classifier.store = "spam";
+        spam.training.store = "spam";
 
         # SMTP Relay (Brevo)
         remote.relay.brevo = {
