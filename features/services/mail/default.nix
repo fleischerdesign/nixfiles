@@ -45,6 +45,18 @@ in
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
+        # Authentik OIDC Directory
+        directory.authentik = {
+          type = "oidc";
+          issuer = "https://auth.ancoris.ovh/application/o/stalwart/";
+          client-id = "%{file:${config.sops.secrets.stalwart_oidc_id.path}}%";
+          client-secret = "%{file:${config.sops.secrets.stalwart_oidc_secret.path}}%";
+        };
+
+        # Use Authentik for authentication and lookup
+        session.auth.directory = "authentik";
+        session.rcpt.directory = "authentik";
+
         # Spam filter
         spam.classifier.store = "data";
         spam.training.store = "data";
@@ -103,5 +115,7 @@ in
     sops.secrets.brevo_smtp_user = { owner = "stalwart-mail"; };
     sops.secrets.brevo_smtp_key = { owner = "stalwart-mail"; };
     sops.secrets.mail_admin_password = { owner = "stalwart-mail"; };
+    sops.secrets.stalwart_oidc_id = { owner = "stalwart-mail"; };
+    sops.secrets.stalwart_oidc_secret = { owner = "stalwart-mail"; };
   };
 }
