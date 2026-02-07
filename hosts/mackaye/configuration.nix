@@ -56,6 +56,7 @@
   my.features.services.portfolio.enable = true;
   my.features.services.couchdb.enable = true;
   my.features.services.homarr.enable = true;
+  my.features.services.vaultwarden.enable = true;
   
   my.features.dev.nixvim.enable = true;
 
