@@ -59,19 +59,21 @@ in
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-                        # Local Authentik LDAP Directory
+                                # Local Authentik LDAP Directory
 
-                        directory.authentik = {
+                                directory.authentik = {
 
-                          type = "ldap";
+                                  type = "ldap";
 
-                          url = "ldap://127.0.0.1:3389";
+                                  url = "ldaps://127.0.0.1:6636";
 
-                          base-dn = "dc=ldap,dc=goauthentik,dc=io";
+                                  tls.allow-invalid-certs = true;
 
-                          
+                                  base-dn = "dc=ldap,dc=goauthentik,dc=io";
 
-                          # Bind credentials
+                                  
+
+                                  # Bind credentials
 
                           bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
 
