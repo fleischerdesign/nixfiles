@@ -16,11 +16,6 @@ in
     yazi
   ] ++ lib.optionals (role != "server") [
     # --- Desktop Only ---
-    (google-chrome.override {
-      commandLineArgs = [
-        "--enable-features=VaapiVideoDecodeLinuxGL,VaapiVideoEncoder,VaapiIgnoreDriverChecks,VaapiVideoDecoder,PlatformHEVCDecoderSupport,UseMultiPlaneFormatForHardwareVideo"
-      ];
-    })
     nerd-fonts.jetbrains-mono
     # gimp
     bitwarden-desktop
