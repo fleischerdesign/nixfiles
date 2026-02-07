@@ -80,15 +80,14 @@ in
           # Authentication Method
           bind.auth.method = "lookup";
 
-          # Filters for Authentik
-          filter.name = "(&(objectClass=user)(|(cn=?)(sAMAccountName=?)))";
-          filter.email = "(&(objectClass=user)(mail=?))";
+          # Filters for Authentik (Verified via ldapsearch)
+          filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
+          filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
 
           # Attribute Mapping
           attributes = {
             name = "cn";
             email = "mail";
-            class = "objectClass";
             groups = "memberOf";
             secret-changed = "pwdChangedTime";
           };
