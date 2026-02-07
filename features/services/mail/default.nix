@@ -2,7 +2,6 @@
 
 let
   cfg = config.my.features.services.mail;
-  # Common DB URL
   dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
 in
 {
@@ -40,6 +39,7 @@ in
         storage.queue = "pg";
         storage.blob = "fs";
         storage.cache = "red";
+        storage.spam = "pg";
 
         # 3. Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
@@ -56,13 +56,12 @@ in
         session.rcpt.relay = "brevo";
 
         # 6. Listeners
-        server.listener.http = {
+        server.listener.management = {
           bind = [ "127.0.0.1:9081" ];
           protocol = "http";
         };
       };
 
-      # Pass secrets as files (Stalwart reads them via %{file:path}%)
       credentials = {
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
@@ -90,7 +89,6 @@ in
       };
     };
 
-    # Directory Setup
     systemd.tmpfiles.rules = [
       "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
       "d /var/lib/stalwart-mail/blobs 0750 stalwart-mail stalwart-mail -"
