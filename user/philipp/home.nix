@@ -54,6 +54,11 @@
       profiles.philipp = {
         userChrome = ''
           @import "firefox-gnome-theme/userChrome.css";
+
+          /* Den Lesezeichen-Stern (Star-Button) komplett entfernen */
+          #star-button-box {
+            display: none !important;
+          }
         '';
         userContent = ''
           @import "firefox-gnome-theme/userContent.css";
