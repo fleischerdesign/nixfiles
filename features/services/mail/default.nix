@@ -71,10 +71,6 @@ in
       };
 
       credentials = {
-        "storage.data.url" = pkgs.writeText "stalwart-db-url" "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
-        "storage.lookup.url" = pkgs.writeText "stalwart-db-url" "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
-        "storage.directory.url" = pkgs.writeText "stalwart-db-url" "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
-        "storage.queue.url" = pkgs.writeText "stalwart-db-url" "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
         "authentication.fallback-admin.user" = config.sops.secrets.mail_admin_user.path;
