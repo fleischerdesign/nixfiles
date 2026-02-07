@@ -23,11 +23,12 @@ in
         storage.data = {
           type = "sql";
           driver = "postgres";
-          # DSN will be injected via credentials
+          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
         };
         storage.lookup = {
           type = "sql";
           driver = "postgres";
+          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
         };
 
         # Caching with Redis
@@ -52,8 +53,6 @@ in
       };
 
       credentials = {
-        "storage.data.url" = config.sops.secrets.stalwart_db_url.path;
-        "storage.lookup.url" = config.sops.secrets.stalwart_db_url.path;
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
         "authentication.fallback-admin.user" = config.sops.secrets.mail_admin_user.path;
@@ -81,7 +80,6 @@ in
     };
 
     # Secrets
-    sops.secrets.stalwart_db_url = { owner = "stalwart-mail"; };
     sops.secrets.brevo_smtp_user = { owner = "stalwart-mail"; };
     sops.secrets.brevo_smtp_key = { owner = "stalwart-mail"; };
     sops.secrets.mail_admin_user = { owner = "stalwart-mail"; };
