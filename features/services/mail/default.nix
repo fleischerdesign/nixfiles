@@ -45,17 +45,9 @@ in
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-        # Authentik OIDC Directory
-        directory.authentik = {
-          type = "oidc";
-          issuer = "https://auth.ancoris.ovh/application/o/stalwart/";
-          client-id = "%{file:${config.sops.secrets.stalwart_oidc_id.path}}%";
-          client-secret = "%{file:${config.sops.secrets.stalwart_oidc_secret.path}}%";
-        };
-
-        # Use Authentik for authentication and lookup
-        session.auth.directory = "authentik";
-        session.rcpt.directory = "authentik";
+        # Use internal SQL directory for authentication and lookup
+        session.auth.directory = "internal";
+        session.rcpt.directory = "internal";
 
         # Spam filter
         spam.classifier.store = "data";
@@ -68,10 +60,16 @@ in
         };
         session.rcpt.relay = "brevo";
 
-        # Management Listener
+        # Management Listener with OIDC option
         server.listener.management = {
           bind = [ "127.0.0.1:9081" ];
           protocol = "http";
+          oidc = {
+            issuer = "https://auth.ancoris.ovh/application/o/stalwart/";
+            client-id = "%{file:${config.sops.secrets.stalwart_oidc_id.path}}%";
+            client-secret = "%{file:${config.sops.secrets.stalwart_oidc_secret.path}}%";
+            scopes = [ "openid" "profile" "email" ];
+          };
         };
 
         # Fallback Admin
