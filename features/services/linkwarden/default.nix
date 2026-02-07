@@ -12,7 +12,7 @@ in
     services.linkwarden = {
       enable = true;
       host = "127.0.0.1";
-      port = 3005;
+      port = 3010;
       
       # Use central postgres
       database = {
@@ -49,7 +49,7 @@ in
     # Caddy Reverse Proxy
     my.features.services.caddy.exposedServices = {
       "linkwarden" = {
-        port = 3005;
+        port = 3010;
         fullDomain = "linkwarden.mky.ancoris.ovh";
       };
     };
