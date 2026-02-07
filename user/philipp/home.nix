@@ -1,6 +1,7 @@
 {
-  config, # Added config to the function arguments
+  config,
   pkgs,
+  inputs,
   ...
 }:
 
@@ -9,6 +10,8 @@
     ./packages.nix
     # Other user-specific modules will be imported here as they are refactored
   ];
+
+  home.file.".mozilla/firefox/philipp/chrome/firefox-gnome-theme".source = inputs.firefox-gnome-theme;
 
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
@@ -45,6 +48,23 @@
     direnv = {
       enable = true;
       nix-direnv.enable = true;
+    };
+    firefox = {
+      enable = true;
+      profiles.philipp = {
+        userChrome = ''
+          @import "firefox-gnome-theme/userChrome.css";
+        '';
+        userContent = ''
+          @import "firefox-gnome-theme/userContent.css";
+        '';
+        settings = {
+          "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
+          "browser.uidensity" = 0;
+          "svg.context-properties.content.enabled" = true;
+          "browser.theme.dark-private-windows" = false;
+        };
+      };
     };
     fish = {
       enable = true;

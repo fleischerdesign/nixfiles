@@ -40,7 +40,6 @@ in
     evince
     nautilus
     gnome-disk-utility
-    firefox
     bluetuith
     (callPackage ../../packages/lychee-slicer { })
     (callPackage ../../packages/ficsit { })

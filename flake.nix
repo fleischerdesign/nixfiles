@@ -59,6 +59,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    firefox-gnome-theme = {
+      url = "github:rafaelmardojai/firefox-gnome-theme";
+      flake = false;
+    };
+
   };
 
   outputs =
