@@ -62,7 +62,7 @@ in
         # Local Authentik LDAP Directory
         directory.authentik = {
           type = "ldap";
-          url = "ldap://127.0.0.1:389";
+          url = "ldap://127.0.0.1:3389";
           base-dn = "dc=ldap,dc=goauthentik,dc=io";
           
           # Bind credentials
