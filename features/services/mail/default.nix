@@ -81,7 +81,7 @@ in
           bind.auth.method = "lookup";
 
           # Filters for Authentik
-          filter.name = "(&(objectClass=user)(cn=?))";
+          filter.name = "(&(objectClass=user)(|(cn=?)(sAMAccountName=?)))";
           filter.email = "(&(objectClass=user)(mail=?))";
 
           # Attribute Mapping
@@ -90,6 +90,7 @@ in
             email = "mail";
             class = "objectClass";
             groups = "memberOf";
+            secret-changed = "pwdChangedTime";
           };
         };
 
