@@ -30,6 +30,16 @@ in
           driver = "postgres";
           url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
         };
+        storage.directory = {
+          type = "sql";
+          driver = "postgres";
+          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+        };
+        storage.queue = {
+          type = "sql";
+          driver = "postgres";
+          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+        };
         storage.blob = {
           type = "fs";
           path = "/var/lib/stalwart-mail/blobs";
@@ -41,8 +51,9 @@ in
           url = "redis://127.0.0.1:6379";
         };
 
-        # Spam filter storage
+        # Spam filter configuration
         spam.classifier.path = "/var/lib/stalwart-mail/spam/filter.classifier";
+        spam.training.path = "/var/lib/stalwart-mail/spam/training";
 
         # SMTP Relay (Brevo)
         remote.relay.brevo = {
@@ -60,6 +71,10 @@ in
       };
 
       credentials = {
+        "storage.data.url" = pkgs.writeText "stalwart-db-url" "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+        "storage.lookup.url" = pkgs.writeText "stalwart-db-url" "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+        "storage.directory.url" = pkgs.writeText "stalwart-db-url" "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+        "storage.queue.url" = pkgs.writeText "stalwart-db-url" "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
         "authentication.fallback-admin.user" = config.sops.secrets.mail_admin_user.path;
@@ -85,6 +100,13 @@ in
         fullDomain = "mail.ancoris.ovh";
       };
     };
+
+    systemd.tmpfiles.rules = [
+      "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
+      "d /var/lib/stalwart-mail/blobs 0750 stalwart-mail stalwart-mail -"
+      "d /var/lib/stalwart-mail/spam 0750 stalwart-mail stalwart-mail -"
+      "d /var/lib/stalwart-mail/spam/training 0750 stalwart-mail stalwart-mail -"
+    ];
 
     # Secrets
     sops.secrets.brevo_smtp_user = { owner = "stalwart-mail"; };
