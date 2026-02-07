@@ -52,6 +52,11 @@
   my.features.services.postgresql.enable = true;
   my.features.services.redis.enable = true;
   my.features.services.authentik.server.enable = true;
+  my.features.services.authentik.outpost.ldap = {
+    enable = true;
+    coreAddress = "http://127.0.0.1:9055";
+    tokenSecretName = "authentik_outpost_ldap_token_mackaye";
+  };
   my.features.services.plausible.enable = true;
   my.features.services.portfolio.enable = true;
   my.features.services.couchdb.enable = true;

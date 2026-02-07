@@ -6,22 +6,33 @@
 }:
 let
   cfg = config.my.features.services.authentik.outpost.ldap;
-  authentikHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
+  mackayeTailscaleIp = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
 in
 {
-  options.my.features.services.authentik.outpost.ldap.enable =
-    lib.mkEnableOption "Authentik LDAP Outpost";
+  options.my.features.services.authentik.outpost.ldap = {
+    enable = lib.mkEnableOption "Authentik LDAP Outpost";
+    
+    coreAddress = lib.mkOption {
+      type = lib.types.str;
+      description = "The full URL (including protocol and port) of the Authentik Core server.";
+    };
+
+    tokenSecretName = lib.mkOption {
+      type = lib.types.str;
+      description = "The name of the secret in sops containing the Authentik token.";
+    };
+  };
 
   config = lib.mkIf cfg.enable {
     # Secrets Setup
-    sops.secrets."authentik_outpost_ldap_token" = {
+    sops.secrets."${cfg.tokenSecretName}" = {
       owner = "authentik-outpost-ldap";
       restartUnits = [ "authentik-outpost-ldap.service" ];
     };
 
     # Template for env vars
     sops.templates."authentik-outpost-ldap.env".content = ''
-      AUTHENTIK_TOKEN=${config.sops.placeholder."authentik_outpost_ldap_token"}
+      AUTHENTIK_TOKEN=${config.sops.placeholder."${cfg.tokenSecretName}"}
     '';
 
     # Create system user
@@ -41,9 +52,9 @@ in
         ExecStart = lib.getExe pkgs.authentik-outposts.ldap;
         EnvironmentFile = config.sops.templates."authentik-outpost-ldap.env".path;
 
-        # Configure connection to Authentik Core via Tailscale
+        # Configure connection to Authentik Core
         Environment = [
-          "AUTHENTIK_HOST=http://${authentikHost}:9055"
+          "AUTHENTIK_HOST=${cfg.coreAddress}"
           "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
         ];
 

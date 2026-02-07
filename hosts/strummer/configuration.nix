@@ -88,7 +88,11 @@
   my.features.services.cloudflare-dyndns.domains = [ "fls.ancoris.ovh" ];
 
   my.features.services.authentik.outpost.proxy.enable = true;
-  my.features.services.authentik.outpost.ldap.enable = true;
+  my.features.services.authentik.outpost.ldap = {
+    enable = true;
+    coreAddress = "http://${config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp}:9055";
+    tokenSecretName = "authentik_outpost_ldap_token_strummer";
+  };
 
   my.features.services.monitoring.node-exporter.enable = true;
   my.features.services.monitoring.promtail = {
