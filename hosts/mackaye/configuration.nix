@@ -31,7 +31,7 @@
   networking.useDHCP = false;
   networking.interfaces.ens18.useDHCP = false;
   networking.defaultGateway = "37.114.55.1";
-  networking.nameservers = [ "1.1.1.1" "8.8.8.8" ];
+  networking.nameservers = [ "9.9.9.9" "1.1.1.1" ];
   networking.interfaces.ens18.ipv4.addresses = [ {
     address = "37.114.55.91";
     prefixLength = 24;
