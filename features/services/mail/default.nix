@@ -3,6 +3,7 @@
 let
   cfg = config.my.features.services.mail;
   dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+  certDir = "/var/lib/stalwart-mail/certs";
 in
 {
   options.my.features.services.mail = {
@@ -10,9 +11,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Grant stalwart access to caddy's certificates
-    users.users.stalwart-mail.extraGroups = [ "caddy" ];
-
     services.stalwart = {
       enable = true;
       openFirewall = true;
@@ -20,10 +18,10 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Use Caddy's certificates
+        # Use deployed certificates
         server.certificate.default = {
-          cert = "%{file:/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.crt}%";
-          privkey = "%{file:/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.key}%";
+          cert = "%{file:${certDir}/mail.crt}%";
+          privkey = "%{file:${certDir}/mail.key}%";
         };
 
         # 0.15 Store Definitions
@@ -123,6 +121,28 @@ in
       };
     };
 
+    # One-shot service to safely copy certificates from Caddy to Stalwart
+    systemd.services.stalwart-cert-deploy = {
+      description = "Deploy Caddy certificates to Stalwart";
+      after = [ "caddy.service" ];
+      before = [ "stalwart.service" ];
+      wantedBy = [ "stalwart.service" ];
+      
+      serviceConfig = {
+        Type = "oneshot";
+        User = "root";
+      };
+
+      script = ''
+        mkdir -p ${certDir}
+        cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.crt ${certDir}/mail.crt
+        cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.key ${certDir}/mail.key
+        chown -R stalwart-mail:stalwart-mail ${certDir}
+        chmod 700 ${certDir}
+        chmod 600 ${certDir}/*
+      '';
+    };
+
     # Ensure PostgreSQL DB exists
     services.postgresql = {
       ensureDatabases = [ "stalwart" ];
@@ -145,16 +165,6 @@ in
     systemd.tmpfiles.rules = [
       "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
       "d /var/lib/stalwart-mail/blobs 0750 stalwart-mail stalwart-mail -"
-      
-      # Grant group read access to caddy certificates
-      "z /var/lib/caddy/.local 0750 caddy caddy -"
-      "z /var/lib/caddy/.local/share 0750 caddy caddy -"
-      "z /var/lib/caddy/.local/share/caddy 0750 caddy caddy -"
-      "z /var/lib/caddy/.local/share/caddy/certificates 0750 caddy caddy -"
-      "z /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory 0750 caddy caddy -"
-      "z /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh 0750 caddy caddy -"
-      "z /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/*.crt 0640 caddy caddy -"
-      "z /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/*.key 0640 caddy caddy -"
     ];
 
     # Secrets
