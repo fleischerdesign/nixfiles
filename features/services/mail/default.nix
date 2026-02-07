@@ -59,16 +59,23 @@ in
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-        # Local Authentik LDAP Directory
-        directory.authentik = {
-          type = "ldap";
-          url = "ldap://127.0.0.1:3389";
-          base-dn = "dc=ldap,dc=goauthentik,dc=io";
-          
-          # Bind credentials
-          bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
-          bind.secret = "%{
-file:${config.sops.secrets.stalwart_ldap_password.path}}%";
+                # Local Authentik LDAP Directory
+
+                directory.authentik = {
+
+                  type = "ldap";
+
+                  url = "ldap://127.0.0.1:3389";
+
+                  base-dn = "dc=ldap,dc=goauthentik,dc=io";
+
+                  
+
+                  # Bind credentials
+
+                  bind.dn = "cn=stalwart,dc=ldap,dc=goauthentik,dc=io";
+
+                  bind.secret = "%{file:${config.sops.secrets.stalwart_ldap_password.path}}%";
 
           # Authentication Method
           bind.auth.method = "lookup";
