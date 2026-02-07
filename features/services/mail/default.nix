@@ -30,12 +30,19 @@ in
           driver = "postgres";
           url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
         };
+        storage.blob = {
+          type = "fs";
+          path = "/var/lib/stalwart-mail/blobs";
+        };
 
         # Caching with Redis
         storage.cache = {
           type = "redis";
           url = "redis://127.0.0.1:6379";
         };
+
+        # Spam filter storage
+        spam.classifier.path = "/var/lib/stalwart-mail/spam/filter.classifier";
 
         # SMTP Relay (Brevo)
         remote.relay.brevo = {
