@@ -60,7 +60,7 @@ in
         };
         session.rcpt.relay = "brevo";
 
-        # Management Listener with OIDC option
+        # Listeners
         server.listener.management = {
           bind = [ "127.0.0.1:9081" ];
           protocol = "http";
@@ -70,6 +70,35 @@ in
             client-secret = "%{file:${config.sops.secrets.stalwart_oidc_secret.path}}%";
             scopes = [ "openid" "profile" "email" ];
           };
+        };
+
+        server.listener.smtp = {
+          bind = [ "[::]:25" ];
+          protocol = "smtp";
+        };
+
+        server.listener.submissions = {
+          bind = [ "[::]:465" ];
+          protocol = "smtp";
+          tls.implicit = true;
+        };
+
+        server.listener.submission = {
+          bind = [ "[::]:587" ];
+          protocol = "smtp";
+          tls.enable = true;
+        };
+
+        server.listener.imaps = {
+          bind = [ "[::]:993" ];
+          protocol = "imap";
+          tls.implicit = true;
+        };
+
+        server.listener.imap = {
+          bind = [ "[::]:143" ];
+          protocol = "imap";
+          tls.enable = true;
         };
 
         # Fallback Admin
