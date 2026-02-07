@@ -14,6 +14,7 @@
       };
       kernel.enable = lib.mkDefault true;
       fish-shell.enable = lib.mkDefault true;
+      networking.topology.enable = lib.mkDefault true;
     };
   };
 
