@@ -10,13 +10,22 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Grant stalwart access to caddy's certificates
+    users.users.stalwart-mail.extraGroups = [ "caddy" ];
+
     services.stalwart = {
       enable = true;
       openFirewall = true;
 
       settings = {
-        server.hostname = "mackaye.ancoris.ovh";
+        server.hostname = "mail.ancoris.ovh";
         
+        # Use Caddy's certificates
+        server.certificate.default = {
+          cert = "%{file:/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.crt}%";
+          privkey = "%{file:/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.key}%";
+        };
+
         # 0.15 Store Definitions
         store.data = {
           type = "sql";
