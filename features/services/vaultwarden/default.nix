@@ -18,6 +18,7 @@ in
         
         # OIDC / Authentik
         SSO_ENABLED = true;
+        SSO_ONLY = true;
         SSO_AUTHORITY = "https://auth.ancoris.ovh/application/o/vaultwarden/";
         SSO_SCOPES = "email profile offline_access";
         SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION = true;
