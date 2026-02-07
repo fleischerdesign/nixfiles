@@ -23,6 +23,8 @@ in
     })
     nerd-fonts.jetbrains-mono
     # gimp
+    bitwarden-desktop
+    bitwarden-cli
     obsidian
     orca-slicer
     endeavour
