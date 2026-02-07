@@ -20,6 +20,7 @@ in
         SSO_ENABLED = true;
         SSO_AUTHORITY = "https://auth.ancoris.ovh/application/o/vaultwarden/";
         SSO_SCOPES = "email profile offline_access";
+        SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION = true;
 
         DATABASE_URL = "postgresql://%2Frun%2Fpostgresql/vaultwarden";
 
