@@ -22,8 +22,7 @@ in
         config.local-keys = [
           "store.*"
           "storage.*"
-          "directory.authentik.*" # Manage LDAP locally
-          # directory.internal is NOT here, so DKIM/Domains stay in DB
+          "directory.authentik.*" # ONLY LDAP is managed by Nix
           "server.*"
           "session.*"
           "remote.*"
@@ -58,7 +57,6 @@ in
           user = "stalwart";
           password = "%{file:/run/credentials/stalwart.service/db_password}%";
           tls.enable = false;
-          pool.max-connections = 10;
         };
 
         # 2. Redis Store
@@ -74,13 +72,8 @@ in
         storage.fts = "db";
         storage.blob = "db";
         
-        # Internal directory handles domain metadata and DKIM
-        storage.directory = "internal"; 
-
-        directory."internal" = {
-          type = "internal";
-          store = "db";
-        };
+        # Back to LDAP as primary directory - this made login work!
+        storage.directory = "authentik"; 
 
         # LDAP Directory for Authentication
         directory."authentik" = {
@@ -99,10 +92,6 @@ in
             secret-changed = "pwdChangedTime";
           };
         };
-
-        # Overrides: Route authentication and recipient lookups to LDAP
-        session.auth.directory = "'authentik'";
-        session.rcpt.directory = "'authentik'";
 
         # SMTP Relay (Brevo)
         remote.relay."brevo" = {
@@ -129,7 +118,6 @@ in
         server.listener.imaps = { bind = [ "[::]:993" ]; protocol = "imap"; tls.implicit = true; hostname = "mail.ancoris.ovh"; };
         server.listener.imap = { bind = [ "[::]:143" ]; protocol = "imap"; tls.enable = true; hostname = "mail.ancoris.ovh"; };
 
-        # Fallback Admin
         authentication.fallback-admin = {
           user = "admin";
           secret = "%{file:${config.sops.secrets.mail_admin_password.path}}%";
