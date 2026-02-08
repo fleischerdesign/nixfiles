@@ -84,12 +84,11 @@ in
                   bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
                   bind.auth.method = "lookup";
                   
-                            filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
-                            # Use official structure with custom attributes
-                            filter.email = "(&(objectClass=inetOrgPerson)(|(stalwart_mail=?)(stalwart_aliases=?)))";
-                            
-                            attributes = {
-                              name = "cn";
+                                      filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
+                                      # Reduced to single placeholder to fix Stalwart 0.15 parser bug
+                                      filter.email = "(&(objectClass=inetOrgPerson)(stalwart_mail=?))";
+                                      
+                                      attributes = {                              name = "cn";
                               email = "stalwart_mail"; 
                               email-alias = "stalwart_aliases";
                               groups = "memberOf";
