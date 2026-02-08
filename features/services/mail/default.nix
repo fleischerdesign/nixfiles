@@ -148,7 +148,8 @@ in
         User = "postgres";
       };
       script = ''
-        psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${config.sops.secrets.stalwart_db_password.path})';"
+        ${config.services.postgresql.package}/bin/psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='stalwart'" | grep -q 1 || exit 0
+        ${config.services.postgresql.package}/bin/psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${config.sops.secrets.stalwart_db_password.path})';"
       '';
     };
 
