@@ -2,6 +2,7 @@
 
 let
   cfg = config.my.features.services.mail;
+  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
   certDir = "/var/lib/stalwart-mail/certs";
 in
 {
@@ -17,7 +18,7 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration for managed sections
+        # Force local configuration for everything we manage with Nix
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -68,6 +69,9 @@ in
         storage.fts = "postgres";
         storage.directory = "authentik";
 
+        # Domains
+        directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
+
         # Local Authentik LDAP Directory
         directory."authentik" = {
           type = "ldap";
@@ -81,7 +85,7 @@ in
           # Authentication Method
           bind.auth.method = "lookup";
 
-          # Filters
+          # Filters for Authentik
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
           filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
 
@@ -94,7 +98,7 @@ in
           };
         };
 
-        # Use Authentik for authentication - MUST be quoted for Stalwart expression engine
+        # Use Authentik for authentication and lookup
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
