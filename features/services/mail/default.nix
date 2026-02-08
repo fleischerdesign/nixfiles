@@ -73,14 +73,27 @@ in
 
                                   
 
-                                  # Bind credentials
+                                            # Bind credentials
 
-                          bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
+                                  
 
-                          bind.secret = "%{file:${config.sops.secrets.stalwart_ldap_password.path}}%";
+                                            bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
 
-          # Authentication Method
-          bind.auth.method = "lookup";
+                                  
+
+                                            # Secret is injected via credentials
+
+                                  
+
+                                  
+
+                                  
+
+                                            # Authentication Method
+
+                                  
+
+                                            bind.auth.method = "lookup";
 
           # Filters for Authentik (Verified via ldapsearch)
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
@@ -169,6 +182,7 @@ in
       credentials = {
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
+        "directory.authentik.bind.secret" = config.sops.secrets.stalwart_ldap_password.path;
       };
     };
 
