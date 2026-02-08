@@ -18,6 +18,20 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
+        # Force local configuration for everything we manage with Nix
+        config.local-keys = [
+          "store.*"
+          "directory.*"
+          "server.*"
+          "session.*"
+          "remote.*"
+          "authentication.*"
+          "certificate.*"
+          "lookup.*"
+          "spam.*"
+          "storage.*"
+        ];
+
         # 0.15 Certificate Definitions
         certificate.default = {
           cert = "%{file:/var/lib/stalwart-mail/certs/mail.crt}%";
