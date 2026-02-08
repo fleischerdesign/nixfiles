@@ -18,11 +18,11 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration only for what we manage
+        # Force local configuration only for managed sections
         config.local-keys = [
           "store.*"
           "storage.*"
-          "directory.authentik.*" # ONLY manage LDAP locally, let internal stay in DB
+          "directory.authentik.*" # Manage LDAP locally
           "server.*"
           "session.*"
           "remote.*"
@@ -48,7 +48,7 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store via TCP
+        # 1. PostgreSQL Store
         store."db" = {
           type = "postgresql";
           host = "127.0.0.1";
@@ -71,7 +71,9 @@ in
         storage.lookup = "redis";
         storage.fts = "db";
         storage.blob = "db";
-        storage.directory = "internal"; # For domain metadata/DKIM
+        
+        # CRITICAL: Set back to authentik for successful user lookups
+        storage.directory = "authentik"; 
 
         # LDAP Directory for Authentication
         directory."authentik" = {
@@ -101,6 +103,11 @@ in
           port = 587;
         };
         session.rcpt.relay = "'brevo'";
+
+        # Debug Logging
+        logger.default.level = "info";
+        logger.modules.directory = "trace";
+        logger.modules.session = "trace";
 
         # Listeners
         server.listener.management = {
