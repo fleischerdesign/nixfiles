@@ -56,6 +56,12 @@
         isDefault = true;
         userChrome = ''
           @import "thunderbird-gnome-theme/userChrome.css";
+
+          /* Fix für die Lücke am unteren Rand (speziell für Niri/Tiling) */
+          #tabbrowser-tabpanels, 
+          #messengerBox {
+            margin-bottom: 0 !important;
+          }
         '';
         userContent = ''
           @import "thunderbird-gnome-theme/userContent.css";
