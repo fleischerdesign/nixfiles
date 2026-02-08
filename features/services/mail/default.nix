@@ -17,7 +17,6 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration for managed sections
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -31,7 +30,6 @@ in
           "spam.*"
         ];
 
-        # 0.15 Certificate Definitions
         certificate."default" = {
           cert = "%{file:${certDir}/mail.crt}%";
           private-key = "%{file:${certDir}/mail.key}%";
@@ -48,30 +46,37 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. Native PostgreSQL Store
-        store."pg" = {
+        # 1. PostgreSQL Store via Socket (with dummy password to satisfy Stalwart driver)
+        store."db" = {
           type = "postgresql";
           host = "/run/postgresql";
           database = "stalwart";
           user = "stalwart";
+          password = "peer_auth_bypass"; # Dummy password
+          tls.enable = false;
+          pool.max-connections = 10;
         };
 
-        # 2. Native Redis Store
+        # 2. Redis Store
         store."redis" = {
           type = "redis";
           redis-type = "single";
           urls = "redis://127.0.0.1:6379";
         };
 
-        # Storage Assignments (Based on 0.15 Documentation)
-        storage.data = "pg";
-        storage.blob = "pg";   # Postgres supports blobs
-        storage.fts = "pg";    # Postgres supports FTS
-        storage.lookup = "redis"; # In-memory store
-        storage.directory = "authentik"; 
+        # 3. Blob Store (Filesystem)
+        store."blobs" = {
+          type = "fs";
+          path = "/var/lib/stalwart-mail/blobs";
+        };
 
-        # Domains
-        directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
+        # Storage Assignments
+        storage.data = "db";
+        storage.lookup = "db";
+        storage.directory = "authentik"; 
+        storage.fts = "db";
+        storage.blob = "blobs";
+        storage.cache = "redis";
 
         # LDAP Directory
         directory."authentik" = {
@@ -84,9 +89,7 @@ in
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
           filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
           attributes = {
-            name = "cn";
-            email = "mail";
-            groups = "memberOf";
+            name = "cn"; email = "mail"; groups = "memberOf";
             secret-changed = "pwdChangedTime";
           };
         };
@@ -131,6 +134,9 @@ in
         "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
       };
     };
+
+    # Give stalwart-mail access to postgres socket directory
+    users.users.stalwart-mail.extraGroups = [ "postgres" ];
 
     systemd.services.stalwart-cert-deploy = {
       description = "Deploy Caddy certificates to Stalwart";
