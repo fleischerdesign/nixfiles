@@ -18,6 +18,7 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
+        # Force local configuration
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -31,10 +32,15 @@ in
           "spam.*"
         ];
 
-        certificate.default = {
+        # 0.15 Certificate Definitions
+        certificate."default" = {
           cert = "%{file:${certDir}/mail.crt}%";
           private-key = "%{file:${certDir}/mail.key}%";
-          default = true;
+        };
+
+        server.tls = {
+          certificate = "default";
+          enable = true;
         };
 
         lookup.default = {
@@ -42,32 +48,34 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 0.15 Store Definitions
-        store.db = {
+        # Backends
+        store."db" = {
           type = "sql";
           driver = "postgres";
           url = dbUrl;
         };
-        store.local = {
+        store."local" = {
           type = "rocksdb";
           path = "/var/lib/stalwart-mail/local_db";
         };
-        store.blobs = {
+        store."blobs" = {
           type = "fs";
           path = "/var/lib/stalwart-mail/blobs";
         };
-        store.redis = {
+        store."cache" = {
           type = "redis";
           urls = [ "redis://127.0.0.1:6379" ];
         };
 
-        # Storage Assignments
+        # Storage Assignments (Based on NixOS tests)
         storage.data = "db";
-        storage.blob = "blobs";
         storage.lookup = "db";
+        storage.directory = "authentik";
         storage.fts = "db";
-        storage.directory = "db";
-        storage.cache = "redis";
+        storage.blob = "blobs";
+        storage.cache = "cache";
+        
+        # Local tasks on RocksDB to avoid startup issues
         storage.queue = "local";
 
         # Domains
@@ -78,19 +86,11 @@ in
           type = "ldap";
           url = "ldap://127.0.0.1:3389";
           base-dn = "dc=ldap,dc=goauthentik,dc=io";
-          
-          # Bind credentials
           bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
           bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
-
-          # Authentication Method
           bind.auth.method = "lookup";
-
-          # Filters
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
           filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
-
-          # Attribute Mapping
           attributes = {
             name = "cn";
             email = "mail";
@@ -114,11 +114,6 @@ in
         };
         session.rcpt.relay = "'brevo'";
 
-        # Debug Logging
-        logger.default.level = "info";
-        logger.modules.directory = "trace";
-        logger.modules.session = "trace";
-
         # Listeners
         server.listener.management = {
           bind = [ "127.0.0.1:9081" ];
@@ -131,41 +126,12 @@ in
           };
         };
 
-        server.listener.smtp = {
-          bind = [ "[::]:25" ];
-          protocol = "smtp";
-          hostname = "mail.ancoris.ovh";
-        };
+        server.listener.smtp = { bind = [ "[::]:25" ]; protocol = "smtp"; hostname = "mail.ancoris.ovh"; };
+        server.listener.submissions = { bind = [ "[::]:465" ]; protocol = "smtp"; tls.implicit = true; hostname = "mail.ancoris.ovh"; };
+        server.listener.submission = { bind = [ "[::]:587" ]; protocol = "smtp"; tls.enable = true; hostname = "mail.ancoris.ovh"; };
+        server.listener.imaps = { bind = [ "[::]:993" ]; protocol = "imap"; tls.implicit = true; hostname = "mail.ancoris.ovh"; };
+        server.listener.imap = { bind = [ "[::]:143" ]; protocol = "imap"; tls.enable = true; hostname = "mail.ancoris.ovh"; };
 
-        server.listener.submissions = {
-          bind = [ "[::]:465" ];
-          protocol = "smtp";
-          tls.implicit = true;
-          hostname = "mail.ancoris.ovh";
-        };
-
-        server.listener.submission = {
-          bind = [ "[::]:587" ];
-          protocol = "smtp";
-          tls.enable = true;
-          hostname = "mail.ancoris.ovh";
-        };
-
-        server.listener.imaps = {
-          bind = [ "[::]:993" ];
-          protocol = "imap";
-          tls.implicit = true;
-          hostname = "mail.ancoris.ovh";
-        };
-
-        server.listener.imap = {
-          bind = [ "[::]:143" ];
-          protocol = "imap";
-          tls.enable = true;
-          hostname = "mail.ancoris.ovh";
-        };
-
-        # Fallback Admin
         authentication.fallback-admin = {
           user = "admin";
           secret = "%{file:${config.sops.secrets.mail_admin_password.path}}%";
@@ -179,18 +145,12 @@ in
       };
     };
 
-    # One-shot service to safely copy certificates from Caddy to Stalwart
     systemd.services.stalwart-cert-deploy = {
       description = "Deploy Caddy certificates to Stalwart";
       after = [ "caddy.service" ];
       before = [ "stalwart.service" ];
       wantedBy = [ "stalwart.service" ];
-      
-      serviceConfig = {
-        Type = "oneshot";
-        User = "root";
-      };
-
+      serviceConfig = { Type = "oneshot"; User = "root"; };
       script = ''
         mkdir -p ${certDir}
         cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.crt ${certDir}/mail.crt
@@ -201,44 +161,22 @@ in
       '';
     };
 
-    # Ensure PostgreSQL DB exists
     services.postgresql = {
       ensureDatabases = [ "stalwart" ];
-      ensureUsers = [
-        {
-          name = "stalwart";
-          ensureDBOwnership = true;
-        }
-      ];
+      ensureUsers = [{ name = "stalwart"; ensureDBOwnership = true; }];
     };
 
-    # Caddy Reverse Proxy
     my.features.services.caddy.exposedServices = {
-      "mail" = {
-        port = 9081;
-        fullDomain = "mail.ancoris.ovh";
-      };
+      "mail" = { port = 9081; fullDomain = "mail.ancoris.ovh"; };
     };
 
-    systemd.tmpfiles.rules = [
-      "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
-      "d /var/lib/stalwart-mail/blobs 0750 stalwart-mail stalwart-mail -"
-    ];
+    systemd.tmpfiles.rules = [ "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -" ];
 
-    # Secrets
     sops.secrets.brevo_smtp_user = { owner = "stalwart-mail"; };
     sops.secrets.brevo_smtp_key = { owner = "stalwart-mail"; };
     sops.secrets.mail_admin_password = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_id = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_secret = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_ldap_password = { owner = "stalwart-mail"; };
-
-    # Template for env vars
-    sops.templates."stalwart-mail.env".content = ''
-      STALWART_LDAP_SECRET=${config.sops.placeholder.stalwart_ldap_password}
-    '';
-
-    # Inject environment variables into Stalwart service
-    systemd.services.stalwart.serviceConfig.EnvironmentFile = config.sops.templates."stalwart-mail.env".path;
   };
 }
