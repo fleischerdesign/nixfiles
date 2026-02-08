@@ -29,6 +29,7 @@ in
           "certificate.default.*"
           "lookup.*"
           "spam.*"
+          "mta.*"
         ];
 
         certificate."default" = {
@@ -103,9 +104,12 @@ in
         session.rcpt.relay = "'brevo'";
 
         # MTA Signing
-        mta.sign.dkim = {
-          enable = true;
-          selector = "202602r";
+        mta = {
+          relay = "'brevo'";
+          sign.dkim = {
+            enable = true;
+            selector = "202602e";
+          };
         };
 
         # Listeners
