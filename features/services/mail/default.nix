@@ -79,11 +79,8 @@ in
         # Routing Strategy
         queue.strategy."remote" = {
           route = [
-            {
-              "if" = "is_local_domain('', rcpt_domain)";
-              "then" = "'local'";
-              "else" = "'brevo'";
-            }
+            { "if" = "is_local_domain('', rcpt_domain)"; "then" = "'local'"; }
+            { "else" = "'brevo'"; }
           ];
         };
 
@@ -102,7 +99,6 @@ in
             secret = "%{file:/run/credentials/stalwart.service/brevo_secret}%";
           };
         };
-
         # LDAP Directory Configuration with CamelCase attributes
         directory."authentik" = {
           type = "ldap";
