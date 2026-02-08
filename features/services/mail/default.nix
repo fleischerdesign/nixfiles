@@ -258,6 +258,6 @@ in
     '';
 
     # Inject environment variables into Stalwart service
-    systemd.services.stalwart-mail.serviceConfig.EnvironmentFile = config.sops.templates."stalwart-mail.env".path;
+    systemd.services.stalwart.serviceConfig.EnvironmentFile = config.sops.templates."stalwart-mail.env".path;
   };
 }
