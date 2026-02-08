@@ -18,7 +18,7 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration for everything we manage with Nix
+        # Force local configuration for managed sections
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -47,8 +47,9 @@ in
 
         # 0.15 Store Definitions
         store.postgres = {
-          type = "postgresql";
-          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+          type = "sql";
+          driver = "postgres";
+          url = dbUrl;
         };
         store.blobs = {
           type = "fs";
@@ -63,9 +64,9 @@ in
         # Storage Assignments
         storage.data = "postgres";
         storage.blob = "blobs";
-        storage.lookup = "redis";
+        storage.lookup = "postgres";
         storage.fts = "postgres";
-        storage.directory = "authentik";
+        storage.directory = "postgres";
 
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
@@ -78,7 +79,7 @@ in
           
           # Bind credentials
           bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
-          bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
+          bind.secret = "%{env:STALWART_LDAP_SECRET}%";
 
           # Authentication Method
           bind.auth.method = "lookup";
@@ -172,7 +173,6 @@ in
       credentials = {
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
-        "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
       };
     };
 
@@ -229,5 +229,13 @@ in
     sops.secrets.stalwart_oidc_id = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_secret = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_ldap_password = { owner = "stalwart-mail"; };
+
+    # Template for env vars
+    sops.templates."stalwart-mail.env".content = ''
+      STALWART_LDAP_SECRET=${config.sops.placeholder.stalwart_ldap_password}
+    '';
+
+    # Inject environment variables into Stalwart service
+    systemd.services.stalwart.serviceConfig.EnvironmentFile = config.sops.templates."stalwart-mail.env".path;
   };
 }
