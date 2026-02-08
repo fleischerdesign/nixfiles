@@ -48,9 +48,7 @@ in
         # 0.15 Store Definitions
         store.postgres = {
           type = "postgresql";
-          host = "/run/postgresql";
-          database = "stalwart";
-          user = "stalwart";
+          url = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
         };
         store.blobs = {
           type = "fs";
