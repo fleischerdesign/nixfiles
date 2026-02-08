@@ -75,27 +75,27 @@ in
         # LDAP is the primary directory for accounts
         storage.directory = "authentik"; 
 
-        # LDAP Directory Configuration
-        directory."authentik" = {
-          type = "ldap";
-          url = "ldap://127.0.0.1:3389";
-          base-dn = "dc=ldap,dc=goauthentik,dc=io";
-          bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
-          bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
-          bind.auth.method = "lookup";
-          
-          filter.name = "(cn=?)";
-          filter.email = "(|(stalwart_mail=?)(stalwart_aliases=?))";
-          
-          attributes = {
-            name = "cn";
-            email = "stalwart_mail";
-            email-alias = "stalwart_aliases";
-            groups = "memberOf";
-            secret-changed = "pwdChangedTime";
-          };
-        };
-
+                # LDAP Directory Configuration
+                directory."authentik" = {
+                  type = "ldap";
+                  url = "ldap://127.0.0.1:3389";
+                  base-dn = "dc=ldap,dc=goauthentik,dc=io";
+                  bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
+                  bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
+                  bind.auth.method = "lookup";
+                  
+                  filter.name = "(cn=?)";
+                  # Use standard mail attribute for lookup to avoid parse errors with multiple placeholders
+                  filter.email = "(mail=?)";
+                  
+                  attributes = {
+                    name = "cn";
+                    email = "stalwart_mail"; 
+                    email-alias = "stalwart_aliases";
+                    groups = "memberOf";
+                    secret-changed = "pwdChangedTime";
+                  };
+                };
         # SMTP Relay (Brevo)
         remote.relay."brevo" = {
           host = "smtp-relay.brevo.com";
