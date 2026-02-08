@@ -245,8 +245,6 @@ PanelWindow {
             
                                                                 iconColor: FrameTheme.foreground
             
-                                                                anchors.centerIn: parent
-            
                                                             }
             
                                                             onClicked: bottomBarWindow.bluetoothClicked()
@@ -264,7 +262,6 @@ PanelWindow {
                                         implicitWidth: 36
                                         content: WifiIcon {
                                                                             iconColor: FrameTheme.foreground
-                                                                            anchors.centerIn: parent
                                                                         }
                                                                         onClicked: bottomBarWindow.wifiClicked()
                                                                     }
@@ -276,7 +273,6 @@ PanelWindow {
                                                                 implicitWidth: 36
                                                                 content: VolumeIcon {
                                                                     iconColor: FrameTheme.foreground
-                                                                    anchors.centerIn: parent
                                                                 }
                                                                 onClicked: bottomBarWindow.volumeClicked()
                                                             }
@@ -287,7 +283,6 @@ PanelWindow {
                                         implicitWidth: 36
                                         content: BatteryIcon {
                                                                             iconColor: FrameTheme.foreground
-                                                                            anchors.centerIn: parent
                                                                         }
                                                                         onClicked: bottomBarWindow.powerClicked()
                                                                     }

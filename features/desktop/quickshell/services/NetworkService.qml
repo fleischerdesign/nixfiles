@@ -66,6 +66,7 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 root.wifiEnabled = (this.text.trim() === "enabled");
+                console.log("NetworkService: wifiEnabled =", root.wifiEnabled, "(raw: '" + this.text.trim() + "')");
                 if (!root.wifiEnabled) {
                     root.wifiNetworks = [];
                 }
@@ -132,7 +133,7 @@ Singleton {
                     const lines = output.split('\n');
                     for (const line of lines) {
                         const parts = line.split(':');
-                        if (parts.length >= 2) {
+                        if (parts.length >= 3) {
                             networks.push({
                                 ssid: parts[0],
                                 signal: parseInt(parts[1], 10),
@@ -144,6 +145,7 @@ Singleton {
                 // Sort networks by signal strength (descending)
                 networks.sort((a, b) => b.signal - a.signal);
                 root.wifiNetworks = networks;
+                console.log("NetworkService: found", networks.length, "networks. Active network:", JSON.stringify(networks.find(n => n.inUse)));
                 root.isScanning = false; // Reset scanning state here
             }
         }

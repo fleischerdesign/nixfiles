@@ -168,35 +168,28 @@ Modal {
                             anchors.fill: parent
                             anchors.margins: 2
                             variant: Pipewire.defaultAudioSink === modelData ? FrameButton.Variant.Secondary : FrameButton.Variant.Ghost
+                            centerContent: false
+
+                            Text {
+                                text: "speaker" // TODO: Detect icon based on media.class or properties
+                                font.family: "Material Symbols Rounded"
+                                color: FrameTheme.foreground
+                            }
                             
-                            // Content
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                spacing: 8
-                                
-                                Text {
-                                    text: "speaker" // TODO: Detect icon based on media.class or properties
-                                    font.family: "Material Symbols Rounded"
-                                    color: FrameTheme.foreground
-                                }
-                                
-                                Text {
-                                    text: modelData.description || modelData.name || "Unknown Device"
-                                    color: FrameTheme.foreground
-                                    font.pixelSize: 13
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
-                                }
-                                
-                                // Checkmark
-                                Text {
-                                    visible: Pipewire.defaultAudioSink === modelData
-                                    text: "check"
-                                    font.family: "Material Symbols Rounded"
-                                    color: FrameTheme.foreground
-                                }
+                            Text {
+                                text: modelData.description || modelData.name || "Unknown Device"
+                                color: FrameTheme.foreground
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                            
+                            // Checkmark
+                            Text {
+                                visible: Pipewire.defaultAudioSink === modelData
+                                text: "check"
+                                font.family: "Material Symbols Rounded"
+                                color: FrameTheme.foreground
                             }
                             
                             onClicked: Pipewire.preferredDefaultAudioSink = modelData

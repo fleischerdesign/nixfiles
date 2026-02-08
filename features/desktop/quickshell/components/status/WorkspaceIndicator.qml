@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.services
 import qs.core
+import qs.components
 
 // WorkspaceIndicator.qml - Minimalist Niri Workspaces
 RowLayout {
