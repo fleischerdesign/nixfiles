@@ -46,13 +46,14 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store via Socket (with dummy password to satisfy Stalwart driver)
+        # 1. PostgreSQL Store via TCP (Maximum Reliability)
         store."db" = {
           type = "postgresql";
-          host = "/run/postgresql";
+          host = "127.0.0.1";
+          port = 5432;
           database = "stalwart";
           user = "stalwart";
-          password = "peer_auth_bypass"; # Dummy password
+          password = "%{file:/run/credentials/stalwart.service/db_password}%";
           tls.enable = false;
           pool.max-connections = 10;
         };
@@ -132,11 +133,24 @@ in
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
         "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
+        "db_password" = config.sops.secrets.stalwart_db_password.path;
       };
     };
 
-    # Give stalwart-mail access to postgres socket directory
-    users.users.stalwart-mail.extraGroups = [ "postgres" ];
+    # One-shot service to ensure postgres user has the correct password
+    systemd.services.stalwart-db-init = {
+      description = "Ensure Stalwart DB user has correct password";
+      after = [ "postgresql.service" ];
+      before = [ "stalwart.service" ];
+      wantedBy = [ "stalwart.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = "postgres";
+      };
+      script = ''
+        psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${config.sops.secrets.stalwart_db_password.path})';"
+      '';
+    };
 
     systemd.services.stalwart-cert-deploy = {
       description = "Deploy Caddy certificates to Stalwart";
@@ -171,5 +185,6 @@ in
     sops.secrets.stalwart_oidc_id = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_secret = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_ldap_password = { owner = "stalwart-mail"; };
+    sops.secrets.stalwart_db_password = { owner = "postgres"; };
   };
 }
