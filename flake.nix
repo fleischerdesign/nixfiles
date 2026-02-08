@@ -64,6 +64,11 @@
       flake = false;
     };
 
+    thunderbird-gnome-theme = {
+      url = "github:rafaelmardojai/thunderbird-gnome-theme";
+      flake = false;
+    };
+
   };
 
   outputs =

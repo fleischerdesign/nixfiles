@@ -12,6 +12,7 @@
   ];
 
   home.file.".mozilla/firefox/philipp/chrome/firefox-gnome-theme".source = inputs.firefox-gnome-theme;
+  home.file.".thunderbird/philipp/chrome/thunderbird-gnome-theme".source = inputs.thunderbird-gnome-theme;
 
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
@@ -48,6 +49,23 @@
     direnv = {
       enable = true;
       nix-direnv.enable = true;
+    };
+    thunderbird = {
+      enable = true;
+      profiles.philipp = {
+        isDefault = true;
+        userChrome = ''
+          @import "thunderbird-gnome-theme/userChrome.css";
+        '';
+        userContent = ''
+          @import "thunderbird-gnome-theme/userContent.css";
+        '';
+        settings = {
+          "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
+          "svg.context-properties.content.enabled" = true;
+          "browser.uidensity" = 0;
+        };
+      };
     };
     firefox = {
       enable = true;

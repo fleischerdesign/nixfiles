@@ -23,7 +23,6 @@ in
       # gimp
       bitwarden-desktop
       bitwarden-cli
-      thunderbird
       obsidian
       orca-slicer
       endeavour
