@@ -76,12 +76,10 @@ in
         storage.directory = "authentik"; 
 
         # Routing Strategy
-        queue.strategy."remote" = {
-          route = [
-            { "if" = "is_local_domain('', rcpt_domain)"; "then" = "'local'"; }
-            { "else" = "'brevo'"; }
-          ];
-        };
+        queue.strategy.route = [
+          { "if" = "is_local_domain('', rcpt_domain)"; "then" = "'local'"; }
+          { "else" = "'brevo'"; }
+        ];
 
         queue.route."local" = {
           type = "local";
