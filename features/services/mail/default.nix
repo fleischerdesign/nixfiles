@@ -21,7 +21,7 @@ in
         config.local-keys = [
           "store.*"
           "storage.*"
-          "directory.authentik.*" # ONLY LDAP is managed by Nix
+          "directory.authentik.*"
           "server.*"
           "session.*"
           "remote.*"
@@ -47,7 +47,7 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store via TCP (Most reliable for Stalwart 0.15)
+        # 1. PostgreSQL Store via TCP
         store."db" = {
           type = "postgresql";
           host = "127.0.0.1";
@@ -71,29 +71,29 @@ in
         storage.lookup = "db";
         storage.fts = "db";
         storage.blob = "db";
-        
-        # LDAP is the primary directory for accounts
         storage.directory = "authentik"; 
 
-                # LDAP Directory Configuration
-                directory."authentik" = {
-                  type = "ldap";
-                  url = "ldap://127.0.0.1:3389";
-                  base-dn = "dc=ldap,dc=goauthentik,dc=io";
-                  bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
-                  bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
-                  bind.auth.method = "lookup";
-                  
-                                      filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
-                                      # Reduced to single placeholder to fix Stalwart 0.15 parser bug
-                                      filter.email = "(&(objectClass=inetOrgPerson)(stalwart_mail=?))";
-                                      
-                                      attributes = {                              name = "cn";
-                              email = "stalwart_mail"; 
-                              email-alias = "stalwart_aliases";
-                              groups = "memberOf";
-                              secret-changed = "pwdChangedTime";
-                            };                };
+        # LDAP Directory Configuration
+        directory."authentik" = {
+          type = "ldap";
+          url = "ldap://127.0.0.1:3389";
+          base-dn = "dc=ldap,dc=goauthentik,dc=io";
+          bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
+          bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
+          bind.auth.method = "lookup";
+          
+          filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
+          filter.email = "(stalwart_mail=?)";
+          
+          attributes = {
+            name = "cn";
+            email = "stalwart_mail"; 
+            email-alias = "stalwart_aliases";
+            groups = "memberOf";
+            secret-changed = "pwdChangedTime";
+          };
+        };
+
         # SMTP Relay (Brevo)
         remote.relay."brevo" = {
           host = "smtp-relay.brevo.com";
