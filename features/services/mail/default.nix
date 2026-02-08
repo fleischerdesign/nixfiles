@@ -36,6 +36,7 @@ in
         certificate."default" = {
           cert = "%{file:${certDir}/mail.crt}%";
           private-key = "%{file:${certDir}/mail.key}%";
+          default = true;
         };
 
         server.tls = {
@@ -74,8 +75,6 @@ in
         storage.fts = "db";
         storage.blob = "blobs";
         storage.cache = "cache";
-        
-        # Local tasks on RocksDB to avoid startup issues
         storage.queue = "local";
 
         # Domains
