@@ -403,7 +403,8 @@
         "portfolio": "portfolio",
         "quickshell": "quickshell",
         "sops-nix": "sops-nix",
-        "spicetify-nix": "spicetify-nix"
+        "spicetify-nix": "spicetify-nix",
+        "thunderbird-gnome-theme": "thunderbird-gnome-theme"
       }
     },
     "sops-nix": {
@@ -489,6 +490,22 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "thunderbird-gnome-theme": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1757216698,
+        "narHash": "sha256-aQAlgHsBAS+DdyYDlYhW/xT86xIu9FO8yJEzSCVaSBg=",
+        "owner": "rafaelmardojai",
+        "repo": "thunderbird-gnome-theme",
+        "rev": "8b9a19eb188b3ede65e8f12a11637bbd56e4f4d7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rafaelmardojai",
+        "repo": "thunderbird-gnome-theme",
         "type": "github"
       }
     },
