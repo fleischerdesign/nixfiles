@@ -77,7 +77,10 @@ in
         storage.directory = "authentik"; 
 
         # Routing Strategy
-        queue.strategy."remote".route = "'brevo'";
+        queue.strategy.route = [
+          { "if" = "is_local_domain('', rcpt_domain)"; "then" = "'local'"; }
+          { "else" = "'brevo'"; }
+        ];
 
         queue.route."local" = {
           type = "local";
@@ -135,20 +138,8 @@ in
         };
 
         server.listener.smtp = { bind = [ "[::]:25" ]; protocol = "smtp"; hostname = "mail.ancoris.ovh"; };
-        server.listener.submissions = { 
-          bind = [ "[::]:465" ]; 
-          protocol = "smtp"; 
-          tls.implicit = true; 
-          hostname = "mail.ancoris.ovh";
-          strategy = "remote";
-        };
-        server.listener.submission = { 
-          bind = [ "[::]:587" ]; 
-          protocol = "smtp"; 
-          tls.enable = true; 
-          hostname = "mail.ancoris.ovh";
-          strategy = "remote";
-        };
+        server.listener.submissions = { bind = [ "[::]:465" ]; protocol = "smtp"; tls.implicit = true; hostname = "mail.ancoris.ovh"; };
+        server.listener.submission = { bind = [ "[::]:587" ]; protocol = "smtp"; tls.enable = true; hostname = "mail.ancoris.ovh"; };
         server.listener.imaps = { bind = [ "[::]:993" ]; protocol = "imap"; tls.implicit = true; hostname = "mail.ancoris.ovh"; };
         server.listener.imap = { bind = [ "[::]:143" ]; protocol = "imap"; tls.enable = true; hostname = "mail.ancoris.ovh"; };
 
