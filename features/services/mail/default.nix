@@ -77,19 +77,18 @@ in
         storage.directory = "authentik"; 
 
         # Routing Strategy
-        queue.strategy.route = [
-          { "if" = "is_local_domain('', rcpt_domain)"; "then" = "'local'"; }
-          { "else" = "'relay'"; }
-        ];
-
-        # Routing Strategy Definitions
-        queue.strategy."local" = {
-          type = "local";
+        queue.strategy."remote" = {
+          route = [
+            {
+              "if" = "is_local_domain('', rcpt_domain)";
+              "then" = "'local'";
+              "else" = "'brevo'";
+            }
+          ];
         };
 
-        queue.strategy."relay" = {
-          type = "relay";
-          gateway = "'brevo'";
+        queue.route."local" = {
+          type = "local";
         };
 
         queue.route."brevo" = {
@@ -99,8 +98,8 @@ in
           protocol = "smtp";
           tls.implicit = false;
           auth = {
-            username = "%{file:/run/credentials/stalwart.service/queue.route.brevo.auth.username}%";
-            secret = "%{file:/run/credentials/stalwart.service/queue.route.brevo.auth.secret}%";
+            username = "%{file:/run/credentials/stalwart.service/brevo_user}%";
+            secret = "%{file:/run/credentials/stalwart.service/brevo_secret}%";
           };
         };
 
@@ -145,8 +144,20 @@ in
         };
 
         server.listener.smtp = { bind = [ "[::]:25" ]; protocol = "smtp"; hostname = "mail.ancoris.ovh"; };
-        server.listener.submissions = { bind = [ "[::]:465" ]; protocol = "smtp"; tls.implicit = true; hostname = "mail.ancoris.ovh"; };
-        server.listener.submission = { bind = [ "[::]:587" ]; protocol = "smtp"; tls.enable = true; hostname = "mail.ancoris.ovh"; };
+        server.listener.submissions = { 
+          bind = [ "[::]:465" ]; 
+          protocol = "smtp"; 
+          tls.implicit = true; 
+          hostname = "mail.ancoris.ovh";
+          strategy = "remote";
+        };
+        server.listener.submission = { 
+          bind = [ "[::]:587" ]; 
+          protocol = "smtp"; 
+          tls.enable = true; 
+          hostname = "mail.ancoris.ovh";
+          strategy = "remote";
+        };
         server.listener.imaps = { bind = [ "[::]:993" ]; protocol = "imap"; tls.implicit = true; hostname = "mail.ancoris.ovh"; };
         server.listener.imap = { bind = [ "[::]:143" ]; protocol = "imap"; tls.enable = true; hostname = "mail.ancoris.ovh"; };
 
@@ -157,8 +168,8 @@ in
       };
 
       credentials = {
-        "queue.route.brevo.auth.username" = config.sops.secrets.brevo_smtp_user.path;
-        "queue.route.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
+        "brevo_user" = config.sops.secrets.brevo_smtp_user.path;
+        "brevo_secret" = config.sops.secrets.brevo_smtp_key.path;
         "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
         "db_password" = config.sops.secrets.stalwart_db_password.path;
       };
