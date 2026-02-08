@@ -82,9 +82,9 @@ in
           bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
           bind.auth.method = "lookup";
           
-          # Use ultra-simple filters to avoid parse errors
-          filter.name = "(cn=?)";
-          filter.email = "(mail=?)";
+          # LDAP Filters (Penibly exact following documentation structure)
+          filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
+          filter.email = "(&(objectClass=inetOrgPerson)(|(stalwart_mail=?)(stalwart_aliases=?)))";
           
           attributes = {
             name = "cn";
