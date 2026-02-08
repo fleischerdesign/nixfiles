@@ -78,14 +78,14 @@ in
         # Routing Strategy
         queue.strategy.route = [
           { "if" = "is_local_domain('', rcpt_domain)"; "then" = "'local'"; }
-          { "else" = "'brevo'"; }
+          { "else" = "'default'"; }
         ];
 
         queue.route."local" = {
           type = "local";
         };
 
-        queue.route."brevo" = {
+        queue.route."default" = {
           type = "relay";
           address = "smtp-relay.brevo.com";
           port = 587;
@@ -146,8 +146,8 @@ in
       };
 
       credentials = {
-        "queue.route.brevo.auth.username" = config.sops.secrets.brevo_smtp_user.path;
-        "queue.route.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
+        "queue.route.default.auth.username" = config.sops.secrets.brevo_smtp_user.path;
+        "queue.route.default.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
         "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
         "db_password" = config.sops.secrets.stalwart_db_password.path;
       };
