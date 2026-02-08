@@ -2,7 +2,6 @@
 
 let
   cfg = config.my.features.services.mail;
-  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
   certDir = "/var/lib/stalwart-mail/certs";
 in
 {
@@ -18,7 +17,7 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration only for managed sections
+        # Force local configuration for managed sections
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -48,7 +47,7 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store
+        # 1. PostgreSQL Store via TCP (Most reliable for Stalwart 0.15)
         store."db" = {
           type = "postgresql";
           host = "127.0.0.1";
@@ -57,25 +56,26 @@ in
           user = "stalwart";
           password = "%{file:/run/credentials/stalwart.service/db_password}%";
           tls.enable = false;
+          pool.max-connections = 10;
         };
 
         # 2. Redis Store
         store."redis" = {
           type = "redis";
           redis-type = "single";
-          urls = "redis://127.0.0.1:6379";
+          url = "redis://127.0.0.1:6379";
         };
 
         # Storage Assignments
         storage.data = "db";
-        storage.lookup = "redis";
+        storage.lookup = "db";
         storage.fts = "db";
         storage.blob = "db";
         
-        # Back to LDAP as primary directory - this made login work!
+        # LDAP is the primary directory for accounts
         storage.directory = "authentik"; 
 
-        # LDAP Directory for Authentication
+        # LDAP Directory Configuration
         directory."authentik" = {
           type = "ldap";
           url = "ldap://127.0.0.1:3389";
@@ -106,8 +106,6 @@ in
           enable = true;
           selector = "202602r";
         };
-
-        # Debug Logging
 
         # Listeners
         server.listener.management = {
