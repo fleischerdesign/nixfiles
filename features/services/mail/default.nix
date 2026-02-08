@@ -31,7 +31,7 @@ in
           "spam.*"
           "storage.*"
         ];
-
+        
         # 0.15 Certificate Definitions
         certificate.default = {
           cert = "%{file:/var/lib/stalwart-mail/certs/mail.crt}%";
@@ -47,17 +47,17 @@ in
 
         # 0.15 Store Definitions
         store.data = {
-          type = "sql";
+          type = "postgres";
           driver = "postgres";
           url = dbUrl;
         };
         store.lookup = {
-          type = "sql";
+          type = "postgres";
           driver = "postgres";
           url = dbUrl;
         };
         store.directory = {
-          type = "sql";
+          type = "postgres";
           driver = "postgres";
           url = dbUrl;
         };
@@ -108,7 +108,7 @@ in
         spam.training.store = "data";
 
         # SMTP Relay (Brevo)
-        remote.relay."brevo" = {
+        remote.relay.brevo = {
           host = "smtp-relay.brevo.com";
           port = 587;
         };
