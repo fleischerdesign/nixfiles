@@ -2,7 +2,6 @@
 
 let
   cfg = config.my.features.services.mail;
-  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
   certDir = "/var/lib/stalwart-mail/certs";
 in
 {
@@ -18,9 +17,10 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration for everything we manage with Nix
+        # Force local configuration for managed sections
         config.local-keys = [
           "store.*"
+          "storage.*"
           "directory.*"
           "server.*"
           "session.*"
@@ -29,13 +29,12 @@ in
           "certificate.*"
           "lookup.*"
           "spam.*"
-          "storage.*"
         ];
-        
+
         # 0.15 Certificate Definitions
         certificate.default = {
-          cert = "%{file:/var/lib/stalwart-mail/certs/mail.crt}%";
-          private-key = "%{file:/var/lib/stalwart-mail/certs/mail.key}%";
+          cert = "%{file:${certDir}/mail.crt}%";
+          private-key = "%{file:${certDir}/mail.key}%";
           default = true;
         };
 
@@ -46,32 +45,28 @@ in
         };
 
         # 0.15 Store Definitions
-        store.data = {
-          type = "postgres";
-          driver = "postgres";
-          url = dbUrl;
+        store.postgres = {
+          type = "postgresql";
+          host = "/run/postgresql";
+          database = "stalwart";
+          user = "stalwart";
         };
-        store.lookup = {
-          type = "postgres";
-          driver = "postgres";
-          url = dbUrl;
-        };
-        store.directory = {
-          type = "postgres";
-          driver = "postgres";
-          url = dbUrl;
-        };
-        store.blob = {
+        store.blobs = {
           type = "fs";
           path = "/var/lib/stalwart-mail/blobs";
         };
-        store.cache = {
+        store.redis = {
           type = "redis";
+          redis-type = "single";
           urls = [ "redis://127.0.0.1:6379" ];
         };
 
-        # Domains
-        directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
+        # Storage Assignments
+        storage.data = "postgres";
+        storage.blob = "blobs";
+        storage.lookup = "redis";
+        storage.fts = "postgres";
+        storage.directory = "authentik";
 
         # Local Authentik LDAP Directory
         directory."authentik" = {
@@ -86,7 +81,7 @@ in
           # Authentication Method
           bind.auth.method = "lookup";
 
-          # Filters for Authentik
+          # Filters
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
           filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
 
@@ -99,16 +94,16 @@ in
           };
         };
 
-        # Use Authentik for authentication and lookup
+        # Use Authentik for authentication - MUST be quoted for Stalwart expression engine
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
         # Spam filter
-        spam.classifier.store = "data";
-        spam.training.store = "data";
+        spam.classifier.store = "postgres";
+        spam.training.store = "postgres";
 
         # SMTP Relay (Brevo)
-        remote.relay.brevo = {
+        remote.relay."brevo" = {
           host = "smtp-relay.brevo.com";
           port = 587;
         };
