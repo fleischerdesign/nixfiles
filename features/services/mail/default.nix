@@ -47,7 +47,7 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store
+        # 1. PostgreSQL Store via TCP
         store."db" = {
           type = "postgresql";
           host = "127.0.0.1";
@@ -73,7 +73,7 @@ in
         storage.blob = "db";
         storage.directory = "authentik"; 
 
-        # LDAP Directory Configuration
+        # LDAP Directory Configuration with CamelCase attributes
         directory."authentik" = {
           type = "ldap";
           url = "ldap://127.0.0.1:3389";
@@ -82,14 +82,14 @@ in
           bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
           bind.auth.method = "lookup";
           
-          # LDAP Filters (Penibly exact following documentation structure)
+          # Use CamelCase attributes to avoid Stalwart filter parser bugs
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
-          filter.email = "(&(objectClass=inetOrgPerson)(|(stalwart_mail=?)(stalwart_aliases=?)))";
+          filter.email = "(&(objectClass=inetOrgPerson)(|(stalwartMail=?)(stalwartAliases=?)))";
           
           attributes = {
             name = "cn";
-            email = "stalwart_mail"; 
-            email-alias = "stalwart_aliases";
+            email = "stalwartMail"; 
+            email-alias = "stalwartAliases";
             groups = "memberOf";
             secret-changed = "pwdChangedTime";
           };
