@@ -47,7 +47,7 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store via TCP
+        # 1. PostgreSQL Store
         store."db" = {
           type = "postgresql";
           host = "127.0.0.1";
@@ -82,8 +82,9 @@ in
           bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
           bind.auth.method = "lookup";
           
-          filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
-          filter.email = "(stalwart_mail=?)";
+          # Use ultra-simple filters to avoid parse errors
+          filter.name = "(cn=?)";
+          filter.email = "(mail=?)";
           
           attributes = {
             name = "cn";
