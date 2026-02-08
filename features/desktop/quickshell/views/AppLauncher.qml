@@ -86,9 +86,9 @@ Modal {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 40
                 radius: FrameTheme.radius
-                color: "transparent"
+                color: FrameTheme.card
                 border.width: 1
-                border.color: searchInput.activeFocus ? FrameTheme.ring : FrameTheme.input
+                border.color: searchInput.activeFocus ? FrameTheme.ring : FrameTheme.border
                 
                 RowLayout {
                     anchors.fill: parent
@@ -108,7 +108,7 @@ Modal {
                         Layout.fillWidth: true
                         font.family: FrameTheme.fontFamily
                         font.pixelSize: 14
-                        placeholderText: "Type a command or search..."
+                        placeholderText: "Search apps..."
                         placeholderTextColor: FrameTheme.mutedForeground
                         background: null
                         color: FrameTheme.foreground
@@ -174,9 +174,11 @@ Modal {
                     width: appListView.width
                     height: 48
                     radius: FrameTheme.radius
-                    color: ListView.isCurrentItem || hoverHandler.hovered ? FrameTheme.accent : "transparent"
-                    
-                    Behavior on color { ColorAnimation { duration: 100 } }
+                    color: {
+                        if (ListView.isCurrentItem) return FrameTheme.primary;
+                        if (hoverHandler.hovered) return FrameTheme.secondary;
+                        return "transparent";
+                    }
 
                     // Content
                     RowLayout {
@@ -202,7 +204,7 @@ Modal {
                                 font.pixelSize: 20
                                 font.family: visible ? model.icon.fontFamily : ""
                                 text: visible ? model.icon.source : ""
-                                color: FrameTheme.foreground
+                                color: delegateRoot.ListView.isCurrentItem ? FrameTheme.primaryForeground : FrameTheme.foreground
                                 visible: model.icon.type === "fontIcon"
                             }
                         }
@@ -212,7 +214,7 @@ Modal {
                             Layout.fillWidth: true
                             Text {
                                 text: model.name
-                                color: FrameTheme.foreground
+                                color: delegateRoot.ListView.isCurrentItem ? FrameTheme.primaryForeground : FrameTheme.foreground
                                 font.family: FrameTheme.fontFamily
                                 font.pixelSize: 14
                                 font.weight: Font.Medium
@@ -225,7 +227,8 @@ Modal {
                         Text {
                             text: "↵"
                             visible: delegateRoot.ListView.isCurrentItem
-                            color: FrameTheme.mutedForeground
+                            color: FrameTheme.primaryForeground
+                            opacity: 0.7
                             font.pixelSize: 12
                         }
                     }

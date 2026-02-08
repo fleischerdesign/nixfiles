@@ -13,7 +13,6 @@ PanelWindow {
     id: bottomBarWindow
     property bool isOpen: false
     
-    // Sync state with visibility logic (includes timer delay)
     onIsOpenChanged: StateManager.bottomBarHovered = isOpen
 
     WlrLayershell.layer: WlrLayer.Top
@@ -31,13 +30,11 @@ PanelWindow {
             if (StateManager.activePanel !== "") {
                 bottomBarWindow.isOpen = true;
             } else if (!windowHover.hovered) {
-                // If no panel is active and mouse is not hovering, start closing
                 closeTimer.start();
             }
         }
     }
     
-    // Height logic: Slightly smaller for tighter ShadCN look
     implicitHeight: isOpen ? 60 : (contentWrapper.y >= 40 ? 10 : 60) 
     anchors {
         left: true
@@ -74,14 +71,12 @@ PanelWindow {
         anchors.fill: parent
         clip: false
         
-        // The "Bar" Container (Invisible wrapper for animation)
         Item {
             id: contentWrapper
             height: 50
             width: parent.width
             anchors.horizontalCenter: parent.horizontalCenter
             
-            // Animation properties
             opacity: bottomBarWindow.isOpen ? 1 : 0
             y: bottomBarWindow.isOpen ? 0 : 50
             
@@ -101,8 +96,6 @@ PanelWindow {
                 onPressed: (mouse) => mouse.accepted = false
             }
 
-            // Islands Layout - Positioned individually
-            
             // --- 1. Launcher Island (Left) ---
             Rectangle {
                 anchors.left: parent.left
@@ -112,14 +105,12 @@ PanelWindow {
                 implicitWidth: 50
                 implicitHeight: 50
                 radius: FrameTheme.radius
-                color: FrameTheme.background
-                border.width: FrameTheme.borderWidth
-                border.color: FrameTheme.border
+                color: FrameTheme.popover
                 
                 RectangularShadow {
-                    width: parent.width; height: parent.height
+                    anchors.fill: parent
                     y: 4; z: -1
-                    color: Qt.rgba(0, 0, 0, 0.2); blur: 12; radius: parent.radius
+                    color: Qt.rgba(0, 0, 0, 0.3); blur: 15; radius: parent.radius
                 }
 
                 FrameButton {
@@ -138,14 +129,12 @@ PanelWindow {
                 implicitWidth: clockText.implicitWidth + 32
                 implicitHeight: 50
                 radius: FrameTheme.radius
-                color: FrameTheme.background
-                border.width: FrameTheme.borderWidth
-                border.color: FrameTheme.border
+                color: FrameTheme.popover
                 
                 RectangularShadow {
-                    width: parent.width; height: parent.height
+                    anchors.fill: parent
                     y: 4; z: -1
-                    color: Qt.rgba(0, 0, 0, 0.2); blur: 12; radius: parent.radius
+                    color: Qt.rgba(0, 0, 0, 0.3); blur: 15; radius: parent.radius
                 }
 
                 Text {
@@ -179,14 +168,12 @@ PanelWindow {
                 implicitWidth: workspaceIndicator.implicitWidth + 24
                 implicitHeight: 50
                 radius: FrameTheme.radius
-                color: FrameTheme.background
-                border.width: FrameTheme.borderWidth
-                border.color: FrameTheme.border
+                color: FrameTheme.popover
                 
                 RectangularShadow {
-                    width: parent.width; height: parent.height
+                    anchors.fill: parent
                     y: 4; z: -1
-                    color: Qt.rgba(0, 0, 0, 0.2); blur: 12; radius: parent.radius
+                    color: Qt.rgba(0, 0, 0, 0.3); blur: 15; radius: parent.radius
                 }
 
                 WorkspaceIndicator {
@@ -204,141 +191,76 @@ PanelWindow {
                 }
             }
 
-                            // --- 3. Status Island (Right) ---
-                            Rectangle {
-                                anchors.right: parent.right
-                                anchors.rightMargin: 20
-                                anchors.verticalCenter: parent.verticalCenter
-                                
-                                implicitWidth: statusLayout.implicitWidth + 24
-                                implicitHeight: 50
-                                radius: FrameTheme.radius
-                                color: FrameTheme.background
-                                border.width: FrameTheme.borderWidth
-                                border.color: FrameTheme.border
-                                
-                                RectangularShadow {
-                                    width: parent.width; height: parent.height
-                                    y: 4; z: -1
-                                    color: Qt.rgba(0, 0, 0, 0.2); blur: 12; radius: parent.radius
-                                }
-            
-                                                    RowLayout {
-            
-                                                        id: statusLayout
-            
-                                                        anchors.centerIn: parent
-            
-                                                        spacing: 2
-            
-                                                        
-            
-                                                        // Bluetooth Indicator
-            
-                                                        FrameButton {
-            
-                                                            variant: FrameButton.Variant.Ghost
-            
-                                                            implicitWidth: 36
-            
-                                                            content: BluetoothIcon {
-            
-                                                                iconColor: FrameTheme.foreground
-            
-                                                            }
-            
-                                                            onClicked: bottomBarWindow.bluetoothClicked()
-            
-                                                        }
-            
-                                                        
-            
-                                                        // Wifi Indicator
-            
-                                                        FrameButton {
-            
-                                
-                                        variant: FrameButton.Variant.Ghost
-                                        implicitWidth: 36
-                                        content: WifiIcon {
-                                                                            iconColor: FrameTheme.foreground
-                                                                        }
-                                                                        onClicked: bottomBarWindow.wifiClicked()
-                                                                    }
-                                            
-                                                                    // Volume Indicator
-                                            
-                                                            FrameButton {
-                                                                variant: FrameButton.Variant.Ghost
-                                                                implicitWidth: 36
-                                                                content: VolumeIcon {
-                                                                    iconColor: FrameTheme.foreground
-                                                                }
-                                                                onClicked: bottomBarWindow.volumeClicked()
-                                                            }
-                                                                        // Battery Indicator (Only on laptops)
-                                    FrameButton {
-                                        visible: UPower.displayDevice && UPower.displayDevice.type === 2
-                                        variant: FrameButton.Variant.Ghost
-                                        implicitWidth: 36
-                                        content: BatteryIcon {
-                                                                            iconColor: FrameTheme.foreground
-                                                                        }
-                                                                        onClicked: bottomBarWindow.powerClicked()
-                                                                    }
-                                            
-                                                                    // Vertical Separator
-                                            
-                                    Rectangle {
-                                        Layout.fillHeight: true
-                                        Layout.topMargin: 12
-                                        Layout.bottomMargin: 12
-                                        Layout.leftMargin: 4
-                                        Layout.rightMargin: 4
-                                        width: 1
-                                        color: FrameTheme.border
-                                    }
-            
-                                                                                    // Notification Center
-            
-                                                                                    FrameButton {
-            
-                                                                                        variant: FrameButton.Variant.Ghost
-            
-                                                                                        implicitWidth: 36
-            
-                                                                                        icon: "notifications"
-            
-                                                                                        
-            
-                                                                                                                                                showBadge: NotificationService.server.trackedNotifications.values.length > 0
-            
-                                                                                        
-            
-                                                                                                                                                
-            
-                                                                                        
-            
-                                                                                                                                                onClicked: {
-            
-                                                                                        
-            
-                                                                                                                                                    bottomBarWindow.notificationClicked()
-            
-                                                                                        
-            
-                                                                                                                                                }
-            
-                                                                                        
-            
-                                                                                                                                            }
-            
-                                                                                        
-            
-                                                                                        
-            
-                                                                                }
-            
-                                                                            }        }
+            // --- 3. Status Island (Right) ---
+            Rectangle {
+                anchors.right: parent.right
+                anchors.rightMargin: 20
+                anchors.verticalCenter: parent.verticalCenter
+                
+                implicitWidth: statusLayout.implicitWidth + 24
+                implicitHeight: 50
+                radius: FrameTheme.radius
+                color: FrameTheme.popover
+                
+                RectangularShadow {
+                    anchors.fill: parent
+                    y: 4; z: -1
+                    color: Qt.rgba(0, 0, 0, 0.3); blur: 15; radius: parent.radius
+                }
+
+                RowLayout {
+                    id: statusLayout
+                    anchors.centerIn: parent
+                    spacing: 2
+                    
+                    FrameButton {
+                        variant: FrameButton.Variant.Ghost
+                        implicitWidth: 36
+                        content: BluetoothIcon { iconColor: FrameTheme.foreground }
+                        onClicked: bottomBarWindow.bluetoothClicked()
+                    }
+                    
+                    FrameButton {
+                        variant: FrameButton.Variant.Ghost
+                        implicitWidth: 36
+                        content: WifiIcon { iconColor: FrameTheme.foreground }
+                        onClicked: bottomBarWindow.wifiClicked()
+                    }
+                    
+                    FrameButton {
+                        variant: FrameButton.Variant.Ghost
+                        implicitWidth: 36
+                        content: VolumeIcon { iconColor: FrameTheme.foreground }
+                        onClicked: bottomBarWindow.volumeClicked()
+                    }
+                    
+                    FrameButton {
+                        visible: UPower.displayDevice && UPower.displayDevice.type === 2
+                        variant: FrameButton.Variant.Ghost
+                        implicitWidth: 36
+                        content: BatteryIcon { iconColor: FrameTheme.foreground }
+                        onClicked: bottomBarWindow.powerClicked()
+                    }
+                    
+                    Rectangle {
+                        width: 1
+                        Layout.fillHeight: true
+                        Layout.topMargin: 12
+                        Layout.bottomMargin: 12
+                        Layout.leftMargin: 4
+                        Layout.rightMargin: 4
+                        color: FrameTheme.border
+                    }
+
+                    FrameButton {
+                        variant: FrameButton.Variant.Ghost
+                        implicitWidth: 36
+                        icon: "notifications"
+                        showBadge: NotificationService.server.trackedNotifications.values.length > 0
+                        onClicked: bottomBarWindow.notificationClicked()
+                    }
+                }
+            }
+        }
     }
 }

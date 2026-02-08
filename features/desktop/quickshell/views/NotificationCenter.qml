@@ -46,7 +46,7 @@ Modal {
         
         // Visuals
         radius: FrameTheme.radius
-        color: FrameTheme.background // Dark
+        color: FrameTheme.popover
         border.width: FrameTheme.borderWidth
         border.color: FrameTheme.border
         

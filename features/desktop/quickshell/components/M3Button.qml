@@ -44,7 +44,7 @@ Rectangle {
     implicitWidth: Math.max(55, contentContainer.width + 40)
     implicitHeight: 40
     
-    radius: 20
+    radius: FrameTheme.radius
     clip: false
     
     RectangularShadow {
@@ -52,7 +52,7 @@ Rectangle {
         visible: root.shadowEnabled && root.enabled
         color: Qt.rgba(0, 0, 0, 0.1)
         blur: 10
-        radius: root.radius
+        radius: FrameTheme.radius
         antialiasing: true
         cached: true
         z: -1
@@ -78,23 +78,23 @@ Rectangle {
         }
         
         if (style === M3Button.Style.Elevated) {
-            return ColorService.layer(ColorService.palette.m3SurfaceContainerLow, 1);
+            return FrameTheme.secondary;
         }
         
         const isTonal = style === M3Button.Style.FilledTonal;
         
         switch (colorRole) {
             case M3Button.ColorRole.Primary:
-                return isTonal ? ColorService.palette.m3PrimaryContainer : ColorService.palette.m3Primary;
+                return FrameTheme.primary;
             case M3Button.ColorRole.Secondary:
-                return isTonal ? ColorService.palette.m3SecondaryContainer : ColorService.palette.m3Secondary;
+                return FrameTheme.secondary;
             case M3Button.ColorRole.Tertiary:
-                return isTonal ? ColorService.palette.m3TertiaryContainer : ColorService.palette.m3Tertiary;
+                return FrameTheme.accent;
             case M3Button.ColorRole.Error:
-                return isTonal ? ColorService.palette.m3ErrorContainer : ColorService.palette.m3Error;
+                return FrameTheme.destructive;
             case M3Button.ColorRole.Surface:
             default:
-                return ColorService.palette.m3SurfaceContainerHigh;
+                return FrameTheme.card;
         }
     }
     
@@ -102,36 +102,34 @@ Rectangle {
         if (style === M3Button.Style.Text || style === M3Button.Style.Outlined) {
             switch (colorRole) {
                 case M3Button.ColorRole.Primary:
-                    return ColorService.palette.m3Primary;
+                    return FrameTheme.primary;
                 case M3Button.ColorRole.Secondary:
-                    return ColorService.palette.m3Secondary;
+                    return FrameTheme.secondaryForeground;
                 case M3Button.ColorRole.Tertiary:
-                    return ColorService.palette.m3Tertiary;
+                    return FrameTheme.accent;
                 case M3Button.ColorRole.Error:
-                    return ColorService.palette.m3Error;
+                    return FrameTheme.destructive;
                 default:
-                    return ColorService.palette.m3OnSurface;
+                    return FrameTheme.foreground;
             }
         }
         
         if (style === M3Button.Style.Elevated) {
-            return ColorService.palette.m3Primary;
+            return FrameTheme.primary;
         }
-        
-        const isTonal = style === M3Button.Style.FilledTonal;
         
         switch (colorRole) {
             case M3Button.ColorRole.Primary:
-                return isTonal ? ColorService.palette.m3OnPrimaryContainer : ColorService.palette.m3OnPrimary;
+                return FrameTheme.primaryForeground;
             case M3Button.ColorRole.Secondary:
-                return isTonal ? ColorService.palette.m3OnSecondaryContainer : ColorService.palette.m3OnSecondary;
+                return FrameTheme.secondaryForeground;
             case M3Button.ColorRole.Tertiary:
-                return isTonal ? ColorService.palette.m3OnTertiaryContainer : ColorService.palette.m3OnTertiary;
+                return FrameTheme.accentForeground;
             case M3Button.ColorRole.Error:
-                return isTonal ? ColorService.palette.m3OnErrorContainer : ColorService.palette.m3OnError;
+                return FrameTheme.destructiveForeground;
             case M3Button.ColorRole.Surface:
             default:
-                return ColorService.palette.m3OnSurface;
+                return FrameTheme.foreground;
         }
     }
     
@@ -141,7 +139,7 @@ Rectangle {
     
     color: autoBackgroundColor
     border.width: style === M3Button.Style.Outlined ? 1 : 0
-    border.color: ColorService.palette.m3Outline
+    border.color: FrameTheme.border
     
     Behavior on color { ColorAnimation { duration: 150 } }
     Behavior on border.color { ColorAnimation { duration: 150 } }

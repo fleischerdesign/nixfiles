@@ -132,54 +132,12 @@ Modal {
             }
             
             // --- WIFI TOGGLE ---
-            Rectangle {
+            GNToggle {
                 Layout.fillWidth: true
-                height: 40
-                radius: FrameTheme.radius
-                color: FrameTheme.secondary
-                
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    spacing: 10
-                    
-                    Text {
-                        text: "wifi"
-                        font.family: "Material Symbols Rounded"
-                        color: FrameTheme.foreground
-                        font.pixelSize: 20
-                    }
-                    
-                    Text {
-                        text: "Wi-Fi"
-                        color: FrameTheme.foreground
-                        font.family: FrameTheme.fontFamily
-                        font.weight: Font.Medium
-                        Layout.fillWidth: true
-                    }
-                    
-                    Rectangle {
-                        width: 40
-                        height: 20
-                        radius: 10
-                        color: NetworkService.wifiEnabled ? FrameTheme.foreground : FrameTheme.muted
-                        
-                        Rectangle {
-                            x: NetworkService.wifiEnabled ? 22 : 2
-                            y: 2
-                            width: 16
-                            height: 16
-                            radius: 8
-                            color: NetworkService.wifiEnabled ? FrameTheme.background : FrameTheme.foreground
-                            Behavior on x { NumberAnimation { duration: 150 } }
-                        }
-                        
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: NetworkService.toggleWifi()
-                        }
-                    }
-                }
+                checked: NetworkService.wifiEnabled
+                icon: "wifi"
+                label: "Wi-Fi"
+                onToggled: NetworkService.toggleWifi()
             }
             
             Rectangle { Layout.fillWidth: true; height: 1; color: FrameTheme.border }

@@ -133,18 +133,18 @@ Modal {
                 // Progress Bar
                 Rectangle {
                     Layout.fillWidth: true
-                    height: 8
-                    radius: 4
+                    height: 12
+                    radius: 6
                     color: FrameTheme.secondary
                     
                     Rectangle {
                         height: parent.height
                         width: parent.width * UPower.displayDevice.percentage
-                        radius: 4
+                        radius: 6
                         color: {
                             if (UPower.displayDevice.state === UPowerDeviceState.Charging) return "#22c55e" // Green
                             if (UPower.displayDevice.percentage < 0.2) return FrameTheme.destructive
-                            return FrameTheme.foreground
+                            return FrameTheme.primary
                         }
                     }
                 }
@@ -171,7 +171,7 @@ Modal {
                     component ProfileButton : FrameButton {
                         Layout.fillWidth: true
                         property var profileValue
-                        variant: PowerProfiles.profile === profileValue ? FrameButton.Variant.Default : FrameButton.Variant.Outline
+                        variant: PowerProfiles.profile === profileValue ? FrameButton.Variant.Default : FrameButton.Variant.Secondary
                         onClicked: PowerProfiles.profile = profileValue
                     }
                     
@@ -200,118 +200,28 @@ Modal {
             Rectangle { Layout.fillWidth: true; height: 1; color: FrameTheme.border }
 
             // --- BRIGHTNESS ---
-            ColumnLayout {
-                spacing: 8
+            GNSlider {
                 Layout.fillWidth: true
                 visible: BrightnessService.available
-                
-                Text { 
-                    text: "Brightness" 
-                    color: FrameTheme.mutedForeground 
-                    font.pixelSize: 12
+                value: BrightnessService.currentBrightness
+                label: "Brightness"
+                icon: {
+                    if (BrightnessService.currentBrightness > 0.7) return "brightness_high";
+                    if (BrightnessService.currentBrightness > 0.3) return "brightness_medium";
+                    return "brightness_low";
                 }
-                
-                RowLayout {
-                    spacing: 8
-                    Layout.fillWidth: true
-                    
-                    Text { 
-                        text: {
-                            if (BrightnessService.currentBrightness > 0.7) return "brightness_high";
-                            if (BrightnessService.currentBrightness > 0.3) return "brightness_medium";
-                            return "brightness_low";
-                        }
-                        font.family: "Material Symbols Rounded"
-                        color: FrameTheme.mutedForeground
-                        font.pixelSize: 18
-                    }
-                    
-                    // Slider
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 6
-                        radius: 3
-                        color: FrameTheme.secondary
-                        
-                        Rectangle {
-                            height: parent.height
-                            width: parent.width * BrightnessService.currentBrightness
-                            radius: 3
-                            color: FrameTheme.foreground
-                        }
-                        
-                        MouseArea {
-                            anchors.fill: parent
-                            onPressed: (mouse) => update(mouse)
-                            onPositionChanged: (mouse) => update(mouse)
-                            function update(mouse) {
-                                BrightnessService.setBrightness(mouse.x / width)
-                            }
-                        }
-                    }
-                    
-                    Text { 
-                        text: Math.round(BrightnessService.currentBrightness * 100) + "%" 
-                        color: FrameTheme.foreground 
-                        font.pixelSize: 12
-                        Layout.preferredWidth: 30
-                        horizontalAlignment: Text.AlignRight
-                    }
-                }
+                onMoved: (val) => BrightnessService.setBrightness(val)
             }
 
             Rectangle { Layout.fillWidth: true; height: 1; color: FrameTheme.border }
 
             // --- NIGHTLIGHT ---
-            Rectangle {
+            GNToggle {
                 Layout.fillWidth: true
-                height: 44
-                radius: FrameTheme.radius
-                color: FrameTheme.secondary
-                
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    spacing: 10
-                    
-                    Text {
-                        text: "nightlight"
-                        font.family: "Material Symbols Rounded"
-                        color: NightlightService.enabled ? "#fbbf24" : FrameTheme.foreground
-                        font.pixelSize: 20
-                    }
-                    
-                    Text {
-                        text: "Night Light"
-                        color: FrameTheme.foreground
-                        font.family: FrameTheme.fontFamily
-                        font.weight: Font.Medium
-                        Layout.fillWidth: true
-                    }
-                    
-                    // Toggle Switch
-                    Rectangle {
-                        width: 40
-                        height: 20
-                        radius: 10
-                        color: NightlightService.enabled ? FrameTheme.foreground : FrameTheme.muted
-                        
-                        Rectangle {
-                            x: NightlightService.enabled ? 22 : 2
-                            y: 2
-                            width: 16
-                            height: 16
-                            radius: 8
-                            color: NightlightService.enabled ? FrameTheme.background : FrameTheme.foreground
-                            Behavior on x { NumberAnimation { duration: 150 } }
-                        }
-                        
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: NightlightService.toggle()
-                        }
-                    }
-                }
+                checked: NightlightService.enabled
+                icon: "nightlight"
+                label: "Night Light"
+                onToggled: NightlightService.toggle()
             }
         }
     }

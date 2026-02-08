@@ -4,7 +4,7 @@ import qs.services
 import qs.core
 import qs.components
 
-// WorkspaceIndicator.qml - Minimalist Niri Workspaces
+// WorkspaceIndicator.qml - Libadwaita Dots & Lines
 RowLayout {
     id: root
     spacing: 6
@@ -14,29 +14,25 @@ RowLayout {
         
         delegate: Rectangle {
             id: dot
-            implicitWidth: modelData.is_active ? 20 : 6
+            implicitWidth: modelData.is_active ? 18 : 6
             implicitHeight: 6
             radius: 3
             
-            // Color logic
+            // Color logic: Primary blue when active, muted when not
             color: {
                 if (modelData.is_urgent) return FrameTheme.destructive;
-                if (modelData.is_active) return FrameTheme.foreground;
-                return FrameTheme.muted;
+                if (modelData.is_active) return FrameTheme.primary;
+                return FrameTheme.mutedForeground;
             }
             
             // Smooth transition for size and color
             Behavior on implicitWidth { NumberAnimation { duration: 300; easing.type: Easing.OutExpo } }
             Behavior on color { ColorAnimation { duration: 200 } }
             
-            // Interaction
             MouseArea {
                 anchors.fill: parent
                 onClicked: WorkspaceService.focusWorkspace(modelData.idx)
             }
-            
-            // Optional: Tooltip or small indicator for windows count
-            // (Could be added here later)
         }
     }
 }

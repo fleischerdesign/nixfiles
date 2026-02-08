@@ -34,111 +34,116 @@ Modal {
 
     Rectangle {
         id: contentRectangle
-        width: 800
-        height: 300
+        width: Math.min(parent.width * 0.95, mainLayout.implicitWidth + 40)
+        height: 240
         
-        // Position: Center Bottom
+        // Position: Bottom
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottomMargin: 70
+        anchors.bottomMargin: 80
         
-        // Frame Style
-        radius: FrameTheme.radius
-        color: FrameTheme.popover
-        border.width: FrameTheme.borderWidth
-        border.color: FrameTheme.border
+        // Frame Style (Activities-like shelf)
+        radius: 24
+        color: Qt.rgba(0.12, 0.12, 0.12, 0.8) // Dark translucent
         
         // Animation
         opacity: shouldBeVisible ? 1 : 0
-        transform: Translate {
-            y: shouldBeVisible ? 0 : 20
-            Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutExpo } }
-        }
+        scale: shouldBeVisible ? 1 : 0.95
+        Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
         Behavior on opacity { NumberAnimation { duration: 250 } }
 
         // Shadow
         RectangularShadow {
-            width: parent.width; height: parent.height
-            y: 8; z: -1
-            color: Qt.rgba(0, 0, 0, 0.4); blur: 30; radius: parent.radius
+            anchors.fill: parent
+            y: 10; z: -1
+            color: Qt.rgba(0, 0, 0, 0.5); blur: 40; radius: parent.radius
         }
 
         RowLayout {
-            anchors.fill: parent
-            anchors.margins: 20
-            spacing: 20
+            id: mainLayout
+            height: parent.height - 40
+            anchors.centerIn: parent
+            spacing: 24
 
             Repeater {
                 model: WorkspaceService.workspaces
                 
                 delegate: Rectangle {
                     id: workspaceCard
-                    Layout.fillWidth: true
+                    Layout.preferredWidth: 200
                     Layout.fillHeight: true
-                    radius: FrameTheme.radius
-                    color: modelData.is_active ? FrameTheme.secondary : "transparent"
-                    border.width: 1
-                    border.color: modelData.is_active ? FrameTheme.ring : FrameTheme.border
+                    radius: 12
+                    color: modelData.is_active ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
+                    border.width: 2
+                    border.color: modelData.is_active ? FrameTheme.primary : "transparent"
                     
+                    Behavior on color { ColorAnimation { duration: 200 } }
+                    Behavior on border.color { ColorAnimation { duration: 200 } }
+
                     // Interaction
                     MouseArea {
                         anchors.fill: parent
+                        hoverEnabled: true
                         onClicked: WorkspaceService.focusWorkspace(modelData.idx)
+                        onEntered: if (!modelData.is_active) workspaceCard.color = Qt.rgba(1, 1, 1, 0.05)
+                        onExited: if (!modelData.is_active) workspaceCard.color = "transparent"
                     }
 
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 12
-                        spacing: 8
+                        spacing: 12
                         
-                        Text {
-                            text: "Workspace " + modelData.idx
-                            color: modelData.is_active ? FrameTheme.foreground : FrameTheme.mutedForeground
-                            font.family: FrameTheme.fontFamily
-                            font.pixelSize: 12
-                            font.weight: modelData.is_active ? Font.Bold : Font.Normal
-                        }
-                        
-                        // Schematic Layout Preview
-                        Item {
+                        // Workspace Preview Area
+                        Rectangle {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                            radius: 6
+                            color: "#1a1a1a" // Mini desktop background
                             clip: true
                             
-                            // Map windows of this workspace
-                            Repeater {
-                                model: {
-                                    const wsWindows = [];
-                                    for (const win of WorkspaceService.windows) {
-                                        if (win.workspace_id === modelData.id) wsWindows.push(win);
-                                    }
-                                    return wsWindows;
-                                }
+                            // Schematic Windows
+                            RowLayout {
+                                anchors.centerIn: parent
+                                spacing: 4
+                                height: parent.height * 0.7
                                 
-                                delegate: Rectangle {
-                                    // Calculate relative position/size
-                                    // Note: Niri coordinates are absolute, we need to normalize
-                                    // For simplicity: We use the layout data
-                                    x: 0 // In Niri, windows are usually in columns
-                                    width: parent.width * 0.8
-                                    height: parent.height * 0.6
-                                    anchors.centerIn: parent
+                                Repeater {
+                                    model: {
+                                        const wsWindows = [];
+                                        for (const win of WorkspaceService.windows) {
+                                            if (win.workspace_id === modelData.id) wsWindows.push(win);
+                                        }
+                                        return wsWindows;
+                                    }
                                     
-                                    radius: 4
-                                    color: modelData.is_focused ? FrameTheme.accent : FrameTheme.muted
-                                    opacity: 0.8
-                                    border.width: 1
-                                    border.color: FrameTheme.border
-                                    
-                                    // App Icon
-                                    IconImage {
-                                        anchors.centerIn: parent
-                                        width: 24; height: 24
-                                        source: "image://icon/" + modelData.app_id
-                                        visible: modelData.app_id !== null
+                                    delegate: Rectangle {
+                                        Layout.preferredWidth: 40
+                                        Layout.fillHeight: true
+                                        radius: 2
+                                        color: modelData.is_focused ? FrameTheme.primary : "#333333"
+                                        border.width: 1
+                                        border.color: Qt.rgba(1, 1, 1, 0.1)
+                                        
+                                        IconImage {
+                                            anchors.centerIn: parent
+                                            width: 16; height: 16
+                                            source: "image://icon/" + modelData.app_id
+                                            visible: modelData.app_id !== null
+                                            opacity: 0.8
+                                        }
                                     }
                                 }
                             }
+                        }
+
+                        Text {
+                            text: "Workspace " + modelData.idx
+                            Layout.alignment: Qt.AlignHCenter
+                            color: modelData.is_active ? FrameTheme.foreground : FrameTheme.mutedForeground
+                            font.family: FrameTheme.fontFamily
+                            font.pixelSize: 11
+                            font.weight: modelData.is_active ? Font.Bold : Font.Normal
                         }
                     }
                 }

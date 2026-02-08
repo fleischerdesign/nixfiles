@@ -85,8 +85,8 @@ Scope {
                 // Horizontal Bar
                 Rectangle {
                     Layout.fillWidth: true
-                    height: 6
-                    radius: 3
+                    height: 12
+                    radius: 6
                     color: FrameTheme.secondary 
                     Layout.alignment: Qt.AlignVCenter // Fix alignment
                     
@@ -94,7 +94,7 @@ Scope {
                         height: parent.height
                         width: parent.width * Math.max(0, Math.min(1, root.value))
                         radius: parent.radius
-                        color: FrameTheme.foreground
+                        color: FrameTheme.primary
                         
                         Behavior on width {
                             NumberAnimation { duration: 50; easing.type: Easing.OutQuad } 

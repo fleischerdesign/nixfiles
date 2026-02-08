@@ -79,59 +79,14 @@ Modal {
             }
             
             // --- MASTER VOLUME ---
-            ColumnLayout {
-                spacing: 8
+            GNSlider {
                 Layout.fillWidth: true
-                
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text { 
-                        text: "Master" 
-                        color: FrameTheme.mutedForeground 
-                        font.pixelSize: 12
-                    }
-                    Item { Layout.fillWidth: true }
-                    Text { 
-                        text: Math.round(AudioService.volume * 100) + "%" 
-                        color: FrameTheme.foreground 
-                        font.pixelSize: 12
-                    }
-                }
-                
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    
-                    FrameButton {
-                        variant: FrameButton.Variant.Ghost
-                        icon: AudioService.muted ? "volume_off" : "volume_up"
-                        onClicked: AudioService.toggleMute()
-                    }
-                    
-                    // Custom Slider (Rectangle based) because native Slider is hard to style perfectly
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 6
-                        radius: 3
-                        color: FrameTheme.secondary
-                        
-                        Rectangle {
-                            height: parent.height
-                            width: parent.width * AudioService.volume
-                            radius: 3
-                            color: FrameTheme.foreground
-                        }
-                        
-                        MouseArea {
-                            anchors.fill: parent
-                            onPressed: (mouse) => updateVolume(mouse)
-                            onPositionChanged: (mouse) => updateVolume(mouse)
-                            function updateVolume(mouse) {
-                                AudioService.setVolume(mouse.x / width)
-                            }
-                        }
-                    }
-                }
+                value: AudioService.volume
+                active: !AudioService.muted
+                icon: AudioService.muted ? "volume_off" : "volume_up"
+                label: "Master"
+                onMoved: (val) => AudioService.setVolume(val)
+                onIconClicked: AudioService.toggleMute()
             }
             
             Rectangle { Layout.fillWidth: true; height: 1; color: FrameTheme.border }
@@ -167,7 +122,7 @@ Modal {
                         FrameButton {
                             anchors.fill: parent
                             anchors.margins: 2
-                            variant: Pipewire.defaultAudioSink === modelData ? FrameButton.Variant.Secondary : FrameButton.Variant.Ghost
+                            variant: Pipewire.defaultAudioSink === modelData ? FrameButton.Variant.Default : FrameButton.Variant.Ghost
                             centerContent: false
 
                             Text {
@@ -228,47 +183,13 @@ Modal {
                             objects: [modelData]
                         }
 
-                        RowLayout {
+                        GNSlider {
                             anchors.fill: parent
-                            spacing: 8
-                            
-                            // App Icon / Name
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 0
-                                Text {
-                                    text: modelData.name || "Unknown App"
-                                    color: FrameTheme.foreground
-                                    font.pixelSize: 13
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
-                                }
-                            }
-                            
-                            // Volume Slider
-                            Rectangle {
-                                Layout.preferredWidth: 80
-                                height: 4
-                                radius: 2
-                                color: FrameTheme.secondary
-                                
-                                Rectangle {
-                                    height: parent.height
-                                    width: parent.width * (modelData.audio ? modelData.audio.volume : 0)
-                                    radius: 2
-                                    color: FrameTheme.foreground
-                                }
-                                
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onPressed: (mouse) => updateAppVolume(mouse)
-                                    onPositionChanged: (mouse) => updateAppVolume(mouse)
-                                    function updateAppVolume(mouse) {
-                                        if (modelData.audio) {
-                                            modelData.audio.volume = Math.max(0, Math.min(1, mouse.x / width))
-                                        }
-                                    }
-                                }
+                            anchors.margins: 4
+                            value: modelData.audio ? modelData.audio.volume : 0
+                            label: modelData.name || "Unknown App"
+                            onMoved: (val) => {
+                                if (modelData.audio) modelData.audio.volume = val
                             }
                         }
                     }
