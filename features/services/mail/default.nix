@@ -84,10 +84,11 @@ in
           bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
           bind.auth.method = "lookup";
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
-          filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
+          filter.email = "(&(objectClass=inetOrgPerson)(|(stalwart_mail=?)(stalwart_aliases=?)))";
           attributes = {
             name = "cn";
-            email = "mail";
+            email = "stalwart_mail";
+            email-alias = "stalwart_aliases";
             groups = "memberOf";
             secret-changed = "pwdChangedTime";
           };
