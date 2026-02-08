@@ -18,7 +18,6 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration for managed sections
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -32,14 +31,12 @@ in
           "spam.*"
         ];
 
-        # 0.15 Certificate Definitions
         certificate.default = {
           cert = "%{file:${certDir}/mail.crt}%";
           private-key = "%{file:${certDir}/mail.key}%";
           default = true;
         };
 
-        # Identity lookup for HELO
         lookup.default = {
           hostname = "mail.ancoris.ovh";
           domain = "ancoris.ovh";
@@ -51,13 +48,16 @@ in
           driver = "postgres";
           url = dbUrl;
         };
+        store.local = {
+          type = "rocksdb";
+          path = "/var/lib/stalwart-mail/local_db";
+        };
         store.blobs = {
           type = "fs";
           path = "/var/lib/stalwart-mail/blobs";
         };
         store.redis = {
           type = "redis";
-          redis-type = "single";
           urls = [ "redis://127.0.0.1:6379" ];
         };
 
@@ -67,6 +67,8 @@ in
         storage.lookup = "db";
         storage.fts = "db";
         storage.directory = "db";
+        storage.cache = "redis";
+        storage.queue = "local";
 
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
@@ -79,12 +81,12 @@ in
           
           # Bind credentials
           bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
-          bind.secret = "%{env:STALWART_LDAP_SECRET}%";
+          bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
 
           # Authentication Method
           bind.auth.method = "lookup";
 
-          # Filters for Authentik
+          # Filters
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
           filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
 
@@ -100,6 +102,10 @@ in
         # Use Authentik for authentication and lookup
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
+
+        # Spam filter
+        spam.classifier.store = "local";
+        spam.training.store = "local";
 
         # SMTP Relay (Brevo)
         remote.relay."brevo" = {
@@ -169,6 +175,7 @@ in
       credentials = {
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
+        "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
       };
     };
 
