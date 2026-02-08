@@ -2,6 +2,7 @@
 
 let
   cfg = config.my.features.services.mail;
+  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
   certDir = "/var/lib/stalwart-mail/certs";
 in
 {
@@ -17,14 +18,15 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
+        # Force local configuration only for what we manage
         config.local-keys = [
           "store.*"
           "storage.*"
-          "directory.*"
+          "directory.authentik.*" # ONLY manage LDAP locally, let internal stay in DB
           "server.*"
           "session.*"
           "remote.*"
-          "authentication.*"
+          "authentication.fallback-admin.*"
           "certificate.default.*"
           "lookup.*"
           "spam.*"
@@ -46,7 +48,7 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store via TCP (Most reliable for Stalwart 0.15)
+        # 1. PostgreSQL Store via TCP
         store."db" = {
           type = "postgresql";
           host = "127.0.0.1";
@@ -55,7 +57,6 @@ in
           user = "stalwart";
           password = "%{file:/run/credentials/stalwart.service/db_password}%";
           tls.enable = false;
-          pool.max-connections = 10;
         };
 
         # 2. Redis Store
@@ -67,15 +68,10 @@ in
 
         # Storage Assignments
         storage.data = "db";
-        storage.blob = "db";
         storage.lookup = "redis";
         storage.fts = "db";
-        storage.directory = "internal"; 
-
-        directory."internal" = {
-          type = "internal";
-          store = "db";
-        };
+        storage.blob = "db";
+        storage.directory = "internal"; # For domain metadata/DKIM
 
         # LDAP Directory for Authentication
         directory."authentik" = {
@@ -95,6 +91,7 @@ in
           };
         };
 
+        # Use Authentik for user authentication
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
@@ -137,16 +134,13 @@ in
       };
     };
 
-    # One-shot service to ensure postgres user has the correct password
+    # Ensure postgres user has the correct password
     systemd.services.stalwart-db-init = {
       description = "Ensure Stalwart DB user has correct password";
       after = [ "postgresql.service" ];
       before = [ "stalwart.service" ];
       wantedBy = [ "stalwart.service" ];
-      serviceConfig = {
-        Type = "oneshot";
-        User = "postgres";
-      };
+      serviceConfig = { Type = "oneshot"; User = "postgres"; };
       script = ''
         ${config.services.postgresql.package}/bin/psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='stalwart'" | grep -q 1 || exit 0
         ${config.services.postgresql.package}/bin/psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${config.sops.secrets.stalwart_db_password.path})';"
@@ -180,13 +174,12 @@ in
 
     systemd.tmpfiles.rules = [ "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -" ];
 
-    # Secrets
     sops.secrets.brevo_smtp_user = { owner = "stalwart-mail"; };
     sops.secrets.brevo_smtp_key = { owner = "stalwart-mail"; };
     sops.secrets.mail_admin_password = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_id = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_secret = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_ldap_password = { owner = "stalwart-mail"; };
-    sops.secrets.stalwart_db_password = { owner = "postgres"; }; # Postgres needs to read it for ALTER USER
+    sops.secrets.stalwart_db_password = { owner = "postgres"; };
   };
 }
