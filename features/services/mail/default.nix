@@ -30,6 +30,7 @@ in
           "lookup.*"
           "spam.*"
           "mta.*"
+          "queue.*"
         ];
 
         certificate."default" = {
@@ -64,7 +65,7 @@ in
         store."redis" = {
           type = "redis";
           redis-type = "single";
-          url = "redis://127.0.0.1:6379";
+          urls = [ "redis://127.0.0.1:6379" ];
         };
 
         # Storage Assignments
@@ -73,6 +74,24 @@ in
         storage.fts = "db";
         storage.blob = "db";
         storage.directory = "authentik"; 
+
+        # Routing Strategy
+        queue.strategy.route = [
+          { if = "is_local_domain('', rcpt_domain)"; then = "'local'"; }
+          { else = "'brevo'"; }
+        ];
+
+        queue.route."local" = {
+          type = "local";
+        };
+
+        queue.route."brevo" = {
+          type = "relay";
+          address = "smtp-relay.brevo.com";
+          port = 587;
+          protocol = "smtp";
+          tls.implicit = false;
+        };
 
         # LDAP Directory Configuration with CamelCase attributes
         directory."authentik" = {
@@ -96,20 +115,10 @@ in
           };
         };
 
-        # SMTP Relay (Brevo)
-        remote.relay."brevo" = {
-          host = "smtp-relay.brevo.com";
-          port = 587;
-        };
-        session.rcpt.relay = "'brevo'";
-
         # MTA Signing
-        mta = {
-          relay = "'brevo'";
-          sign.dkim = {
-            enable = true;
-            selector = "202602e";
-          };
+        mta.sign.dkim = {
+          enable = true;
+          selector = "202602e";
         };
 
         # Listeners
@@ -137,8 +146,8 @@ in
       };
 
       credentials = {
-        "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
-        "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
+        "queue.route.brevo.auth.username" = config.sops.secrets.brevo_smtp_user.path;
+        "queue.route.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
         "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
         "db_password" = config.sops.secrets.stalwart_db_password.path;
       };
