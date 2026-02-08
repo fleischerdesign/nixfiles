@@ -101,10 +101,6 @@ in
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
-        # Spam filter
-        spam.classifier.store = "db";
-        spam.training.store = "db";
-
         # SMTP Relay (Brevo)
         remote.relay."brevo" = {
           host = "smtp-relay.brevo.com";
