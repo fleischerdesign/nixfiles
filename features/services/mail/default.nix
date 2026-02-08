@@ -53,88 +53,52 @@ in
         };
         store.cache = {
           type = "redis";
-          url = "redis://127.0.0.1:6379";
+          urls = [ "redis://127.0.0.1:6379" ];
         };
 
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-                                                # Local Authentik LDAP Directory
+        # Local Authentik LDAP Directory
+        directory."authentik" = {
+          type = "ldap";
+          url = "ldap://127.0.0.1:3389";
+          base-dn = "dc=ldap,dc=goauthentik,dc=io";
+          
+          # Bind credentials
+          bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
+          bind.secret = "%{env:STALWART_LDAP_SECRET}%";
 
-                                                directory."authentik" = {
+          # Authentication Method
+          bind.auth.method = "lookup";
 
-                                                  type = "ldap";
+          # Filters for Authentik
+          filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
+          filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
 
-                                                  url = "ldap://127.0.0.1:3389";
+          # Attribute Mapping
+          attributes = {
+            name = "cn";
+            email = "mail";
+            groups = "memberOf";
+            secret-changed = "pwdChangedTime";
+          };
+        };
 
-                                                  base-dn = "dc=ldap,dc=goauthentik,dc=io";
-
-                                                  
-
-                                                            # Bind credentials
-
-                                                  
-
-                                                            bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
-
-                                                  
-
-                                                            bind.secret = "%{env:STALWART_LDAP_SECRET}%";
-
-                                                  
-
-                                                  
-
-                                                  
-
-                                                            # Authentication Method
-
-                                                  bind.auth.method = "lookup";
-
-                                        
-
-                                                  # Filters for Authentik (Verified via ldapsearch)
-
-                                                  filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
-
-                                                  filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
-
-                                        
-
-                                                  # Attribute Mapping
-
-                                                  attributes = {
-
-                                                    name = "cn";
-
-                                                    email = "mail";
-
-                                                    groups = "memberOf";
-
-                                                    secret-changed = "pwdChangedTime";
-
-                                                  };
-
-                                                };
-
-                                        
-
-                                                # Use Authentik for authentication and lookup
-
-                                                session.auth.directory = "'authentik'";
-
-                                                session.rcpt.directory = "'authentik'";
+        # Use Authentik for authentication and lookup
+        session.auth.directory = "'authentik'";
+        session.rcpt.directory = "'authentik'";
 
         # Spam filter
         spam.classifier.store = "data";
         spam.training.store = "data";
 
         # SMTP Relay (Brevo)
-        remote.relay.brevo = {
+        remote.relay."brevo" = {
           host = "smtp-relay.brevo.com";
           port = 587;
         };
-        session.rcpt.relay = "brevo";
+        session.rcpt.relay = "'brevo'";
 
         # Debug Logging
         logger.default.level = "info";
@@ -177,12 +141,14 @@ in
           bind = [ "[::]:993" ];
           protocol = "imap";
           tls.implicit = true;
+          hostname = "mail.ancoris.ovh";
         };
 
         server.listener.imap = {
           bind = [ "[::]:143" ];
           protocol = "imap";
           tls.enable = true;
+          hostname = "mail.ancoris.ovh";
         };
 
         # Fallback Admin
