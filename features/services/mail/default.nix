@@ -71,15 +71,23 @@ in
 
                                                   
 
-                                                  # Bind credentials
+                                                            # Bind credentials
 
-                                                  bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
+                                                  
 
-                                                  # Secret is injected via credentials
+                                                            bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
 
-                                        
+                                                  
 
-                                                  # Authentication Method
+                                                            bind.secret = "%{env:STALWART_LDAP_SECRET}%";
+
+                                                  
+
+                                                  
+
+                                                  
+
+                                                            # Authentication Method
 
                                                   bind.auth.method = "lookup";
 
@@ -187,7 +195,6 @@ in
       credentials = {
         "remote.relay.brevo.auth.user" = config.sops.secrets.brevo_smtp_user.path;
         "remote.relay.brevo.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
-        "directory.\"authentik\".bind.secret" = config.sops.secrets.stalwart_ldap_password.path;
       };
     };
 
@@ -244,5 +251,13 @@ in
     sops.secrets.stalwart_oidc_id = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_oidc_secret = { owner = "stalwart-mail"; };
     sops.secrets.stalwart_ldap_password = { owner = "stalwart-mail"; };
+
+    # Template for env vars
+    sops.templates."stalwart-mail.env".content = ''
+      STALWART_LDAP_SECRET=${config.sops.placeholder.stalwart_ldap_password}
+    '';
+
+    # Inject environment variables into Stalwart service
+    systemd.services.stalwart-mail.serviceConfig.EnvironmentFile = config.sops.templates."stalwart-mail.env".path;
   };
 }
