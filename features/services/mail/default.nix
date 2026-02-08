@@ -83,8 +83,10 @@ in
           bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
           bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
           bind.auth.method = "lookup";
-          filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
-          filter.email = "(&(objectClass=inetOrgPerson)(|(stalwart_mail=?)(stalwart_aliases=?)))";
+          
+          filter.name = "(cn=?)";
+          filter.email = "(|(stalwart_mail=?)(stalwart_aliases=?))";
+          
           attributes = {
             name = "cn";
             email = "stalwart_mail";
