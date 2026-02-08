@@ -18,8 +18,6 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration only for specific managed keys
-        # We allow certificates (except default) and domains to be managed in DB
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -28,12 +26,11 @@ in
           "session.*"
           "remote.*"
           "authentication.*"
-          "certificate.default.*" # Only protect the main SSL cert
+          "certificate.default.*"
           "lookup.*"
           "spam.*"
         ];
 
-        # 0.15 Certificate Definitions
         certificate."default" = {
           cert = "%{file:${certDir}/mail.crt}%";
           private-key = "%{file:${certDir}/mail.key}%";
@@ -50,7 +47,7 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store
+        # 1. Main PostgreSQL Store
         store."db" = {
           type = "sql";
           driver = "postgres";
@@ -63,7 +60,13 @@ in
           urls = [ "redis://127.0.0.1:6379" ];
         };
 
-        # 3. Blob Store (Filesystem)
+        # 3. RocksDB Store for internal metadata and spam (to avoid startup crashes)
+        store."internal" = {
+          type = "rocksdb";
+          path = "/var/lib/stalwart-mail/internal";
+        };
+
+        # 4. Blob Store (Filesystem)
         store."blobs" = {
           type = "fs";
           path = "/var/lib/stalwart-mail/blobs";
@@ -71,17 +74,12 @@ in
 
         # Storage Assignments
         storage.data = "db";
-        storage.lookup = "db";
-        storage.fts = "db";
         storage.blob = "blobs";
-        storage.cache = "redis";
+        storage.fts = "db";
+        storage.lookup = "redis";
         
-        # CRITICAL: storage.directory must be internal for domain metadata/DKIM
-        # session.auth.directory is used for actual user logins
+        # Internal metadata and directory fallback on RocksDB
         storage.directory = "internal"; 
-
-        # Domains
-        directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
         # LDAP Directory for Authentication
         directory."authentik" = {
@@ -101,7 +99,6 @@ in
           };
         };
 
-        # Use Authentik for user authentication
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
@@ -149,16 +146,13 @@ in
       };
     };
 
-    # One-shot service to ensure postgres user has the correct password
+    # Ensure postgres user has the correct password
     systemd.services.stalwart-db-init = {
       description = "Ensure Stalwart DB user has correct password";
       after = [ "postgresql.service" ];
       before = [ "stalwart.service" ];
       wantedBy = [ "stalwart.service" ];
-      serviceConfig = {
-        Type = "oneshot";
-        User = "postgres";
-      };
+      serviceConfig = { Type = "oneshot"; User = "postgres"; };
       script = ''
         ${config.services.postgresql.package}/bin/psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='stalwart'" | grep -q 1 || exit 0
         ${config.services.postgresql.package}/bin/psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${config.sops.secrets.stalwart_db_password.path})';"
@@ -190,7 +184,11 @@ in
       "mail" = { port = 9081; fullDomain = "mail.ancoris.ovh"; };
     };
 
-    systemd.tmpfiles.rules = [ "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -" ];
+    systemd.tmpfiles.rules = [
+      "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
+      "d /var/lib/stalwart-mail/blobs 0750 stalwart-mail stalwart-mail -"
+      "d /var/lib/stalwart-mail/internal 0750 stalwart-mail stalwart-mail -"
+    ];
 
     sops.secrets.brevo_smtp_user = { owner = "stalwart-mail"; };
     sops.secrets.brevo_smtp_key = { owner = "stalwart-mail"; };
