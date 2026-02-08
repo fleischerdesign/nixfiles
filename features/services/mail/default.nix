@@ -100,6 +100,14 @@ in
         };
         session.rcpt.relay = "'brevo'";
 
+        # MTA Signing
+        mta.sign.dkim = {
+          enable = true;
+          selector = "202602r";
+        };
+
+        # Debug Logging
+
         # Listeners
         server.listener.management = {
           bind = [ "127.0.0.1:9081" ];
