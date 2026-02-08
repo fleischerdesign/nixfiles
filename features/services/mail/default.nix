@@ -2,7 +2,6 @@
 
 let
   cfg = config.my.features.services.mail;
-  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
   certDir = "/var/lib/stalwart-mail/certs";
 in
 {
@@ -49,39 +48,32 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store
-        store."db" = {
-          type = "sql";
-          driver = "postgres";
-          url = dbUrl;
+        # 1. Native PostgreSQL Store
+        store."pg" = {
+          type = "postgresql";
+          host = "/run/postgresql";
+          database = "stalwart";
+          user = "stalwart";
         };
 
-        # 2. Redis Store
+        # 2. Native Redis Store
         store."redis" = {
           type = "redis";
-          urls = [ "redis://127.0.0.1:6379" ];
+          redis-type = "single";
+          urls = "redis://127.0.0.1:6379";
         };
 
-        # 3. Blob Store (Filesystem)
-        store."blobs" = {
-          type = "fs";
-          path = "/var/lib/stalwart-mail/blobs";
-        };
-
-        # Storage Assignments
-        storage.data = "db";
-        storage.lookup = "db";
+        # Storage Assignments (Based on 0.15 Documentation)
+        storage.data = "pg";
+        storage.blob = "pg";   # Postgres supports blobs
+        storage.fts = "pg";    # Postgres supports FTS
+        storage.lookup = "redis"; # In-memory store
         storage.directory = "authentik"; 
-        storage.fts = "db";
-        storage.blob = "blobs";
-        storage.cache = "redis";
-        
-        # Note: Spam and Queue will use storage.data (db) by default
 
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-        # Local Authentik LDAP Directory
+        # LDAP Directory
         directory."authentik" = {
           type = "ldap";
           url = "ldap://127.0.0.1:3389";
@@ -99,7 +91,6 @@ in
           };
         };
 
-        # Use Authentik for authentication and lookup
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
@@ -109,11 +100,6 @@ in
           port = 587;
         };
         session.rcpt.relay = "'brevo'";
-
-        # Debug Logging
-        logger.default.level = "info";
-        logger.modules.directory = "trace";
-        logger.modules.session = "trace";
 
         # Listeners
         server.listener.management = {
