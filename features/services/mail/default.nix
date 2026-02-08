@@ -2,7 +2,7 @@
 
 let
   cfg = config.my.features.services.mail;
-  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
+  dbUrl = "postgres://stalwart@%2Frun%2Fpostgresql/stalwart";
   certDir = "/var/lib/stalwart-mail/certs";
 in
 {
@@ -18,7 +18,6 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
-        # Force local configuration
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -32,7 +31,6 @@ in
           "spam.*"
         ];
 
-        # 0.15 Certificate Definitions
         certificate."default" = {
           cert = "%{file:${certDir}/mail.crt}%";
           private-key = "%{file:${certDir}/mail.key}%";
@@ -49,38 +47,44 @@ in
           domain = "ancoris.ovh";
         };
 
-        # Backends
+        # 1. PostgreSQL Store
         store."db" = {
           type = "sql";
           driver = "postgres";
           url = dbUrl;
         };
-        store."local" = {
-          type = "rocksdb";
-          path = "/var/lib/stalwart-mail/local_db";
+
+        # 2. Redis Store
+        store."redis" = {
+          type = "redis";
+          url = "redis://127.0.0.1:6379";
         };
+
+        # 3. Blob Store (Filesystem)
         store."blobs" = {
           type = "fs";
           path = "/var/lib/stalwart-mail/blobs";
         };
-        store."cache" = {
-          type = "redis";
-          urls = [ "redis://127.0.0.1:6379" ];
+
+        # 4. RocksDB for Queue/Spam (Local only)
+        store."local" = {
+          type = "rocksdb";
+          path = "/var/lib/stalwart-mail/local_db";
         };
 
-        # Storage Assignments (Based on NixOS tests)
+        # Assignments
         storage.data = "db";
         storage.lookup = "db";
-        storage.directory = "authentik";
+        storage.directory = "authentik"; 
         storage.fts = "db";
         storage.blob = "blobs";
-        storage.cache = "cache";
-        storage.queue = "local";
+        storage.cache = "redis";
+        storage.queue = "local"; 
 
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-        # Local Authentik LDAP Directory
+        # LDAP Directory
         directory."authentik" = {
           type = "ldap";
           url = "ldap://127.0.0.1:3389";
@@ -98,15 +102,14 @@ in
           };
         };
 
-        # Use Authentik for authentication and lookup
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
-        # Spam filter
+        # Spam Filter (RocksDB)
         spam.classifier.store = "local";
         spam.training.store = "local";
 
-        # SMTP Relay (Brevo)
+        # Relay
         remote.relay."brevo" = {
           host = "smtp-relay.brevo.com";
           port = 587;
