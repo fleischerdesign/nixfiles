@@ -81,8 +81,8 @@ in
           route = [
             { 
               "if" = "is_local_domain('', rcpt_domain)"; 
-              "then" = "'local'"; 
-              "else" = "'brevo'"; 
+              "then" = "local"; 
+              "else" = "brevo"; 
             }
           ];
         };
