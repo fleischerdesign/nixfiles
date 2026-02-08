@@ -23,6 +23,7 @@ in
           "store.*"
           "storage.*"
           "directory.authentik.*" # Manage LDAP locally
+          # directory.internal is NOT here, so DKIM/Domains stay in DB
           "server.*"
           "session.*"
           "remote.*"
@@ -57,6 +58,7 @@ in
           user = "stalwart";
           password = "%{file:/run/credentials/stalwart.service/db_password}%";
           tls.enable = false;
+          pool.max-connections = 10;
         };
 
         # 2. Redis Store
@@ -72,8 +74,13 @@ in
         storage.fts = "db";
         storage.blob = "db";
         
-        # CRITICAL: Set back to authentik for successful user lookups
-        storage.directory = "authentik"; 
+        # Internal directory handles domain metadata and DKIM
+        storage.directory = "internal"; 
+
+        directory."internal" = {
+          type = "internal";
+          store = "db";
+        };
 
         # LDAP Directory for Authentication
         directory."authentik" = {
@@ -93,7 +100,7 @@ in
           };
         };
 
-        # Use Authentik for user authentication
+        # Overrides: Route authentication and recipient lookups to LDAP
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
@@ -103,11 +110,6 @@ in
           port = 587;
         };
         session.rcpt.relay = "'brevo'";
-
-        # Debug Logging
-        logger.default.level = "info";
-        logger.modules.directory = "trace";
-        logger.modules.session = "trace";
 
         # Listeners
         server.listener.management = {
@@ -127,6 +129,7 @@ in
         server.listener.imaps = { bind = [ "[::]:993" ]; protocol = "imap"; tls.implicit = true; hostname = "mail.ancoris.ovh"; };
         server.listener.imap = { bind = [ "[::]:143" ]; protocol = "imap"; tls.enable = true; hostname = "mail.ancoris.ovh"; };
 
+        # Fallback Admin
         authentication.fallback-admin = {
           user = "admin";
           secret = "%{file:${config.sops.secrets.mail_admin_password.path}}%";
@@ -141,7 +144,7 @@ in
       };
     };
 
-    # Ensure postgres user has the correct password
+    # One-shot service to ensure postgres user has the correct password
     systemd.services.stalwart-db-init = {
       description = "Ensure Stalwart DB user has correct password";
       after = [ "postgresql.service" ];
