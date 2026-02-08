@@ -2,7 +2,7 @@
 
 let
   cfg = config.my.features.services.mail;
-  dbUrl = "postgres://stalwart@%2Frun%2Fpostgresql/stalwart";
+  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
   certDir = "/var/lib/stalwart-mail/certs";
 in
 {
@@ -18,6 +18,7 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
+        # Force local configuration for managed sections
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -31,6 +32,7 @@ in
           "spam.*"
         ];
 
+        # 0.15 Certificate Definitions
         certificate."default" = {
           cert = "%{file:${certDir}/mail.crt}%";
           private-key = "%{file:${certDir}/mail.key}%";
@@ -57,7 +59,7 @@ in
         # 2. Redis Store
         store."redis" = {
           type = "redis";
-          url = "redis://127.0.0.1:6379";
+          urls = [ "redis://127.0.0.1:6379" ];
         };
 
         # 3. Blob Store (Filesystem)
@@ -66,25 +68,20 @@ in
           path = "/var/lib/stalwart-mail/blobs";
         };
 
-        # 4. RocksDB for Queue/Spam (Local only)
-        store."local" = {
-          type = "rocksdb";
-          path = "/var/lib/stalwart-mail/local_db";
-        };
-
-        # Assignments
+        # Storage Assignments
         storage.data = "db";
         storage.lookup = "db";
         storage.directory = "authentik"; 
         storage.fts = "db";
         storage.blob = "blobs";
         storage.cache = "redis";
-        storage.queue = "local"; 
+        
+        # Note: Spam and Queue will use storage.data (db) by default
 
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
 
-        # LDAP Directory
+        # Local Authentik LDAP Directory
         directory."authentik" = {
           type = "ldap";
           url = "ldap://127.0.0.1:3389";
@@ -102,19 +99,21 @@ in
           };
         };
 
+        # Use Authentik for authentication and lookup
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
-        # Spam Filter (RocksDB)
-        spam.classifier.store = "local";
-        spam.training.store = "local";
-
-        # Relay
+        # SMTP Relay (Brevo)
         remote.relay."brevo" = {
           host = "smtp-relay.brevo.com";
           port = 587;
         };
         session.rcpt.relay = "'brevo'";
+
+        # Debug Logging
+        logger.default.level = "info";
+        logger.modules.directory = "trace";
+        logger.modules.session = "trace";
 
         # Listeners
         server.listener.management = {
