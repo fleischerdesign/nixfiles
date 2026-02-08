@@ -2,6 +2,7 @@
 
 let
   cfg = config.my.features.services.mail;
+  dbUrl = "postgresql://stalwart@%2Frun%2Fpostgresql/stalwart";
   certDir = "/var/lib/stalwart-mail/certs";
 in
 {
@@ -17,6 +18,8 @@ in
       settings = {
         server.hostname = "mail.ancoris.ovh";
         
+        # Force local configuration only for specific managed keys
+        # We allow certificates (except default) and domains to be managed in DB
         config.local-keys = [
           "store.*"
           "storage.*"
@@ -25,11 +28,12 @@ in
           "session.*"
           "remote.*"
           "authentication.*"
-          "certificate.*"
+          "certificate.default.*" # Only protect the main SSL cert
           "lookup.*"
           "spam.*"
         ];
 
+        # 0.15 Certificate Definitions
         certificate."default" = {
           cert = "%{file:${certDir}/mail.crt}%";
           private-key = "%{file:${certDir}/mail.key}%";
@@ -46,23 +50,17 @@ in
           domain = "ancoris.ovh";
         };
 
-        # 1. PostgreSQL Store via TCP (Maximum Reliability)
+        # 1. PostgreSQL Store
         store."db" = {
-          type = "postgresql";
-          host = "127.0.0.1";
-          port = 5432;
-          database = "stalwart";
-          user = "stalwart";
-          password = "%{file:/run/credentials/stalwart.service/db_password}%";
-          tls.enable = false;
-          pool.max-connections = 10;
+          type = "sql";
+          driver = "postgres";
+          url = dbUrl;
         };
 
         # 2. Redis Store
         store."redis" = {
           type = "redis";
-          redis-type = "single";
-          urls = "redis://127.0.0.1:6379";
+          urls = [ "redis://127.0.0.1:6379" ];
         };
 
         # 3. Blob Store (Filesystem)
@@ -74,12 +72,18 @@ in
         # Storage Assignments
         storage.data = "db";
         storage.lookup = "db";
-        storage.directory = "authentik"; 
         storage.fts = "db";
         storage.blob = "blobs";
         storage.cache = "redis";
+        
+        # CRITICAL: storage.directory must be internal for domain metadata/DKIM
+        # session.auth.directory is used for actual user logins
+        storage.directory = "internal"; 
 
-        # LDAP Directory
+        # Domains
+        directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
+
+        # LDAP Directory for Authentication
         directory."authentik" = {
           type = "ldap";
           url = "ldap://127.0.0.1:3389";
@@ -90,11 +94,14 @@ in
           filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
           filter.email = "(&(objectClass=inetOrgPerson)(mail=?))";
           attributes = {
-            name = "cn"; email = "mail"; groups = "memberOf";
+            name = "cn";
+            email = "mail";
+            groups = "memberOf";
             secret-changed = "pwdChangedTime";
           };
         };
 
+        # Use Authentik for user authentication
         session.auth.directory = "'authentik'";
         session.rcpt.directory = "'authentik'";
 
@@ -104,6 +111,11 @@ in
           port = 587;
         };
         session.rcpt.relay = "'brevo'";
+
+        # Debug Logging
+        logger.default.level = "info";
+        logger.modules.directory = "trace";
+        logger.modules.session = "trace";
 
         # Listeners
         server.listener.management = {
