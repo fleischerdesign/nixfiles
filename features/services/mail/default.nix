@@ -46,7 +46,7 @@ in
         };
 
         # 0.15 Store Definitions
-        store.postgres = {
+        store.db = {
           type = "sql";
           driver = "postgres";
           url = dbUrl;
@@ -62,11 +62,11 @@ in
         };
 
         # Storage Assignments
-        storage.data = "postgres";
+        storage.data = "db";
         storage.blob = "blobs";
-        storage.lookup = "postgres";
-        storage.fts = "postgres";
-        storage.directory = "postgres";
+        storage.lookup = "db";
+        storage.fts = "db";
+        storage.directory = "db";
 
         # Domains
         directory.internal.domains = [ "ancoris.ovh" "fleischer.design" ];
@@ -102,8 +102,8 @@ in
         session.rcpt.directory = "'authentik'";
 
         # Spam filter
-        spam.classifier.store = "postgres";
-        spam.training.store = "postgres";
+        spam.classifier.store = "db";
+        spam.training.store = "db";
 
         # SMTP Relay (Brevo)
         remote.relay."brevo" = {
