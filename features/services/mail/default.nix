@@ -84,18 +84,17 @@ in
                   bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
                   bind.auth.method = "lookup";
                   
-                  filter.name = "(cn=?)";
-                  # Use standard mail attribute for lookup to avoid parse errors with multiple placeholders
-                  filter.email = "(mail=?)";
-                  
-                  attributes = {
-                    name = "cn";
-                    email = "stalwart_mail"; 
-                    email-alias = "stalwart_aliases";
-                    groups = "memberOf";
-                    secret-changed = "pwdChangedTime";
-                  };
-                };
+                            filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
+                            # Use official structure with custom attributes
+                            filter.email = "(&(objectClass=inetOrgPerson)(|(stalwart_mail=?)(stalwart_aliases=?)))";
+                            
+                            attributes = {
+                              name = "cn";
+                              email = "stalwart_mail"; 
+                              email-alias = "stalwart_aliases";
+                              groups = "memberOf";
+                              secret-changed = "pwdChangedTime";
+                            };                };
         # SMTP Relay (Brevo)
         remote.relay."brevo" = {
           host = "smtp-relay.brevo.com";
