@@ -89,7 +89,7 @@ in
 
         queue.strategy."relay" = {
           type = "relay";
-          route = "'brevo'";
+          gateway = "'brevo'";
         };
 
         queue.route."brevo" = {
