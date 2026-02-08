@@ -79,11 +79,8 @@ in
         # Routing Strategy
         queue.strategy."remote" = {
           route = [
-            { 
-              "if" = "is_local_domain('', rcpt_domain)"; 
-              "then" = "local"; 
-              "else" = "brevo"; 
-            }
+            { "if" = "is_local_domain('', rcpt_domain)"; "then" = "'local'"; }
+            { "else" = "'relay'"; }
           ];
         };
 
@@ -91,15 +88,15 @@ in
           type = "local";
         };
 
-        queue.route."brevo" = {
+        queue.route."relay" = {
           type = "relay";
           address = "smtp-relay.brevo.com";
           port = 587;
           protocol = "smtp";
           tls.implicit = false;
           auth = {
-            username = "%{file:/run/credentials/stalwart.service/brevo_user}%";
-            secret = "%{file:/run/credentials/stalwart.service/brevo_secret}%";
+            username = "%{file:/run/credentials/stalwart.service/queue.route.relay.auth.username}%";
+            secret = "%{file:/run/credentials/stalwart.service/queue.route.relay.auth.secret}%";
           };
         };
 
@@ -168,8 +165,8 @@ in
       };
 
       credentials = {
-        "brevo_user" = config.sops.secrets.brevo_smtp_user.path;
-        "brevo_secret" = config.sops.secrets.brevo_smtp_key.path;
+        "queue.route.relay.auth.username" = config.sops.secrets.brevo_smtp_user.path;
+        "queue.route.relay.auth.secret" = config.sops.secrets.brevo_smtp_key.path;
         "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
         "db_password" = config.sops.secrets.stalwart_db_password.path;
       };
