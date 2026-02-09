@@ -2,6 +2,7 @@
   config,
   pkgs,
   inputs,
+  osConfig,
   ...
 }:
 
@@ -51,7 +52,7 @@
       nix-direnv.enable = true;
     };
     thunderbird = {
-      enable = true;
+      enable = osConfig.my.role != "server";
       profiles.philipp = {
         isDefault = true;
         userChrome = ''
@@ -74,7 +75,7 @@
       };
     };
     firefox = {
-      enable = true;
+      enable = osConfig.my.role != "server";
       profiles.philipp = {
         userChrome = ''
           @import "firefox-gnome-theme/userChrome.css";
