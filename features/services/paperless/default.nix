@@ -117,8 +117,9 @@ in
     virtualisation.oci-containers.backend = "podman";
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
       image = "docker.io/manuc66/node-hp-scan-to:latest";
-      user = "315:987"; # paperless:media
       environment = {
+        PUID = "315";
+        PGID = "987";
         IP = "192.168.178.62";
         LABEL = "paperless";
         TZ = "Europe/Berlin";
