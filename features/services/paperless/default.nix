@@ -114,6 +114,7 @@ in
     systemd.services.paperless-scheduler.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
 
     # Scanner Service
+    virtualisation.oci-containers.backend = "podman";
     virtualisation.oci-containers.containers."node-hp-scan-to" = {
       image = "docker.io/manuc66/node-hp-scan-to:latest";
       user = "315:987"; # paperless:media
