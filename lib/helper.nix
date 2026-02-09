@@ -63,7 +63,7 @@ let
     ++ extraModules
     ++ allFeatureModules
     ++ [
-      (import (../hosts + "/${hostname}/configuration.nix"))
+      ../hosts/${hostname}/configuration.nix
       home-manager-unstable.nixosModules.home-manager
       {
         home-manager = {
