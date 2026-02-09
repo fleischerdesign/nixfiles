@@ -121,8 +121,8 @@ in
 
         # MTA Signing
         mta.sign.dkim = {
-          enable = true;
-          selector = "202602r";
+          enable = false;
+          # selector = "202602r";
         };
 
         # Listeners
