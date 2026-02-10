@@ -80,7 +80,7 @@
       languagePacks = [ "de" ];
       profiles.philipp = {
         search = {
-          default = "DuckDuckGo";
+          default = "ddg";
           force = true;
         };
         userChrome = ''
