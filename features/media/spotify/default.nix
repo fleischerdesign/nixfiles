@@ -2,6 +2,7 @@
 { config, lib, pkgs, inputs, ... }:
 
   let
+    cfg = config.my.features.media.spotify;
     spicePkgs = inputs.spicetify-nix.legacyPackages.${pkgs.stdenv.hostPlatform.system};
   in
 {
