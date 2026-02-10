@@ -34,6 +34,7 @@ in
             visualstudioexptteam.vscodeintellicode
             dbaeumer.vscode-eslint
             bbenoist.qml
+            cweijan.vscode-database-client2
           ];
           userSettings = {
             "extensions.autoUpdate" = false;
