@@ -71,11 +71,13 @@
           "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
           "svg.context-properties.content.enabled" = true;
           "browser.uidensity" = 0;
+          "intl.locale.requested" = "de";
         };
       };
     };
     firefox = {
       enable = osConfig.my.role != "server";
+      languagePacks = [ "de" ];
       profiles.philipp = {
         userChrome = ''
           @import "firefox-gnome-theme/userChrome.css";
@@ -93,6 +95,7 @@
           "browser.uidensity" = 0;
           "svg.context-properties.content.enabled" = true;
           "browser.theme.dark-private-windows" = false;
+          "intl.locale.requested" = "de";
         };
       };
     };
