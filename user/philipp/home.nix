@@ -79,6 +79,10 @@
       enable = osConfig.my.role != "server";
       languagePacks = [ "de" ];
       profiles.philipp = {
+        search = {
+          default = "DuckDuckGo";
+          force = true;
+        };
         userChrome = ''
           @import "firefox-gnome-theme/userChrome.css";
 
