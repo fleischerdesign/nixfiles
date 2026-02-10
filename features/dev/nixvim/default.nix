@@ -17,21 +17,19 @@ in
         viAlias = true; # Creates a vi alias to vim
         vimAlias = true; # Creates a vim alias to nvim
 
+        colorschemes.vscode = {
+          enable = true;
+          settings = {
+            transparent = true;
+            italic_comments = true;
+          };
+        };
+
         globals = {
           mapleader = " ";
         };
 
         highlight = {
-          Normal = {
-            bg = "NONE";
-            ctermbg = "NONE";
-          };
-
-          NonText = {
-            bg = "NONE";
-            ctermbg = "NONE";
-          };
-
           # Make indentation lines very subtle (dark grey)
           IblIndent = {
             fg = "#444444";
@@ -47,6 +45,7 @@ in
           relativenumber = true;
           shiftwidth = 2;
           cmdheight = 0;
+          background = "dark"; # Use valid value 'dark'
           signcolumn = "yes"; # Always show the signcolumn to prevent jumping
           clipboard = "unnamedplus"; # Use system clipboard
           fillchars = {
@@ -98,8 +97,26 @@ in
           # Better diagnostics list
           trouble.enable = true;
 
-          nvim-tree.enable = true;
+          # Tab-like buffer bar
+          bufferline = {
+            enable = true;
+            settings = {
+              options = {
+                separator_style = "thick";
+                diagnostics = "nvim_lsp";
+                offsets = [
+                  {
+                    filetype = "NvimTree";
+                    text = "File Explorer";
+                    highlight = "Directory";
+                    text_align = "left";
+                  }
+                ];
+              };
+            };
+          };
 
+          nvim-tree.enable = true;
           fugitive.enable = true;
 
           # Which-key shows available keybindings
@@ -111,6 +128,9 @@ in
           lualine = {
             enable = true;
             settings = {
+              options = {
+                theme = "auto";
+              };
               extensions = [ "nvim-tree" ];
             };
           };
@@ -333,6 +353,52 @@ in
             key = "<leader>xx";
             action = "<cmd>Trouble diagnostics toggle<cr>";
             options.desc = "Toggle Trouble (Diagnostics)";
+          }
+
+          # --- Window Navigation ---
+          {
+            key = "<C-h>";
+            action = "<C-w>h";
+            options.desc = "Move to left window";
+          }
+          {
+            key = "<C-j>";
+            action = "<C-w>j";
+            options.desc = "Move to lower window";
+          }
+          {
+            key = "<C-k>";
+            action = "<C-w>k";
+            options.desc = "Move to upper window";
+          }
+          {
+            key = "<C-l>";
+            action = "<C-w>l";
+            options.desc = "Move to right window";
+          }
+
+          # --- Buffer Navigation (Bufferline) ---
+          {
+            key = "<S-h>";
+            action = "<cmd>BufferLineCyclePrev<cr>";
+            options.desc = "Previous Buffer";
+          }
+          {
+            key = "<S-l>";
+            action = "<cmd>BufferLineCycleNext<cr>";
+            options.desc = "Next Buffer";
+          }
+          {
+            key = "<leader>bd";
+            action = "<cmd>bdelete<cr>";
+            options.desc = "Delete current Buffer";
+          }
+
+          # --- Utilities ---
+          {
+            key = "<leader>h";
+            action = "<cmd>nohlsearch<cr>";
+            options.desc = "Clear search highlights";
           }
         ];
 
