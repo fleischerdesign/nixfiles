@@ -52,8 +52,13 @@ in
       font-family = "JetBrainsMono Nerd Font";
       font-size = 10;
       keybind = [
-        "ctrl+h=goto_split:left"
-        "ctrl+l=goto_split:right"
+        "alt+h=goto_split:left"
+        "alt+l=goto_split:right"
+        "alt+k=goto_split:top"
+        "alt+j=goto_split:bottom"
+        "ctrl+shift+h=previous_tab"
+        "ctrl+shift+l=next_tab"
+        "ctrl+shift+t=new_tab"
       ];
     };
   };

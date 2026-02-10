@@ -393,6 +393,11 @@ in
             action = "<cmd>bdelete<cr>";
             options.desc = "Delete current Buffer";
           }
+          {
+            key = "<leader>bn";
+            action = "<cmd>enew<cr>";
+            options.desc = "New empty Buffer";
+          }
 
           # --- Utilities ---
           {
