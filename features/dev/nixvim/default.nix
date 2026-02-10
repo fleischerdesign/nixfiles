@@ -31,6 +31,14 @@ in
             bg = "NONE";
             ctermbg = "NONE";
           };
+
+          # Make indentation lines very subtle (dark grey)
+          IblIndent = {
+            fg = "#444444";
+          };
+          IblWhitespace = {
+            fg = "#444444";
+          };
         };
 
         opts = {
@@ -39,13 +47,57 @@ in
           relativenumber = true;
           shiftwidth = 2;
           cmdheight = 0;
+          signcolumn = "yes"; # Always show the signcolumn to prevent jumping
+          clipboard = "unnamedplus"; # Use system clipboard
           fillchars = {
             eob = " ";
           };
         };
 
+        # Extra packages like clipboard providers
+        extraPackages = with pkgs; [
+          wl-clipboard
+        ];
+
         # Nixvim plugins
         plugins = {
+          # Git signs (Visual Git integration)
+          gitsigns.enable = true;
+
+          # Easy commenting
+          comment.enable = true;
+
+          # Auto-closing brackets
+          nvim-autopairs.enable = true;
+
+          # Indentation guides
+          indent-blankline = {
+            enable = true;
+            settings = {
+              indent = {
+                char = "┊"; # Thinner, dotted character for a subtle look
+              };
+            };
+          };
+
+          # Icons in autocomplete
+          lspkind = {
+            enable = true;
+            settings.cmp = {
+              enable = true;
+              menu = {
+                nvim_lsp = "[LSP]";
+                nvim_lua = "[api]";
+                path = "[path]";
+                luasnip = "[snip]";
+                buffer = "[buf]";
+              };
+            };
+          };
+
+          # Better diagnostics list
+          trouble.enable = true;
+
           nvim-tree.enable = true;
 
           fugitive.enable = true;
@@ -276,6 +328,22 @@ in
           {
             key = "_";
             action = "?";
+          }
+          {
+            key = "<leader>xx";
+            action = "<cmd>Trouble diagnostics toggle<cr>";
+            options.desc = "Toggle Trouble (Diagnostics)";
+          }
+        ];
+
+        # Format on Save
+        autoCmd = [
+          {
+            event = "BufWritePre";
+            pattern = "*";
+            callback = {
+              __raw = "function() vim.lsp.buf.format() end";
+            };
           }
         ];
       };
