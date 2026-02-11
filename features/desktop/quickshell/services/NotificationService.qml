@@ -61,7 +61,21 @@ Singleton {
     // === PUBLIC METHODS (for existing notifications) ===
     
     function dismiss(notification) {
-        console.log("[NotificationService] Dismiss:", notification.summary);
+        if (!notification) {
+            console.warn("[NotificationService] Dismiss called with null notification. Cleaning up ghost entries.");
+            for (let i = popupsModel.count - 1; i >= 0; i--) {
+                if (!popupsModel.get(i).notification) {
+                    popupsModel.remove(i);
+                }
+            }
+            return;
+        }
+
+        try {
+            console.log("[NotificationService] Dismiss:", notification.summary);
+        } catch (e) {
+            console.warn("[NotificationService] Dismiss: Could not read summary (object might be invalid).");
+        }
         
         for (let i = 0; i < popupsModel.count; i++) {
             const item = popupsModel.get(i);
@@ -115,6 +129,11 @@ Singleton {
     // === PRIVATE METHODS ===
     
     function handleNotification(notification) {
+        if (!notification) {
+            console.warn("[NotificationService] Received null notification, ignoring.");
+            return;
+        }
+
         console.log("[NotificationService] Received:", notification.summary);
         
         // Markiere als tracked für NotificationCenter
