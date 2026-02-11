@@ -21,6 +21,7 @@
   # Features
   my.features.media.gaming.enable = true;
   my.features.media.spotify.enable = true;
+  my.features.system.networking.tailscale.enable = true;
 
   my.features.dev.containers.enable = true;
   my.features.dev.containers.users = [ "philipp" ];
