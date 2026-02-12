@@ -32,6 +32,9 @@ in
           "mta.*"
           "queue.strategy.*"
           "queue.route.*"
+          "tracer.*"
+          "tracing.*"
+          "metrics.*"
         ];
 
         certificate."default" = {
@@ -69,12 +72,41 @@ in
           urls = [ "redis://127.0.0.1:6379" ];
         };
 
+        # 3. RocksDB Store for Telemetry
+        store."rocksdb" = {
+          type = "rocksdb";
+          path = "/var/lib/stalwart-mail/rocksdb";
+        };
+
         # Storage Assignments
         storage.data = "db";
         storage.lookup = "db";
         storage.fts = "db";
         storage.blob = "db";
         storage.directory = "authentik"; 
+        storage.tracer = "rocksdb";
+        storage.history = "rocksdb";
+
+        # Telemetry Configuration
+        tracing.history = {
+          enable = true;
+          store = "rocksdb";
+          retention = "7d";
+        };
+
+        metrics.history = {
+          enable = true;
+          store = "rocksdb";
+          retention = "30d";
+        };
+
+        tracer.log = {
+          type = "log";
+          level = "info";
+          path = "/var/lib/stalwart-mail/logs";
+          prefix = "stalwart.log";
+          enable = true;
+        };
 
         # Routing Strategy
         queue.strategy.route = [
@@ -195,7 +227,11 @@ in
       "mail" = { port = 9081; fullDomain = "mail.ancoris.ovh"; };
     };
 
-    systemd.tmpfiles.rules = [ "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -" ];
+    systemd.tmpfiles.rules = [
+      "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
+      "d /var/lib/stalwart-mail/rocksdb 0750 stalwart-mail stalwart-mail -"
+      "d /var/lib/stalwart-mail/logs 0750 stalwart-mail stalwart-mail -"
+    ];
 
     sops.secrets.brevo_smtp_user = { owner = "stalwart-mail"; };
     sops.secrets.brevo_smtp_key = { owner = "stalwart-mail"; };
