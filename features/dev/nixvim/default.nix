@@ -198,8 +198,9 @@ in
                 { name = "path"; }
               ];
               mapping = {
-                # Bestätige einen Vorschlag mit Enter
-                "<CR>" = "cmp.mapping.confirm({ select = true })";
+                # Bestätige einen Vorschlag mit Enter, aber nur wenn er explizit ausgewählt wurde.
+                # Das verhindert, dass Enter eine neue Zeile blockiert, wenn das Menü nur offen ist.
+                "<CR>" = "cmp.mapping.confirm({ select = false })";
                 # Navigiere mit Tab und Shift-Tab durch die Vorschläge
                 "<Tab>" = "cmp.mapping.select_next_item()";
                 "<S-Tab>" = "cmp.mapping.select_prev_item()";
