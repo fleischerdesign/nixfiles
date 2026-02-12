@@ -36,6 +36,7 @@ in
       delfin
       inkscape
       evince
+      libreoffice-fresh
       nautilus
       gnome-disk-utility
       bluetuith
