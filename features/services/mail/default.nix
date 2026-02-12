@@ -100,6 +100,10 @@ in
           retention = "30d";
         };
 
+        metrics.prometheus = {
+          enable = true;
+        };
+
         tracer.log = {
           type = "log";
           level = "info";
