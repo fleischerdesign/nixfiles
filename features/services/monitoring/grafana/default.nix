@@ -74,13 +74,6 @@ in
               group_by = [ "alertname" ];
             }
           ];
-          # Alle alten UIDs löschen
-          rules.settings.deleteRules = [
-            { orgId = 1; uid = "infra-host-down-v2"; }
-            { orgId = 1; uid = "infra-disk-space-v2"; }
-            { orgId = 1; uid = "infra-high-ram-v1"; }
-            { orgId = 1; uid = "infra-systemd-failed-v1"; }
-          ];
           rules.settings.groups = [
             {
               name = "Infrastructure";
@@ -97,7 +90,10 @@ in
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
-                      model = { expr = "up{job=\"node-exporter\"}"; };
+                      model = { 
+                        # Capture both node_mackaye and node_strummer
+                        expr = "up{job=~\"node_.*\"}"; 
+                      };
                     }
                     {
                       refId = "B";
