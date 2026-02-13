@@ -57,12 +57,12 @@ in
                   type = "webhook";
                   settings = {
                     url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
-                    # CamelCase passend zu httpMethod
+                    # Mix aus CamelCase (für Method) und snake_case (für Auth)
                     httpMethod = "POST";
-                    authorizationScheme = "Bearer";
+                    authorization_scheme = "Bearer";
                   };
                   secureSettings = {
-                    authorizationCredentials = "$NTFY_TOKEN";
+                    authorization_credentials = "$NTFY_TOKEN";
                   };
                 }
               ];
