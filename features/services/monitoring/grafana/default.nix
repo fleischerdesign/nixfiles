@@ -74,6 +74,13 @@ in
               group_by = [ "alertname" ];
             }
           ];
+          # Alle alten UIDs löschen
+          rules.settings.deleteRules = [
+            { orgId = 1; uid = "infra-host-down-v2"; }
+            { orgId = 1; uid = "infra-disk-space-v2"; }
+            { orgId = 1; uid = "infra-high-ram-v1"; }
+            { orgId = 1; uid = "infra-systemd-failed-v1"; }
+          ];
           rules.settings.groups = [
             {
               name = "Infrastructure";
@@ -83,7 +90,7 @@ in
                 {
                   uid = "infra-host-down-v3";
                   title = "Host Down";
-                  condition = "C"; # Now Block C is the condition
+                  condition = "C";
                   for = "2m";
                   data = [
                     {
