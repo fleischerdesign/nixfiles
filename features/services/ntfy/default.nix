@@ -13,7 +13,7 @@ in
       enable = true;
       settings = {
         base-url = "https://ntfy.${config.my.features.services.caddy.baseDomain}";
-        listen-http = "127.0.0.1:8082";
+        listen-http = "127.0.0.1:8083";
         auth-file = "/var/lib/ntfy-sh/auth.db";
         auth-default-access = "deny-all";
         behind-proxy = true;
@@ -31,7 +31,7 @@ in
 
     # Expose via Caddy (ohne Authentik, ntfy macht eigenes Auth)
     my.features.services.caddy.exposedServices.ntfy = {
-      port = 8082;
+      port = 8083;
       auth = false; 
     };
 
