@@ -75,6 +75,7 @@ in
             {
               name = "Infrastructure";
               folder = "System";
+              interval = "60s"; # Required field fixed
               rules = [
                 {
                   uid = "host-down";
