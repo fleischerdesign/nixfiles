@@ -14,7 +14,7 @@ in
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
     sops.secrets.grafana_ntfy_token = { }; # Definition from ntfy/default.nix
 
-    # Template for Grafana environment variables
+    # Template für Grafana Umgebungsvariablen
     sops.templates."grafana.env".content = ''
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
@@ -75,7 +75,7 @@ in
             {
               name = "Infrastructure";
               folder = "System";
-              interval = "60s"; # Required field fixed
+              interval = "60s";
               rules = [
                 {
                   uid = "host-down";
@@ -85,7 +85,8 @@ in
                   data = [
                     {
                       refId = "A";
-                      datasourceUid = "prometheus-uid";
+                      # Use __default__ to avoid startup race conditions
+                      datasourceUid = "__default__";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = {
                         expr = "up == 0";
@@ -107,7 +108,7 @@ in
                   data = [
                     {
                       refId = "A";
-                      datasourceUid = "prometheus-uid";
+                      datasourceUid = "__default__";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = {
                         expr = "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100 < 10";
@@ -129,14 +130,12 @@ in
         datasources.settings.datasources = [
           {
             name = "Prometheus";
-            uid = "prometheus-uid";
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;
           }
           {
             name = "Loki";
-            uid = "loki-uid";
             type = "loki";
             url = "http://localhost:3100";
           }
