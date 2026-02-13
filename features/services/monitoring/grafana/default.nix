@@ -14,10 +14,11 @@ in
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
     sops.secrets.grafana_ntfy_token = { }; # Definition kommt aus ntfy/default.nix
 
-    # Template für Grafana Umgebungsvariablen (für OIDC)
+    # Template für Grafana Umgebungsvariablen
     sops.templates."grafana.env".content = ''
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
+      NTFY_TOKEN=${config.sops.placeholder.grafana_ntfy_token}
     '';
 
     services.grafana = {
@@ -57,8 +58,8 @@ in
                   settings = {
                     url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
                     httpMethod = "POST";
-                    # Laut Export liegen Credentials beim Webhook in den normalen settings
-                    authorization_credentials = config.sops.placeholder.grafana_ntfy_token;
+                    # Laut manuellem Export gehören Credentials in 'settings' (nicht secure_settings)
+                    authorization_credentials = "$NTFY_TOKEN";
                   };
                 }
               ];
