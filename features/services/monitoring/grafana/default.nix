@@ -32,7 +32,7 @@ in
         };
 
         log = {
-          level = "info"; # Back to info
+          level = "info";
         };
         
         # OIDC Authentication with Authentik
@@ -113,7 +113,8 @@ in
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = {
-                        expr = "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100 < 10";
+                        # Monitoren all real filesystems, excluding tempfs
+                        expr = "(node_filesystem_avail_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} * 100) < 10";
                         hide = false;
                         intervalMs = 1000;
                         maxDataPoints = 43200;
@@ -121,7 +122,51 @@ in
                     }
                   ];
                   annotations = {
-                    summary = "Instance {{ $labels.instance }} has less than 10% free space on /.";
+                    summary = "Instance {{ $labels.instance }} device {{ $labels.device }} mounted on {{ $labels.mountpoint }} has less than 10% free space.";
+                  };
+                }
+                {
+                  uid = "infra-high-ram-v1";
+                  title = "High Memory Usage";
+                  condition = "A";
+                  for = "5m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = { from = 600; to = 0; };
+                      model = {
+                        expr = "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100) > 95";
+                        hide = false;
+                        intervalMs = 1000;
+                        maxDataPoints = 43200;
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Instance {{ $labels.instance }} has more than 95% RAM usage.";
+                  };
+                }
+                {
+                  uid = "infra-systemd-failed-v1";
+                  title = "Systemd Service Failed";
+                  condition = "A";
+                  for = "1m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = { from = 600; to = 0; };
+                      model = {
+                        expr = "node_systemd_unit_state{state=\"failed\"} == 1";
+                        hide = false;
+                        intervalMs = 1000;
+                        maxDataPoints = 43200;
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Systemd service {{ $labels.name }} on {{ $labels.instance }} is in failed state.";
                   };
                 }
               ];
