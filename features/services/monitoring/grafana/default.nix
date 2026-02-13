@@ -14,7 +14,7 @@ in
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
     sops.secrets.grafana_ntfy_token = { }; # Definition from ntfy/default.nix
 
-    # Template for Grafana environment variables
+    # Template für Grafana Umgebungsvariablen
     sops.templates."grafana.env".content = ''
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
@@ -70,20 +70,17 @@ in
               group_by = [ "alertname" ];
             }
           ];
-          # Rules removed temporarily to fix startup crash
         };
 
         datasources.settings.datasources = [
           {
             name = "Prometheus";
-            uid = "prometheus"; 
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;
           }
           {
             name = "Loki";
-            uid = "loki";
             type = "loki";
             url = "http://localhost:3100";
           }
