@@ -32,7 +32,7 @@ in
         };
 
         log = {
-          level = "debug";
+          level = "info"; # Back to info
         };
         
         # OIDC Authentication with Authentik
@@ -74,24 +74,72 @@ in
               group_by = [ "alertname" ];
             }
           ];
-          # Alte, kaputte Regeln löschen
-          rules.settings.deleteRules = [
-            { orgId = 1; uid = "host-down"; }
-            { orgId = 1; uid = "disk-space-low"; }
-            { orgId = 1; uid = "infra-host-down-v1"; }
-            { orgId = 1; uid = "infra-disk-space-v1"; }
+          rules.settings.groups = [
+            {
+              name = "Infrastructure";
+              folder = "System";
+              interval = "60s";
+              rules = [
+                {
+                  uid = "infra-host-down-v2";
+                  title = "Host Down";
+                  condition = "A";
+                  for = "2m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = { from = 600; to = 0; };
+                      model = {
+                        expr = "up == 0";
+                        hide = false;
+                        intervalMs = 1000;
+                        maxDataPoints = 43200;
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Instance {{ $labels.instance }} has been down for more than 2 minutes.";
+                  };
+                }
+                {
+                  uid = "infra-disk-space-v2";
+                  title = "Disk Space Low";
+                  condition = "A";
+                  for = "5m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = { from = 600; to = 0; };
+                      model = {
+                        expr = "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100 < 10";
+                        hide = false;
+                        intervalMs = 1000;
+                        maxDataPoints = 43200;
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Instance {{ $labels.instance }} has less than 10% free space on /.";
+                  };
+                }
+              ];
+            }
           ];
         };
 
         datasources.settings.datasources = [
           {
             name = "Prometheus";
+            uid = "PBFA97CFB590B2093"; 
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;
           }
           {
             name = "Loki";
+            uid = "P8E80F9AEF21F6940";
             type = "loki";
             url = "http://localhost:3100";
           }
