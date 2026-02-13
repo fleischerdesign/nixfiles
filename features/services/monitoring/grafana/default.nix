@@ -74,12 +74,18 @@ in
               group_by = [ "alertname" ];
             }
           ];
+          # Alte, kaputte Regeln löschen
+          rules.settings.deleteRules = [
+            { orgId = 1; uid = "host-down"; }
+            { orgId = 1; uid = "disk-space-low"; }
+            { orgId = 1; uid = "infra-host-down-v1"; }
+            { orgId = 1; uid = "infra-disk-space-v1"; }
+          ];
         };
 
         datasources.settings.datasources = [
           {
             name = "Prometheus";
-            # UID removed as a workaround for Grafana 12.x provisioning bug
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;
