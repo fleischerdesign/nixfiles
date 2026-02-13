@@ -12,9 +12,9 @@ in
     # SOPS Secrets for OIDC and ntfy
     sops.secrets.grafana_oidc_client_secret = { owner = "grafana"; };
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
-    sops.secrets.grafana_ntfy_token = { }; # Definition kommt aus ntfy/default.nix
+    sops.secrets.grafana_ntfy_token = { }; # Definition from ntfy/default.nix
 
-    # Template für Grafana Umgebungsvariablen
+    # Template for Grafana environment variables
     sops.templates."grafana.env".content = ''
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
@@ -58,7 +58,6 @@ in
                   settings = {
                     url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
                     httpMethod = "POST";
-                    # Laut manuellem Export gehören Credentials in 'settings' (nicht secure_settings)
                     authorization_credentials = "$NTFY_TOKEN";
                   };
                 }
@@ -71,17 +70,72 @@ in
               group_by = [ "alertname" ];
             }
           ];
+          # Declarative Alert Rules
+          rules.settings.groups = [
+            {
+              name = "Infrastructure";
+              folder = "System";
+              rules = [
+                {
+                  uid = "host-down";
+                  title = "Host Down";
+                  condition = "A";
+                  for = "2m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "prometheus-uid";
+                      relativeTimeRange = { from = 600; to = 0; };
+                      model = {
+                        expr = "up == 0";
+                        hide = false;
+                        intervalMs = 1000;
+                        maxDataPoints = 43200;
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Instance {{ $labels.instance }} has been down for more than 2 minutes.";
+                  };
+                }
+                {
+                  uid = "disk-space-low";
+                  title = "Disk Space Low";
+                  condition = "A";
+                  for = "5m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "prometheus-uid";
+                      relativeTimeRange = { from = 600; to = 0; };
+                      model = {
+                        expr = "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100 < 10";
+                        hide = false;
+                        intervalMs = 1000;
+                        maxDataPoints = 43200;
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Instance {{ $labels.instance }} has less than 10% free space on /.";
+                  };
+                }
+              ];
+            }
+          ];
         };
 
         datasources.settings.datasources = [
           {
             name = "Prometheus";
+            uid = "prometheus-uid";
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;
           }
           {
             name = "Loki";
+            uid = "loki-uid";
             type = "loki";
             url = "http://localhost:3100";
           }
