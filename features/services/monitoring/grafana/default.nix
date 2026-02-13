@@ -14,7 +14,7 @@ in
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
     sops.secrets.grafana_ntfy_token = { }; # Definition from ntfy/default.nix
 
-    # Template für Grafana Umgebungsvariablen
+    # Template for Grafana environment variables
     sops.templates."grafana.env".content = ''
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
@@ -85,14 +85,14 @@ in
                   data = [
                     {
                       refId = "A";
-                      # Use __default__ to avoid startup race conditions
-                      datasourceUid = "__default__";
+                      # Must match the UID defined in datasources below
+                      datasourceUid = "prometheus";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = {
                         expr = "up == 0";
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
+                        refId = "A";
+                        # Explicit datasource info in model
+                        datasource = { type = "prometheus"; uid = "prometheus"; };
                       };
                     }
                   ];
@@ -108,13 +108,12 @@ in
                   data = [
                     {
                       refId = "A";
-                      datasourceUid = "__default__";
+                      datasourceUid = "prometheus";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = {
                         expr = "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100 < 10";
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
+                        refId = "A";
+                        datasource = { type = "prometheus"; uid = "prometheus"; };
                       };
                     }
                   ];
@@ -130,12 +129,14 @@ in
         datasources.settings.datasources = [
           {
             name = "Prometheus";
+            uid = "prometheus"; # Static UID for alert rules
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;
           }
           {
             name = "Loki";
+            uid = "loki";
             type = "loki";
             url = "http://localhost:3100";
           }
