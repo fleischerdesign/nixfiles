@@ -9,14 +9,16 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # SOPS Secrets for OIDC
+    # SOPS Secrets for OIDC and ntfy
     sops.secrets.grafana_oidc_client_secret = { owner = "grafana"; };
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
+    sops.secrets.grafana_ntfy_token = { owner = "grafana"; };
 
     # Template to provide secrets as environment variables
     sops.templates."grafana.env".content = ''
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
+      NTFY_TOKEN=${config.sops.placeholder.grafana_ntfy_token}
     '';
 
     services.grafana = {
@@ -46,6 +48,35 @@ in
       };
 
       provision = {
+        # Declarative Alerting
+        alerting = {
+          contactPoints.settings.contactPoints = [
+            {
+              name = "ntfy";
+              receivers = [
+                {
+                  uid = "ntfy-alerts";
+                  type = "webhook";
+                  settings = {
+                    url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
+                    httpMethod = "POST";
+                  };
+                  secureSettings = {
+                    authorization_header = "Bearer $__ENV{NTFY_TOKEN}";
+                  };
+                }
+              ];
+            }
+          ];
+          # Optional: Set ntfy as default
+          policies.settings.policies = [
+            {
+              receiver = "ntfy";
+              group_by = [ "alertname" ];
+            }
+          ];
+        };
+
         datasources.settings.datasources = [
           {
             name = "Prometheus";

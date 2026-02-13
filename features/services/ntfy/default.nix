@@ -9,6 +9,16 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Secret für den Token (wird von Grafana mitgenutzt)
+    sops.secrets.grafana_ntfy_token = { owner = "ntfy-sh"; };
+    sops.secrets.ntfy_users = { owner = "ntfy-sh"; };
+
+    # Template für ntfy env, um Token deklarativ einzubauen
+    sops.templates."ntfy.env".content = ''
+      NTFY_AUTH_USERS="${config.sops.placeholder.ntfy_users}"
+      NTFY_AUTH_TOKENS="philipp:${config.sops.placeholder.grafana_ntfy_token}:Grafana"
+    '';
+
     services.ntfy-sh = {
       enable = true;
       settings = {
@@ -19,27 +29,18 @@ in
         behind-proxy = true;
         enable-login = true;
         require-login = true;
-        # Erlaubt das Hochladen von Anhängen (optional, aber nützlich für Alerts mit Bildern)
         attachment-cache-dir = "/var/lib/ntfy-sh/attachments";
       };
-      # Hier kommen NTFY_AUTH_USERS etc. rein
-      environmentFile = config.sops.secrets.ntfy_env.path;
+      environmentFile = config.sops.templates."ntfy.env".path;
     };
 
-    # Verzeichnis für Anhänge sicherstellen
     systemd.tmpfiles.rules = [
       "d /var/lib/ntfy-sh/attachments 0700 ntfy-sh ntfy-sh -"
     ];
 
-    # Expose via Caddy (ohne Authentik, ntfy macht eigenes Auth)
     my.features.services.caddy.exposedServices.ntfy = {
       port = 8083;
       auth = false; 
-    };
-
-    # Sops Secret definieren
-    sops.secrets.ntfy_env = {
-      owner = "ntfy-sh";
     };
   };
 }
