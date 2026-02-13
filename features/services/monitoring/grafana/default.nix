@@ -12,7 +12,7 @@ in
     # SOPS Secrets for OIDC and ntfy
     sops.secrets.grafana_oidc_client_secret = { owner = "grafana"; };
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
-    sops.secrets.grafana_ntfy_token = { owner = "grafana"; };
+    sops.secrets.grafana_ntfy_token = { }; # Definition kommt aus ntfy/default.nix
 
     # Template to provide secrets as environment variables
     sops.templates."grafana.env".content = ''

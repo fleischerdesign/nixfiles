@@ -10,7 +10,11 @@ in
 
   config = lib.mkIf cfg.enable {
     # Secret für den Token (wird von Grafana mitgenutzt)
-    sops.secrets.grafana_ntfy_token = { owner = "ntfy-sh"; };
+    sops.secrets.grafana_ntfy_token = { 
+      owner = "ntfy-sh";
+      group = "grafana";
+      mode = "0440"; # Nur Besitzer und Gruppe dürfen lesen
+    };
     sops.secrets.ntfy_users = { owner = "ntfy-sh"; };
 
     # Template für ntfy env, um Token deklarativ einzubauen
