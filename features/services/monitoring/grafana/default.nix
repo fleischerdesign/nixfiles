@@ -57,10 +57,13 @@ in
                   type = "webhook";
                   settings = {
                     url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
-                    httpMethod = "POST";
-                    # Wir nutzen generische Header, da $__ENV in secureSettings oft nicht aufgelöst wird
-                    httpHeaderName1 = "Authorization";
-                    httpHeaderValue1 = "Bearer $__ENV{NTFY_TOKEN}";
+                    http_method = "POST";
+                    authorization_scheme = "Bearer";
+                  };
+                  secureSettings = {
+                    # WICHTIG: Im UI wird dieses Feld IMMER leer angezeigt, da es verschlüsselt ist.
+                    # Die Syntax $VAR wird laut Grafana-Doku bevorzugt.
+                    authorization_credentials = "$NTFY_TOKEN";
                   };
                 }
               ];
