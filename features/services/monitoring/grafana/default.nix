@@ -79,26 +79,25 @@ in
               name = "Infrastructure";
               folder = "System";
               interval = "60s";
-              rules = [
-                {
-                  uid = "infra-host-down-v2";
-                  title = "Host Down";
-                  condition = "A";
-                  for = "2m";
-                  data = [
-                    {
-                      refId = "A";
-                      datasourceUid = "PBFA97CFB590B2093";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = {
-                        expr = "up == 0";
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
-                      };
-                    }
-                  ];
-                  annotations = {
+                                rules = [
+                              {
+                                uid = "infra-host-down-v2";
+                                title = "Host Down";
+                                condition = "A";
+                                for = "2m";
+                                data = [
+                                  {
+                                    refId = "A";
+                                    datasourceUid = "PBFA97CFB590B2093";
+                                    relativeTimeRange = { from = 600; to = 0; };
+                                    model = {
+                                      expr = "up{job=\"node-exporter\"} == 0";
+                                      hide = false;
+                                      intervalMs = 1000;
+                                      maxDataPoints = 43200;
+                                    };
+                                  }
+                                ];                  annotations = {
                     summary = "Instance {{ $labels.instance }} has been down for more than 2 minutes.";
                   };
                 }
