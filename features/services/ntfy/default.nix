@@ -12,7 +12,7 @@ in
     services.ntfy-sh = {
       enable = true;
       settings = {
-        base-url = "https://ntfy.\${config.my.features.services.caddy.baseDomain}";
+        base-url = "https://ntfy.${config.my.features.services.caddy.baseDomain}";
         listen-http = "127.0.0.1:8082";
         auth-file = "/var/lib/ntfy-sh/auth.db";
         auth-default-access = "deny-all";
