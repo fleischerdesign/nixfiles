@@ -81,30 +81,26 @@ in
               interval = "60s";
               rules = [
                 {
-                  uid = "infra-host-down-v2";
+                  uid = "infra-host-down-v3";
                   title = "Host Down";
-                  condition = "B"; # Condition is now the expression block
+                  condition = "C"; # Now Block C is the condition
                   for = "2m";
                   data = [
                     {
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
-                      model = {
-                        expr = "up{job=\"node-exporter\"}"; # Just fetch the data
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
-                      };
+                      model = { expr = "up{job=\"node-exporter\"}"; };
                     }
                     {
                       refId = "B";
-                      datasourceUid = "-100"; # UID for __expr__
-                      model = {
-                        # Check if any value in A is 0
-                        expression = "$A == 0";
-                        type = "math";
-                      };
+                      datasourceUid = "-100";
+                      model = { expression = "A"; type = "reduce"; reducer = "last"; };
+                    }
+                    {
+                      refId = "C";
+                      datasourceUid = "-100";
+                      model = { expression = "$B == 0"; type = "math"; };
                     }
                   ];
                   annotations = {
@@ -112,29 +108,28 @@ in
                   };
                 }
                 {
-                  uid = "infra-disk-space-v2";
+                  uid = "infra-disk-space-v3";
                   title = "Disk Space Low";
-                  condition = "B";
+                  condition = "C";
                   for = "5m";
                   data = [
                     {
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
-                      model = {
+                      model = { 
                         expr = "(node_filesystem_avail_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} * 100)";
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
                       };
                     }
                     {
                       refId = "B";
                       datasourceUid = "-100";
-                      model = {
-                        expression = "$A < 10";
-                        type = "math";
-                      };
+                      model = { expression = "A"; type = "reduce"; reducer = "last"; };
+                    }
+                    {
+                      refId = "C";
+                      datasourceUid = "-100";
+                      model = { expression = "$B < 10"; type = "math"; };
                     }
                   ];
                   annotations = {
@@ -142,29 +137,26 @@ in
                   };
                 }
                 {
-                  uid = "infra-high-ram-v1";
+                  uid = "infra-high-ram-v2";
                   title = "High Memory Usage";
-                  condition = "B";
+                  condition = "C";
                   for = "5m";
                   data = [
                     {
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
-                      model = {
-                        expr = "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100)";
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
-                      };
+                      model = { expr = "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100)"; };
                     }
                     {
                       refId = "B";
                       datasourceUid = "-100";
-                      model = {
-                        expression = "$A > 95";
-                        type = "math";
-                      };
+                      model = { expression = "A"; type = "reduce"; reducer = "last"; };
+                    }
+                    {
+                      refId = "C";
+                      datasourceUid = "-100";
+                      model = { expression = "$B > 95"; type = "math"; };
                     }
                   ];
                   annotations = {
@@ -172,29 +164,26 @@ in
                   };
                 }
                 {
-                  uid = "infra-systemd-failed-v1";
+                  uid = "infra-systemd-failed-v2";
                   title = "Systemd Service Failed";
-                  condition = "B";
+                  condition = "C";
                   for = "1m";
                   data = [
                     {
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
-                      model = {
-                        expr = "node_systemd_unit_state{state=\"failed\"}";
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
-                      };
+                      model = { expr = "node_systemd_unit_state{state=\"failed\"}"; };
                     }
                     {
                       refId = "B";
                       datasourceUid = "-100";
-                      model = {
-                        expression = "$A == 1";
-                        type = "math";
-                      };
+                      model = { expression = "A"; type = "reduce"; reducer = "last"; };
+                    }
+                    {
+                      refId = "C";
+                      datasourceUid = "-100";
+                      model = { expression = "$B == 1"; type = "math"; };
                     }
                   ];
                   annotations = {
