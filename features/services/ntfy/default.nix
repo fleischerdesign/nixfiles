@@ -33,7 +33,7 @@ in
         behind-proxy = true;
         enable-login = true;
         require-login = true;
-        log-level = "trace";
+        log-level = "info";
         attachment-cache-dir = "/var/lib/ntfy-sh/attachments";
       };
       environmentFile = config.sops.templates."ntfy.env".path;
