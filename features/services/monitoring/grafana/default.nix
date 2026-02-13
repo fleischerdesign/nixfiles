@@ -70,66 +70,13 @@ in
               group_by = [ "alertname" ];
             }
           ];
-          # Declarative Alert Rules
-          rules.settings.groups = [
-            {
-              name = "Infrastructure";
-              folder = "System";
-              interval = "60s";
-              rules = [
-                {
-                  uid = "host-down";
-                  title = "Host Down";
-                  condition = "A";
-                  for = "2m";
-                  data = [
-                    {
-                      refId = "A";
-                      # Must match the UID defined in datasources below
-                      datasourceUid = "prometheus";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = {
-                        expr = "up == 0";
-                        refId = "A";
-                        # Explicit datasource info in model
-                        datasource = { type = "prometheus"; uid = "prometheus"; };
-                      };
-                    }
-                  ];
-                  annotations = {
-                    summary = "Instance {{ $labels.instance }} has been down for more than 2 minutes.";
-                  };
-                }
-                {
-                  uid = "disk-space-low";
-                  title = "Disk Space Low";
-                  condition = "A";
-                  for = "5m";
-                  data = [
-                    {
-                      refId = "A";
-                      datasourceUid = "prometheus";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = {
-                        expr = "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100 < 10";
-                        refId = "A";
-                        datasource = { type = "prometheus"; uid = "prometheus"; };
-                      };
-                    }
-                  ];
-                  annotations = {
-                    summary = "Instance {{ $labels.instance }} has less than 10% free space on /.";
-                  };
-                }
-              ];
-            }
-          ];
+          # Rules removed temporarily to fix startup crash
         };
 
         datasources.settings.datasources = [
           {
             name = "Prometheus";
-            uid = "prometheus"; # Static UID for alert rules
+            uid = "prometheus"; 
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;
