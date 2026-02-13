@@ -79,32 +79,42 @@ in
               name = "Infrastructure";
               folder = "System";
               interval = "60s";
-                                rules = [
-                              {
-                                uid = "infra-host-down-v2";
-                                title = "Host Down";
-                                condition = "A";
-                                for = "2m";
-                                data = [
-                                  {
-                                    refId = "A";
-                                    datasourceUid = "PBFA97CFB590B2093";
-                                    relativeTimeRange = { from = 600; to = 0; };
-                                    model = {
-                                      expr = "up{job=\"node-exporter\"} == 0";
-                                      hide = false;
-                                      intervalMs = 1000;
-                                      maxDataPoints = 43200;
-                                    };
-                                  }
-                                ];                  annotations = {
+              rules = [
+                {
+                  uid = "infra-host-down-v2";
+                  title = "Host Down";
+                  condition = "B"; # Condition is now the expression block
+                  for = "2m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = { from = 600; to = 0; };
+                      model = {
+                        expr = "up{job=\"node-exporter\"}"; # Just fetch the data
+                        hide = false;
+                        intervalMs = 1000;
+                        maxDataPoints = 43200;
+                      };
+                    }
+                    {
+                      refId = "B";
+                      datasourceUid = "-100"; # UID for __expr__
+                      model = {
+                        # Check if any value in A is 0
+                        expression = "$A == 0";
+                        type = "math";
+                      };
+                    }
+                  ];
+                  annotations = {
                     summary = "Instance {{ $labels.instance }} has been down for more than 2 minutes.";
                   };
                 }
                 {
                   uid = "infra-disk-space-v2";
                   title = "Disk Space Low";
-                  condition = "A";
+                  condition = "B";
                   for = "5m";
                   data = [
                     {
@@ -112,11 +122,18 @@ in
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = {
-                        # Monitoren all real filesystems, excluding tempfs
-                        expr = "(node_filesystem_avail_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} * 100) < 10";
+                        expr = "(node_filesystem_avail_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} * 100)";
                         hide = false;
                         intervalMs = 1000;
                         maxDataPoints = 43200;
+                      };
+                    }
+                    {
+                      refId = "B";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "$A < 10";
+                        type = "math";
                       };
                     }
                   ];
@@ -127,7 +144,7 @@ in
                 {
                   uid = "infra-high-ram-v1";
                   title = "High Memory Usage";
-                  condition = "A";
+                  condition = "B";
                   for = "5m";
                   data = [
                     {
@@ -135,10 +152,18 @@ in
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = {
-                        expr = "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100) > 95";
+                        expr = "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100)";
                         hide = false;
                         intervalMs = 1000;
                         maxDataPoints = 43200;
+                      };
+                    }
+                    {
+                      refId = "B";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "$A > 95";
+                        type = "math";
                       };
                     }
                   ];
@@ -149,7 +174,7 @@ in
                 {
                   uid = "infra-systemd-failed-v1";
                   title = "Systemd Service Failed";
-                  condition = "A";
+                  condition = "B";
                   for = "1m";
                   data = [
                     {
@@ -157,10 +182,18 @@ in
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = {
-                        expr = "node_systemd_unit_state{state=\"failed\"} == 1";
+                        expr = "node_systemd_unit_state{state=\"failed\"}";
                         hide = false;
                         intervalMs = 1000;
                         maxDataPoints = 43200;
+                      };
+                    }
+                    {
+                      refId = "B";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "$A == 1";
+                        type = "math";
                       };
                     }
                   ];
