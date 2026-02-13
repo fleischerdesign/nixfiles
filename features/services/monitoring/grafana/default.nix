@@ -30,6 +30,10 @@ in
           domain = "grafana.mky.ancoris.ovh";
           root_url = "https://grafana.mky.ancoris.ovh";
         };
+
+        log = {
+          level = "debug";
+        };
         
         # OIDC Authentication with Authentik
         "auth.generic_oauth" = {
@@ -70,72 +74,18 @@ in
               group_by = [ "alertname" ];
             }
           ];
-          rules.settings.groups = [
-            {
-              name = "Infrastructure";
-              folder = "System";
-              interval = "60s";
-              rules = [
-                {
-                  uid = "infra-host-down-v1";
-                  title = "Host Down";
-                  condition = "A";
-                  for = "2m";
-                  data = [
-                    {
-                      refId = "A";
-                      datasourceUid = "prometheus";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = {
-                        expr = "up == 0";
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
-                      };
-                    }
-                  ];
-                  annotations = {
-                    summary = "Instance {{ $labels.instance }} has been down for more than 2 minutes.";
-                  };
-                }
-                {
-                  uid = "infra-disk-space-v1";
-                  title = "Disk Space Low";
-                  condition = "A";
-                  for = "5m";
-                  data = [
-                    {
-                      refId = "A";
-                      datasourceUid = "prometheus";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = {
-                        expr = "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100 < 10";
-                        hide = false;
-                        intervalMs = 1000;
-                        maxDataPoints = 43200;
-                      };
-                    }
-                  ];
-                  annotations = {
-                    summary = "Instance {{ $labels.instance }} has less than 10% free space on /.";
-                  };
-                }
-              ];
-            }
-          ];
         };
 
         datasources.settings.datasources = [
           {
             name = "Prometheus";
-            uid = "prometheus"; 
+            # UID removed as a workaround for Grafana 12.x provisioning bug
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;
           }
           {
             name = "Loki";
-            uid = "loki";
             type = "loki";
             url = "http://localhost:3100";
           }
