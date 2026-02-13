@@ -58,11 +58,9 @@ in
                   settings = {
                     url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
                     httpMethod = "POST";
-                    authorization_scheme = "Bearer";
-                  };
-                  secure_settings = {
-                    # Test-Platzhalter um zu sehen, ob das Feld überhaupt befüllt wird
-                    authorization_credentials = "YOUR_TOKEN_HERE";
+                    # Wir nutzen die generischen Header Felder, da diese IMMER gesendet werden
+                    httpHeaderName1 = "Authorization";
+                    httpHeaderValue1 = "Bearer YOUR_TOKEN_HERE";
                   };
                 }
               ];
