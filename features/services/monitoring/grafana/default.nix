@@ -60,9 +60,8 @@ in
                     httpMethod = "POST";
                     authorization_scheme = "Bearer";
                   };
-                  secureSettings = {
-                    # Syntax ohne Escape, damit Grafana es als Variable sieht
-                    authorization_credentials = "\${NTFY_TOKEN}";
+                  secure_settings = {
+                    authorization_credentials = "$NTFY_TOKEN";
                   };
                 }
               ];
@@ -96,6 +95,7 @@ in
       config.sops.templates."grafana.env".path
     ];
 
+    # Reverse Proxy
     my.features.services.caddy.exposedServices = {
       "grafana" = {
         port = 3000;
