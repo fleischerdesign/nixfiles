@@ -91,7 +91,6 @@ in
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = { 
-                        # Capture both node_mackaye and node_strummer
                         expr = "up{job=~\"node_.*\"}"; 
                       };
                     }
@@ -121,7 +120,8 @@ in
                       datasourceUid = "PBFA97CFB590B2093";
                       relativeTimeRange = { from = 600; to = 0; };
                       model = { 
-                        expr = "(node_filesystem_avail_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|fuse.lxcfs|cgroup|none\"} * 100)";
+                        # Only monitor real persistent filesystems to avoid NaN errors from ramfs/tmpfs
+                        expr = "(node_filesystem_avail_bytes{fstype=~\"ext4|xfs|zfs|vfat\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs|zfs|vfat\"} * 100)";
                       };
                     }
                     {
