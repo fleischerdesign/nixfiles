@@ -14,7 +14,7 @@ in
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
     sops.secrets.grafana_ntfy_token = { }; # Definition kommt aus ntfy/default.nix
 
-    # Template to provide secrets as environment variables
+    # Template für Grafana Umgebungsvariablen
     sops.templates."grafana.env".content = ''
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
@@ -42,13 +42,11 @@ in
           auth_url = "https://auth.ancoris.ovh/application/o/authorize/";
           token_url = "https://auth.ancoris.ovh/application/o/token/";
           api_url = "https://auth.ancoris.ovh/application/o/userinfo/";
-          # Map Authentik groups to Grafana roles
           role_attribute_path = "contains(groups, 'Grafana Admins') && 'Admin' || 'Viewer'";
         };
       };
 
       provision = {
-        # Declarative Alerting
         alerting = {
           contactPoints.settings.contactPoints = [
             {
@@ -60,15 +58,14 @@ in
                   settings = {
                     url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
                     httpMethod = "POST";
-                  };
-                  secureSettings = {
-                    authorization_header = "Bearer $__ENV{NTFY_TOKEN}";
+                    # Wir nutzen generische Header, da $__ENV in secureSettings oft nicht aufgelöst wird
+                    httpHeaderName1 = "Authorization";
+                    httpHeaderValue1 = "Bearer $__ENV{NTFY_TOKEN}";
                   };
                 }
               ];
             }
           ];
-          # Optional: Set ntfy as default
           policies.settings.policies = [
             {
               receiver = "ntfy";
@@ -93,12 +90,10 @@ in
       };
     };
 
-    # Load the environment file into the Grafana service
     systemd.services.grafana.serviceConfig.EnvironmentFile = [
       config.sops.templates."grafana.env".path
     ];
 
-    # Reverse Proxy
     my.features.services.caddy.exposedServices = {
       "grafana" = {
         port = 3000;
