@@ -17,6 +17,8 @@ in
         auth-file = "/var/lib/ntfy-sh/auth.db";
         auth-default-access = "deny-all";
         behind-proxy = true;
+        enable-login = true;
+        require-login = true;
         # Erlaubt das Hochladen von Anhängen (optional, aber nützlich für Alerts mit Bildern)
         attachment-cache-dir = "/var/lib/ntfy-sh/attachments";
       };
