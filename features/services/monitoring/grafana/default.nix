@@ -59,7 +59,6 @@ in
                     url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
                     # Wir setzen beide Varianten, um sicherzugehen
                     httpMethod = "POST";
-                    http_method = "POST";
                     authorization_scheme = "Bearer";
                   };
                   secureSettings = {
