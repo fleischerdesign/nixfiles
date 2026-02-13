@@ -12,7 +12,7 @@ in
     # SOPS Secrets for OIDC and ntfy
     sops.secrets.grafana_oidc_client_secret = { owner = "grafana"; };
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
-    sops.secrets.grafana_ntfy_token = { }; # Definition kommt aus ntfy/default.nix
+    sops.secrets.grafana_ntfy_token = { owner = "grafana"; };
 
     # Template für Grafana Umgebungsvariablen
     sops.templates."grafana.env".content = ''
@@ -61,7 +61,8 @@ in
                     authorization_scheme = "Bearer";
                   };
                   secure_settings = {
-                    authorization_credentials = "$NTFY_TOKEN";
+                    # Test-Platzhalter um zu sehen, ob das Feld überhaupt befüllt wird
+                    authorization_credentials = "YOUR_TOKEN_HERE";
                   };
                 }
               ];
@@ -95,7 +96,6 @@ in
       config.sops.templates."grafana.env".path
     ];
 
-    # Reverse Proxy
     my.features.services.caddy.exposedServices = {
       "grafana" = {
         port = 3000;
