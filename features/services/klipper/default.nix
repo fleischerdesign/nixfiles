@@ -139,9 +139,18 @@ in
       "${cfg.expose.subdomain}.${baseDomain}" = {
         extraConfig = ''
           root * ${pkgs.mainsail}/share/mainsail
-          file_server
-          try_files {path} /index.html
-          ${lib.optionalString cfg.expose.auth "import authentik"}
+
+          route {
+            @api {
+              path /websocket /printer/* /api/* /access/* /machine/* /server/*
+            }
+            reverse_proxy @api 127.0.0.1:7125
+
+            ${lib.optionalString cfg.expose.auth "import authentik"}
+
+            file_server
+            try_files {path} /index.html
+          }
         '';
       };
 
