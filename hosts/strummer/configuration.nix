@@ -111,6 +111,21 @@
     auth = true;
   };
 
+  my.features.system.backups.restic = {
+    enable = true;
+    environmentFile = "restic_env_strummer";
+    paths = [
+      "/var/lib"
+      "/data/storage/docs"
+    ];
+    exclude = [
+      "**/node_modules"
+      "**/.cache"
+      "/var/lib/docker"
+      "/var/lib/jellyfin/metadata"
+    ];
+  };
+
   my.features.dev.nixvim.enable = true;
   my.features.dev.containers.enable = true;
   my.features.dev.containers.users = [ "philipp" ];
