@@ -65,6 +65,10 @@
   my.features.services.linkwarden.enable = true;
   my.features.services.mail.enable = true;
   my.features.services.ntfy.enable = true;
+  my.features.system.backups.restic = {
+    enable = true;
+    environmentFile = "restic_env_mackaye";
+  };
   
   my.features.dev.nixvim.enable = true;
 
