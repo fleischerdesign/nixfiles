@@ -22,7 +22,7 @@ The configuration is highly modular and automated, with the following directory 
 
 -   `overlays/`: Contains Nixpkgs overlays. For example, `pip-on-top/` patches the `pip-on-top` GNOME extension for German localization.
 
--   `packages/`: Contains custom package definitions for applications not found in `nixpkgs`, such as `ficsit`, `karere`, and `lychee-slicer`.
+-   `packages/`: Contains custom package definitions for applications not found in `nixpkgs`, such as `ficsit` and `lychee-slicer`.
 
 ## Automation with `helper.nix`
 
@@ -66,6 +66,5 @@ The `lib/helper.nix` file is central to this configuration and provides several 
 -   **Shell:** Fish is the default shell, integrated with `direnv` for automatic environment loading.
 -   **Custom Packages:** Several applications are packaged manually:
     -   `ficsit`: A Satisfactory mod manager.
-    -   `karere`: A GTK4 wrapper for WhatsApp Web.
     -   `lychee-slicer`: A slicer for resin 3D printers.
 -   **Overlays:** Includes an overlay to patch the `pip-on-top` GNOME extension for German localization.

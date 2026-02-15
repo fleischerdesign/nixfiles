@@ -40,9 +40,9 @@ in
       nautilus
       gnome-disk-utility
       bluetuith
+      karere
       (callPackage ../../packages/lychee-slicer { })
       (callPackage ../../packages/ficsit { })
-      (callPackage ../../packages/karere { })
     ];
 
   programs.ghostty = lib.mkIf (role != "server") {
