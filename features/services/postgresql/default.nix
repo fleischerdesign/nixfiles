@@ -24,8 +24,8 @@ in
     # Automatic Backups
     services.postgresqlBackup = {
       enable = true;
-      location = "/var/backup/postgresql";
-      startAt = "*-*-* 03:00:00"; 
+      location = "/var/lib/postgresql/backups";
+      startAt = "*-*-* 02:00:00"; # Eine Stunde vor Restic
       backupAll = true;
     };
   };
