@@ -85,22 +85,31 @@
       ...
     }@inputs:
     let
+      system = "x86_64-linux";
+      
+      # Zentralisierte Overlays
+      overlays = [
+        (import ./overlays/pip-on-top)
+        inputs.nix-vscode-extensions.overlays.default
+      ];
+
+      # Zentrale Nixpkgs Instanz mit globaler Config
+      pkgs = import nixpkgs-unstable {
+        inherit system overlays;
+        config.allowUnfree = true;
+      };
+
       helpers = import ./lib/helper.nix {
-        pkgs-unstable = nixpkgs-unstable;
+        inherit pkgs;
         home-manager-unstable = home-manager-unstable;
       };
     in
     {
       nixosConfigurations = {
         yorke = helpers.mkSystem {
-          system = "x86_64-linux";
+          inherit system pkgs inputs;
           hostname = "yorke";
-          inputs = inputs;
           extraModules = [ inputs.niri.nixosModules.niri ];
-          overlays = [
-            (import ./overlays/pip-on-top)
-            inputs.nix-vscode-extensions.overlays.default
-          ];
           users = [
             {
               name = "philipp";
@@ -113,14 +122,9 @@
           ];
         };
         jello = helpers.mkSystem {
-          system = "x86_64-linux";
+          inherit system pkgs inputs;
           hostname = "jello";
-          inputs = inputs;
           extraModules = [ inputs.niri.nixosModules.niri ];
-          overlays = [
-            (import ./overlays/pip-on-top)
-            inputs.nix-vscode-extensions.overlays.default
-          ];
           users = [
             {
               name = "philipp";
@@ -133,9 +137,8 @@
           ];
         };
         strummer = helpers.mkSystem {
-          system = "x86_64-linux";
+          inherit system pkgs inputs;
           hostname = "strummer";
-          inputs = inputs;
           users = [
             {
               name = "philipp";
@@ -144,9 +147,8 @@
           ];
         };
         mackaye = helpers.mkSystem {
-          system = "x86_64-linux";
+          inherit system pkgs inputs;
           hostname = "mackaye";
-          inputs = inputs;
           extraModules = [ inputs.disko.nixosModules.disko ];
           users = [
             {

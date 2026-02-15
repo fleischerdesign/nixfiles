@@ -1,24 +1,18 @@
 # lib/helper.nix
 # Utility functions for NixOS and Home Manager configurations.
-{ pkgs-unstable, home-manager-unstable, ... }:
+{ pkgs, home-manager-unstable, ... }:
 
 let
-  lib = pkgs-unstable.lib;
+  lib = pkgs.lib;
 
   # Recursively find all default.nix files in a directory
-  # Returns a list of paths.
   findModules = dir:
     let
       entries = builtins.readDir dir;
-      
-      # If default.nix exists in current dir, return it (and don't recurse deeper for modules, 
-      # assuming a folder with default.nix IS the module)
       current = if lib.hasAttr "default.nix" entries then
         [ (dir + "/default.nix") ]
       else
         [];
-      
-      # Recurse into directories
       subdirs = lib.filterAttrs (n: v: v == "directory") entries;
       subModules = lib.concatMap 
         (name: findModules (dir + "/${name}")) 
@@ -29,10 +23,10 @@ let
   # Main System Builder
   mkSystem = {
     system,
+    pkgs, # Fertige Instanz aus flake.nix
     hostname,
     inputs,
     users ? [],
-    overlays ? [],
     extraModules ? []
   }:
   let
@@ -52,12 +46,13 @@ let
     }) users);
 
   in
-  pkgs-unstable.lib.nixosSystem {
+  # WICHTIG: nixosSystem muss vom Input kommen, nicht von der pkgs-Instanz
+  inputs.nixpkgs-unstable.lib.nixosSystem {
     inherit system;
-    specialArgs = { inherit inputs hostname; }; # 'role' is no longer specialArg, it's imported in config
+    specialArgs = { inherit inputs hostname; };
     modules = [
-      # Base Nixpkgs config
-      { nixpkgs = { inherit overlays; config.allowUnfree = true; }; }
+      # Verwende die fertige pkgs Instanz
+      { nixpkgs.pkgs = pkgs; }
       inputs.sops-nix.nixosModules.sops
     ]
     ++ extraModules
