@@ -182,11 +182,12 @@ in
               nil_ls.enable = true;
               # QML
               qmlls.enable = true;
-	      # Java
-	      jdtls.enable = true;
+              # Java
+              jdtls.enable = true;
+              # Go
+              gopls.enable = true;
             };
           };
-
           # Autocomplete
           cmp = {
             enable = true;
