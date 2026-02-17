@@ -13,11 +13,13 @@ in
     sops.secrets.grafana_oidc_client_secret = { owner = "grafana"; };
     sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
     sops.secrets.grafana_ntfy_token = { }; # Definition from ntfy/default.nix
+    sops.secrets.grafana_secret_key = { owner = "grafana"; };
 
     # Template for Grafana environment variables
     sops.templates."grafana.env".content = ''
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
+      GF_SECURITY_SECRET_KEY=${config.sops.placeholder.grafana_secret_key}
       NTFY_TOKEN=${config.sops.placeholder.grafana_ntfy_token}
     '';
 
@@ -29,6 +31,10 @@ in
           http_port = 3000;
           domain = "grafana.mky.ancoris.ovh";
           root_url = "https://grafana.mky.ancoris.ovh";
+        };
+
+        security = {
+          secret_key = "$__ENV{GF_SECURITY_SECRET_KEY}";
         };
 
         log = {
