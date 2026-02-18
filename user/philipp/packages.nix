@@ -20,7 +20,7 @@ in
     ++ lib.optionals (role != "server") [
       # --- Desktop Only ---
       nerd-fonts.jetbrains-mono
-      # gimp
+      gimp
       bitwarden-desktop
       bitwarden-cli
       obsidian
