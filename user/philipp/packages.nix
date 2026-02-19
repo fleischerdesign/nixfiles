@@ -19,6 +19,7 @@ in
     ]
     ++ lib.optionals (role != "server") [
       # --- Desktop Only ---
+      google-chrome
       nerd-fonts.jetbrains-mono
       gimp
       bitwarden-desktop
