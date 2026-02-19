@@ -20,22 +20,6 @@
         "type": "github"
       }
     },
-    "firefox-gnome-theme": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1771204701,
-        "narHash": "sha256-BT2dt/yaaXpYdwX9EzkG/MOnaB1MLbTzV2pU5vI20NU=",
-        "owner": "rafaelmardojai",
-        "repo": "firefox-gnome-theme",
-        "rev": "93011b4b88a93ffca3ad5d71b163ede327620d14",
-        "type": "github"
-      },
-      "original": {
-        "owner": "rafaelmardojai",
-        "repo": "firefox-gnome-theme",
-        "type": "github"
-      }
-    },
     "flake-compat": {
       "locked": {
         "lastModified": 1733328505,
@@ -391,7 +375,6 @@
     "root": {
       "inputs": {
         "disko": "disko",
-        "firefox-gnome-theme": "firefox-gnome-theme",
         "home-manager-stable": "home-manager-stable",
         "home-manager-unstable": "home-manager-unstable",
         "niri": "niri",
@@ -403,8 +386,7 @@
         "portfolio": "portfolio",
         "quickshell": "quickshell",
         "sops-nix": "sops-nix",
-        "spicetify-nix": "spicetify-nix",
-        "thunderbird-gnome-theme": "thunderbird-gnome-theme"
+        "spicetify-nix": "spicetify-nix"
       }
     },
     "sops-nix": {
@@ -490,22 +472,6 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
-        "type": "github"
-      }
-    },
-    "thunderbird-gnome-theme": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1757216698,
-        "narHash": "sha256-aQAlgHsBAS+DdyYDlYhW/xT86xIu9FO8yJEzSCVaSBg=",
-        "owner": "rafaelmardojai",
-        "repo": "thunderbird-gnome-theme",
-        "rev": "8b9a19eb188b3ede65e8f12a11637bbd56e4f4d7",
-        "type": "github"
-      },
-      "original": {
-        "owner": "rafaelmardojai",
-        "repo": "thunderbird-gnome-theme",
         "type": "github"
       }
     },
