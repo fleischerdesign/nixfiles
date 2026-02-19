@@ -61,8 +61,6 @@
   my.features.services.portfolio.enable = true;
   my.features.services.couchdb.enable = true;
   my.features.services.homarr.enable = true;
-  my.features.services.vaultwarden.enable = true;
-  my.features.services.linkwarden.enable = true;
   my.features.services.ntfy.enable = true;
   my.features.system.backups.restic = {
     enable = true;
