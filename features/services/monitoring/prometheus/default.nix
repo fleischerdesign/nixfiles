@@ -48,11 +48,6 @@ in
           job_name = "blocky_strummer";
           static_configs = [ { targets = [ "${strummerTailscaleIp}:4000" ]; } ];
         }
-        {
-          job_name = "stalwart";
-          metrics_path = "/metrics/prometheus";
-          static_configs = [ { targets = [ "localhost:9081" ]; } ];
-        }
       ];
     };
   };
