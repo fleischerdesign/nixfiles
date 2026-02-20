@@ -36,12 +36,17 @@ Modal {
         width: 320
         height: Math.min(600, mainLayout.implicitHeight + 32)
         
-        // Position: Bottom Right, slightly offset to align with volume icon
+        // Position: Bottom Right
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         anchors.bottomMargin: 70
-        anchors.rightMargin: 70 // Offset from right edge to align with volume button
+        anchors.rightMargin: 70 
         
+        // Ensure all pipewire nodes are tracked for property access
+        PwObjectTracker {
+            objects: Pipewire.nodes
+        }
+
         // Frame Style
         radius: FrameTheme.radius
         color: FrameTheme.popover
@@ -110,11 +115,9 @@ Modal {
                     
                     delegate: Item {
                         width: ListView.view.width
-                        // Filter: !isStream && isSink && audio
                         visible: modelData && !modelData.isStream && modelData.isSink && modelData.audio
                         height: visible ? 40 : 0
                         
-                        // Tracker to bind properties
                         PwObjectTracker {
                             objects: [modelData]
                         }
@@ -126,7 +129,7 @@ Modal {
                             centerContent: false
 
                             Text {
-                                text: "speaker" // TODO: Detect icon based on media.class or properties
+                                text: "speaker"
                                 font.family: "Material Symbols Rounded"
                                 color: FrameTheme.foreground
                             }
@@ -139,7 +142,6 @@ Modal {
                                 Layout.fillWidth: true
                             }
                             
-                            // Checkmark
                             Text {
                                 visible: Pipewire.defaultAudioSink === modelData
                                 text: "check"
@@ -161,22 +163,22 @@ Modal {
                 Layout.fillWidth: true
                 
                 Text { 
-                    text: "Apps" 
-                    color: FrameTheme.mutedForeground 
+                    text: "Applications" 
+                    color: FrameTheme.mutedForeground
                     font.pixelSize: 12
                 }
                 
                 ListView {
+                    id: appsListView
                     Layout.fillWidth: true
-                    implicitHeight: Math.min(200, contentItem.childrenRect.height) // Max height with scroll
-                    clip: true
+                    implicitHeight: Math.min(300, contentItem.childrenRect.height)
                     model: Pipewire.nodes
                     interactive: true
+                    clip: true
                     
                     delegate: Item {
-                        width: ListView.view.width
-                        // Filter: isStream && !isSink && audio
-                        visible: modelData && modelData.isStream && !modelData.isSink && modelData.audio
+                        width: appsListView.width
+                        visible: modelData && modelData.isStream && modelData.audio
                         height: visible ? 50 : 0
                         
                         PwObjectTracker {
@@ -186,13 +188,28 @@ Modal {
                         GNSlider {
                             anchors.fill: parent
                             anchors.margins: 4
-                            value: modelData.audio ? modelData.audio.volume : 0
-                            label: modelData.name || "Unknown App"
+                            value: (modelData && modelData.audio) ? modelData.audio.volume : 0
+                            label: {
+                                if (!modelData) return "";
+                                const p = modelData.properties;
+                                return (p && (p["application.name"] || p["media.name"])) || modelData.description || modelData.name || "App";
+                            }
                             onMoved: (val) => {
-                                if (modelData.audio) modelData.audio.volume = val
+                                if (modelData && modelData.audio) {
+                                    modelData.audio.volume = val
+                                }
                             }
                         }
                     }
+                }
+
+                Text {
+                    visible: appsListView.count === 0
+                    text: "No active apps"
+                    color: FrameTheme.mutedForeground
+                    font.pixelSize: 11
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 8
                 }
             }
         }
