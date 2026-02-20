@@ -24,10 +24,18 @@ Modal {
         if (shouldBeVisible) {
             visible = true
             BluetoothService.startDiscovery()
+            discoveryTimeoutTimer.start()
         } else {
             BluetoothService.stopDiscovery()
+            discoveryTimeoutTimer.stop()
             hideDelayTimer.start()
         }
+    }
+    
+    Timer {
+        id: discoveryTimeoutTimer
+        interval: 15000 // 15 seconds discovery timeout
+        onTriggered: BluetoothService.stopDiscovery()
     }
     
     Timer {
@@ -115,7 +123,7 @@ Modal {
                 visible: BluetoothService.enabled
                 
                 Text { 
-                    text: "Paired Devices" 
+                    text: "Devices" 
                     color: FrameTheme.mutedForeground 
                     font.pixelSize: 12
                 }
@@ -134,7 +142,12 @@ Modal {
                         
                         // Device Icon (Generic)
                         Text {
-                            text: modelData.iconName === "audio-headset" ? "headphones" : "bluetooth"
+                            text: {
+                                if (modelData.iconName === "audio-headset" || modelData.iconName === "audio-card") return "headphones"
+                                if (modelData.iconName === "input-keyboard") return "keyboard"
+                                if (modelData.iconName === "input-mouse") return "mouse"
+                                return "bluetooth"
+                            }
                             font.family: "Material Symbols Rounded"
                             color: FrameTheme.foreground
                         }
@@ -194,6 +207,16 @@ Modal {
                             else BluetoothService.connectToDevice(modelData)
                         }
                     }
+                }
+                
+                Text {
+                    visible: BluetoothService.knownDevices && BluetoothService.knownDevices.length === 0
+                    text: "No devices found"
+                    color: FrameTheme.mutedForeground
+                    font.pixelSize: 12
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 16
+                    Layout.bottomMargin: 16
                 }
             }
             

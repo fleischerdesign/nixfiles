@@ -16,10 +16,14 @@ Singleton {
     // --- Methods ---
     function refresh() {
         // This will be called to update the network state
-        if (isScanning) return;
         getWifiRadioStateProcess.running = true;
         getEthernetStateProcess.running = true;
-        listNetworksProcess.running = true;
+        
+        // Only refresh the list if we're not already doing a full hardware scan
+        // If a scan is in progress, listNetworksProcess will be started when it finishes.
+        if (!isScanning) {
+            listNetworksProcess.running = true;
+        }
     }
 
     function scan() {
@@ -53,7 +57,7 @@ Singleton {
             waitForEnd: false
             onTextChanged: {
                 // A change occurred, trigger a refresh
-                console.log("NetworkService: Detected network change, refreshing...");
+                // Use a timer or debounce if this is too frequent
                 root.refresh();
             }
         }
@@ -66,7 +70,6 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 root.wifiEnabled = (this.text.trim() === "enabled");
-                console.log("NetworkService: wifiEnabled =", root.wifiEnabled, "(raw: '" + this.text.trim() + "')");
                 if (!root.wifiEnabled) {
                     root.wifiNetworks = [];
                 }
@@ -74,7 +77,7 @@ Singleton {
         }
         onExited: (exitCode) => {
             if (exitCode !== 0) {
-                console.error("NetworkService: Failed to get WiFi radio state. Is nmcli installed and in PATH?");
+                console.error("NetworkService: Failed to get WiFi radio state.");
             }
         }
     }
@@ -88,8 +91,7 @@ Singleton {
                 let output = this.text.trim();
                 let isConnected = false;
                 if (output) {
-                    const lines = output.split('
-');
+                    const lines = output.split('\n');
                     for (const line of lines) {
                         const parts = line.split(':');
                         if (parts.length >= 2 && parts[0] === 'ethernet' && parts[1] === 'connected') {
@@ -114,14 +116,14 @@ Singleton {
         command: ["nmcli", "dev", "wifi", "rescan"]
         onExited: (exitCode) => {
             if (exitCode !== 0) {
-                console.warn("NetworkService: WiFi scan command failed. May require permissions.");
+                console.warn("NetworkService: WiFi scan command failed.");
             }
-            // When scan is done, refresh the list
-            root.refresh();
+            // When scan is done, get the list
+            listNetworksProcess.running = true;
         }
     }
 
-    // Process to list the networks found (called by refresh())
+    // Process to list the networks found (called by refresh() or scanProcess)
     Process {
         id: listNetworksProcess
         command: ["nmcli", "-t", "-f", "SSID,SIGNAL,IN-USE", "dev", "wifi"]
@@ -145,15 +147,14 @@ Singleton {
                 // Sort networks by signal strength (descending)
                 networks.sort((a, b) => b.signal - a.signal);
                 root.wifiNetworks = networks;
-                console.log("NetworkService: found", networks.length, "networks. Active network:", JSON.stringify(networks.find(n => n.inUse)));
-                root.isScanning = false; // Reset scanning state here
+                root.isScanning = false; 
             }
         }
         onExited: (exitCode) => {
             if (exitCode !== 0) {
                 console.error("NetworkService: Failed to list WiFi networks.");
-                root.isScanning = false;
             }
+            root.isScanning = false;
         }
     }
 
