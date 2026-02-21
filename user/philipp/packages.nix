@@ -42,6 +42,7 @@ in
       gnome-disk-utility
       bluetuith
       karere
+      cameractrls-gtk4
       (callPackage ../../packages/lychee-slicer { })
       (callPackage ../../packages/ficsit { })
     ];
