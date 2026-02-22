@@ -51,6 +51,8 @@ in
           complete_dir = "/data/storage/downloads/complete";
           permissions = "775";
           cache_limit = "512M";
+          bandwidth_max = "12.5M";
+          bandwidth_perc = 90;
         };
         servers.ninja = {
           name = "Newsgroup Ninja";
