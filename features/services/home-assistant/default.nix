@@ -13,6 +13,50 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    sops.secrets.hass_now_api_token = { owner = "hass"; };
+
+    sops.templates."hass-rest-commands.yaml" = {
+      owner = "hass";
+      content = ''
+        now_school:
+          url: "https://fleischer.design/api/now"
+          method: POST
+          headers:
+            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+          content_type: "application/json"
+          payload: >
+            {
+              "de": "Gerade am lernen",
+              "en": "Now learning",
+              "icon": "mage:book-text"
+            }
+        now_home_programming:
+          url: "https://fleischer.design/api/now"
+          method: POST
+          headers:
+            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+          content_type: "application/json"
+          payload: >
+            {
+              "de": "Gerade am coden",
+              "en": "Now programming",
+              "icon": "mage:robot-uwu"
+            }
+        now_sport:
+          url: "https://fleischer.design/api/now"
+          method: "POST"
+          headers:
+            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+          content_type: "application/json"
+          payload: >
+            {
+              "de": "Gerade am Sport treiben",
+              "en": "Now doing sports",
+              "icon": "mage:zap"
+            }
+      '';
+    };
+
     services.home-assistant = {
       enable = true;
       extraComponents = [
@@ -36,6 +80,7 @@ in
         "automation ui" = "!include automations.yaml";
         "script ui" = "!include scripts.yaml";
         "scene ui" = "!include scenes.yaml";
+        rest_command = "!include ${config.sops.templates."hass-rest-commands.yaml".path}";
 
         http = {
           server_port = 8123;
