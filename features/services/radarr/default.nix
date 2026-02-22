@@ -33,7 +33,7 @@ in
 
     # Ownership management for storage
     systemd.tmpfiles.rules = [
-      "d /data/storage/movies 0775 radarr media -"
+      "d /data/storage/movies 2775 radarr media -"
     ];
 
     services.radarr = {
