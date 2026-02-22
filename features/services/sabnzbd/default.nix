@@ -39,6 +39,7 @@ in
       user = "sabnzbd";
       group = "media";
       allowConfigWrite = false;
+      configFile = null;
       secretFiles = [ config.sops.templates."sabnzbd-secret.ini".path ];
 
       settings = {
