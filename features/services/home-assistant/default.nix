@@ -59,6 +59,9 @@ in
 
     services.home-assistant = {
       enable = true;
+      customComponents = [
+        pkgs.home-assistant-custom-components.moonraker
+      ];
       extraComponents = [
         # Pre-install common python dependencies for integrations
         "esphome"
