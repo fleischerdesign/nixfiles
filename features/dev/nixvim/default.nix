@@ -48,6 +48,7 @@ in
           background = "dark"; # Use valid value 'dark'
           signcolumn = "yes"; # Always show the signcolumn to prevent jumping
           clipboard = "unnamedplus"; # Use system clipboard
+          completeopt = "menu,menuone,noselect";
           fillchars = {
             eob = " ";
           };
@@ -192,6 +193,7 @@ in
           cmp = {
             enable = true;
             settings = {
+              preselect = "None";
               sources = [
                 { name = "nvim_lsp"; }
                 { name = "luasnip"; }
@@ -199,12 +201,15 @@ in
                 { name = "path"; }
               ];
               mapping = {
-                # Bestätige einen Vorschlag mit Enter, aber nur wenn er explizit ausgewählt wurde.
-                # Das verhindert, dass Enter eine neue Zeile blockiert, wenn das Menü nur offen ist.
-                "<CR>" = "cmp.mapping.confirm({ select = false })";
-                # Navigiere mit Tab und Shift-Tab durch die Vorschläge
-                "<Tab>" = "cmp.mapping.select_next_item()";
-                "<S-Tab>" = "cmp.mapping.select_prev_item()";
+                # Navigiere mit Strg+n und Strg+p (Vim Standard & Primeagen Style)
+                "<C-n>" = "cmp.mapping.select_next_item()";
+                "<C-p>" = "cmp.mapping.select_prev_item()";
+                # Bestätige mit Strg+y (ThePrimeagen Style)
+                "<C-y>" = "cmp.mapping.confirm({ select = true })";
+                # Brich mit Strg+e ab
+                "<C-e>" = "cmp.mapping.abort()";
+                # Manuell die Vervollständigung triggern
+                "<C-Space>" = "cmp.mapping.complete()";
                 # Scrolle durch die Dokumentation des Vorschlags
                 "<C-d>" = "cmp.mapping.scroll_docs(-4)";
                 "<C-f>" = "cmp.mapping.scroll_docs(4)";
