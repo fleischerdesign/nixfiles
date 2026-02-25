@@ -34,14 +34,12 @@ in
         enable-login = true;
         require-login = true;
         log-level = "info";
-        attachment-cache-dir = "/var/lib/ntfy-sh/attachments";
+        attachment-cache-dir = "/var/cache/ntfy-sh/attachments";
       };
       environmentFile = config.sops.templates."ntfy.env".path;
     };
 
-    systemd.tmpfiles.rules = [
-      "d /var/lib/ntfy-sh/attachments 0700 ntfy-sh ntfy-sh -"
-    ];
+    systemd.services.ntfy-sh.serviceConfig.CacheDirectory = "ntfy-sh";
 
     my.features.services.caddy.exposedServices.ntfy = {
       port = 8083;
