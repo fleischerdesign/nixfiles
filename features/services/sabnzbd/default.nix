@@ -90,7 +90,7 @@ in
 
     systemd.services.sabnzbd.serviceConfig = {
       ReadWritePaths = [ "/data/storage/downloads" ];
-      UMask = "0002";
+      UMask = lib.mkForce "0002";
     };
 
     # Caddy Integration
