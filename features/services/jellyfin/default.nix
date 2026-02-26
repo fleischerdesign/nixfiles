@@ -20,7 +20,7 @@ in
       # Native Hardware Acceleration (New in NixOS 24.11/25.05+)
       hardwareAcceleration = {
         enable = true;
-        type = "vaapi"; # Use VAAPI directly instead of QSV to avoid MFX session errors
+        type = "qsv"; # QSV is generally better for subtitle burn-in on Intel
         device = "/dev/dri/renderD128";
       };
 
