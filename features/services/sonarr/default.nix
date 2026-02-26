@@ -61,7 +61,7 @@ in
 
     systemd.services.sonarr.serviceConfig = {
       ReadWritePaths = [ "/data/storage/tv" "/data/storage/downloads" ];
-      UMask = "0002";
+      UMask = lib.mkForce "0002";
     };
 
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
