@@ -57,7 +57,7 @@ in
       flake = "/etc/nixos";
     };
 
-    documentation.man.generateCaches = false; # Disable man cache generation
+    documentation.man.cache.enable = false; # Disable man cache generation
 
     # System packages to be installed
     environment.systemPackages = with pkgs; [
