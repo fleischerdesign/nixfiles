@@ -30,7 +30,6 @@ in
       resources
       moonlight-qt
       packet
-      freecad-wayland
       yaak
       penpot-desktop
       deskflow
