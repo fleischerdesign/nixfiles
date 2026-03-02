@@ -165,7 +165,11 @@ in
             };
 
             # Treesitter for syntax highlighting
-            treesitter.enable = true;
+            treesitter = {
+              enable = true;
+              highlight.enable = true;
+              indent.enable = true;
+            };
 
             # LSP for code intelligence
             lsp = {
