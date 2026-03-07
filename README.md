@@ -62,7 +62,7 @@ The `lib/helper.nix` file is central to this configuration and provides several 
 -   **Development:** A pre-configured development environment including:
     -   **NixVim:** Set as the default editor with plugins for LSP, fuzzy finding (Telescope), and more.
     -   **VS Codium:** Configured with a set of extensions for web development, Nix, Java, and more.
--   **Gaming:** A dedicated gaming setup with Steam, Lutris, and Sunshine for game streaming.
+-   **Gaming:** A dedicated gaming setup with Steam, Bottles, and Sunshine for game streaming.
 -   **Shell:** Fish is the default shell, integrated with `direnv` for automatic environment loading.
 -   **Custom Packages:** Several applications are packaged manually:
     -   `ficsit`: A Satisfactory mod manager.

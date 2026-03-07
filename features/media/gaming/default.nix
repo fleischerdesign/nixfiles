@@ -6,7 +6,7 @@ let
 in
 {
   options.my.features.media.gaming = {
-    enable = lib.mkEnableOption "Gaming packages and services (Steam, Lutris, Sunshine)";
+    enable = lib.mkEnableOption "Gaming packages and services (Steam, Bottles, Sunshine)";
   };
 
   config = lib.mkIf cfg.enable {
@@ -27,15 +27,7 @@ in
     };
 
     environment.systemPackages = with pkgs; [
-      winetricks
-      wine
-      (lutris.override {
-        extraLibraries = pkgs: with pkgs; [
-          libadwaita
-          gtk4
-        ];
-      })
-      umu-launcher
+      bottles
     ];
   };
 }
