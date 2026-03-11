@@ -52,6 +52,11 @@ in
     # XDG portals for desktop integration (e.g., file pickers)
     xdg.portal = {
       enable = true;
+      config = {
+        common = {
+          default = [ "gnome" ];
+        };
+      };
       extraPortals = [
         pkgs.xdg-desktop-portal-gtk
         pkgs.xdg-desktop-portal-gnome
