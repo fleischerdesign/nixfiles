@@ -25,7 +25,6 @@ in
       gimp
       obsidian
       orca-slicer
-      endeavour
       resources
       moonlight-qt
       packet
