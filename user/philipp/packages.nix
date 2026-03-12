@@ -19,6 +19,7 @@ in
     ]
     ++ lib.optionals (role != "server") [
       # --- Desktop Only ---
+      opencode
       google-chrome
       nerd-fonts.jetbrains-mono
       gimp
