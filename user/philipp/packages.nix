@@ -23,8 +23,6 @@ in
       google-chrome
       nerd-fonts.jetbrains-mono
       gimp
-      bitwarden-desktop
-      bitwarden-cli
       obsidian
       orca-slicer
       endeavour
@@ -33,7 +31,6 @@ in
       packet
       yaak
       penpot-desktop
-      deskflow
       delfin
       inkscape
       evince
