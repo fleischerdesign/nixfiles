@@ -40,7 +40,6 @@ in
       karere
       cameractrls-gtk4
       (callPackage ../../packages/lychee-slicer { })
-      (callPackage ../../packages/ficsit { })
     ];
 
   programs.ghostty = lib.mkIf (role != "server") {
