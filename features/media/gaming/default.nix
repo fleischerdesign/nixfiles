@@ -7,6 +7,11 @@ in
 {
   options.my.features.media.gaming = {
     enable = lib.mkEnableOption "Gaming packages and services (Steam, Bottles, Sunshine)";
+    sunshine.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether to enable the Sunshine streaming host.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -19,7 +24,7 @@ in
       localNetworkGameTransfers.openFirewall = true;
     };
 
-    services.sunshine = {
+    services.sunshine = lib.mkIf cfg.sunshine.enable {
       enable = true;
       autoStart = true;
       capSysAdmin = true;

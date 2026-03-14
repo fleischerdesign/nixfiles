@@ -29,6 +29,8 @@
   my.features.dev.nixvim.enable = true;
 
   my.features.media.spotify.enable = true;
+  my.features.media.gaming.enable = true;
+  my.features.media.gaming.sunshine.enable = false;
   my.features.system.networking.tailscale.enable = true;
 
   system.stateVersion = "24.05";
