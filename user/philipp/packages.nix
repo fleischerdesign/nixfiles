@@ -29,7 +29,6 @@ in
       moonlight-qt
       packet
       yaak
-      penpot-desktop
       delfin
       inkscape
       evince
