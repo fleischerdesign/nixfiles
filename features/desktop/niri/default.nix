@@ -172,7 +172,7 @@ in
               # --- User-defined Apps ---
               "Mod+Return".action = spawn "ghostty";
               "Mod+Space".action =
-                spawn-sh "busctl --user call org.carp.Shell /org/carp/Shell org.carp.Shell ToggleLauncher"; # User preference
+                spawn-sh "busctl --user call org.axis.Shell /org/axis/Shell org.axis.Shell ToggleLauncher"; # User preference
 
               # --- Defaults based on the definitive action list ---
               "Mod+Shift+Slash".action = show-hotkey-overlay;
