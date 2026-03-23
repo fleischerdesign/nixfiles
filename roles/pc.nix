@@ -3,12 +3,13 @@
 { lib, ... }:
 
 {
+  programs.kdeconnect.enable = true;
   # It enables a baseline set of features common to all graphical systems.
   my.features = {
     system = {
       common.enable = lib.mkDefault true;
       audio.enable = lib.mkDefault true;
-            bootloader = {
+      bootloader = {
         enable = lib.mkDefault true;
         provider = lib.mkDefault "systemd-boot";
       };
