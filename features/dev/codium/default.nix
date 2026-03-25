@@ -53,7 +53,7 @@ in
               "window.titleBarStyle" = "custom";
               "window.customTitleBarVisibility" = "auto";
 
-              "security.workspace.trust.enabled" = true;
+              "security.workspace.trust.enabled" = false;
 
               "editor.fontFamily" = "'JetBrainsMono Nerd Font', 'monospace', monospace";
               "editor.fontLigatures" = true;
