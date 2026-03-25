@@ -1,4 +1,10 @@
-{ inputs, config, lib, pkgs, ... }:
+{
+  inputs,
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   imports = [
     ./hardware-configuration.nix
@@ -20,7 +26,6 @@
 
   # Features
   my.features.desktop.niri.enable = true;
-  my.features.desktop.quickshell.enable = true;
 
   my.features.dev.containers.enable = true;
   my.features.dev.containers.users = [ "philipp" ];

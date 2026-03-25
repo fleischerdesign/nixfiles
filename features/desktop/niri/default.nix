@@ -19,7 +19,7 @@ in
     # Dependencies
     my.features.system.wayland.enable = true;
     my.features.system.audio.enable = true;
-    my.features.desktop.quickshell.enable = true;
+    my.features.desktop.quickshell.enable = false;
 
     # Conflicts
     assertions = [
@@ -37,12 +37,13 @@ in
     # GNOME virtual filesystem
     services.gvfs.enable = true;
 
-    # Configure greetd with tuigreet to launch niri-session
+    # Configure greetd with auto-login into niri-session
     services.greetd = {
       enable = true;
       settings = {
         default_session = {
-          command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd '${pkgs.niri}/bin/niri-session'";
+          command = "${pkgs.niri}/bin/niri-session";
+          user = "philipp";
         };
       };
     };
@@ -91,6 +92,7 @@ in
         }:
         {
           home.packages = [
+            inputs.carp.packages.${pkgs.stdenv.hostPlatform.system}.default
             pkgs.adwaita-icon-theme
             pkgs.swww
             pkgs.brightnessctl
@@ -150,6 +152,13 @@ in
                   "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1"
                 ];
               }
+              # Start AXIS shell (locked on boot)
+              {
+                argv = [
+                  "axis"
+                  "--locked"
+                ];
+              }
             ];
 
             outputs = lib.mkIf (hostname == "jello") {
@@ -176,15 +185,16 @@ in
 
               # --- Defaults based on the definitive action list ---
               "Mod+Shift+Slash".action = show-hotkey-overlay;
-              "Super+Alt+L".action = spawn-sh "qs ipc call lockscreen lock";
+              "Super+Alt+L".action =
+                spawn-sh "busctl --user call org.axis.Shell /org/axis/Shell org.axis.Shell Lock";
 
               "XF86AudioRaiseVolume".action = spawn-sh "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 0.1+";
               "XF86AudioLowerVolume".action = spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-";
               "XF86AudioMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle";
               "XF86AudioMicMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle";
 
-              "XF86MonBrightnessUp".action = spawn-sh "qs ipc call brightness increaseBrightness 0.15";
-              "XF86MonBrightnessDown".action = spawn-sh "qs ipc call brightness decreaseBrightness 0.15";
+              "XF86MonBrightnessUp".action = spawn-sh "brightnessctl set 15%+";
+              "XF86MonBrightnessDown".action = spawn-sh "brightnessctl set 15%-";
               "Mod+Q".action = close-window;
 
               "Mod+Left".action = focus-column-left;

@@ -59,6 +59,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    carp = {
+      url = "github:fleischerdesign/Axis";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
   };
 
   outputs =
@@ -76,7 +81,7 @@
     }@inputs:
     let
       system = "x86_64-linux";
-      
+
       # Zentralisierte Overlays
       overlays = [
         (import ./overlays/pip-on-top)
