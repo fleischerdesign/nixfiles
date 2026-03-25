@@ -4,6 +4,7 @@
 
 {
   programs.kdeconnect.enable = true;
+  hardware.enableRedistributableFirmware = lib.mkDefault true;
   # It enables a baseline set of features common to all graphical systems.
   my.features = {
     system = {
