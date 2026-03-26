@@ -98,7 +98,7 @@ in
             pkgs.brightnessctl
             pkgs.libnotify
             pkgs.sushi
-            pkgs.polkit_gnome # Authentication Agent
+            pkgs.polkit_gnome
           ];
 
           programs.niri.settings = with config.lib.niri.actions; {
@@ -152,7 +152,6 @@ in
                   "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1"
                 ];
               }
-              # Start AXIS shell (locked on boot)
               {
                 argv = [
                   "axis"
@@ -178,12 +177,10 @@ in
             };
 
             binds = {
-              # --- User-defined Apps ---
               "Mod+Return".action = spawn "ghostty";
               "Mod+Space".action =
-                spawn-sh "busctl --user call org.axis.Shell /org/axis/Shell org.axis.Shell ToggleLauncher"; # User preference
+                spawn-sh "busctl --user call org.axis.Shell /org/axis/Shell org.axis.Shell ToggleLauncher";
 
-              # --- Defaults based on the definitive action list ---
               "Mod+Shift+Slash".action = show-hotkey-overlay;
               "Super+Alt+L".action =
                 spawn-sh "busctl --user call org.axis.Shell /org/axis/Shell org.axis.Shell Lock";
