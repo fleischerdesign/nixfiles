@@ -94,7 +94,6 @@ in
           home.packages = [
             inputs.carp.packages.${pkgs.stdenv.hostPlatform.system}.default
             pkgs.adwaita-icon-theme
-            pkgs.swww
             pkgs.brightnessctl
             pkgs.libnotify
             pkgs.sushi
@@ -138,14 +137,6 @@ in
             ];
 
             spawn-at-startup = [
-              { argv = [ "swww-daemon" ]; }
-              {
-                argv = [
-                  "swww"
-                  "img"
-                  "/etc/nixos/media/wallpaper.jpg"
-                ];
-              }
               # Start Polkit Agent
               {
                 argv = [
@@ -155,6 +146,8 @@ in
               {
                 argv = [
                   "axis"
+                  "--wallpaper"
+                  "/etc/nixos/media/wallpaper.jpg"
                   "--locked"
                 ];
               }
