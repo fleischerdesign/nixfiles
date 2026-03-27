@@ -9,11 +9,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774616961,
-        "narHash": "sha256-p23yS7vkQ5wx2btXdoLHSn64jqjSXq7oi+fk0iGuY7c=",
+        "lastModified": 1774629752,
+        "narHash": "sha256-UPMUHBTpeIFmN+b3WMLQwKPFhpFAk5ozSkX+2B3k904=",
         "owner": "fleischerdesign",
         "repo": "Axis",
-        "rev": "e194545d539ea06537f4a8691bf21bcc7318323c",
+        "rev": "eb583b63ff45aec056c800b756eee54884025570",
         "type": "github"
       },
       "original": {
