@@ -104,7 +104,10 @@
         yorke = helpers.mkSystem {
           inherit system pkgs inputs;
           hostname = "yorke";
-          extraModules = [ inputs.niri.nixosModules.niri ];
+          extraModules = [
+            inputs.niri.nixosModules.niri
+            inputs.carp.nixosModules.default
+          ];
           users = [
             {
               name = "philipp";
@@ -119,7 +122,10 @@
         jello = helpers.mkSystem {
           inherit system pkgs inputs;
           hostname = "jello";
-          extraModules = [ inputs.niri.nixosModules.niri ];
+          extraModules = [
+            inputs.niri.nixosModules.niri
+            inputs.carp.nixosModules.default
+          ];
           users = [
             {
               name = "philipp";
