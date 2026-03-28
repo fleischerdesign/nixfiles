@@ -5,6 +5,15 @@
 {
   programs.kdeconnect.enable = true;
   hardware.enableRedistributableFirmware = lib.mkDefault true;
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      userServices = true;
+    };
+  };
   # It enables a baseline set of features common to all graphical systems.
   my.features = {
     system = {
