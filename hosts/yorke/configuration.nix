@@ -21,6 +21,8 @@
       "networkmanager"
       "wheel"
       "adbusers"
+      "input"
+      "uinput"
     ];
   };
 
