@@ -9,11 +9,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774965770,
-        "narHash": "sha256-EPUAhQ56/N75HlRpIm9uIVkw045dxxgR+naXmRCNjZ4=",
+        "lastModified": 1774994652,
+        "narHash": "sha256-HRrh5kQTHi8FF8KRujtHAtPFOlbSEW5E0s9qyJFZJEM=",
         "owner": "fleischerdesign",
         "repo": "Axis",
-        "rev": "82d274dd291f56b9c32bc14c583b2735b2bb468b",
+        "rev": "892d505578dbe234361e83b48d1444d0d53b06e6",
         "type": "github"
       },
       "original": {
@@ -174,11 +174,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774898676,
-        "narHash": "sha256-0Utnqo+FbB+0CVUi0MI3oonF0Kuzy9VcgRkxl53Euvk=",
+        "lastModified": 1774991950,
+        "narHash": "sha256-kScKj3qJDIWuN9/6PMmgy5esrTUkYinrO5VvILik/zw=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "a184bd2f8426087bae93f203403cd4b86c99e57d",
+        "rev": "f2d3e04e278422c7379e067e323734f3e8c585a7",
         "type": "github"
       },
       "original": {
@@ -273,11 +273,11 @@
         "nixpkgs-nixcord": "nixpkgs-nixcord"
       },
       "locked": {
-        "lastModified": 1774946064,
-        "narHash": "sha256-nWB/n+l2lMSk3BHarxC4AgamHr2oLUbzHDvYLO17/6w=",
+        "lastModified": 1774975258,
+        "narHash": "sha256-Ww5PABhlEEjatSd0x7E3gie6xSN66kBFxaC0viaS0M4=",
         "owner": "kaylorben",
         "repo": "nixcord",
-        "rev": "2baeae803b75deb3a0acb8edb493d7917b5f675d",
+        "rev": "6bd52668fc6f3187e27c391d67f6e5169480986a",
         "type": "github"
       },
       "original": {
