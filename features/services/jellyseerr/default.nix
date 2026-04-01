@@ -40,7 +40,7 @@ in
 
     # Ensure the config directory exists with correct permissions
     systemd.tmpfiles.rules = [
-      "d /var/lib/jellyseerr 0750 root root -"
+      "d /var/lib/jellyseerr 0750 1000 1000 -"
     ];
 
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
