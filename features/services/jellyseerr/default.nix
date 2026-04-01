@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.jellyseerr;
 in
@@ -7,15 +12,20 @@ in
     enable = lib.mkEnableOption "Jellyseerr Media Request Manager";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "seerr"; };
-      auth = lib.mkEnableOption "Protect with Authentik" // { default = false; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "seerr";
+      };
+      auth = lib.mkEnableOption "Protect with Authentik" // {
+        default = false;
+      };
     };
   };
 
   config = lib.mkIf cfg.enable {
     # Run Jellyseerr as an OCI Container
     virtualisation.oci-containers.containers."jellyseerr" = {
-      image = "docker.io/fallenbagel/jellyseerr:preview-OIDC";
+      image = "ghcr.io/v3djg6gl/seerr:feat-oidc-jellyfin-quickconnect";
       extraOptions = [
         "--network=host"
       ];
@@ -33,11 +43,10 @@ in
       "d /var/lib/jellyseerr 0750 root root -"
     ];
 
-    # Register with Caddy Feature
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "jellyseerr" = {
         port = 5055;
-        auth = cfg.expose.auth; 
+        auth = cfg.expose.auth;
         subdomain = cfg.expose.subdomain;
       };
     };
