@@ -38,9 +38,9 @@ in
       };
     };
 
-    # Ensure the config directory exists with correct permissions
+    # Ensure the config directory exists with correct permissions recursively
     systemd.tmpfiles.rules = [
-      "d /var/lib/jellyseerr 0750 1000 1000 -"
+      "Z /var/lib/jellyseerr 0750 1000 1000 -"
     ];
 
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
