@@ -29,7 +29,7 @@ in
       moonlight-qt
       packet
       yaak
-      delfin
+      jellyfin-desktop
       inkscape
       evince
       libreoffice-fresh
