@@ -67,7 +67,7 @@ in
     networking.firewall.allowedTCPPorts = [ 80 443 ];
     networking.firewall.allowedUDPPorts = [ 443 ]; # QUIC / HTTP/3
 
-    # Allow group read access to logs (for CrowdSec and Promtail)
+    # Allow group read access to logs (for CrowdSec and Alloy)
     systemd.services.caddy.serviceConfig.UMask = "0027";
 
     systemd.tmpfiles.rules = [

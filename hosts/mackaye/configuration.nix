@@ -38,7 +38,7 @@
   } ];
 
   my.features.services.monitoring.node-exporter.enable = true;
-  my.features.services.monitoring.promtail = {
+  my.features.services.monitoring.alloy = {
     enable = true;
     lokiHost = "127.0.0.1";
   };
