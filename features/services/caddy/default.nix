@@ -55,8 +55,8 @@ in
             name = if conf.fullDomain != null then conf.fullDomain else "${conf.subdomain}.${cfg.baseDomain}";
             value = {
               extraConfig = ''
-                reverse_proxy 127.0.0.1:${toString conf.port}
                 ${lib.optionalString conf.auth "import authentik"}
+                reverse_proxy 127.0.0.1:${toString conf.port}
               '';
             };
           };
