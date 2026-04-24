@@ -72,6 +72,18 @@
     auth = true;
   };
 
+  my.features.services.lidarr.enable = true;
+  my.features.services.lidarr.expose = {
+    enable = true;
+    auth = true;
+  };
+
+  my.features.services.navidrome.enable = true;
+  my.features.services.navidrome.expose = {
+    enable = true;
+    auth = false; # Navidrome has its own auth, but can be put behind Authentik if needed.
+  };
+
   my.features.services.jellyfin.enable = true;
   my.features.services.jellyfin.expose = {
     enable = true;
