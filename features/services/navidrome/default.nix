@@ -23,8 +23,21 @@ in
     };
     users.groups.navidrome = { };
 
+    # SOPS Secrets for Metadata Services
+    sops.secrets.navidrome_lastfm_api_key = { owner = "navidrome"; };
+    sops.secrets.navidrome_lastfm_secret = { owner = "navidrome"; };
+
+    sops.templates."navidrome.env" = {
+      owner = "navidrome";
+      content = ''
+        ND_LASTFM_APIKEY=${config.sops.placeholder.navidrome_lastfm_api_key}
+        ND_LASTFM_SECRET=${config.sops.placeholder.navidrome_lastfm_secret}
+      '';
+    };
+
     services.navidrome = {
       enable = true;
+      environmentFiles = [ config.sops.templates."navidrome.env".path ];
       settings = {
         MusicFolder = "/data/storage/music";
         Address = "0.0.0.0";
@@ -33,6 +46,11 @@ in
         "ExtAuth.TrustedSources" = "127.0.0.1/32";
         "ExtAuth.UserHeader" = "X-Authentik-Username";
         "ExtAuth.LogoutURL" = "https://${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}/outpost.goauthentik.io/sign_out";
+
+        # Performance & Metadata
+        "TranscodingCacheSize" = "2GB";
+        "LastFM.Enabled" = true;
+        "LastFM.Language" = "de";
       };
     };
 
