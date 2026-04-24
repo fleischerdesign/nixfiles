@@ -29,6 +29,10 @@ in
         MusicFolder = "/data/storage/music";
         Address = "0.0.0.0";
         Port = 4533;
+        # Forward Auth via Authentik
+        "ExtAuth.TrustedSources" = "127.0.0.1/32";
+        "ExtAuth.UserHeader" = "X-Authentik-Username";
+        "ExtAuth.LogoutURL" = "https://${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}/outpost.goauthentik.io/auth/logout";
       };
     };
 
