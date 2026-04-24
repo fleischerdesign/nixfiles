@@ -37,7 +37,7 @@ in
 
     services.navidrome = {
       enable = true;
-      environmentFiles = [ config.sops.templates."navidrome.env".path ];
+      environmentFile = config.sops.templates."navidrome.env".path;
       settings = {
         MusicFolder = "/data/storage/music";
         Address = "0.0.0.0";
