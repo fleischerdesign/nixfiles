@@ -39,13 +39,9 @@ in
       # Authentik Snippet
       extraConfig = ''
         (authentik) {
-          route {
-            reverse_proxy /outpost.goauthentik.io/* 127.0.0.1:9000
-            forward_auth 127.0.0.1:9000 {
-              uri /outpost.goauthentik.io/auth/caddy
-              copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
-              trusted_proxies private_ranges
-            }
+          # Handle outpost paths (callback, sign_out, etc) directly
+          handle /outpost.goauthentik.io/* {
+            reverse_proxy 127.0.0.1:9000
           }
         }
       '';
@@ -56,8 +52,17 @@ in
           mkVHost = name: conf: {
             name = if conf.fullDomain != null then conf.fullDomain else "${conf.subdomain}.${cfg.baseDomain}";
             value = {
-              extraConfig = ''
-                ${lib.optionalString conf.auth "import authentik"}
+              extraConfig = if conf.auth then ''
+                import authentik
+                handle {
+                  forward_auth 127.0.0.1:9000 {
+                    uri /outpost.goauthentik.io/auth/caddy
+                    copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
+                    trusted_proxies private_ranges
+                  }
+                  reverse_proxy 127.0.0.1:${toString conf.port}
+                }
+              '' else ''
                 reverse_proxy 127.0.0.1:${toString conf.port}
               '';
             };
