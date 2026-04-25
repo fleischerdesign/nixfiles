@@ -29,6 +29,7 @@ in
       moonlight-qt
       packet
       yaak
+      feishin
       jellyfin-desktop
       inkscape
       evince
