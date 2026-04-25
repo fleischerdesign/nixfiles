@@ -31,6 +31,7 @@ in
       yaak
       feishin
       jellyfin-desktop
+      mpv
       inkscape
       evince
       libreoffice-fresh
