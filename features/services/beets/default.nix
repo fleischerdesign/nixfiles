@@ -22,6 +22,7 @@ in
       directory: ${cfg.musicDirectory}
       library: /var/lib/beets/musiclibrary.db
       statefile: /var/lib/beets/state.pickle
+      artist_credit: yes
       import:
         write: true
         copy: false
@@ -31,7 +32,7 @@ in
         quiet_fallback: asis
         timid: false
         log: /var/lib/beets/import.log
-      plugins: [ mbsync, lastgenre, lyrics, scrub, info, chroma ]
+      plugins: [ mbsync, lastgenre, lyrics, scrub, info, chroma, discogs ]
       lastgenre:
         auto: true
         source: album
@@ -40,9 +41,8 @@ in
       chroma:
         auto: true
       match:
-        strong_rec_confidence: 0.10
-        medium_rec_confidence: 0.05
-        rec_gap: 0.1
+        strong_rec_thresh: 0.10
+        rec_gap_thresh: 0.1
     '';
 
     # Create library directory with access for media group
