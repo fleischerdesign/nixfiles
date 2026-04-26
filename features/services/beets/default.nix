@@ -25,7 +25,7 @@ in
         move: false
         resume: ask
         incremental: true
-        quiet_fallback: skip
+        quiet_fallback: asis
         timid: false
         log: /var/lib/beets/import.log
       plugins: [ mbsync, lastgenre, lyrics, scrub, info ]
