@@ -18,6 +18,7 @@ in
     environment.etc."beets/config.yaml".text = ''
       directory: ${cfg.musicDirectory}
       library: /var/lib/beets/musiclibrary.db
+      statefile: /var/lib/beets/state.pickle
       import:
         write: true
         copy: false
