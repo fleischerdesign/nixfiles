@@ -22,6 +22,7 @@ in
       directory: ${cfg.musicDirectory}
       library: /var/lib/beets/musiclibrary.db
       statefile: /var/lib/beets/state.pickle
+      configdir: /var/lib/beets
       artist_credit: yes
       import:
         write: true
