@@ -12,7 +12,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    environment.systemPackages = [ pkgs.beets ];
+    environment.systemPackages = [ 
+      pkgs.beets 
+      pkgs.chromaprint
+    ];
 
     # Global Beets Configuration
     environment.etc."beets/config.yaml".text = ''
@@ -28,12 +31,18 @@ in
         quiet_fallback: asis
         timid: false
         log: /var/lib/beets/import.log
-      plugins: [ mbsync, lastgenre, lyrics, scrub, info ]
+      plugins: [ mbsync, lastgenre, lyrics, scrub, info, chromaprint ]
       lastgenre:
         auto: true
         source: album
       lyrics:
         auto: true
+      chromaprint:
+        auto: true
+      match:
+        strong_rec_confidence: 0.10
+        medium_rec_confidence: 0.05
+        rec_gap: 0.1
     '';
 
     # Create library directory with access for media group
