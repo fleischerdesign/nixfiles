@@ -29,7 +29,6 @@ in
       moonlight-qt
       packet
       yaak
-      feishin
       jellyfin-desktop
       mpv
       inkscape

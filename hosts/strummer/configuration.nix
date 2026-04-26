@@ -73,18 +73,6 @@
     auth = true;
   };
 
-  my.features.services.lidarr.enable = true;
-  my.features.services.lidarr.expose = {
-    enable = true;
-    auth = true;
-  };
-
-  my.features.services.navidrome.enable = true;
-  my.features.services.navidrome.expose = {
-    enable = true;
-    auth = true;
-  };
-
   my.features.services.jellyfin.enable = true;
   my.features.services.jellyfin.expose = {
     enable = true;
@@ -97,7 +85,6 @@
   my.features.services.bazarr.expose.enable = true;
   my.features.services.jellyseerr.enable = true;
   my.features.services.jellyseerr.expose.enable = true;
-  my.features.services.beets.enable = true;
   my.features.services.cloudflare-dyndns.enable = true;
   my.features.services.cloudflare-dyndns.domains = [ "fls.ancoris.ovh" ];
 
