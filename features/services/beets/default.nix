@@ -17,12 +17,13 @@ in
       pkgs.chromaprint
     ];
 
+    environment.variables.BEETSDIR = "/var/lib/beets";
+
     # Global Beets Configuration
     environment.etc."beets/config.yaml".text = ''
       directory: ${cfg.musicDirectory}
       library: /var/lib/beets/musiclibrary.db
       statefile: /var/lib/beets/state.pickle
-      configdir: /var/lib/beets
       artist_credit: yes
       import:
         write: true
@@ -46,9 +47,11 @@ in
         rec_gap_thresh: 0.1
     '';
 
-    # Create library directory with access for media group
+    # Create library directory and symlink config so plugins can write to BEETSDIR
     systemd.tmpfiles.rules = [
       "d /var/lib/beets 2775 root media -"
+      "L+ /var/lib/beets/config.yaml - - - - /etc/beets/config.yaml"
+    ];
     ];
 
     # Automation script provided by the beets feature
