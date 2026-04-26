@@ -35,9 +35,9 @@ in
         auto: true
     '';
 
-    # Create library directory with access for lidarr and media group
+    # Create library directory with access for media group
     systemd.tmpfiles.rules = [
-      "d /var/lib/beets 0775 lidarr media -"
+      "d /var/lib/beets 2775 root media -"
     ];
 
     # Automation script provided by the beets feature
