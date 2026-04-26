@@ -44,7 +44,7 @@ in
     environment.etc."beets/lidarr-automator.sh" = {
       mode = "0755";
       text = ''
-        #!/bin/bash
+        #!${pkgs.bash}/bin/bash
         # Triggered by Lidarr: lidarr_eventtype, lidarr_album_path
         if [ "$lidarr_eventtype" == "Download" ] || [ "$lidarr_eventtype" == "AlbumDownload" ]; then
           echo "[$(date)] Beets: Tagging $lidarr_album_path" >> /var/lib/beets/import.log
