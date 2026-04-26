@@ -96,6 +96,7 @@
   my.features.services.bazarr.expose.enable = true;
   my.features.services.jellyseerr.enable = true;
   my.features.services.jellyseerr.expose.enable = true;
+  my.features.services.beets.enable = true;
   my.features.services.cloudflare-dyndns.enable = true;
   my.features.services.cloudflare-dyndns.domains = [ "fls.ancoris.ovh" ];
 

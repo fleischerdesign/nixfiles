@@ -59,8 +59,9 @@ in
       }];
     };
 
+    systemd.services.lidarr.path = [ pkgs.beets ];
     systemd.services.lidarr.serviceConfig = {
-      ReadWritePaths = [ "/data/storage/music" "/data/storage/downloads" ];
+      ReadWritePaths = [ "/data/storage/music" "/data/storage/downloads" "/var/lib/beets" ];
       UMask = lib.mkForce "0002";
     };
 
