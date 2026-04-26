@@ -52,7 +52,6 @@ in
       "d /var/lib/beets 2775 root media -"
       "L+ /var/lib/beets/config.yaml - - - - /etc/beets/config.yaml"
     ];
-    ];
 
     # Automation script provided by the beets feature
     environment.etc."beets/lidarr-automator.sh" = {
