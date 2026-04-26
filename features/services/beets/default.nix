@@ -23,8 +23,8 @@ in
     environment.etc."beets/config.yaml".text = ''
       directory: ${cfg.musicDirectory}
       library: /var/lib/beets/musiclibrary.db
-      statefile: /var/lib/beets/state.pickle
       artist_credit: yes
+      languages: [ en, de ]
       import:
         write: true
         copy: false
@@ -43,8 +43,13 @@ in
       chroma:
         auto: true
       match:
-        strong_rec_thresh: 0.10
+        strong_rec_thresh: 0.15
         rec_gap_thresh: 0.1
+        distance_weights:
+          media: 0.0
+        preferred:
+          media: ['Digital Media|File']
+          countries: ['DE', 'XW', 'US']
     '';
 
     # Create library directory and symlink config so plugins can write to BEETSDIR
