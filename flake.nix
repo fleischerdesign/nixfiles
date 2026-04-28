@@ -85,7 +85,6 @@
       # Zentralisierte Overlays
       overlays = [
         (import ./overlays/pip-on-top)
-        (import ./overlays/fix/openldap)
         inputs.nix-vscode-extensions.overlays.default
       ];
 
