@@ -45,8 +45,15 @@ in
         localIp = "192.168.178.27";
       };
 
-      jello = { };
-      yorke = { };
+      jello = {
+        tailscaleIp = "100.88.135.75";
+        localIp = "192.168.178.30";
+      };
+
+      yorke = {
+        tailscaleIp = "100.107.168.30";
+        localIp = "192.168.178.179";
+      };
     };
   };
 }

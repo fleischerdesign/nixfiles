@@ -24,7 +24,10 @@ in
         # Custom DNS Mapping (Split DNS)
         customDNS = {
           mapping = {
-            "fls.ancoris.ovh" = "192.168.178.27";
+            "fls.ancoris.ovh" = config.my.features.system.networking.topology.hosts.strummer.localIp;
+            "mky.ancoris.ovh" = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
+            "jello.ancoris.ovh" = config.my.features.system.networking.topology.hosts.jello.localIp;
+            "yorke.ancoris.ovh" = config.my.features.system.networking.topology.hosts.yorke.localIp;
           };
         };
 

@@ -102,6 +102,10 @@
   };
 
   my.features.system.networking.tailscale.enable = true;
+  my.features.system.networking.tailscale.subnetRouter = {
+    enable = true;
+    routes = [ "192.168.178.0/24" ];
+  };
 
   my.features.services.crowdsec.enable = true;
   my.features.services.crowdsec.role = "agent";
