@@ -58,6 +58,7 @@ in
     };
 
     documentation.man.cache.enable = false; # Disable man cache generation
+    documentation.doc.enable = false; # Disable HTML/Info documentation generation
 
     # System packages to be installed
     environment.systemPackages = with pkgs; [
