@@ -25,6 +25,7 @@ final: prev: {
           rev = version;
           hash = "sha256-XmTsD5vVFi+q9gf5lMqro5OcWhgRX573cc4gUozA1Hs=";
         };
+        sourceRoot = "source/vectors";
         postPatch = "";
       });
     })
