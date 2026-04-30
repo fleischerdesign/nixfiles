@@ -23,12 +23,10 @@ in
 
         # Custom DNS Mapping (Split DNS)
         customDNS = {
-          mapping = {
-            "fls.ancoris.ovh" = config.my.features.system.networking.topology.hosts.strummer.localIp;
-            "mky.ancoris.ovh" = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
-            "jello.ancoris.ovh" = config.my.features.system.networking.topology.hosts.jello.localIp;
-            "yorke.ancoris.ovh" = config.my.features.system.networking.topology.hosts.yorke.localIp;
-          };
+          mapping = lib.mapAttrs' (name: host: {
+            name = host.domain;
+            value = if host.tailscaleIp != null then host.tailscaleIp else host.localIp;
+          }) config.my.features.system.networking.topology.hosts;
         };
 
         # Ad-blocking configuration
