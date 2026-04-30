@@ -21,13 +21,16 @@ final: prev: {
         '';
       });
 
-      cryptography_vectors = pprev.cryptography_vectors.overrideAttrs (old: {
-        version = "47.0.0";
-        src = pfinal.cryptography.src;
+      cryptography_vectors = pprev.buildPythonPackage {
+        pname = "cryptography-vectors";
+        inherit (pfinal.cryptography) version src;
+        pyproject = true;
         sourceRoot = "source/vectors";
-        dontPatch = true;
-        postPatch = "";
-      });
+        build-system = [ pprev.uv-build ];
+        doCheck = false;
+        pythonImportsCheck = [ "cryptography_vectors" ];
+        meta = pprev.cryptography_vectors.meta;
+      };
     })
   ];
 }
