@@ -22,8 +22,10 @@ final: prev: {
       });
 
       cryptography_vectors = pprev.cryptography_vectors.overrideAttrs (old: {
-        inherit (pfinal.cryptography) version src;
+        version = "47.0.0";
+        src = pfinal.cryptography.src;
         sourceRoot = "source/vectors";
+        dontPatch = true;
         postPatch = "";
       });
     })
