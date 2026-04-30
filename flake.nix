@@ -86,7 +86,6 @@
       overlays = [
         (import ./overlays/pip-on-top)
         (import ./overlays/fix/openldap)
-        (import ./overlays/fix/cryptography-pr)
         inputs.nix-vscode-extensions.overlays.default
       ];
 
