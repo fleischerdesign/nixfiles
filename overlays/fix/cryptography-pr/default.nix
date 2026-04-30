@@ -17,7 +17,7 @@ final: prev: {
         };
       });
 
-      cryptography-vectors = python-prev.cryptography-vectors.overrideAttrs (old: rec {
+      cryptography_vectors = python-prev.cryptography_vectors.overrideAttrs (old: rec {
         version = "47.0.0";
         src = prev.fetchFromGitHub {
           owner = "pyca";
