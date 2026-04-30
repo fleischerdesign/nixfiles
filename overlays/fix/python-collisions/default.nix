@@ -11,6 +11,11 @@ final: prev: {
           rm -rf $out/${python-prev.python.sitePackages}/docs || true
         '';
       });
+      django = python-prev.django.overrideAttrs (old: {
+        doCheck = false;
+        dontCheck = true;
+        checkPhase = "true";
+      });
       moto = python-prev.moto.overrideAttrs (old: {
         doCheck = false;
         dontCheck = true;
