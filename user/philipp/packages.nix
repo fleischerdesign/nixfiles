@@ -30,7 +30,6 @@ in
       packet
       yaak
       jellyfin-desktop
-      mpv
       inkscape
       evince
       libreoffice-fresh
