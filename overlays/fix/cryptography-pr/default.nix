@@ -1,12 +1,12 @@
 final: prev: {
   pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-    (python-final: python-prev: {
-      cryptography = python-prev.cryptography.overrideAttrs (old: rec {
+    (pfinal: pprev: {
+      cryptography = pprev.cryptography.overrideAttrs (old: rec {
         version = "47.0.0";
         src = prev.fetchFromGitHub {
           owner = "pyca";
           repo = "cryptography";
-          rev = version;
+          tag = version;
           hash = "sha256-XmTsD5vVFi+q9gf5lMqro5OcWhgRX573cc4gUozA1Hs=";
         };
         cargoDeps = prev.rustPlatform.fetchCargoVendor {
@@ -15,16 +15,14 @@ final: prev: {
           inherit version;
           hash = "sha256-RpNSJ4WKnKtqzR1qs223DAM4i0etb4ddL1lZ+PeduVU=";
         };
+        postPatch = ''
+          substituteInPlace pyproject.toml \
+            --replace-fail "--benchmark-disable" ""
+        '';
       });
 
-      cryptography_vectors = python-prev.cryptography_vectors.overrideAttrs (old: rec {
-        version = "47.0.0";
-        src = prev.fetchFromGitHub {
-          owner = "pyca";
-          repo = "cryptography";
-          rev = version;
-          hash = "sha256-XmTsD5vVFi+q9gf5lMqro5OcWhgRX573cc4gUozA1Hs=";
-        };
+      cryptography_vectors = pprev.cryptography_vectors.overrideAttrs (old: {
+        inherit (pfinal.cryptography) version src;
         sourceRoot = "source/vectors";
         postPatch = "";
       });
