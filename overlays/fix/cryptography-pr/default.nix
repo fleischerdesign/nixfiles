@@ -15,22 +15,13 @@ final: prev: {
           inherit version;
           hash = "sha256-RpNSJ4WKnKtqzR1qs223DAM4i0etb4ddL1lZ+PeduVU=";
         };
-        postPatch = ''
-          substituteInPlace pyproject.toml \
-            --replace-fail "--benchmark-disable" ""
-        '';
       });
 
-      cryptography_vectors = pprev.buildPythonPackage {
-        pname = "cryptography-vectors";
+      cryptography_vectors = pprev.cryptography_vectors.overrideAttrs (old: rec {
         inherit (pfinal.cryptography) version src;
-        pyproject = true;
-        sourceRoot = "source/vectors";
-        build-system = [ pprev.uv-build ];
-        doCheck = false;
-        pythonImportsCheck = [ "cryptography_vectors" ];
-        meta = pprev.cryptography_vectors.meta;
-      };
+        sourceRoot = "${src.name}/vectors";
+        postPatch = null;
+      });
     })
   ];
 }
