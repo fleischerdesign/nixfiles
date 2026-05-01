@@ -35,9 +35,9 @@ in
                   { for = [ "192.168.178.0/24" ]; answer = host.localIp; }
                   { answer = host.tailscaleIp; }
                 ]
-                else [
-                  { answer = if host.tailscaleIp != null then host.tailscaleIp else host.localIp; }
-                ];
+                else if host.tailscaleIp != null
+                then host.tailscaleIp
+                else host.localIp;
             in
             lib.mapAttrs' (name: host: {
               name = host.domain;
