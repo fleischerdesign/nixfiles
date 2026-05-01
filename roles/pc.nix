@@ -18,6 +18,8 @@
       wayland.enable = lib.mkDefault true;
       fish-shell.enable = lib.mkDefault true;
       printing.enable = lib.mkDefault true;
+      networking.ssh.enable = lib.mkDefault true;
+      networking.topology.enable = lib.mkDefault true;
     };
   };
 }
