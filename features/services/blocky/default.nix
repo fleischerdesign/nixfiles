@@ -21,13 +21,26 @@ in
           "https://dns.google/dns-query"
         ];
 
+        # Bootstrap DNS — bricht den DNS-Loop (Blocky → System-Resolver → MagicDNS → Blocky)
+        # Löst DoH-Upstream-Hostnames via Plain-DNS auf, ohne den System-Resolver zu nutzen
+        bootstrapDns = [
+          { upstream = "1.1.1.1"; }
+          { upstream = "9.9.9.9"; }
+        ];
+
         # Custom DNS Mapping (Split DNS)
         # Subdomains werden automatisch mit aufgelöst (Blocky-Feature)
-        # Tailscale-Clients erreichen die lokalen IPs via Subnet-Router auf strummer
+        # Heimnetz-Hosts: lokale IP (via LAN oder Subnet-Router)
+        # Externe Hosts (mackaye): Tailscale-IP (lokale IP nicht erreichbar)
         customDNS = {
           mapping = lib.mapAttrs' (name: host: {
             name = host.domain;
-            value = if host.localIp != null then host.localIp else host.tailscaleIp;
+            value =
+              if host.localIp != null && lib.hasPrefix "192.168.178." host.localIp
+              then host.localIp
+              else if host.tailscaleIp != null
+              then host.tailscaleIp
+              else host.localIp;
           }) config.my.features.system.networking.topology.hosts;
         };
 
