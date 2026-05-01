@@ -18,18 +18,12 @@ in
 
   config = lib.mkIf cfg.enable {
     services.tailscale.enable = true;
-    services.tailscale.extraUpFlags = lib.mkIf cfg.subnetRouter.enable [
+    services.tailscale.useRoutingFeatures = lib.mkIf cfg.subnetRouter.enable "server";
+    services.tailscale.extraSetFlags = lib.mkIf cfg.subnetRouter.enable [
       "--advertise-routes=${lib.concatStringsSep "," cfg.subnetRouter.routes}"
     ];
 
-    # Erlaubt Tailscale Traffic durch die Firewall
     networking.firewall.checkReversePath = "loose";
     networking.firewall.trustedInterfaces = [ "tailscale0" ];
-
-    # Wenn Subnet Router aktiv ist, muss IP Forwarding an sein
-    boot.kernel.sysctl = lib.mkIf cfg.subnetRouter.enable {
-      "net.ipv4.ip_forward" = 1;
-      "net.ipv6.conf.all.forwarding" = 1;
-    };
   };
 }

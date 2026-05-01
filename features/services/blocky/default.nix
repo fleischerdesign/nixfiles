@@ -21,12 +21,28 @@ in
           "https://dns.google/dns-query"
         ];
 
-        # Custom DNS Mapping (Split DNS)
-        customDNS = {
-          mapping = lib.mapAttrs' (name: host: {
-            name = host.domain;
-            value = if host.tailscaleIp != null then host.tailscaleIp else host.localIp;
-          }) config.my.features.system.networking.topology.hosts;
+        # Conditional DNS Mapping (Split DNS)
+        # Geräte im Heimnetz (192.168.178.0/24) bekommen lokale IPs,
+        # alle anderen (Tailscale-Clients) bekommen Tailscale-IPs
+        conditional = {
+          mapping =
+            let
+              hosts = config.my.features.system.networking.topology.hosts;
+              isInHomeNetwork = ip: lib.hasPrefix "192.168.178." ip;
+              mkHostMapping = host:
+                if host.localIp != null && host.tailscaleIp != null && isInHomeNetwork host.localIp
+                then [
+                  { for = [ "192.168.178.0/24" ]; answer = host.localIp; }
+                  { answer = host.tailscaleIp; }
+                ]
+                else [
+                  { answer = if host.tailscaleIp != null then host.tailscaleIp else host.localIp; }
+                ];
+            in
+            lib.mapAttrs' (name: host: {
+              name = host.domain;
+              value = mkHostMapping host;
+            }) (lib.filterAttrs (name: host: host.domain != null) hosts);
         };
 
         # Ad-blocking configuration
