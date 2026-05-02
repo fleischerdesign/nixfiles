@@ -145,7 +145,7 @@ in
               }
               {
                 argv = [
-                  "axis"
+                  "axis-shell"
                   "--wallpaper"
                   "/etc/nixos/media/wallpaper.jpg"
                   "--locked"
