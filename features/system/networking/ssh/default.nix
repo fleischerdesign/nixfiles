@@ -16,6 +16,9 @@ in
   config = lib.mkIf cfg.enable {
     my.features.system.networking.topology.enable = lib.mkDefault true;
 
+    systemd.services.sshd.after = [ "network-online.target" ]
+      ++ lib.optional config.services.tailscale.enable "tailscaled.service";
+
     services.openssh = {
       enable = true;
       settings = {
