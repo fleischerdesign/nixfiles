@@ -126,6 +126,7 @@ in
               {
                 matches = [ { title = "^Bild im Bild$"; } ];
                 open-floating = true;
+                open-focused = false;
                 default-column-width.fixed = 480;
                 default-window-height.fixed = 270;
                 default-floating-position = {
