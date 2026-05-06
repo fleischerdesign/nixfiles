@@ -15,7 +15,6 @@ in
   config = lib.mkIf cfg.enable {
     services.jellyfin = {
       enable = true;
-      openFirewall = true;
 
       # Native Hardware Acceleration (New in NixOS 24.11/25.05+)
       hardwareAcceleration = {

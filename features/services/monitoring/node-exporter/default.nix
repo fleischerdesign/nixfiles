@@ -13,7 +13,6 @@ in
       enable = true;
       enabledCollectors = [ "systemd" "processes" ];
       port = 9100;
-      openFirewall = true;
     };
   };
 }

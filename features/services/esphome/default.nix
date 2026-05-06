@@ -20,7 +20,6 @@ in
     services.esphome = {
       enable = true;
       port = 6052;
-      openFirewall = true; 
     };
 
     networking.firewall.allowedUDPPorts = [ 5353 ];

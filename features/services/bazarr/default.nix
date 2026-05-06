@@ -15,7 +15,6 @@ in
   config = lib.mkIf cfg.enable {
     services.bazarr = {
       enable = true;
-      openFirewall = true;
     };
 
     # Ensure bazarr has access to the media files
