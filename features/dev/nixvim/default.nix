@@ -232,6 +232,18 @@ in
 
           # Keybindings
           keymaps = [
+            # --- Insert mode escape ---
+            {
+              mode = "i";
+              key = "jk";
+              action = "<Esc>";
+              options = {
+                noremap = true;
+                silent = true;
+                desc = "Exit insert mode with jk";
+              };
+            }
+
             {
               key = "<leader>ff";
               action = "<cmd>Telescope find_files<cr>";
