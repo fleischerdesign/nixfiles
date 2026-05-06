@@ -191,9 +191,5 @@
           }
         ) self.nixosConfigurations;
       };
-
-      checks = builtins.mapAttrs
-        (systemName: deployLib: deployLib.deployChecks self.deploy)
-        inputs.deploy-rs.lib;
     };
 }
