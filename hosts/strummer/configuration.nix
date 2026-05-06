@@ -8,19 +8,6 @@
 
   networking.hostName = "strummer";
 
-  users.users.philipp = {
-    isNormalUser = true;
-    description = "Philipp Fleischer";
-    extraGroups = [
-      "networkmanager"
-      "wheel"
-      "media"
-    ];
-    openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+bSErYniJev/+/UxsilaoxHGYW8oVpd3pYMQuuGStw fleis@Yorke"
-    ];
-  };
-
   services.caddy = {};
 
   # Features

@@ -4,8 +4,8 @@
 
 let
   lib = pkgs.lib;
+  userLib = import ./users.nix;
 
-  # Recursively find all default.nix files in a directory
   findModules = dir:
     let
       entries = builtins.readDir dir;
@@ -20,10 +20,9 @@ let
     in
     current ++ subModules;
 
-  # Main System Builder
   mkSystem = {
     system,
-    pkgs, # Fertige Instanz aus flake.nix
+    pkgs,
     hostname,
     inputs,
     users ? [],
@@ -33,8 +32,17 @@ let
     featuresDir = ../features;
     userDir = ../user;
     
-    # Automatically discover all feature modules
     allFeatureModules = findModules featuresDir;
+
+    nixosUsers = lib.listToAttrs (map (user: {
+      name = user.name;
+      value = {
+        isNormalUser = true;
+        inherit (userLib.${user.name}) description;
+        extraGroups = user.extraGroups or [ "networkmanager" "wheel" ];
+        openssh.authorizedKeys.keys = userLib.${user.name}.sshKeys;
+      };
+    }) users);
 
     homeManagerUsers = lib.listToAttrs (map (user: {
       name = user.name;
@@ -46,13 +54,12 @@ let
     }) users);
 
   in
-  # WICHTIG: nixosSystem muss vom Input kommen, nicht von der pkgs-Instanz
   inputs.nixpkgs-unstable.lib.nixosSystem {
     inherit system;
     specialArgs = { inherit inputs hostname; };
     modules = [
-      # Verwende die fertige pkgs Instanz
       { nixpkgs.pkgs = pkgs; }
+      { users.users = nixosUsers; }
       inputs.sops-nix.nixosModules.sops
     ]
     ++ extraModules

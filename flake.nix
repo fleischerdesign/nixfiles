@@ -64,6 +64,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    deploy-rs = {
+      url = "github:serokell/deploy-rs";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
   };
 
   outputs =
@@ -77,6 +82,7 @@
       spicetify-nix,
       disko,
       portfolio,
+      deploy-rs,
       ...
     }@inputs:
     let
@@ -113,6 +119,7 @@
           users = [
             {
               name = "philipp";
+              extraGroups = [ "networkmanager" "wheel" "adbusers" "input" "uinput" ];
               homeModules = [
                 inputs.nixcord.homeModules.nixcord
                 inputs.spicetify-nix.homeManagerModules.default
@@ -131,6 +138,7 @@
           users = [
             {
               name = "philipp";
+              extraGroups = [ "networkmanager" "wheel" "adbusers" "input" "uinput" ];
               homeModules = [
                 inputs.nixcord.homeModules.nixcord
                 inputs.spicetify-nix.homeManagerModules.default
@@ -145,6 +153,7 @@
           users = [
             {
               name = "philipp";
+              extraGroups = [ "networkmanager" "wheel" "media" ];
               homeModules = [ inputs.nixvim.homeModules.nixvim ];
             }
           ];
@@ -156,10 +165,35 @@
           users = [
             {
               name = "philipp";
+              extraGroups = [ "networkmanager" "wheel" ];
               homeModules = [ inputs.nixvim.homeModules.nixvim ];
             }
           ];
         };
       };
+
+      deploy = {
+        autoRollback = true;
+        magicRollback = true;
+
+        nodes = builtins.mapAttrs (name: _: 
+          let
+            hostConfig = self.nixosConfigurations.${name};
+          in
+          {
+            hostname = hostConfig.config.my.features.system.networking.topology.hosts.${name}.tailscaleIp;
+            profiles.system = {
+              user = "root";
+              sshUser = "root";
+              sshOpts = [ "-i" "/home/philipp/.ssh/deploy-key" ];
+              path = inputs.deploy-rs.lib.${system}.activate.nixos hostConfig;
+            };
+          }
+        ) self.nixosConfigurations;
+      };
+
+      checks = builtins.mapAttrs
+        (systemName: deployLib: deployLib.deployChecks self.deploy)
+        inputs.deploy-rs.lib;
     };
 }
