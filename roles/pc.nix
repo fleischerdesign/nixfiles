@@ -1,6 +1,6 @@
 # roles/pc.nix
 # This is the base role for any "Personal Computer", whether desktop or notebook.
-{ lib, ... }:
+{ config, lib, inputs, pkgs, ... }:
 
 {
   programs.kdeconnect.enable = true;
@@ -22,4 +22,8 @@
       networking.topology.enable = lib.mkDefault true;
     };
   };
+
+  environment.systemPackages = [
+    inputs.deploy-rs.packages.${pkgs.stdenv.hostPlatform.system}.default
+  ];
 }
