@@ -59,8 +59,8 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    carp = {
-      url = "github:fleischerdesign/Axis";
+    axis = {
+      url = "github:fleischerdesign/Axis/develop";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
@@ -114,7 +114,7 @@
           hostname = "yorke";
           extraModules = [
             inputs.niri.nixosModules.niri
-            inputs.carp.nixosModules.default
+            inputs.axis.nixosModules.default
           ];
           users = [
             {
@@ -133,7 +133,7 @@
           hostname = "jello";
           extraModules = [
             inputs.niri.nixosModules.niri
-            inputs.carp.nixosModules.default
+            inputs.axis.nixosModules.default
           ];
           users = [
             {

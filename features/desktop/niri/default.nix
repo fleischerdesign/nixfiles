@@ -92,7 +92,7 @@ in
         }:
         {
           home.packages = [
-            inputs.carp.packages.${pkgs.stdenv.hostPlatform.system}.default
+            inputs.axis.packages.${pkgs.stdenv.hostPlatform.system}.default
             pkgs.adwaita-icon-theme
             pkgs.brightnessctl
             pkgs.libnotify
