@@ -43,7 +43,7 @@ in
     my.features.system.networking.topology.hosts = {
       mackaye = {
         tailscaleIp = "100.120.39.68";
-        localIp = "192.168.1.10";
+        localIp = "173.249.22.211";
         domain = "mky.ancoris.ovh";
       };
 

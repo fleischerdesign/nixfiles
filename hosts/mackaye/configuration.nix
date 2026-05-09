@@ -17,11 +17,11 @@
   my.features.system.common.geoip.enable = true;
 
   networking.useDHCP = false;
-  networking.interfaces.ens18.useDHCP = false;
-  networking.defaultGateway = "37.114.55.1";
+  networking.interfaces.eth0.useDHCP = false;
+  networking.defaultGateway = "173.249.22.1";
   networking.nameservers = [ "9.9.9.9" "1.1.1.1" ];
-  networking.interfaces.ens18.ipv4.addresses = [ {
-    address = "37.114.55.91";
+  networking.interfaces.eth0.ipv4.addresses = [ {
+    address = "173.249.22.211";
     prefixLength = 24;
   } ];
 
@@ -45,10 +45,10 @@
     coreAddress = "http://127.0.0.1:9055";
     tokenSecretName = "authentik_outpost_ldap_token_mackaye";
   };
-  my.features.services.plausible.enable = true;
+
   my.features.services.portfolio.enable = true;
   my.features.services.couchdb.enable = true;
-  my.features.services.homarr.enable = true;
+
   my.features.services.ntfy.enable = true;
   my.features.system.backups.restic = {
     enable = true;
