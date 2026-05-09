@@ -8,16 +8,23 @@
           type = "gpt";
           partitions = {
             boot = {
-              size = "1M";
-              type = "EF02"; # BIOS Boot Partition
-              priority = 1;
+              size = "4M";
+              type = "EF02"; # BIOS Boot Partition (sda14)
+            };
+            ESP = {
+              size = "106M";
+              type = "EF00"; # EFI System (sda15, unused)
+              content = {
+                type = "filesystem";
+                format = "vfat";
+              };
             };
             root = {
               size = "100%";
               content = {
                 type = "filesystem";
                 format = "ext4";
-                mountpoint = "/";
+                mountpoint = "/"; # sda1
               };
             };
           };
