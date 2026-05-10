@@ -2,7 +2,7 @@ name: Flake Update
 
 on:
   schedule:
-    - cron: "0 6 * * 1"
+    - cron: "0 6 * * *"
   workflow_dispatch:
 
 jobs:
@@ -24,6 +24,7 @@ jobs:
           title: "chore: update flake.lock"
           branch: "flake-update/$(date +%Y-%m-%d)"
           delete-branch: true
+          automerge: true
           body: |
             Automatisches `nix flake update`.
 
