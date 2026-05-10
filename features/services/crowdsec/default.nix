@@ -27,6 +27,20 @@ in
     services.crowdsec = {
       enable = true;
 
+      localConfig.parsers.s02Enrich = [
+        {
+          name = "custom/trusted-internal";
+          description = "Whitelist internal LAN and Tailscale IPs";
+          whitelist = {
+            reason = "trusted internal network";
+            cidr = [
+              "192.168.178.0/24"
+              "100.64.0.0/10"
+            ];
+          };
+        }
+      ];
+
       hub.collections = [
         "crowdsecurity/linux"
         "crowdsecurity/caddy"
