@@ -1,0 +1,30 @@
+name: Flake Update
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update flake.lock
+        run: nix flake update --commit-lock-file
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          title: "chore: update flake.lock"
+          branch: "flake-update/$(date +%Y-%m-%d)"
+          delete-branch: true
+          body: |
+            Automatisches `nix flake update`.
+
+            Bitte `nix flake check` Ergebnis prüfen vor dem Mergen.

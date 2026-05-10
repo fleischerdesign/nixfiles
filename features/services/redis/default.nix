@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.redis;
 in
@@ -14,7 +19,7 @@ in
       port = 6379;
       bind = "127.0.0.1";
       # Optional: Persistence configuration if needed
-      appendOnly = true; 
+      appendOnly = true;
     };
   };
 }

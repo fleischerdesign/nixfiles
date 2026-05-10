@@ -1,6 +1,12 @@
 # roles/pc.nix
 # This is the base role for any "Personal Computer", whether desktop or notebook.
-{ config, lib, inputs, pkgs, ... }:
+{
+  config,
+  lib,
+  inputs,
+  pkgs,
+  ...
+}:
 
 {
   programs.kdeconnect.enable = true;

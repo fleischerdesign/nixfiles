@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.sabnzbd;
   domain = "${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}";
@@ -8,16 +13,25 @@ in
     enable = lib.mkEnableOption "SABnzbd Downloader";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "sabnzbd"; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "sabnzbd";
+      };
       auth = lib.mkEnableOption "Protect with Authentik";
     };
   };
 
   config = lib.mkIf cfg.enable {
     # 1. SOPS Secrets
-    sops.secrets.newsgroup_ninja_password = { owner = "sabnzbd"; };
-    sops.secrets.sabnzbd_api_key = { owner = "sabnzbd"; };
-    sops.secrets.sabnzbd_nzb_key = { owner = "sabnzbd"; };
+    sops.secrets.newsgroup_ninja_password = {
+      owner = "sabnzbd";
+    };
+    sops.secrets.sabnzbd_api_key = {
+      owner = "sabnzbd";
+    };
+    sops.secrets.sabnzbd_nzb_key = {
+      owner = "sabnzbd";
+    };
 
     # 2. Template for sensitive values
     sops.templates."sabnzbd-secret.ini" = {
@@ -47,7 +61,7 @@ in
           port = 8080;
           host = "0.0.0.0";
           host_whitelist = "${domain}, localhost, 127.0.0.1";
-          inet_exposure = 2; 
+          inet_exposure = 2;
           download_dir = "/data/storage/downloads/incomplete";
           complete_dir = "/data/storage/downloads/complete";
           permissions = "775";

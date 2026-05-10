@@ -1,5 +1,10 @@
 # features/system/fish-shell.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.system.fish-shell;

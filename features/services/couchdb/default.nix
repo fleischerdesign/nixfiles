@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.couchdb;
@@ -15,7 +20,7 @@ in
       package = pkgs.couchdb3;
       bindAddress = "127.0.0.1";
       port = 5984;
-      
+
       # Inject config via templates (passwords)
       extraConfigFiles = [ config.sops.templates."couchdb_admin.ini".path ];
 
@@ -34,8 +39,12 @@ in
     };
 
     # 2. SOPS Secrets
-    sops.secrets.couchdb_admin_password = { owner = "couchdb"; };
-    sops.secrets.couchdb_obsidian_password = { owner = "couchdb"; };
+    sops.secrets.couchdb_admin_password = {
+      owner = "couchdb";
+    };
+    sops.secrets.couchdb_obsidian_password = {
+      owner = "couchdb";
+    };
 
     # 3. Generate the admin config file (CouchDB 3.x uses [admins] section)
     sops.templates."couchdb_admin.ini" = {

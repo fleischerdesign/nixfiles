@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.linkwarden;
@@ -13,7 +18,7 @@ in
       enable = true;
       host = "127.0.0.1";
       port = 3010;
-      
+
       # Use central postgres
       database = {
         host = "/run/postgresql";
@@ -27,7 +32,7 @@ in
         # Linkwarden specific: NEXTAUTH_URL must end with /api/v1/auth
         NEXTAUTH_URL = "https://linkwarden.mky.ancoris.ovh/api/v1/auth";
         BASE_URL = "https://linkwarden.mky.ancoris.ovh";
-        
+
         NEXT_PUBLIC_DISABLE_REGISTRATION = "true";
         NEXT_PUBLIC_CREDENTIALS_ENABLED = "false";
       };
@@ -59,6 +64,8 @@ in
     # AUTHENTIK_CLIENT_ID=...
     # AUTHENTIK_CLIENT_SECRET=...
     # NEXTAUTH_SECRET=... (random string)
-    sops.secrets.linkwarden_env = { owner = "linkwarden"; };
+    sops.secrets.linkwarden_env = {
+      owner = "linkwarden";
+    };
   };
 }

@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.paperless;
 in
@@ -7,7 +12,10 @@ in
     enable = lib.mkEnableOption "Paperless-ngx Document Management";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "paperless"; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "paperless";
+      };
     };
   };
 
@@ -22,22 +30,24 @@ in
     # 2. Template for the sensitive JSON Auth variable
     sops.templates."paperless.env" = {
       content = ''
-        PAPERLESS_SOCIALACCOUNT_PROVIDERS=${builtins.toJSON {
-          openid_connect = {
-            APPS = [
-              {
-                provider_id = "authentik";
-                name = "Authentik";
-                client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
-                secret = config.sops.placeholder.paperless_oidc_secret;
-                settings = {
-                  server_url = "https://auth.ancoris.ovh/application/o/paperless";
-                };
-              }
-            ];
-            OAUTH_PKCE_ENABLED = "True";
-          };
-        }}
+        PAPERLESS_SOCIALACCOUNT_PROVIDERS=${
+          builtins.toJSON {
+            openid_connect = {
+              APPS = [
+                {
+                  provider_id = "authentik";
+                  name = "Authentik";
+                  client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
+                  secret = config.sops.placeholder.paperless_oidc_secret;
+                  settings = {
+                    server_url = "https://auth.ancoris.ovh/application/o/paperless";
+                  };
+                }
+              ];
+              OAUTH_PKCE_ENABLED = "True";
+            };
+          }
+        }
       '';
     };
 
@@ -63,7 +73,7 @@ in
       enable = true;
       port = 28981;
       address = "127.0.0.1";
-      
+
       mediaDir = "/data/storage/docs/media";
       consumptionDir = "/data/storage/docs/consume";
 
@@ -76,7 +86,7 @@ in
         PAPERLESS_URL = "https://${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}";
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
-        
+
         # Stability and Proxy Fixes
         PAPERLESS_SOCIALACCOUNT_REQUESTS_TIMEOUT = "30";
         PAPERLESS_USE_X_FORWARD_HOST = "true";
@@ -109,9 +119,12 @@ in
         REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
       };
     };
-    systemd.services.paperless-consumer.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-    systemd.services.paperless-task-queue.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-    systemd.services.paperless-scheduler.serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
+    systemd.services.paperless-consumer.serviceConfig.EnvironmentFile =
+      config.sops.templates."paperless.env".path;
+    systemd.services.paperless-task-queue.serviceConfig.EnvironmentFile =
+      config.sops.templates."paperless.env".path;
+    systemd.services.paperless-scheduler.serviceConfig.EnvironmentFile =
+      config.sops.templates."paperless.env".path;
 
     # Scanner Service
     virtualisation.oci-containers.backend = "podman";

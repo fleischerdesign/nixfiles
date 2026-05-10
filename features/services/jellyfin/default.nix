@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.jellyfin;
 in
@@ -7,8 +12,13 @@ in
     enable = lib.mkEnableOption "Jellyfin Media Server";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "jelly"; };
-      auth = lib.mkEnableOption "Protect with Authentik" // { default = false; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "jelly";
+      };
+      auth = lib.mkEnableOption "Protect with Authentik" // {
+        default = false;
+      };
     };
   };
 
@@ -44,13 +54,17 @@ in
 
     # Permissions
     users.groups.media = { };
-    users.users.jellyfin.extraGroups = [ "media" "video" "render" ];
+    users.users.jellyfin.extraGroups = [
+      "media"
+      "video"
+      "render"
+    ];
 
     # Register with Caddy Feature
     my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
       "jellyfin" = {
         port = 8096;
-        auth = cfg.expose.auth; 
+        auth = cfg.expose.auth;
         subdomain = cfg.expose.subdomain;
       };
     };

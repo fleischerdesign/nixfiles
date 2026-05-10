@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.radarr;
 in
@@ -7,7 +12,10 @@ in
     enable = lib.mkEnableOption "Radarr Movie Manager";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "radarr"; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "radarr";
+      };
       auth = lib.mkEnableOption "Protect with Authentik";
     };
   };
@@ -25,7 +33,9 @@ in
     users.groups.radarr = { };
 
     # SOPS Secret for API Key
-    sops.secrets.radarr_api_key = { owner = "radarr"; };
+    sops.secrets.radarr_api_key = {
+      owner = "radarr";
+    };
     sops.templates."radarr.env" = {
       owner = "radarr";
       content = "RADARR__AUTH__APIKEY=${config.sops.placeholder.radarr_api_key}";
@@ -51,16 +61,24 @@ in
     };
 
     services.postgresql = {
-      ensureDatabases = [ "radarr-main" "radarr-log" ];
-      ensureUsers = [{
-        name = "radarr";
-        ensureDBOwnership = false;
-        ensureClauses.superuser = true;
-      }];
+      ensureDatabases = [
+        "radarr-main"
+        "radarr-log"
+      ];
+      ensureUsers = [
+        {
+          name = "radarr";
+          ensureDBOwnership = false;
+          ensureClauses.superuser = true;
+        }
+      ];
     };
 
     systemd.services.radarr.serviceConfig = {
-      ReadWritePaths = [ "/data/storage/movies" "/data/storage/downloads" ];
+      ReadWritePaths = [
+        "/data/storage/movies"
+        "/data/storage/downloads"
+      ];
       UMask = lib.mkForce "0002";
     };
 

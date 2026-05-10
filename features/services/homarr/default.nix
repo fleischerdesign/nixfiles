@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.homarr;
@@ -20,16 +25,16 @@ in
         # Security
         AUTH_SECRET=${config.sops.placeholder.homarr_auth_secret}
         SECRET_ENCRYPTION_KEY=${config.sops.placeholder.homarr_encryption_key}
-        
+
         # URLs
         BASE_URL=https://ancoris.ovh
         NEXTAUTH_URL=https://ancoris.ovh
-        
+
         # Redis (Using Mackaye's native redis)
         REDIS_IS_EXTERNAL=true
         REDIS_HOST=127.0.0.1
         REDIS_PORT=6379
-        
+
         # Authentication Configuration
         AUTH_PROVIDERS=oidc
         AUTH_OIDC_AUTO_LOGIN=true
@@ -47,7 +52,7 @@ in
 
     # 3. Create persistent directory with correct UID for the container
     systemd.tmpfiles.rules = [
-      "d /var/lib/homarr 0755 1000 1000 -" 
+      "d /var/lib/homarr 0755 1000 1000 -"
     ];
 
     # 4. Homarr Container

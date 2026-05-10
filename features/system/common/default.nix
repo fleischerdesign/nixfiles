@@ -1,5 +1,10 @@
 # features/system/common.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.system.common;
@@ -11,7 +16,11 @@ in
   };
 
   options.my.role = lib.mkOption {
-    type = lib.types.enum [ "server" "desktop" "notebook" ];
+    type = lib.types.enum [
+      "server"
+      "desktop"
+      "notebook"
+    ];
     default = "server";
     description = "The role of this machine (server, desktop, notebook).";
   };

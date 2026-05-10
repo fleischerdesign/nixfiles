@@ -3,6 +3,7 @@ keys:
   - &philipp age1t2z30qm3c9x7n75nwsra7l97609fkmvz7wjqlsz9ahwsz4a50cwsvjly7j
   - &strummer age15vu7hfhm9ccprhrae3y59gx5dpx7k09ngt6zqynehjrlkhegzpsqk3ltth
   - &mackaye age1h38e8jystv3lstdxc6txltw2r804uh3geu8nz2x4je90krafs32qfyzk47
+  - &ci age19hdr3x7538f0w26dtj877srt7fg804hmhaktr053r9kme9veqv5q8d7w7g
 
 creation_rules:
   - path_regex: secrets/.*\.yaml$
@@ -12,3 +13,4 @@ creation_rules:
           - *philipp
           - *strummer
           - *mackaye
+          - *ci

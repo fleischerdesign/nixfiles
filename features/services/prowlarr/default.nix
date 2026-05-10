@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.prowlarr;
 in
@@ -7,7 +12,10 @@ in
     enable = lib.mkEnableOption "Prowlarr Indexer Manager";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "prowlarr"; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "prowlarr";
+      };
       auth = lib.mkEnableOption "Protect with Authentik";
     };
   };
@@ -25,7 +33,9 @@ in
     users.groups.prowlarr = { };
 
     # SOPS Secret for API Key
-    sops.secrets.prowlarr_api_key = { owner = "prowlarr"; };
+    sops.secrets.prowlarr_api_key = {
+      owner = "prowlarr";
+    };
     sops.templates."prowlarr.env" = {
       owner = "prowlarr";
       content = "PROWLARR__AUTH__APIKEY=${config.sops.placeholder.prowlarr_api_key}";
@@ -50,7 +60,10 @@ in
 
     # Ensure PostgreSQL database and user exist for Prowlarr
     services.postgresql = {
-      ensureDatabases = [ "prowlarr-main" "prowlarr-log" ];
+      ensureDatabases = [
+        "prowlarr-main"
+        "prowlarr-log"
+      ];
       ensureUsers = [
         {
           name = "prowlarr";

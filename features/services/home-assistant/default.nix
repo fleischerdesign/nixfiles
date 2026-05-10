@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.home-assistant;
 in
@@ -7,13 +12,18 @@ in
     enable = lib.mkEnableOption "Home Assistant";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "hass"; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "hass";
+      };
       auth = lib.mkEnableOption "Protect with Authentik";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    sops.secrets.hass_now_api_token = { owner = "hass"; };
+    sops.secrets.hass_now_api_token = {
+      owner = "hass";
+    };
 
     sops.templates."hass-rest-commands.yaml" = {
       owner = "hass";
@@ -77,8 +87,8 @@ in
       ];
       config = {
         # This generates the configuration.yaml
-        default_config = {};
-        
+        default_config = { };
+
         # Enable UI editing
         "automation ui" = "!include automations.yaml";
         "script ui" = "!include scripts.yaml";
@@ -88,7 +98,10 @@ in
         http = {
           server_port = 8123;
           use_x_forwarded_for = true;
-          trusted_proxies = [ "127.0.0.1" "::1" ];
+          trusted_proxies = [
+            "127.0.0.1"
+            "::1"
+          ];
         };
       };
     };
@@ -98,7 +111,10 @@ in
 
     # Allow Home Assistant to access Zigbee USB sticks
     users.users.hass = {
-      extraGroups = [ "dialout" "tty" ];
+      extraGroups = [
+        "dialout"
+        "tty"
+      ];
     };
 
     # mDNS for device discovery (Cast, IPP, ESPHome)

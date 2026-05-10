@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.blocky;
 in
@@ -12,7 +17,7 @@ in
       enable = true;
       settings = {
         # Network configuration - Blocky expects the port or address:port
-        ports.dns = 53; 
+        ports.dns = 53;
         ports.http = 4000; # Port for metrics and API
 
         # Upstream DNS (using DNS-over-HTTPS for privacy)
@@ -36,11 +41,12 @@ in
           mapping = lib.mapAttrs' (name: host: {
             name = host.domain;
             value =
-              if host.localIp != null && lib.hasPrefix "192.168.178." host.localIp
-              then host.localIp
-              else if host.tailscaleIp != null
-              then host.tailscaleIp
-              else host.localIp;
+              if host.localIp != null && lib.hasPrefix "192.168.178." host.localIp then
+                host.localIp
+              else if host.tailscaleIp != null then
+                host.tailscaleIp
+              else
+                host.localIp;
           }) config.my.features.system.networking.topology.hosts;
         };
 

@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.cloudflare-dyndns;
 in
@@ -7,7 +12,7 @@ in
     enable = lib.mkEnableOption "Cloudflare Dynamic DNS";
     domains = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [];
+      default = [ ];
       description = "List of domains/subdomains to update (e.g. ['home.example.com'])";
     };
   };
@@ -21,7 +26,7 @@ in
       apiTokenFile = config.sops.secrets.cloudflare_api_token.path;
       domains = cfg.domains;
       # Update every 5 minutes
-      frequency = "*:0/5"; 
+      frequency = "*:0/5";
     };
   };
 }

@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.mealie;
 in
@@ -7,16 +12,25 @@ in
     enable = lib.mkEnableOption "Mealie Recipe Manager";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "mealie"; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "mealie";
+      };
       auth = lib.mkEnableOption "Protect with Authentik";
     };
   };
 
   config = lib.mkIf cfg.enable {
     # 1. Load individual secrets from sops file
-    sops.secrets.mealie_smtp_password = { sopsFile = ../../../secrets/secrets.yaml; };
-    sops.secrets.mealie_oidc_secret = { sopsFile = ../../../secrets/secrets.yaml; };
-    sops.secrets.mealie_openai_key = { sopsFile = ../../../secrets/secrets.yaml; };
+    sops.secrets.mealie_smtp_password = {
+      sopsFile = ../../../secrets/secrets.yaml;
+    };
+    sops.secrets.mealie_oidc_secret = {
+      sopsFile = ../../../secrets/secrets.yaml;
+    };
+    sops.secrets.mealie_openai_key = {
+      sopsFile = ../../../secrets/secrets.yaml;
+    };
 
     # 2. Create a template file that combines them into ENV format
     sops.templates."mealie.env" = {
@@ -31,7 +45,7 @@ in
       enable = true;
       port = 9025;
       listenAddress = "127.0.0.1";
-      
+
       # 3. Point Mealie to the generated template file
       credentialsFile = config.sops.templates."mealie.env".path;
 
@@ -39,7 +53,7 @@ in
         ALLOW_SIGNUP = "false";
         TZ = "Europe/Berlin";
         BASE_URL = "https://${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}";
-        
+
         # SMTP Configuration
         SMTP_HOST = "mail.smtp2go.com";
         SMTP_PORT = "2525";

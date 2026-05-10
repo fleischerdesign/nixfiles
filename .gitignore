@@ -1,6 +1,6 @@
 result
 log
-.envrc
+.direnv
 *.drv
 *.o
 *.docbook

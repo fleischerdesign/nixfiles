@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.ntfy;
@@ -10,12 +15,14 @@ in
 
   config = lib.mkIf cfg.enable {
     # Secret für den Token (wird von Grafana mitgenutzt)
-    sops.secrets.grafana_ntfy_token = { 
+    sops.secrets.grafana_ntfy_token = {
       owner = "ntfy-sh";
       group = "grafana";
       mode = "0440"; # Nur Besitzer und Gruppe dürfen lesen
     };
-    sops.secrets.ntfy_users = { owner = "ntfy-sh"; };
+    sops.secrets.ntfy_users = {
+      owner = "ntfy-sh";
+    };
 
     # Template für ntfy env, um Token deklarativ einzubauen
     sops.templates."ntfy.env".content = ''
@@ -43,7 +50,7 @@ in
 
     my.features.services.caddy.exposedServices.ntfy = {
       port = 8083;
-      auth = false; 
+      auth = false;
     };
   };
 }

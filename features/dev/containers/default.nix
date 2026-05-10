@@ -1,5 +1,10 @@
 # features/dev/containers.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.dev.containers;
@@ -10,7 +15,7 @@ in
 
     users = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [];
+      default = [ ];
       description = "List of system users to add to the 'docker' group.";
     };
   };

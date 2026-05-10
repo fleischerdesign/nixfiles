@@ -1,4 +1,9 @@
-{ config, pkgs, inputs, ... }:
+{
+  config,
+  pkgs,
+  inputs,
+  ...
+}:
 {
   imports = [
     ./hardware-configuration.nix
@@ -19,11 +24,16 @@
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = false;
   networking.defaultGateway = "173.249.22.1";
-  networking.nameservers = [ "9.9.9.9" "1.1.1.1" ];
-  networking.interfaces.eth0.ipv4.addresses = [ {
-    address = "173.249.22.211";
-    prefixLength = 24;
-  } ];
+  networking.nameservers = [
+    "9.9.9.9"
+    "1.1.1.1"
+  ];
+  networking.interfaces.eth0.ipv4.addresses = [
+    {
+      address = "173.249.22.211";
+      prefixLength = 24;
+    }
+  ];
 
   my.features.services.monitoring.node-exporter.enable = true;
   my.features.services.monitoring.alloy = {
@@ -54,8 +64,8 @@
     enable = true;
     environmentFile = "restic_env_mackaye";
   };
-  
+
   my.features.dev.nixvim.enable = true;
 
-  system.stateVersion = "24.11"; 
+  system.stateVersion = "24.11";
 }

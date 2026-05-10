@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.monitoring.grafana;
@@ -10,10 +15,16 @@ in
 
   config = lib.mkIf cfg.enable {
     # SOPS Secrets for OIDC and ntfy
-    sops.secrets.grafana_oidc_client_secret = { owner = "grafana"; };
-    sops.secrets.grafana_oidc_client_id = { owner = "grafana"; };
+    sops.secrets.grafana_oidc_client_secret = {
+      owner = "grafana";
+    };
+    sops.secrets.grafana_oidc_client_id = {
+      owner = "grafana";
+    };
     sops.secrets.grafana_ntfy_token = { }; # Definition from ntfy/default.nix
-    sops.secrets.grafana_secret_key = { owner = "grafana"; };
+    sops.secrets.grafana_secret_key = {
+      owner = "grafana";
+    };
 
     # Template for Grafana environment variables
     sops.templates."grafana.env".content = ''
@@ -40,7 +51,7 @@ in
         log = {
           level = "info";
         };
-        
+
         # OIDC Authentication with Authentik
         "auth.generic_oauth" = {
           enabled = true;
@@ -95,20 +106,30 @@ in
                     {
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = { 
-                        expr = "up{job=~\"node_.*\"}"; 
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      model = {
+                        expr = "up{job=~\"node_.*\"}";
                       };
                     }
                     {
                       refId = "B";
                       datasourceUid = "-100";
-                      model = { expression = "A"; type = "reduce"; reducer = "last"; };
+                      model = {
+                        expression = "A";
+                        type = "reduce";
+                        reducer = "last";
+                      };
                     }
                     {
                       refId = "C";
                       datasourceUid = "-100";
-                      model = { expression = "$B == 0"; type = "math"; };
+                      model = {
+                        expression = "$B == 0";
+                        type = "math";
+                      };
                     }
                   ];
                   annotations = {
@@ -124,8 +145,11 @@ in
                     {
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = { 
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      model = {
                         # Only monitor real persistent filesystems to avoid NaN errors from ramfs/tmpfs
                         expr = "(node_filesystem_avail_bytes{fstype=~\"ext4|xfs|zfs|vfat\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs|zfs|vfat\"} * 100)";
                       };
@@ -133,12 +157,19 @@ in
                     {
                       refId = "B";
                       datasourceUid = "-100";
-                      model = { expression = "A"; type = "reduce"; reducer = "last"; };
+                      model = {
+                        expression = "A";
+                        type = "reduce";
+                        reducer = "last";
+                      };
                     }
                     {
                       refId = "C";
                       datasourceUid = "-100";
-                      model = { expression = "$B < 10"; type = "math"; };
+                      model = {
+                        expression = "$B < 10";
+                        type = "math";
+                      };
                     }
                   ];
                   annotations = {
@@ -154,18 +185,30 @@ in
                     {
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = { expr = "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100)"; };
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      model = {
+                        expr = "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100)";
+                      };
                     }
                     {
                       refId = "B";
                       datasourceUid = "-100";
-                      model = { expression = "A"; type = "reduce"; reducer = "last"; };
+                      model = {
+                        expression = "A";
+                        type = "reduce";
+                        reducer = "last";
+                      };
                     }
                     {
                       refId = "C";
                       datasourceUid = "-100";
-                      model = { expression = "$B > 95"; type = "math"; };
+                      model = {
+                        expression = "$B > 95";
+                        type = "math";
+                      };
                     }
                   ];
                   annotations = {
@@ -181,18 +224,30 @@ in
                     {
                       refId = "A";
                       datasourceUid = "PBFA97CFB590B2093";
-                      relativeTimeRange = { from = 600; to = 0; };
-                      model = { expr = "node_systemd_unit_state{state=\"failed\"}"; };
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      model = {
+                        expr = "node_systemd_unit_state{state=\"failed\"}";
+                      };
                     }
                     {
                       refId = "B";
                       datasourceUid = "-100";
-                      model = { expression = "A"; type = "reduce"; reducer = "last"; };
+                      model = {
+                        expression = "A";
+                        type = "reduce";
+                        reducer = "last";
+                      };
                     }
                     {
                       refId = "C";
                       datasourceUid = "-100";
-                      model = { expression = "$B == 1"; type = "math"; };
+                      model = {
+                        expression = "$B == 1";
+                        type = "math";
+                      };
                     }
                   ];
                   annotations = {
@@ -207,7 +262,7 @@ in
         datasources.settings.datasources = [
           {
             name = "Prometheus";
-            uid = "PBFA97CFB590B2093"; 
+            uid = "PBFA97CFB590B2093";
             type = "prometheus";
             url = "http://localhost:9090";
             isDefault = true;

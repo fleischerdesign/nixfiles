@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.authentik.server;
@@ -10,7 +15,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    
+
     # 1. User & Group
     users.users.authentik = {
       isSystemUser = true;
@@ -18,14 +23,17 @@ in
       home = "/var/lib/authentik";
       createHome = true;
     };
-    users.groups.authentik = {};
+    users.groups.authentik = { };
 
     # 2. Authentik Server Service
     systemd.services.authentik-server = {
       description = "Authentik Server";
       wantedBy = [ "multi-user.target" ];
-      after = [ "postgresql.service" "redis.service" ];
-      
+      after = [
+        "postgresql.service"
+        "redis.service"
+      ];
+
       serviceConfig = {
         ExecStart = "${lib.getExe authentikPackage} server";
         User = "authentik";
@@ -55,8 +63,11 @@ in
     systemd.services.authentik-worker = {
       description = "Authentik Worker";
       wantedBy = [ "multi-user.target" ];
-      after = [ "postgresql.service" "redis.service" ];
-      
+      after = [
+        "postgresql.service"
+        "redis.service"
+      ];
+
       serviceConfig = {
         ExecStart = "${lib.getExe authentikPackage} worker";
         User = "authentik";

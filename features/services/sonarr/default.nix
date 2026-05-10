@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.sonarr;
 in
@@ -7,7 +12,10 @@ in
     enable = lib.mkEnableOption "Sonarr Series Manager";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "sonarr"; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "sonarr";
+      };
       auth = lib.mkEnableOption "Protect with Authentik";
     };
   };
@@ -25,7 +33,9 @@ in
     users.groups.sonarr = { };
 
     # SOPS Secret for API Key
-    sops.secrets.sonarr_api_key = { owner = "sonarr"; };
+    sops.secrets.sonarr_api_key = {
+      owner = "sonarr";
+    };
     sops.templates."sonarr.env" = {
       owner = "sonarr";
       content = "SONARR__AUTH__APIKEY=${config.sops.placeholder.sonarr_api_key}";
@@ -51,16 +61,24 @@ in
     };
 
     services.postgresql = {
-      ensureDatabases = [ "sonarr-main" "sonarr-log" ];
-      ensureUsers = [{
-        name = "sonarr";
-        ensureDBOwnership = false;
-        ensureClauses.superuser = true;
-      }];
+      ensureDatabases = [
+        "sonarr-main"
+        "sonarr-log"
+      ];
+      ensureUsers = [
+        {
+          name = "sonarr";
+          ensureDBOwnership = false;
+          ensureClauses.superuser = true;
+        }
+      ];
     };
 
     systemd.services.sonarr.serviceConfig = {
-      ReadWritePaths = [ "/data/storage/tv" "/data/storage/downloads" ];
+      ReadWritePaths = [
+        "/data/storage/tv"
+        "/data/storage/downloads"
+      ];
       UMask = lib.mkForce "0002";
     };
 

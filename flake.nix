@@ -108,6 +108,19 @@
       };
     in
     {
+      formatter.${system} = pkgs.nixfmt;
+
+      devShells.${system}.default = pkgs.mkShell {
+        packages = with pkgs; [
+          nixfmt
+          deadnix
+          statix
+          nil
+          sops
+          age
+        ];
+      };
+
       nixosConfigurations = {
         yorke = helpers.mkSystem {
           inherit system pkgs inputs;
@@ -119,7 +132,13 @@
           users = [
             {
               name = "philipp";
-              extraGroups = [ "networkmanager" "wheel" "adbusers" "input" "uinput" ];
+              extraGroups = [
+                "networkmanager"
+                "wheel"
+                "adbusers"
+                "input"
+                "uinput"
+              ];
               homeModules = [
                 inputs.nixcord.homeModules.nixcord
                 inputs.spicetify-nix.homeManagerModules.default
@@ -138,7 +157,13 @@
           users = [
             {
               name = "philipp";
-              extraGroups = [ "networkmanager" "wheel" "adbusers" "input" "uinput" ];
+              extraGroups = [
+                "networkmanager"
+                "wheel"
+                "adbusers"
+                "input"
+                "uinput"
+              ];
               homeModules = [
                 inputs.nixcord.homeModules.nixcord
                 inputs.spicetify-nix.homeManagerModules.default
@@ -153,7 +178,11 @@
           users = [
             {
               name = "philipp";
-              extraGroups = [ "networkmanager" "wheel" "media" ];
+              extraGroups = [
+                "networkmanager"
+                "wheel"
+                "media"
+              ];
               homeModules = [ inputs.nixvim.homeModules.nixvim ];
             }
           ];
@@ -165,7 +194,10 @@
           users = [
             {
               name = "philipp";
-              extraGroups = [ "networkmanager" "wheel" ];
+              extraGroups = [
+                "networkmanager"
+                "wheel"
+              ];
               homeModules = [ inputs.nixvim.homeModules.nixvim ];
             }
           ];
@@ -176,7 +208,8 @@
         autoRollback = true;
         magicRollback = true;
 
-        nodes = builtins.mapAttrs (name: _: 
+        nodes = builtins.mapAttrs (
+          name: _:
           let
             hostConfig = self.nixosConfigurations.${name};
           in
@@ -185,7 +218,10 @@
             profiles.system = {
               user = "root";
               sshUser = "root";
-              sshOpts = [ "-i" "/home/philipp/.ssh/deploy-key" ];
+              sshOpts = [
+                "-i"
+                "/home/philipp/.ssh/deploy-key"
+              ];
               path = inputs.deploy-rs.lib.${system}.activate.nixos hostConfig;
             };
           }

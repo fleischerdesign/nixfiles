@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.vaultwarden;
@@ -15,7 +20,7 @@ in
       config = {
         DOMAIN = "https://vault.ancoris.ovh";
         SIGNUPS_ALLOWED = false;
-        
+
         # OIDC / Authentik
         SSO_ENABLED = true;
         SSO_ONLY = true;
@@ -52,6 +57,8 @@ in
 
     # Secrets
     # Should contain SSO_CLIENT_ID and SSO_CLIENT_SECRET
-    sops.secrets.vaultwarden_env = { owner = "vaultwarden"; };
+    sops.secrets.vaultwarden_env = {
+      owner = "vaultwarden";
+    };
   };
 }

@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
   # Disable the generic bootloader feature from role/server (which enforces systemd-boot)
@@ -8,7 +13,7 @@
   # Most vServers use BIOS/MBR boot with GRUB.
   boot.loader.grub.enable = true;
   boot.loader.grub.devices = lib.mkForce [ "/dev/sda" ]; # Matches sda from lsblk
-  
+
   # If UEFI is supported:
   # boot.loader.systemd-boot.enable = true;
   # boot.loader.efi.canTouchEfiVariables = true;

@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.monitoring.alloy;
@@ -45,8 +50,11 @@ in
     users.users.alloy = {
       isSystemUser = true;
       group = "alloy";
-      extraGroups = [ "systemd-journal" "caddy" ];
+      extraGroups = [
+        "systemd-journal"
+        "caddy"
+      ];
     };
-    users.groups.alloy = {};
+    users.groups.alloy = { };
   };
 }

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -e
+
+changed=$(git diff --cached --name-only --diff-filter=ACM | grep '\.nix$' || true)
+
+if [ -n "$changed" ]; then
+  echo "==> nixfmt"
+  echo "$changed" | xargs -r nixfmt
+  echo "$changed" | xargs -r git add
+fi
+
+echo "==> deadnix"
+deadnix --fail .
+
+echo "==> statix"
+statix check .

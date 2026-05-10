@@ -1,4 +1,9 @@
-{ config, pkgs, inputs, ... }:
+{
+  config,
+  pkgs,
+  inputs,
+  ...
+}:
 {
   imports = [
     ./hardware-configuration.nix
@@ -8,7 +13,7 @@
 
   networking.hostName = "strummer";
 
-  services.caddy = {};
+  services.caddy = { };
 
   # Features
   my.features.services.caddy.enable = true;
@@ -122,5 +127,5 @@
   my.features.dev.containers.enable = true;
   my.features.dev.containers.users = [ "philipp" ];
 
-  system.stateVersion = "24.11"; 
+  system.stateVersion = "24.11";
 }

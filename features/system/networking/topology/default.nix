@@ -27,13 +27,27 @@ in
     enable = lib.mkEnableOption "Centralized network topology configuration";
 
     hosts = lib.mkOption {
-      type = lib.types.attrsOf (lib.types.submodule {
-        options = {
-          tailscaleIp = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Tailscale IP of the host"; };
-          localIp = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Local IP of the host"; };
-          domain = lib.mkOption { type = lib.types.nullOr lib.types.str; default = null; description = "Primary domain of the host"; };
-        };
-      });
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            tailscaleIp = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Tailscale IP of the host";
+            };
+            localIp = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Local IP of the host";
+            };
+            domain = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Primary domain of the host";
+            };
+          };
+        }
+      );
       default = { };
       description = "Definition of all known hosts in the network";
     };

@@ -1,5 +1,10 @@
 # features/system/kernel.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.system.kernel;

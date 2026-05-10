@@ -38,7 +38,6 @@ in
       bluetuith
       karere
       cameractrls-gtk4
-      (callPackage ../../packages/lychee-slicer { })
     ];
 
   programs.ghostty = lib.mkIf (role != "server") {

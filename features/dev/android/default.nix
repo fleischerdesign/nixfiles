@@ -1,5 +1,10 @@
 # features/dev/android.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.dev.android;

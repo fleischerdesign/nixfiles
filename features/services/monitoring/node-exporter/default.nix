@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.monitoring.node-exporter;
@@ -11,7 +16,10 @@ in
   config = lib.mkIf cfg.enable {
     services.prometheus.exporters.node = {
       enable = true;
-      enabledCollectors = [ "systemd" "processes" ];
+      enabledCollectors = [
+        "systemd"
+        "processes"
+      ];
       port = 9100;
     };
   };

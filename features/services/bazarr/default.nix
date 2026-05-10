@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.bazarr;
 in
@@ -7,8 +12,13 @@ in
     enable = lib.mkEnableOption "Bazarr Subtitle Manager";
     expose = {
       enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption { type = lib.types.str; default = "bazarr"; };
-      auth = lib.mkEnableOption "Protect with Authentik" // { default = true; };
+      subdomain = lib.mkOption {
+        type = lib.types.str;
+        default = "bazarr";
+      };
+      auth = lib.mkEnableOption "Protect with Authentik" // {
+        default = true;
+      };
     };
   };
 

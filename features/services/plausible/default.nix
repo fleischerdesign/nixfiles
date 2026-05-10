@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.features.services.plausible;
@@ -17,24 +22,24 @@ in
       isSystemUser = true;
       group = "plausible";
     };
-    users.groups.plausible = {};
+    users.groups.plausible = { };
 
     services.plausible = {
       enable = true;
-      
+
       server = {
         baseUrl = "https://plausible.mky.ancoris.ovh";
         secretKeybaseFile = config.sops.secrets.plausible_secret_key_base.path;
         port = 8000;
         listenAddress = "127.0.0.1";
-        disableRegistration = true; 
+        disableRegistration = true;
       };
 
       database = {
         clickhouse.url = "http://127.0.0.1:8123/plausible_events_db";
         postgres = {
           dbname = "plausible";
-          socket = "/run/postgresql"; 
+          socket = "/run/postgresql";
         };
       };
     };
@@ -64,6 +69,8 @@ in
     };
 
     # Secrets
-    sops.secrets.plausible_secret_key_base = { owner = "plausible"; };
+    sops.secrets.plausible_secret_key_base = {
+      owner = "plausible";
+    };
   };
 }

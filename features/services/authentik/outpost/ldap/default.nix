@@ -11,7 +11,7 @@ in
 {
   options.my.features.services.authentik.outpost.ldap = {
     enable = lib.mkEnableOption "Authentik LDAP Outpost";
-    
+
     coreAddress = lib.mkOption {
       type = lib.types.str;
       description = "The full URL (including protocol and port) of the Authentik Core server.";

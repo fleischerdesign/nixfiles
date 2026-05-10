@@ -32,7 +32,6 @@ in
         # Database URL for Drizzle/Libsql (Absolute Path)
         NUXT_DB_URL = "file:/var/lib/portfolio/.data/db.sqlite";
 
-
         # Puppeteer runtime fix: Use system chromium
         PUPPETEER_EXECUTABLE_PATH = "${pkgs.google-chrome}/bin/google-chrome-stable";
       };
@@ -91,4 +90,3 @@ in
     };
   };
 }
-

@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.postgresql;
 in
@@ -11,7 +16,7 @@ in
     services.postgresql = {
       enable = true;
       package = pkgs.postgresql_18;
-      
+
       # Peer authentication for local socket connections
       authentication = pkgs.lib.mkOverride 10 ''
         #type database  DBuser  auth-method
