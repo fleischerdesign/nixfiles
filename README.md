@@ -1,70 +1,146 @@
-# My NixOS Configuration
+# NixOS Configuration
 
-This repository contains my personal configuration for NixOS and Home Manager, managed using [Nix Flakes](https://nixos.wiki/wiki/Flakes).
+Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nixos.wiki/wiki/Flakes), spanning 4 hosts.
+
+## Hosts
+
+| Host | Role | Hardware | Purpose |
+|------|------|----------|---------|
+| `yorke` | notebook | AMD laptop | Daily driver |
+| `jello` | desktop | Intel desktop | Gaming / workstation |
+| `mackaye` | server | VPS | Central services — Authentik, Grafana, Prometheus, Loki, PostgreSQL, Redis |
+| `strummer` | server | Intel home server | Media server — \*arr stack, Jellyfin, Home Assistant, Klipper, Paperless |
 
 ## Structure
 
-The configuration is highly modular and automated, with the following directory structure:
+```
+.
+├── flake.nix              # Entry point: inputs, outputs, 4 systems, deploy config
+├── flake.lock
+├── lib/
+│   ├── helper.nix          # mkSystem, findModules (auto-discovery)
+│   └── users.nix           # User metadata & SSH keys
+├── roles/                  # Role-based baseline configs
+│   ├── pc.nix              # Base PC — audio, wayland, printing, ssh, kdeconnect, ...
+│   ├── desktop.nix         # Extends pc.nix, sets my.role = "desktop"
+│   ├── notebook.nix        # Extends pc.nix, sets my.role = "notebook"
+│   └── server.nix          # Headless — no audio/wayland, SOPS host-key decryption
+├── features/               # Feature modules (auto-discovered)
+│   ├── desktop/            # niri, gnome, quickshell
+│   ├── dev/                # android, containers, codium, nixvim
+│   ├── media/              # gaming, spotify
+│   ├── services/           # caddy, authentik, *arr, jellyfin, monitoring, ...
+│   └── system/             # common, audio, bootloader, networking, backups, ...
+├── hosts/                  # Per-host configuration
+│   ├── yorke/              # configuration.nix + hardware
+│   ├── jello/              # configuration.nix + hardware
+│   ├── mackaye/            # configuration.nix + hardware + disk-config.nix (disko)
+│   └── strummer/           # configuration.nix + hardware
+├── user/
+│   └── philipp/            # Home Manager config
+│       ├── home.nix
+│       └── packages.nix    # Role-conditional packages
+├── secrets/                # SOPS-encrypted secrets
+├── overlays/               # Nixpkgs overlays (pip-on-top, openldap fix, docs-conflict fix)
+├── media/                  # Wallpaper etc.
+├── .github/workflows/      # CI — flake check, weekly flake update
+└── .githooks/              # Pre-commit — nixfmt + deadnix + statix
+```
 
--   `flake.nix`: The main entry point. It defines the NixOS systems (`yorke` and `jello`) and pulls in all necessary inputs like `nixpkgs`, `home-manager`, and other dependencies.
+## Architecture
 
--   `lib/helper.nix`: The core of the automation. It contains helper functions to build systems, discover modules, and generate configuration options dynamically.
+### Roles
 
--   `hosts/`: Contains the machine-specific configurations.
-    -   `base.nix`: A foundational configuration that is applied to all hosts. It sets up things like flakes, timezone, and basic system packages.
-    -   `yorke/`, `jello/`: Directories for specific hosts, each containing a `configuration.nix` to define host-specific settings and enable desired modules.
+Roles define baseline system features. Each host imports one role:
 
--   `home-manager/`: Contains Home Manager configurations, structured in a layered approach.
-    -   `default/`: Contains modules with default settings and packages (`direnv`, `fish`, `nil`) that apply to all users.
-    -   `philipp/`: A user-specific directory containing personal configurations for packages, `codium`, `nixvim`, and GNOME settings via `dconf`.
+- **`pc`** — Foundation for graphical machines: PipeWire audio, Wayland, CUPS printing, SSH server, KDE Connect, Fish shell, systemd-boot, Firmware.
+- **`desktop`** — Extends `pc` with `my.role = "desktop"`.
+- **`notebook`** — Extends `pc` with `my.role = "notebook"`.
+- **`server`** — Headless baseline: SSH server, SOPS host-key decryption, Fish shell, systemd-boot. No audio/Wayland/KDE Connect.
 
--   `modules/nixos/`: A collection of reusable NixOS modules that can be enabled on a per-host basis. This includes modules for `boot`, `audio` (Pipewire), `desktop` (GNOME), and `gaming`.
+User packages in `user/philipp/packages.nix` are conditional on `my.role`: desktop apps (Ghostty terminal, GIMP, Obsidian, LibreOffice, InkScape, etc.) are only installed when `role != "server"`.
 
--   `overlays/`: Contains Nixpkgs overlays. For example, `pip-on-top/` patches the `pip-on-top` GNOME extension for German localization.
+### Features
 
--   `packages/`: Contains custom package definitions for applications not found in `nixpkgs`, such as `ficsit` and `lychee-slicer`.
+Features live under `features/<category>/<name>/default.nix` and are **auto-discovered**: `lib/helper.nix` recursively scans every subdirectory for `default.nix` files and includes them as NixOS modules. No manual import needed.
 
-## Automation with `helper.nix`
+Each feature declares an `my.features.<path>.enable` option. Hosts activate what they need in their `configuration.nix`. Features that aren't enabled have zero effect.
 
-The `lib/helper.nix` file is central to this configuration and provides several key functions:
+Features can also declare dependencies (e.g. enabling `niri` forces `wayland` and `audio`) and conflicts (e.g. `niri` cannot be enabled alongside `gnome`).
 
--   **`mkSystem`:** This function builds a complete NixOS system. It takes the system's architecture, hostname, inputs, user configurations, and overlays as arguments, and assembles the final system configuration from the various parts (`base.nix`, host-specific configuration, and modules).
+### Desktop: niri + Axis Shell
 
--   **Automatic Module Discovery:** The helper automatically scans the `modules/nixos/` directory and generates a corresponding `enable` option for each `.nix` file. For example, a module at `modules/nixos/desktop/gnome.nix` creates an option `my.nixos.desktop.gnome.enable`. This allows for easy activation and deactivation of modules within a host's `configuration.nix`.
+The desktop runs **[niri](https://github.com/YaLTeR/niri)** (scrolling-tiling Wayland compositor) with **[Axis Shell](https://github.com/fleischerdesign/Axis)** as the custom desktop shell. Axis provides the launcher, lock screen, notifications, and quick settings — integrated via D-Bus. **Fish** is the terminal shell, integrated with `direnv` for automatic environment loading. **Ghostty** is the terminal emulator.
 
--   **Layered Home Manager Configuration:** The `mkSystem` function also manages Home Manager configurations. It combines a `default` profile (from `home-manager/default`) with user-specific profiles (e.g., `home-manager/philipp`). User-specific modules in `home-manager/<user>/modules/` also get dynamic `enable` options under the `my.homeManager` attribute set.
+### Topology
+
+`features/system/networking/topology` centralizes Tailscale IPs, local IPs, and domains for all hosts. Other features reference peers via `config.my.features.system.networking.topology.hosts.<name>` — no hardcoded IPs.
+
+### Secrets
+
+All secrets are managed via **[SOPS](https://github.com/getsops/sops)** with age encryption. Encrypted to 4 keys: user key (philipp), host keys (mackaye, strummer), and a CI key. Secrets live in `secrets/secrets.yaml`. Services consume them via SOPS template files.
+
+## Key Features
+
+### Desktop (yorke, jello)
+- **niri** scrolling-tiling Wayland compositor with **Axis Shell**
+- **Steam** + **Sunshine** game streaming + **Bottles**
+- **Spotify** with Spicetify theming
+- **VS Codium** with declarative extensions
+- **NixVim** (Neovim configured via Nix) with LSP, Telescope, Treesitter, and German keyboard adaptations
+
+### Server / Services (mackaye)
+- **Authentik** SSO — identity provider with LDAP and proxy outposts
+- **Grafana** + **Prometheus** + **Loki** — monitoring, metrics, and log aggregation
+- **CrowdSec** — intrusion prevention (master node)
+- **PostgreSQL** + **Redis** — shared databases and caching
+- **Caddy** — reverse proxy with automatic virtual host generation
+- **CouchDB** — document database sync (Obsidian)
+- **ntfy** — push notifications
+- **Portfolio** — personal website (fleischer.design)
+
+### Server / Services (strummer)
+- **Caddy** — reverse proxy (fls.ancoris.ovh)
+- **Sonarr** + **Radarr** + **Prowlarr** + **Bazarr** + **SABnzbd** + **Jellyseerr** + **Recyclarr** — full \*arr media stack
+- **Jellyfin** — media server with Intel VAAPI hardware decoding
+- **Home Assistant** — smart home (Zigbee, ESPHome, MQTT)
+- **Klipper** + **Moonraker** — 3D printer management
+- **Paperless-ngx** — document management with Authentik SSO
+- **Mealie** — recipe manager
+- **Blocky** — DNS ad-blocker
+- **CrowdSec** — intrusion prevention (agent)
+- **Cloudflare DDNS** — dynamic DNS updates
+
+### Shared / All Hosts
+- **Tailscale** VPN — all hosts connected, strummer as subnet router (192.168.178.0/24)
+- **Restic** backups — daily encrypted backups with pruning (mackaye + strummer)
+- **Docker** — container runtime (yorke, jello, strummer)
+- **NixVim** — terminal editor on all hosts
 
 ## Installation / Usage
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <your-repository-url>
-    cd <repository-name>
-    ```
+```bash
+# Clone
+git clone <repo-url> && cd nixos-config
 
-2.  **Apply the configuration:**
-    Ensure Nix is installed with Flakes enabled. Then run the following command to apply the configuration for a specific host (e.g., `yorke` or `jello`):
+# Dev shell (direnv auto-loads nixfmt, deadnix, statix, sops, etc.)
+direnv allow
 
-    ```bash
-    # Apply system configuration and switch to the new system
-    sudo nixos-rebuild switch --flake .#yorke
+# Build and switch locally
+sudo nixos-rebuild switch --flake .#yorke
 
-    # Only build and test the configuration without switching
-    nixos-rebuild dry-build --flake .#jello
-    ```
+# Deploy to all hosts via Tailscale
+deploy .# -- --ssh-user root -i ~/.ssh/deploy-key
 
-    Home Manager configurations are automatically applied as part of the system build, so a separate `home-manager switch` is not necessary.
+# Edit secrets
+sops secrets/secrets.yaml
+```
 
-## Highlights
+Home Manager is integrated — system builds include user configs, no separate `home-manager switch` needed.
 
--   **Systems:** The configuration manages two systems: `yorke` (AMD) and `jello` (Intel).
--   **Desktop Environment:** A customized GNOME desktop with several extensions like `blur-my-shell`, `gsconnect`, `dash-to-dock`, and `paperwm`.
--   **Development:** A pre-configured development environment including:
-    -   **NixVim:** Set as the default editor with plugins for LSP, fuzzy finding (Telescope), and more.
-    -   **VS Codium:** Configured with a set of extensions for web development, Nix, Java, and more.
--   **Gaming:** A dedicated gaming setup with Steam, Bottles, and Sunshine for game streaming.
--   **Shell:** Fish is the default shell, integrated with `direnv` for automatic environment loading.
--   **Custom Packages:** Several applications are packaged manually:
-    -   `ficsit`: A Satisfactory mod manager.
-    -   `lychee-slicer`: A slicer for resin 3D printers.
--   **Overlays:** Includes an overlay to patch the `pip-on-top` GNOME extension for German localization.
+## Tooling
+
+- **Pre-commit hook:** `nixfmt` (format) → `deadnix` (dead code) → `statix` (lint) on staged `.nix` files
+- **GitHub Actions:** `flake check` on PR/push, weekly `flake update` with auto-PR
+- **Formatter:** `nixfmt`
+- **Deployment:** `deploy-rs` with auto-rollback
