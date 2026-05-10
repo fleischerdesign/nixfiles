@@ -56,7 +56,7 @@ Roles define baseline system features. Each host imports one role:
 - **`pc`** — Foundation for graphical machines: PipeWire audio, Wayland, CUPS printing, SSH server, KDE Connect, Fish shell, systemd-boot, Firmware.
 - **`desktop`** — Extends `pc` with `my.role = "desktop"`.
 - **`notebook`** — Extends `pc` with `my.role = "notebook"`.
-- **`server`** — Headless baseline: SSH server, SOPS host-key decryption, Fish shell, systemd-boot. No audio/Wayland/KDE Connect.
+- **`server`** — Headless baseline: SSH server, SOPS host-key decryption, Fish shell, systemd-boot.
 
 User packages in `user/philipp/packages.nix` are conditional on `my.role`: desktop apps (Ghostty terminal, GIMP, Obsidian, LibreOffice, InkScape, etc.) are only installed when `role != "server"`.
 
