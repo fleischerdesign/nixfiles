@@ -227,7 +227,7 @@
 
       deploy = {
         autoRollback = true;
-        magicRollback = true;
+        magicRollback = false;
 
         nodes = builtins.mapAttrs (
           name: _:
