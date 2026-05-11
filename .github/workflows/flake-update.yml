@@ -5,6 +5,10 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -15,17 +19,27 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set date
+        run: echo "DATE_TODAY=$(date +%Y-%m-%d)" >> "$GITHUB_ENV"
+
       - name: Update flake.lock
         run: nix flake update
 
       - name: Create Pull Request
+        id: create-pr
         uses: peter-evans/create-pull-request@v7
         with:
           title: "chore: update flake.lock"
-          branch: "flake-update/$(date +%Y-%m-%d)"
+          branch: "flake-update/${{ env.DATE_TODAY }}"
           delete-branch: true
-          automerge: true
           body: |
-            Automatisches `nix flake update`.
+            Automatic `nix flake update`.
 
-            Bitte `nix flake check` Ergebnis prüfen vor dem Mergen.
+            Please verify `nix flake check` result before merging if auto-merge is disabled.
+
+      - name: Enable auto-merge
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.create-pr.outputs.pull-request-number }}
+          merge-method: squash
