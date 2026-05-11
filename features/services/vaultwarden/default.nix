@@ -48,11 +48,10 @@ in
     };
 
     # Caddy Reverse Proxy
-    my.features.services.caddy.exposedServices = {
-      "vaultwarden" = {
-        port = 8082;
-        fullDomain = "vault.ancoris.ovh";
-      };
+    my.registry.vaultwarden = {
+      host = config.networking.hostName;
+      port = 8082;
+      fullDomain = "vault.ancoris.ovh";
     };
 
     # Secrets

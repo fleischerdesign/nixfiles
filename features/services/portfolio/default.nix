@@ -77,11 +77,10 @@ in
     users.groups.portfolio = { };
 
     # Caddy Reverse Proxy
-    my.features.services.caddy.exposedServices = {
-      "portfolio" = {
-        port = 3005;
-        fullDomain = "fleischer.design";
-      };
+    my.registry.portfolio = {
+      host = config.networking.hostName;
+      port = 3005;
+      fullDomain = "fleischer.design";
     };
 
     # Secrets

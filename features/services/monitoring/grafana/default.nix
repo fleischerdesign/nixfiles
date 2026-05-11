@@ -281,11 +281,10 @@ in
       config.sops.templates."grafana.env".path
     ];
 
-    my.features.services.caddy.exposedServices = {
-      "grafana" = {
-        port = 3000;
-        subdomain = "grafana";
-      };
+    my.registry.grafana = {
+      host = config.networking.hostName;
+      port = 3000;
+      subdomain = "grafana";
     };
   };
 }

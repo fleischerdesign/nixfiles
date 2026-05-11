@@ -61,11 +61,10 @@ in
     };
 
     # Caddy Reverse Proxy
-    my.features.services.caddy.exposedServices = {
-      "plausible" = {
-        port = 8000;
-        subdomain = "plausible";
-      };
+    my.registry.plausible = {
+      host = config.networking.hostName;
+      port = 8000;
+      subdomain = "plausible";
     };
 
     # Secrets

@@ -174,5 +174,26 @@ in
         '';
       };
     };
+    # 5. Registry entries for monitoring (Caddy is managed directly above)
+    my.registry.mainsail = {
+      host = config.networking.hostName;
+      port = 7125;
+      subdomain = "mainsail";
+      caddy.enable = false;
+    };
+
+    my.registry.moonraker = {
+      host = config.networking.hostName;
+      port = 7125;
+      subdomain = "moonraker";
+      caddy.enable = false;
+    };
+
+    my.registry.mainsail-cam = {
+      host = config.networking.hostName;
+      port = 8081;
+      subdomain = "cam.moonraker";
+      caddy.enable = false;
+    };
   };
 }

@@ -97,11 +97,10 @@ in
     };
 
     # 5. Reverse Proxy
-    my.features.services.caddy.exposedServices = {
-      "authentik" = {
-        port = 9055;
-        fullDomain = "auth.ancoris.ovh";
-      };
+    my.registry.authentik = {
+      host = config.networking.hostName;
+      port = 9055;
+      fullDomain = "auth.ancoris.ovh";
     };
 
     # 6. Secrets

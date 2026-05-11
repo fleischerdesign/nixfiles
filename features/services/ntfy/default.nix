@@ -48,8 +48,10 @@ in
 
     systemd.services.ntfy-sh.serviceConfig.CacheDirectory = "ntfy-sh";
 
-    my.features.services.caddy.exposedServices.ntfy = {
+    my.registry.ntfy = {
+      host = config.networking.hostName;
       port = 8083;
+      subdomain = "ntfy";
       auth = false;
     };
   };

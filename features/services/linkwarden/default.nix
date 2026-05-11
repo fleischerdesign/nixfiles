@@ -52,11 +52,10 @@ in
     };
 
     # Caddy Reverse Proxy
-    my.features.services.caddy.exposedServices = {
-      "linkwarden" = {
-        port = 3010;
-        fullDomain = "linkwarden.mky.ancoris.ovh";
-      };
+    my.registry.linkwarden = {
+      host = config.networking.hostName;
+      port = 3010;
+      fullDomain = "linkwarden.mky.ancoris.ovh";
     };
 
     # Secrets

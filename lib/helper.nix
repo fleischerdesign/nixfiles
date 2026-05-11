@@ -22,6 +22,7 @@ let
       pkgs,
       hostname,
       inputs,
+      flake ? null,
       users ? [ ],
       extraModules ? [ ],
     }:
@@ -59,7 +60,7 @@ let
     in
     inputs.nixpkgs-unstable.lib.nixosSystem {
       inherit system;
-      specialArgs = { inherit inputs hostname; };
+      specialArgs = { inherit inputs hostname flake; };
       modules = [
         { nixpkgs.pkgs = pkgs; }
         { users.users = nixosUsers; }

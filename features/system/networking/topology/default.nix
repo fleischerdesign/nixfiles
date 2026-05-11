@@ -45,6 +45,14 @@ in
               default = null;
               description = "Primary domain of the host";
             };
+            hostType = lib.mkOption {
+              type = lib.types.enum [
+                "server"
+                "client"
+              ];
+              default = "client";
+              description = "Host type — clients are excluded from server-targeted probes";
+            };
           };
         }
       );
@@ -59,12 +67,14 @@ in
         tailscaleIp = "100.120.39.68";
         localIp = "173.249.22.211";
         domain = "mky.ancoris.ovh";
+        hostType = "server";
       };
 
       strummer = {
         tailscaleIp = "100.125.253.108";
         localIp = "192.168.178.27";
         domain = "fls.ancoris.ovh";
+        hostType = "server";
       };
 
       jello = {

@@ -43,12 +43,11 @@ in
       "Z /var/lib/jellyseerr 0750 1000 1000 -"
     ];
 
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "jellyseerr" = {
-        port = 5055;
-        auth = cfg.expose.auth;
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.jellyseerr = {
+      host = config.networking.hostName;
+      port = 5055;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = cfg.expose.auth;
     };
   };
 }

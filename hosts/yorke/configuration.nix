@@ -27,6 +27,7 @@
   my.features.media.gaming.enable = true;
   my.features.media.gaming.sunshine.enable = false;
   my.features.system.networking.tailscale.enable = true;
+  my.features.system.networking.tailscale.acceptRoutes = true;
 
   system.stateVersion = "24.05";
 }

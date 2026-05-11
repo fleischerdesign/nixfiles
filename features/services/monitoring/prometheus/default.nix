@@ -50,5 +50,12 @@ in
         }
       ];
     };
+
+    my.registry.prometheus = {
+      host = config.networking.hostName;
+      port = 9090;
+      monitoring.tcp.enable = true;
+      monitoring.tcp.group = "Infrastructure";
+    };
   };
 }

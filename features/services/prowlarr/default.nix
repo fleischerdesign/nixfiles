@@ -74,12 +74,11 @@ in
     };
 
     # Register with Caddy Feature
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "prowlarr" = {
-        port = 9696;
-        auth = cfg.expose.auth;
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.prowlarr = {
+      host = config.networking.hostName;
+      port = 9696;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = cfg.expose.auth;
     };
   };
 }

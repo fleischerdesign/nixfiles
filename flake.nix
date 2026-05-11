@@ -87,6 +87,7 @@
     }@inputs:
     let
       system = "x86_64-linux";
+      flake = self;
 
       # Zentralisierte Overlays
       overlays = [
@@ -123,7 +124,12 @@
 
       nixosConfigurations = {
         yorke = helpers.mkSystem {
-          inherit system pkgs inputs;
+          inherit
+            system
+            pkgs
+            inputs
+            flake
+            ;
           hostname = "yorke";
           extraModules = [
             inputs.niri.nixosModules.niri
@@ -148,7 +154,12 @@
           ];
         };
         jello = helpers.mkSystem {
-          inherit system pkgs inputs;
+          inherit
+            system
+            pkgs
+            inputs
+            flake
+            ;
           hostname = "jello";
           extraModules = [
             inputs.niri.nixosModules.niri
@@ -173,7 +184,12 @@
           ];
         };
         strummer = helpers.mkSystem {
-          inherit system pkgs inputs;
+          inherit
+            system
+            pkgs
+            inputs
+            flake
+            ;
           hostname = "strummer";
           users = [
             {
@@ -188,7 +204,12 @@
           ];
         };
         mackaye = helpers.mkSystem {
-          inherit system pkgs inputs;
+          inherit
+            system
+            pkgs
+            inputs
+            flake
+            ;
           hostname = "mackaye";
           extraModules = [ inputs.disko.nixosModules.disko ];
           users = [

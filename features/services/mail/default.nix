@@ -274,11 +274,10 @@ in
       ];
     };
 
-    my.features.services.caddy.exposedServices = {
-      "mail" = {
-        port = 9081;
-        fullDomain = "mail.ancoris.ovh";
-      };
+    my.registry.mail = {
+      host = config.networking.hostName;
+      port = 9081;
+      fullDomain = "mail.ancoris.ovh";
     };
 
     systemd.tmpfiles.rules = [

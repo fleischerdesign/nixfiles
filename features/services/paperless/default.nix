@@ -144,12 +144,11 @@ in
     };
 
     # Register with Caddy Feature
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "paperless" = {
-        port = 28981;
-        auth = false; # Native OIDC
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.paperless = {
+      host = config.networking.hostName;
+      port = 28981;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = false;
     };
   };
 }

@@ -30,12 +30,11 @@ in
     networking.firewall.allowedUDPPorts = [ 5353 ];
 
     # Register with Caddy Feature
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "esphome" = {
-        port = 6052;
-        auth = cfg.expose.auth;
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.esphome = {
+      host = config.networking.hostName;
+      port = 6052;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = cfg.expose.auth;
     };
   };
 }

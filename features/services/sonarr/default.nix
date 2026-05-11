@@ -82,12 +82,11 @@ in
       UMask = lib.mkForce "0002";
     };
 
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "sonarr" = {
-        port = 8989;
-        auth = cfg.expose.auth;
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.sonarr = {
+      host = config.networking.hostName;
+      port = 8989;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = cfg.expose.auth;
     };
   };
 }

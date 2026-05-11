@@ -31,12 +31,11 @@ in
     users.users.bazarr.extraGroups = [ "media" ];
 
     # Register with Caddy
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "bazarr" = {
-        port = 6767;
-        auth = cfg.expose.auth;
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.bazarr = {
+      host = config.networking.hostName;
+      port = 6767;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = cfg.expose.auth;
     };
   };
 }

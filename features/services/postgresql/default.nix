@@ -33,5 +33,12 @@ in
       startAt = "*-*-* 02:00:00"; # Eine Stunde vor Restic
       backupAll = true;
     };
+
+    my.registry.postgresql = {
+      host = config.networking.hostName;
+      port = 5432;
+      monitoring.tcp.enable = true;
+      monitoring.tcp.group = "Infrastructure";
+    };
   };
 }

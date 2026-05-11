@@ -61,12 +61,11 @@ in
     ];
 
     # Register with Caddy Feature
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "jellyfin" = {
-        port = 8096;
-        auth = cfg.expose.auth;
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.jellyfin = {
+      host = config.networking.hostName;
+      port = 8096;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = cfg.expose.auth;
     };
   };
 }

@@ -57,11 +57,10 @@ in
     };
 
     # 4. Reverse Proxy via Caddy
-    my.features.services.caddy.exposedServices = {
-      "couchdb" = {
-        port = 5984;
-        fullDomain = "couchdb.mky.ancoris.ovh";
-      };
+    my.registry.couchdb = {
+      host = config.networking.hostName;
+      port = 5984;
+      fullDomain = "couchdb.mky.ancoris.ovh";
     };
   };
 }

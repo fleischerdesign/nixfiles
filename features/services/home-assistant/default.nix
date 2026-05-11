@@ -129,12 +129,11 @@ in
     };
 
     # Register with Caddy Feature
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "home-assistant" = {
-        port = 8123;
-        auth = cfg.expose.auth;
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.home-assistant = {
+      host = config.networking.hostName;
+      port = 8123;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = cfg.expose.auth;
     };
   };
 }

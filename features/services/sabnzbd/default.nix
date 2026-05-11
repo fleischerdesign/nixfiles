@@ -108,12 +108,11 @@ in
     };
 
     # Caddy Integration
-    my.features.services.caddy.exposedServices = lib.mkIf cfg.expose.enable {
-      "sabnzbd" = {
-        port = 8080;
-        auth = cfg.expose.auth;
-        subdomain = cfg.expose.subdomain;
-      };
+    my.registry.sabnzbd = {
+      host = config.networking.hostName;
+      port = 8080;
+      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
+      auth = cfg.expose.auth;
     };
   };
 }

@@ -19,6 +19,7 @@
   my.features.services.caddy.baseDomain = "mky.ancoris.ovh";
 
   my.features.system.networking.tailscale.enable = true;
+  my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.common.geoip.enable = true;
 
   networking.useDHCP = false;
@@ -60,6 +61,7 @@
   my.features.services.couchdb.enable = true;
 
   my.features.services.ntfy.enable = true;
+  my.features.services.gatus.enable = true;
   my.features.system.backups.restic = {
     enable = true;
     environmentFile = "restic_env_mackaye";

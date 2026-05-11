@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
@@ -14,31 +13,6 @@ in
     baseDomain = lib.mkOption {
       type = lib.types.str;
       description = "Base domain for exposed services (e.g. fls.ancoris.ovh)";
-    };
-
-    exposedServices = lib.mkOption {
-      description = "Services to expose via Caddy";
-      default = { };
-      type = lib.types.attrsOf (
-        lib.types.submodule (
-          { name, ... }:
-          {
-            options = {
-              port = lib.mkOption { type = lib.types.int; };
-              auth = lib.mkEnableOption "Protect with Authentik";
-              subdomain = lib.mkOption {
-                type = lib.types.str;
-                default = name; # Default: Use the attribute name
-              };
-              fullDomain = lib.mkOption {
-                type = lib.types.nullOr lib.types.str;
-                default = null;
-                description = "Override the entire domain (bypasses subdomain and baseDomain)";
-              };
-            };
-          }
-        )
-      );
     };
   };
 
@@ -56,9 +30,16 @@ in
         }
       '';
 
-      # Generate virtualHosts from exposedServices
+      # Generate virtualHosts from service registry (local host only)
       virtualHosts =
         let
+          localServices = lib.filterAttrs (
+            _: svc:
+            svc.host == config.networking.hostName
+            && svc.caddy.enable
+            && (svc.subdomain != null || svc.fullDomain != null)
+          ) config.my.registry;
+
           mkVHost = name: conf: {
             name = if conf.fullDomain != null then conf.fullDomain else "${conf.subdomain}.${cfg.baseDomain}";
             value = {
@@ -82,7 +63,7 @@ in
             };
           };
         in
-        lib.listToAttrs (lib.mapAttrsToList mkVHost cfg.exposedServices);
+        lib.listToAttrs (lib.mapAttrsToList mkVHost localServices);
     };
 
     networking.firewall.allowedTCPPorts = [
