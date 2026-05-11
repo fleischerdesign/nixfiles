@@ -29,6 +29,7 @@ jobs:
         id: create-pr
         uses: peter-evans/create-pull-request@v7
         with:
+          token: ${{ secrets.WORKFLOW_TOKEN }}
           title: "chore: update flake.lock"
           branch: "flake-update/${{ env.DATE_TODAY }}"
           delete-branch: true
@@ -40,6 +41,6 @@ jobs:
       - name: Enable auto-merge
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.WORKFLOW_TOKEN }}
           pull-request-number: ${{ steps.create-pr.outputs.pull-request-number }}
           merge-method: squash
