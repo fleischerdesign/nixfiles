@@ -92,6 +92,7 @@
     enable = true;
     lokiHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
   };
+  my.features.services.monitoring.blackbox-exporter.enable = true;
 
   my.features.system.networking.tailscale.enable = true;
   my.features.system.networking.tailscale.subnetRouter = {

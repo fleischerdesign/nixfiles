@@ -44,6 +44,7 @@
   my.features.services.monitoring.prometheus.enable = true;
   my.features.services.monitoring.loki.enable = true;
   my.features.services.monitoring.grafana.enable = true;
+  my.features.services.monitoring.blackbox-exporter.enable = true;
 
   my.features.services.crowdsec.enable = true;
   my.features.services.crowdsec.role = "master";
@@ -61,7 +62,6 @@
   my.features.services.couchdb.enable = true;
 
   my.features.services.ntfy.enable = true;
-  my.features.services.gatus.enable = true;
   my.features.system.backups.restic = {
     enable = true;
     environmentFile = "restic_env_mackaye";

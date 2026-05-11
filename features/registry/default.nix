@@ -63,15 +63,6 @@
                   default = "/";
                 };
 
-                conditions = lib.mkOption {
-                  type = lib.types.listOf lib.types.str;
-                  default = [ "[STATUS] < 500" ];
-                };
-
-                interval = lib.mkOption {
-                  type = lib.types.str;
-                  default = "1m";
-                };
               };
 
               tcp = {
@@ -84,16 +75,6 @@
                 group = lib.mkOption {
                   type = lib.types.str;
                   default = "Infrastructure";
-                };
-
-                conditions = lib.mkOption {
-                  type = lib.types.listOf lib.types.str;
-                  default = [ "[CONNECTED] == true" ];
-                };
-
-                interval = lib.mkOption {
-                  type = lib.types.str;
-                  default = "1m";
                 };
               };
             };
