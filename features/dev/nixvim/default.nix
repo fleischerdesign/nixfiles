@@ -43,6 +43,14 @@ in
             IblWhitespace = {
               fg = "#444444";
             };
+            # Make floating windows visible against transparent background
+            NormalFloat = {
+              bg = "#2d2d30";
+            };
+            FloatBorder = {
+              fg = "#555555";
+              bg = "#2d2d30";
+            };
           };
 
           opts = {
@@ -50,7 +58,10 @@ in
             timeoutlen = 300;
             number = true;
             relativenumber = true;
-            shiftwidth = 2;
+            shiftwidth = 4;
+            expandtab = true;
+            tabstop = 4;
+            softtabstop = 4;
             cmdheight = 0;
             background = "dark"; # Use valid value 'dark'
             signcolumn = "yes"; # Always show the signcolumn to prevent jumping
@@ -452,7 +463,7 @@ in
               event = "BufWritePre";
               pattern = "*";
               callback = {
-                __raw = "function() vim.lsp.buf.format() end";
+                __raw = "function() vim.lsp.buf.format({ async = true }) end";
               };
             }
           ];
