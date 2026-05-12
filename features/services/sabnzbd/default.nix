@@ -61,7 +61,7 @@ in
           port = 8080;
           host = "0.0.0.0";
           host_whitelist = "${domain}, localhost, 127.0.0.1";
-          inet_exposure = 2;
+          inet_exposure = 4;
           download_dir = "/data/storage/downloads/incomplete";
           complete_dir = "/data/storage/downloads/complete";
           permissions = "775";
