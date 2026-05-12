@@ -10,7 +10,7 @@ if [ -n "$changed" ]; then
 fi
 
 echo "==> deadnix"
-deadnix --fail .
+echo "$changed" | xargs -r deadnix --fail
 
 echo "==> statix"
 statix check .
