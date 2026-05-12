@@ -47,6 +47,7 @@ in
 
           opts = {
             updatetime = 100;
+            timeoutlen = 300;
             number = true;
             relativenumber = true;
             shiftwidth = 2;
@@ -55,6 +56,9 @@ in
             signcolumn = "yes"; # Always show the signcolumn to prevent jumping
             clipboard = "unnamedplus"; # Use system clipboard
             completeopt = "menu,menuone,noselect";
+            scrolloff = 8;
+            undofile = true;
+            undodir.__raw = "vim.fn.stdpath('state') .. '/undo/'";
             fillchars = {
               eob = " ";
             };
@@ -201,6 +205,10 @@ in
                 svelte.enable = true;
               };
             };
+            # Snippets engine + community snippets
+            luasnip.enable = true;
+            nvim-snippets.enable = true;
+
             # Autocomplete
             cmp = {
               enable = true;
