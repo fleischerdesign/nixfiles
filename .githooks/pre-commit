@@ -13,4 +13,6 @@ echo "==> deadnix"
 echo "$changed" | xargs -r deadnix --fail
 
 echo "==> statix"
-statix check .
+if [ -n "$changed" ]; then
+  echo "$changed" | xargs -r statix check
+fi
