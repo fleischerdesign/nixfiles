@@ -25,6 +25,7 @@ in
     my.registry.redis = {
       host = config.networking.hostName;
       port = 6379;
+      monitoring.http.enable = false;
       monitoring.tcp.enable = true;
       monitoring.tcp.group = "Infrastructure";
     };

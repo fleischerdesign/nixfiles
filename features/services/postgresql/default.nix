@@ -37,6 +37,7 @@ in
     my.registry.postgresql = {
       host = config.networking.hostName;
       port = 5432;
+      monitoring.http.enable = false;
       monitoring.tcp.enable = true;
       monitoring.tcp.group = "Infrastructure";
     };
