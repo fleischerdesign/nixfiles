@@ -58,6 +58,10 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
+    };
+
   };
 
   outputs =
@@ -87,6 +91,11 @@
       helpers = import ./lib/helper.nix {
         inherit pkgs home-manager-unstable;
       };
+
+      globalModules = [
+        inputs.sops-nix.nixosModules.sops
+        inputs.hermes-agent.nixosModules.default
+      ];
     in
     {
       formatter.${system} = pkgs.nixfmt;
@@ -109,6 +118,7 @@
             pkgs
             inputs
             flake
+            globalModules
             ;
           hostname = "yorke";
           extraModules = [
@@ -139,6 +149,7 @@
             pkgs
             inputs
             flake
+            globalModules
             ;
           hostname = "jello";
           extraModules = [
@@ -169,6 +180,7 @@
             pkgs
             inputs
             flake
+            globalModules
             ;
           hostname = "strummer";
           users = [
@@ -189,6 +201,7 @@
             pkgs
             inputs
             flake
+            globalModules
             ;
           hostname = "mackaye";
           extraModules = [ inputs.disko.nixosModules.disko ];

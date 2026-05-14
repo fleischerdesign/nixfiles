@@ -11,7 +11,7 @@ let
     let
       entries = builtins.readDir dir;
       current = if lib.hasAttr "default.nix" entries then [ (dir + "/default.nix") ] else [ ];
-      subdirs = lib.filterAttrs (n: v: v == "directory") entries;
+      subdirs = lib.filterAttrs (_: v: v == "directory") entries;
       subModules = lib.concatMap (name: findModules (dir + "/${name}")) (builtins.attrNames subdirs);
     in
     current ++ subModules;
@@ -25,6 +25,7 @@ let
       flake ? null,
       users ? [ ],
       extraModules ? [ ],
+      globalModules ? [ ],
     }:
     let
       featuresDir = ../features;
@@ -64,8 +65,8 @@ let
       modules = [
         { nixpkgs.pkgs = pkgs; }
         { users.users = nixosUsers; }
-        inputs.sops-nix.nixosModules.sops
       ]
+      ++ globalModules
       ++ extraModules
       ++ allFeatureModules
       ++ [
