@@ -2,13 +2,7 @@
 
 {
   inputs = {
-    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-24.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-
-    home-manager-stable = {
-      url = "github:nix-community/home-manager/release-24.11";
-      inputs.nixpkgs.follows = "nixpkgs-stable";
-    };
 
     home-manager-unstable = {
       url = "github:nix-community/home-manager";
@@ -79,7 +73,6 @@
 
       # Zentralisierte Overlays
       overlays = [
-        (import ./overlays/pip-on-top)
         (import ./overlays/fix/openldap)
         (import ./overlays/fix/docs-conflict)
         inputs.nix-vscode-extensions.overlays.default

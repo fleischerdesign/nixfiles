@@ -21,12 +21,12 @@ Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nix
 │   ├── helper.nix          # mkSystem, findModules (auto-discovery)
 │   └── users.nix           # User metadata & SSH keys
 ├── roles/                  # Role-based baseline configs
-│   ├── pc.nix              # Base PC — audio, wayland, printing, ssh, kdeconnect, ...
+│   ├── pc.nix              # Base PC — audio, wayland, printing, ssh, ...
 │   ├── desktop.nix         # Extends pc.nix, sets my.role = "desktop"
 │   ├── notebook.nix        # Extends pc.nix, sets my.role = "notebook"
 │   └── server.nix          # Headless — no audio/wayland, SOPS host-key decryption
 ├── features/               # Feature modules (auto-discovered)
-│   ├── desktop/            # niri, gnome, quickshell
+│   ├── desktop/            # niri, gnome
 │   ├── dev/                # android, containers, codium, nixvim
 │   ├── media/              # gaming, spotify
 │   ├── services/           # caddy, authentik, *arr, jellyfin, monitoring, ...
@@ -41,7 +41,7 @@ Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nix
 │       ├── home.nix
 │       └── packages.nix    # Role-conditional packages
 ├── secrets/                # SOPS-encrypted secrets
-├── overlays/               # Nixpkgs overlays (pip-on-top, openldap fix, docs-conflict fix)
+├── overlays/               # Nixpkgs overlays (openldap fix, docs-conflict fix)
 ├── media/                  # Wallpaper etc.
 ├── .github/workflows/      # CI — flake check, weekly flake update
 └── .githooks/              # Pre-commit — nixfmt + deadnix + statix
@@ -53,7 +53,7 @@ Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nix
 
 Roles define baseline system features. Each host imports one role:
 
-- **`pc`** — Foundation for graphical machines: PipeWire audio, Wayland, CUPS printing, SSH server, KDE Connect, Fish shell, systemd-boot, Firmware.
+- **`pc`** — Foundation for graphical machines: PipeWire audio, Wayland, CUPS printing, SSH server, Fish shell, systemd-boot, Firmware.
 - **`desktop`** — Extends `pc` with `my.role = "desktop"`.
 - **`notebook`** — Extends `pc` with `my.role = "notebook"`.
 - **`server`** — Headless baseline: SSH server, SOPS host-key decryption, Fish shell, systemd-boot.
