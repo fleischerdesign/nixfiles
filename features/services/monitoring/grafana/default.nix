@@ -111,7 +111,7 @@ in
                         to = 0;
                       };
                       model = {
-                        expr = "up{job=~\"node_.*\"}";
+                        expr = "up{job=~\"node-exporter_.*\"}";
                       };
                     }
                     {

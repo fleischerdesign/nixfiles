@@ -102,6 +102,16 @@ in
     ];
     systemd.services.crowdsec-firewall-bouncer.serviceConfig.DynamicUser = lib.mkForce false;
 
+    my.endpoints.crowdsec = lib.mkIf isMaster {
+      host = config.networking.hostName;
+      port = 6060;
+      monitoring = {
+        http.enable = false;
+        scrape.enable = true;
+        scrape.port = 6060;
+      };
+    };
+
     # Secrets
     sops.secrets.crowdsec_bouncer_key = {
       owner = "root";

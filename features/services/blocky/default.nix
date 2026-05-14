@@ -87,5 +87,15 @@ in
     # Open DNS ports in the firewall
     networking.firewall.allowedUDPPorts = [ 53 ];
     networking.firewall.allowedTCPPorts = [ 53 ];
+
+    my.endpoints.blocky = {
+      host = config.networking.hostName;
+      port = 4000;
+      monitoring = {
+        http.enable = false;
+        scrape.enable = true;
+        scrape.port = 4000;
+      };
+    };
   };
 }

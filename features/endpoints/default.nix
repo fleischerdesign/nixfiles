@@ -62,7 +62,6 @@
                   type = lib.types.str;
                   default = "/";
                 };
-
               };
 
               tcp = {
@@ -75,6 +74,21 @@
                 group = lib.mkOption {
                   type = lib.types.str;
                   default = "Infrastructure";
+                };
+              };
+
+              scrape = {
+                enable = lib.mkEnableOption "Prometheus scrape target for this service";
+
+                port = lib.mkOption {
+                  type = lib.types.int;
+                  description = "Port to scrape Prometheus metrics from (may differ from service port)";
+                };
+
+                path = lib.mkOption {
+                  type = lib.types.str;
+                  default = "/metrics";
+                  description = "Metrics endpoint path";
                 };
               };
             };

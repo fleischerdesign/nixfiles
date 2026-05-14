@@ -43,5 +43,11 @@ in
         ];
       };
     };
+
+    my.endpoints.loki = {
+      host = config.networking.hostName;
+      port = 3100;
+      monitoring.http.enable = false;
+    };
   };
 }

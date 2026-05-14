@@ -10,7 +10,6 @@ let
   cfg = config.my.features.services.monitoring.prometheus;
   hosts = config.my.features.system.networking.topology.hosts or { };
   ownHost = config.networking.hostName;
-  strummerTailscaleIp = hosts.strummer.tailscaleIp or config.networking.hostName;
 
   resolveDomain =
     svc:
@@ -24,21 +23,20 @@ let
     else
       null;
 
-  blackboxRelabel =
-    blackboxAddr: [
-      {
-        source_labels = [ "__address__" ];
-        target_label = "__param_target";
-      }
-      {
-        source_labels = [ "__param_target" ];
-        target_label = "instance";
-      }
-      {
-        target_label = "__address__";
-        replacement = blackboxAddr;
-      }
-    ];
+  blackboxRelabel = blackboxAddr: [
+    {
+      source_labels = [ "__address__" ];
+      target_label = "__param_target";
+    }
+    {
+      source_labels = [ "__param_target" ];
+      target_label = "instance";
+    }
+    {
+      target_label = "__address__";
+      replacement = blackboxAddr;
+    }
+  ];
 
   registriesByHost =
     if flake != null then
@@ -51,26 +49,27 @@ let
   ) (flake.nixosConfigurations or { });
 
   httpLocalByHost = lib.mapAttrs (
-    hostName: registry: lib.filterAttrs (_: svc: svc.host == hostName && svc.monitoring.http.enable) registry
+    hostName: registry:
+    lib.filterAttrs (_: svc: svc.host == hostName && svc.monitoring.http.enable) registry
   ) registriesByHost;
 
   tcpLocalByHost = lib.mapAttrs (
-    hostName: registry: lib.filterAttrs (_: svc: svc.host == hostName && svc.monitoring.tcp.enable) registry
+    hostName: registry:
+    lib.filterAttrs (_: svc: svc.host == hostName && svc.monitoring.tcp.enable) registry
   ) registriesByHost;
 
-  allServices = lib.foldl' (acc: registry: acc // registry) { } (builtins.attrValues registriesByHost);
+  allServices = lib.foldl' (acc: registry: acc // registry) { } (
+    builtins.attrValues registriesByHost
+  );
 
   httpPublicServices = lib.filterAttrs (
     _: svc: svc.monitoring.http.enable && resolveDomain svc != null
   ) allServices;
 
-  otherServerHosts = lib.filterAttrs (
-    n: h: n != ownHost && h.hostType or "client" == "server"
-  ) hosts;
+  otherServerHosts = lib.filterAttrs (n: h: n != ownHost && h.hostType or "client" == "server") hosts;
 
   blackboxAddrForHost =
-    hostName:
-    if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.tailscaleIp}:9115";
+    hostName: if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.tailscaleIp}:9115";
 in
 {
   options.my.features.services.monitoring.prometheus = {
@@ -83,36 +82,28 @@ in
       port = 9090;
 
       scrapeConfigs =
-        [
-          {
-            job_name = "prometheus";
-            static_configs = [ { targets = [ "localhost:9090" ]; } ];
-          }
-          {
-            job_name = "node_mackaye";
-            static_configs = [ { targets = [ "localhost:9100" ]; } ];
-          }
-          {
-            job_name = "node_strummer";
-            static_configs = [ { targets = [ "${strummerTailscaleIp}:9100" ]; } ];
-          }
-          {
-            job_name = "crowdsec_mackaye";
-            static_configs = [ { targets = [ "localhost:6060" ]; } ];
-          }
-          {
-            job_name = "crowdsec_strummer";
-            static_configs = [ { targets = [ "${strummerTailscaleIp}:6060" ]; } ];
-          }
-          {
-            job_name = "authentik";
-            static_configs = [ { targets = [ "localhost:9300" ]; } ];
-          }
-          {
-            job_name = "blocky_strummer";
-            static_configs = [ { targets = [ "${strummerTailscaleIp}:4000" ]; } ];
-          }
-        ]
+        # Prometheus scrape targets — auto-generated from endpoint registry, per host
+        builtins.concatLists (
+          lib.mapAttrsToList (
+            hostName: registry:
+            lib.mapAttrsToList (svcName: svc: {
+              job_name = "${svcName}_${hostName}";
+              metrics_path = svc.monitoring.scrape.path;
+              static_configs = [
+                {
+                  targets = [
+                    (
+                      if hostName == ownHost then
+                        "localhost:${toString svc.monitoring.scrape.port}"
+                      else
+                        "${hosts.${hostName}.tailscaleIp}:${toString svc.monitoring.scrape.port}"
+                    )
+                  ];
+                }
+              ];
+            }) (lib.filterAttrs (_: svc: svc.monitoring.scrape.enable or false) registry)
+          ) registriesByHost
+        )
         ++
 
           # Blackbox: HTTP local probes per host
@@ -210,8 +201,12 @@ in
     my.endpoints.prometheus = {
       host = config.networking.hostName;
       port = 9090;
-      monitoring.tcp.enable = true;
-      monitoring.tcp.group = "Infrastructure";
+      monitoring = {
+        tcp.enable = true;
+        tcp.group = "Infrastructure";
+        scrape.enable = true;
+        scrape.port = 9090;
+      };
     };
   };
 }

@@ -101,6 +101,10 @@ in
       host = config.networking.hostName;
       port = 9055;
       fullDomain = "auth.ancoris.ovh";
+      monitoring = {
+        scrape.enable = true;
+        scrape.port = 9300;
+      };
     };
 
     # 6. Secrets
