@@ -75,7 +75,7 @@
     auth = true;
   };
 
-  my.endpoints.jellyseerr.subdomain = "jellyseerr";
+  my.endpoints.jellyseerr.subdomain = "seerr";
 
   my.endpoints.mainsail = {
     subdomain = "mainsail";
