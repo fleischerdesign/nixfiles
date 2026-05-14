@@ -3,7 +3,6 @@
   config,
   lib,
   pkgs,
-  inputs,
   ...
 }:
 
@@ -19,7 +18,6 @@ in
     # Dependencies
     my.features.system.wayland.enable = true;
     my.features.system.audio.enable = true;
-    my.features.desktop.quickshell.enable = false;
 
     # Conflicts
     assertions = [
@@ -32,51 +30,37 @@ in
     # System-level configuration for Niri
 
     # Disable X server for a pure Wayland setup
-    services.xserver.enable = false;
-
-    # GNOME virtual filesystem
-    services.gvfs.enable = true;
-
-    # Configure greetd with auto-login into niri-session
-    services.greetd = {
-      enable = true;
-      settings = {
-        default_session = {
-          command = "${pkgs.niri}/bin/niri-session";
-          user = "philipp";
+    services = {
+      xserver.enable = false;
+      gvfs.enable = true;
+      greetd = {
+        enable = true;
+        settings = {
+          default_session = {
+            command = "${pkgs.niri}/bin/niri-session";
+            user = "philipp";
+          };
         };
+      };
+      upower.enable = true;
+      power-profiles-daemon.enable = true;
+      gnome.gnome-keyring.enable = true;
+      locate = {
+        enable = true;
+        package = pkgs.plocate;
       };
     };
 
-    # Enable niri itself
     programs.niri.enable = true;
     programs.niri.package = pkgs.niri;
 
-    # Power management service
-    services.upower.enable = true;
-    services.power-profiles-daemon.enable = true; # Required for PowerPanel profiles
-
-    # XDG portals for desktop integration (e.g., file pickers)
     xdg.portal = {
       enable = true;
-      config = {
-        common = {
-          default = [ "gnome" ];
-        };
-      };
+      config.common.default = [ "gnome" ];
       extraPortals = [
         pkgs.xdg-desktop-portal-gtk
         pkgs.xdg-desktop-portal-gnome
       ];
-    };
-
-    # GNOME keyring for secrets
-    services.gnome.gnome-keyring.enable = true;
-
-    # Faster file searching
-    services.locate = {
-      enable = true;
-      package = pkgs.plocate;
     };
 
     # Home Manager-level configuration for Niri

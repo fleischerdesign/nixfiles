@@ -1,7 +1,6 @@
 # roles/pc.nix
 # This is the base role for any "Personal Computer", whether desktop or notebook.
 {
-  config,
   lib,
   inputs,
   pkgs,
@@ -9,7 +8,6 @@
 }:
 
 {
-  programs.kdeconnect.enable = true;
   hardware.enableRedistributableFirmware = lib.mkDefault true;
   # It enables a baseline set of features common to all graphical systems.
   my.features = {

@@ -49,11 +49,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    quickshell = {
-      url = "github:quickshell-mirror/quickshell";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
     portfolio = {
       url = "github:fleischerdesign/portfolio";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -74,15 +69,8 @@
   outputs =
     {
       self,
-      nixpkgs-stable,
       nixpkgs-unstable,
-      home-manager-stable,
       home-manager-unstable,
-      nixvim,
-      spicetify-nix,
-      disko,
-      portfolio,
-      deploy-rs,
       ...
     }@inputs:
     let
@@ -104,8 +92,7 @@
       };
 
       helpers = import ./lib/helper.nix {
-        inherit pkgs;
-        home-manager-unstable = home-manager-unstable;
+        inherit pkgs home-manager-unstable;
       };
     in
     {
