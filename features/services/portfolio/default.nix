@@ -77,7 +77,7 @@ in
     users.groups.portfolio = { };
 
     # Caddy Reverse Proxy
-    my.registry.portfolio = {
+    my.endpoints.portfolio = {
       host = config.networking.hostName;
       port = 3005;
       fullDomain = "fleischer.design";

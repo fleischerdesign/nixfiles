@@ -66,7 +66,7 @@ in
     };
 
     # 5. Reverse Proxy via Caddy
-    my.registry.homarr = {
+    my.endpoints.homarr = {
       host = config.networking.hostName;
       port = 7575;
       fullDomain = "ancoris.ovh";

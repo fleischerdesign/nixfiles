@@ -10,14 +10,6 @@ in
 {
   options.my.features.services.prowlarr = {
     enable = lib.mkEnableOption "Prowlarr Indexer Manager";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "prowlarr";
-      };
-      auth = lib.mkEnableOption "Protect with Authentik";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -74,11 +66,9 @@ in
     };
 
     # Register with Caddy Feature
-    my.registry.prowlarr = {
+    my.endpoints.prowlarr = {
       host = config.networking.hostName;
       port = 9696;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = cfg.expose.auth;
     };
   };
 }

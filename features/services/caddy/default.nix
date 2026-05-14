@@ -38,7 +38,7 @@ in
             svc.host == config.networking.hostName
             && svc.caddy.enable
             && (svc.subdomain != null || svc.fullDomain != null)
-          ) config.my.registry;
+          ) config.my.endpoints;
 
           mkVHost = name: conf: {
             name = if conf.fullDomain != null then conf.fullDomain else "${conf.subdomain}.${cfg.baseDomain}";

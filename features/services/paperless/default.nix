@@ -10,13 +10,6 @@ in
 {
   options.my.features.services.paperless = {
     enable = lib.mkEnableOption "Paperless-ngx Document Management";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "paperless";
-      };
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -83,7 +76,7 @@ in
         PAPERLESS_DBENGINE = "django.db.backends.postgresql";
         PAPERLESS_DBNAME = "paperless";
         PAPERLESS_DBUSER = "paperless";
-        PAPERLESS_URL = "https://${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}";
+        PAPERLESS_URL = let d = config.my.endpoints.paperless.subdomain; in lib.mkIf (d != null) "https://${d}.${config.my.features.services.caddy.baseDomain}";
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
 
@@ -144,11 +137,9 @@ in
     };
 
     # Register with Caddy Feature
-    my.registry.paperless = {
+    my.endpoints.paperless = {
       host = config.networking.hostName;
       port = 28981;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = false;
     };
   };
 }

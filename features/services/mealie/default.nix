@@ -10,14 +10,6 @@ in
 {
   options.my.features.services.mealie = {
     enable = lib.mkEnableOption "Mealie Recipe Manager";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "mealie";
-      };
-      auth = lib.mkEnableOption "Protect with Authentik";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -52,7 +44,7 @@ in
       settings = {
         ALLOW_SIGNUP = "false";
         TZ = "Europe/Berlin";
-        BASE_URL = "https://${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}";
+        BASE_URL = let d = config.my.endpoints.mealie.subdomain; in lib.mkIf (d != null) "https://${d}.${config.my.features.services.caddy.baseDomain}";
 
         # SMTP Configuration
         SMTP_HOST = "mail.smtp2go.com";
@@ -84,11 +76,9 @@ in
     };
 
     # Register with Caddy Feature
-    my.registry.mealie = {
+    my.endpoints.mealie = {
       host = config.networking.hostName;
       port = 9025;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = cfg.expose.auth;
     };
   };
 }

@@ -10,14 +10,6 @@ in
 {
   options.my.features.services.home-assistant = {
     enable = lib.mkEnableOption "Home Assistant";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "hass";
-      };
-      auth = lib.mkEnableOption "Protect with Authentik";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -128,12 +120,9 @@ in
       };
     };
 
-    # Register with Caddy Feature
-    my.registry.home-assistant = {
+    my.endpoints.home-assistant = {
       host = config.networking.hostName;
       port = 8123;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = cfg.expose.auth;
     };
   };
 }

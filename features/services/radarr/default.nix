@@ -10,14 +10,6 @@ in
 {
   options.my.features.services.radarr = {
     enable = lib.mkEnableOption "Radarr Movie Manager";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "radarr";
-      };
-      auth = lib.mkEnableOption "Protect with Authentik";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -82,11 +74,9 @@ in
       UMask = lib.mkForce "0002";
     };
 
-    my.registry.radarr = {
+    my.endpoints.radarr = {
       host = config.networking.hostName;
       port = 7878;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = cfg.expose.auth;
     };
   };
 }

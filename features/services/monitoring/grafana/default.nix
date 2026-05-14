@@ -281,7 +281,7 @@ in
       config.sops.templates."grafana.env".path
     ];
 
-    my.registry.grafana = {
+    my.endpoints.grafana = {
       host = config.networking.hostName;
       port = 3000;
       subdomain = "grafana";

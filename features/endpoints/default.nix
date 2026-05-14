@@ -3,7 +3,7 @@
   ...
 }:
 {
-  options.my.registry = lib.mkOption {
+  options.my.endpoints = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule (
         { ... }:
@@ -84,6 +84,6 @@
     );
 
     default = { };
-    description = "Central service registry — single source of truth for Caddy, Gatus, and future consumers";
+    description = "Central service endpoints — single source of truth for Caddy, monitoring, and future consumers";
   };
 }

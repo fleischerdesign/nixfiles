@@ -10,16 +10,6 @@ in
 {
   options.my.features.services.jellyseerr = {
     enable = lib.mkEnableOption "Jellyseerr Media Request Manager";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "seerr";
-      };
-      auth = lib.mkEnableOption "Protect with Authentik" // {
-        default = false;
-      };
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -43,11 +33,9 @@ in
       "Z /var/lib/jellyseerr 0750 1000 1000 -"
     ];
 
-    my.registry.jellyseerr = {
+    my.endpoints.jellyseerr = {
       host = config.networking.hostName;
       port = 5055;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = cfg.expose.auth;
     };
   };
 }

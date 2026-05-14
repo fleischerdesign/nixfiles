@@ -42,9 +42,9 @@ let
 
   registriesByHost =
     if flake != null then
-      lib.mapAttrs (_: hostCfg: hostCfg.config.my.registry or { }) (flake.nixosConfigurations or { })
+      lib.mapAttrs (_: hostCfg: hostCfg.config.my.endpoints or { }) (flake.nixosConfigurations or { })
     else
-      { ${ownHost} = config.my.registry or { }; };
+      { ${ownHost} = config.my.endpoints or { }; };
 
   hostsWithBlackbox = lib.filterAttrs (
     _: hostCfg: hostCfg.config.my.features.services.monitoring.blackbox-exporter.enable or false
@@ -207,7 +207,7 @@ in
           ];
     };
 
-    my.registry.prometheus = {
+    my.endpoints.prometheus = {
       host = config.networking.hostName;
       port = 9090;
       monitoring.tcp.enable = true;

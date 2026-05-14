@@ -48,7 +48,7 @@ in
     };
 
     # Caddy Reverse Proxy
-    my.registry.vaultwarden = {
+    my.endpoints.vaultwarden = {
       host = config.networking.hostName;
       port = 8082;
       fullDomain = "vault.ancoris.ovh";

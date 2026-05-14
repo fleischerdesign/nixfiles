@@ -20,65 +20,72 @@
   my.features.services.caddy.baseDomain = "fls.ancoris.ovh";
 
   my.features.services.home-assistant.enable = true;
-  my.features.services.home-assistant.expose = {
-    enable = true;
-    subdomain = "hass";
-    auth = false;
-  };
-
   my.features.services.esphome.enable = true;
-  my.features.services.esphome.expose = {
-    enable = true;
-    auth = true;
-  };
-
   my.features.services.mealie.enable = true;
-  my.features.services.mealie.expose = {
-    enable = true;
-    auth = false;
-  };
-
   my.features.services.paperless.enable = true;
-  my.features.services.paperless.expose.enable = true;
-
   my.features.services.prowlarr.enable = true;
-  my.features.services.prowlarr.expose = {
-    enable = true;
-    auth = true;
-  };
-
   my.features.services.radarr.enable = true;
-  my.features.services.radarr.expose = {
-    enable = true;
-    auth = true;
-  };
-
   my.features.services.sabnzbd.enable = true;
-  my.features.services.sabnzbd.expose = {
-    enable = true;
-    auth = true;
-  };
-
   my.features.services.sonarr.enable = true;
-  my.features.services.sonarr.expose = {
-    enable = true;
-    auth = true;
-  };
-
   my.features.services.jellyfin.enable = true;
-  my.features.services.jellyfin.expose = {
-    enable = true;
-    subdomain = "jellyfin";
-  };
-
   my.features.services.recyclarr.enable = true;
   my.features.services.blocky.enable = true;
   my.features.services.bazarr.enable = true;
-  my.features.services.bazarr.expose.enable = true;
   my.features.services.jellyseerr.enable = true;
-  my.features.services.jellyseerr.expose.enable = true;
   my.features.services.cloudflare-dyndns.enable = true;
   my.features.services.cloudflare-dyndns.domains = [ "fls.ancoris.ovh" ];
+  my.features.services.klipper.enable = true;
+
+  # Endpoints (subdomain/auth — set subdomain ≠ null to expose via Caddy)
+  my.endpoints.home-assistant.subdomain = "hass";
+
+  my.endpoints.esphome = {
+    subdomain = "esphome";
+    auth = true;
+  };
+
+  my.endpoints.mealie.subdomain = "mealie";
+
+  my.endpoints.paperless.subdomain = "paperless";
+
+  my.endpoints.prowlarr = {
+    subdomain = "prowlarr";
+    auth = true;
+  };
+
+  my.endpoints.radarr = {
+    subdomain = "radarr";
+    auth = true;
+  };
+
+  my.endpoints.sabnzbd = {
+    subdomain = "sabnzbd";
+    auth = true;
+  };
+
+  my.endpoints.sonarr = {
+    subdomain = "sonarr";
+    auth = true;
+  };
+
+  my.endpoints.jellyfin.subdomain = "jellyfin";
+
+  my.endpoints.bazarr = {
+    subdomain = "bazarr";
+    auth = true;
+  };
+
+  my.endpoints.jellyseerr.subdomain = "jellyseerr";
+
+  my.endpoints.mainsail = {
+    subdomain = "mainsail";
+    auth = true;
+  };
+  my.endpoints.moonraker = {
+    subdomain = "moonraker";
+    auth = true;
+  };
+  my.endpoints.mainsail-cam.subdomain = "cam.moonraker";
 
   my.features.services.authentik.outpost.proxy.enable = true;
   my.features.services.authentik.outpost.ldap = {
@@ -102,12 +109,6 @@
 
   my.features.services.crowdsec.enable = true;
   my.features.services.crowdsec.role = "agent";
-
-  my.features.services.klipper.enable = true;
-  my.features.services.klipper.expose = {
-    enable = true;
-    auth = true;
-  };
 
   my.features.system.backups.restic = {
     enable = true;

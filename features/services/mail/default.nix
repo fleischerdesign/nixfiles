@@ -274,7 +274,7 @@ in
       ];
     };
 
-    my.registry.mail = {
+    my.endpoints.mail = {
       host = config.networking.hostName;
       port = 9081;
       fullDomain = "mail.ancoris.ovh";

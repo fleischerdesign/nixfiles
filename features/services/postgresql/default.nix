@@ -34,7 +34,7 @@ in
       backupAll = true;
     };
 
-    my.registry.postgresql = {
+    my.endpoints.postgresql = {
       host = config.networking.hostName;
       port = 5432;
       monitoring.http.enable = false;

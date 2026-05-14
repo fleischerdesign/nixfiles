@@ -22,7 +22,7 @@ in
       appendOnly = true;
     };
 
-    my.registry.redis = {
+    my.endpoints.redis = {
       host = config.networking.hostName;
       port = 6379;
       monitoring.http.enable = false;

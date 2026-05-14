@@ -48,7 +48,7 @@ in
 
     systemd.services.ntfy-sh.serviceConfig.CacheDirectory = "ntfy-sh";
 
-    my.registry.ntfy = {
+    my.endpoints.ntfy = {
       host = config.networking.hostName;
       port = 8083;
       subdomain = "ntfy";

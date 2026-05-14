@@ -97,7 +97,7 @@ in
     };
 
     # 5. Reverse Proxy
-    my.registry.authentik = {
+    my.endpoints.authentik = {
       host = config.networking.hostName;
       port = 9055;
       fullDomain = "auth.ancoris.ovh";

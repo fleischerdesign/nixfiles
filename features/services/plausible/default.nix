@@ -61,7 +61,7 @@ in
     };
 
     # Caddy Reverse Proxy
-    my.registry.plausible = {
+    my.endpoints.plausible = {
       host = config.networking.hostName;
       port = 8000;
       subdomain = "plausible";

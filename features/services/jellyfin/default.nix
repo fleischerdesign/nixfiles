@@ -10,16 +10,6 @@ in
 {
   options.my.features.services.jellyfin = {
     enable = lib.mkEnableOption "Jellyfin Media Server";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "jelly";
-      };
-      auth = lib.mkEnableOption "Protect with Authentik" // {
-        default = false;
-      };
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -60,12 +50,9 @@ in
       "render"
     ];
 
-    # Register with Caddy Feature
-    my.registry.jellyfin = {
+    my.endpoints.jellyfin = {
       host = config.networking.hostName;
       port = 8096;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = cfg.expose.auth;
     };
   };
 }

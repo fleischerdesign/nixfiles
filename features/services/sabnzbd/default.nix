@@ -6,19 +6,11 @@
 }:
 let
   cfg = config.my.features.services.sabnzbd;
-  domain = "${cfg.expose.subdomain}.${config.my.features.services.caddy.baseDomain}";
+  domain = "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}";
 in
 {
   options.my.features.services.sabnzbd = {
-    enable = lib.mkEnableOption "SABnzbd Downloader";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "sabnzbd";
-      };
-      auth = lib.mkEnableOption "Protect with Authentik";
-    };
+    enable = lib.mkEnableOption "SABnzbd Usenet Downloader";
   };
 
   config = lib.mkIf cfg.enable {
@@ -60,7 +52,7 @@ in
         misc = {
           port = 8080;
           host = "0.0.0.0";
-          host_whitelist = "${domain}, localhost, 127.0.0.1";
+          host_whitelist = "${if config.my.endpoints.sabnzbd.subdomain != null then "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}, " else ""}localhost, 127.0.0.1";
           inet_exposure = 4;
           download_dir = "/data/storage/downloads/incomplete";
           complete_dir = "/data/storage/downloads/complete";
@@ -108,11 +100,9 @@ in
     };
 
     # Caddy Integration
-    my.registry.sabnzbd = {
+    my.endpoints.sabnzbd = {
       host = config.networking.hostName;
       port = 8080;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = cfg.expose.auth;
     };
   };
 }

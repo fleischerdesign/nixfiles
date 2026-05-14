@@ -36,7 +36,7 @@ in
       });
     };
 
-    my.registry.blackbox-exporter = {
+    my.endpoints.blackbox-exporter = {
       host = config.networking.hostName;
       port = 9115;
       monitoring.tcp.enable = true;

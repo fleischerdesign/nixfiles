@@ -9,15 +9,7 @@ let
 in
 {
   options.my.features.services.sonarr = {
-    enable = lib.mkEnableOption "Sonarr Series Manager";
-    expose = {
-      enable = lib.mkEnableOption "Expose via Caddy";
-      subdomain = lib.mkOption {
-        type = lib.types.str;
-        default = "sonarr";
-      };
-      auth = lib.mkEnableOption "Protect with Authentik";
-    };
+    enable = lib.mkEnableOption "Sonarr TV Show Manager";
   };
 
   config = lib.mkIf cfg.enable {
@@ -82,11 +74,9 @@ in
       UMask = lib.mkForce "0002";
     };
 
-    my.registry.sonarr = {
+    my.endpoints.sonarr = {
       host = config.networking.hostName;
       port = 8989;
-      subdomain = if cfg.expose.enable then cfg.expose.subdomain else null;
-      auth = cfg.expose.auth;
     };
   };
 }
