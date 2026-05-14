@@ -58,10 +58,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    hermes-agent = {
-      url = "github:NousResearch/hermes-agent";
-    };
-
   };
 
   outputs =
@@ -94,7 +90,6 @@
 
       globalModules = [
         inputs.sops-nix.nixosModules.sops
-        inputs.hermes-agent.nixosModules.default
       ];
     in
     {

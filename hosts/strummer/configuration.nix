@@ -29,7 +29,6 @@
         sonarr.enable = true;
         jellyfin.enable = true;
         recyclarr.enable = true;
-        hermes-agent.enable = true;
         blocky.enable = true;
         bazarr.enable = true;
         jellyseerr.enable = true;
