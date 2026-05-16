@@ -6,22 +6,6 @@
   ...
 }:
 
-let
-  hostSubmodule = lib.types.submodule {
-    options = {
-      tailscaleIp = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "Tailscale IP des Hosts";
-      };
-      localIp = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "Lokale IP des Hosts";
-      };
-    };
-  };
-in
 {
   options.my.features.system.networking.topology = {
     enable = lib.mkEnableOption "Centralized network topology configuration";
@@ -67,6 +51,13 @@ in
         tailscaleIp = "100.120.39.68";
         localIp = "173.249.22.211";
         domain = "mky.ancoris.ovh";
+        hostType = "server";
+      };
+
+      rollins = {
+        tailscaleIp = "100.126.5.72";
+        localIp = "37.114.55.91";
+        domain = "rls.ancoris.ovh";
         hostType = "server";
       };
 

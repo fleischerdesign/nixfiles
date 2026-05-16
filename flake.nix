@@ -211,6 +211,27 @@
             }
           ];
         };
+        rollins = helpers.mkSystem {
+          inherit
+            system
+            pkgs
+            inputs
+            flake
+            globalModules
+            ;
+          hostname = "rollins";
+          extraModules = [ inputs.disko.nixosModules.disko ];
+          users = [
+            {
+              name = "philipp";
+              extraGroups = [
+                "networkmanager"
+                "wheel"
+              ];
+              homeModules = [ inputs.nixvim.homeModules.nixvim ];
+            }
+          ];
+        };
       };
 
       deploy = {
