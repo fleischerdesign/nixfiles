@@ -1,8 +1,6 @@
 {
-  config,
   lib,
   pkgs,
-  inputs,
   osConfig,
   ...
 }:
@@ -25,6 +23,7 @@ in
       gimp
       obsidian
       orca-slicer
+      lycheeslicer
       resources
       moonlight-qt
       packet
