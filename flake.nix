@@ -75,10 +75,7 @@
       overlays = [
         (import ./overlays/fix/openldap)
         (import ./overlays/fix/docs-conflict)
-        (import ./overlays/fix/esptool)
-        (import ./overlays/fix/inline-snapshot)
-        (import ./overlays/fix/watchfiles)
-        (import ./overlays/fix/django)
+        (import ./overlays/fix/python-tests)
         inputs.nix-vscode-extensions.overlays.default
       ];
 
