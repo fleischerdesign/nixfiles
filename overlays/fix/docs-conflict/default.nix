@@ -1,6 +1,6 @@
-final: prev: {
+_: prev: {
   pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-    (pfinal: pprev: {
+    (_: pprev: {
       cryptography = pprev.cryptography.overrideAttrs (old: {
         postInstall = (old.postInstall or "") + ''
           rm -rf $out/${prev.python3.sitePackages}/docs
