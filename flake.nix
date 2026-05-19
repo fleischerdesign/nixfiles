@@ -75,7 +75,6 @@
       overlays = [
         (import ./overlays/fix/openldap)
         (import ./overlays/fix/docs-conflict)
-        (import ./overlays/fix/python-tests)
         inputs.nix-vscode-extensions.overlays.default
       ];
 
