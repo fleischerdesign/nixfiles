@@ -39,7 +39,7 @@
   };
   my.features.services.monitoring.blackbox-exporter.enable = true;
 
-  my.features.services.harmonia.enable = true;
+  my.features.services.atticd.enable = true;
 
   my.features.services.crowdsec = {
     enable = true;

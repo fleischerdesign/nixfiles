@@ -33,8 +33,8 @@ in
         "flakes"
       ];
 
-      substituters = [ "https://cache.rls.ancoris.ovh" ];
-      trusted-public-keys = [ "cache.rls.ancoris.ovh-1:ZP9Vsn5B5RFJsKrbrvLMEYDytHM1PznmP+PRR4D0ZVg=" ];
+      substituters = [ "https://cache.rls.ancoris.ovh/nixfiles" ];
+      trusted-public-keys = [ ];
     };
 
     # Network manager configuration
