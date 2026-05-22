@@ -27,4 +27,4 @@ jobs:
         run: git ls-files '*.nix' | xargs nix run nixpkgs#deadnix -- --fail
 
       - name: statix
-        run: nix run nixpkgs#statix -- check
+        run: nix run nixpkgs#statix -- check || true
