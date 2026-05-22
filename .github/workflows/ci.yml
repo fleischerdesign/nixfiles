@@ -62,8 +62,18 @@ jobs:
       - name: Push to binary cache
         if: github.event_name == 'push' && success()
         run: |
+          mkdir -p ~/.config/attic
+          cat > ~/.config/attic/config.toml << 'ATTCEOF'
+          default-server = "nixfiles-server"
+
+          [servers.nixfiles-server]
+          endpoint = "https://cache.rls.ancoris.ovh"
+          token = "${{ secrets.ATTIC_PUSH_TOKEN }}"
+          ATTCEOF
+          chmod 600 ~/.config/attic/config.toml
+
           for i in 1 2 3; do
-            nix copy --to "https://cache.rls.ancoris.ovh/nixfiles?access-token=${{ secrets.ATTIC_PUSH_TOKEN }}" \
+            nix shell nixpkgs#attic-client -c attic push nixfiles \
               ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" && exit 0
             echo "Push attempt $i failed, retrying in 10s..."
             sleep 10
