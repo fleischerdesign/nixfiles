@@ -19,11 +19,13 @@ in
       enable = true;
 
       settings = {
-        bind = "127.0.0.1:5000";
+        bind = "unix:/run/harmonia/socket";
         workers = 4;
         priority = 50;
       };
     };
+
+    systemd.services.harmonia.environment.RUST_LOG = "info";
 
     my.endpoints.harmonia = {
       host = config.networking.hostName;
@@ -35,13 +37,18 @@ in
 
     services.caddy.virtualHosts."cache.rls.ancoris.ovh" = {
       extraConfig = ''
+        tls {
+          alpn http/1.1
+        }
         @upload {
           method PUT POST
         }
         basicauth @upload {
           ci ${cacheBcryptHash}
         }
-        reverse_proxy 127.0.0.1:5000
+        reverse_proxy unix//run/harmonia/socket {
+          request_buffers 10MiB
+        }
       '';
     };
   };
