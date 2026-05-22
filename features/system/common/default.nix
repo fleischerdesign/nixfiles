@@ -34,7 +34,10 @@ in
       ];
 
       substituters = [ "https://cache.rls.ancoris.ovh" ];
-      trusted-public-keys = [ "fleischerdesign:7pBdmvIy6gzfOVfp8yonkVfVcyXsGYYMLExwc6bDRkM=" ];
+      trusted-public-keys = [
+        "cache.rls.ancoris.ovh-1:ZP9Vsn5B5RFJsKrbrvLMEYDytHM1PznmP+PRR4D0ZVg="
+        "fleischerdesign:7pBdmvIy6gzfOVfp8yonkVfVcyXsGYYMLExwc6bDRkM="
+      ];
     };
 
     # Network manager configuration

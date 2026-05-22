@@ -18,12 +18,16 @@ in
     services.harmonia.cache = {
       enable = true;
 
+      signKeyPaths = [ config.sops.secrets.harmonia-cache-key.path ];
+
       settings = {
         bind = "unix:/run/harmonia/socket";
         workers = 4;
         priority = 50;
       };
     };
+
+    sops.secrets.harmonia-cache-key = { };
 
     systemd.services.harmonia.environment.RUST_LOG = "info";
 
