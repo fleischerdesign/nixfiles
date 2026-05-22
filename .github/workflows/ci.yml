@@ -48,7 +48,7 @@ jobs:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           extra_nix_config: |
             substituters = https://cache.rls.ancoris.ovh https://cache.nixos.org
-            trusted-public-keys = cache.rls.ancoris.ovh-1:ZP9Vsn5B5RFJsKrbrvLMEYDytHM1PznmP+PRR4D0ZVg= fleischerdesign:7pBdmvIy6gzfOVfp8yonkVfVcyXsGYYMLExwc6bDRkM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+            trusted-public-keys = cache.rls.ancoris.ovh-1:ZP9Vsn5B5RFJsKrbrvLMEYDytHM1PznmP+PRR4D0ZVg= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
 
       - name: Build ${{ matrix.host }}
         run: |
