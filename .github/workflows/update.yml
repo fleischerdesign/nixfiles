@@ -1,0 +1,140 @@
+name: Flake Update
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      has-updates: ${{ steps.detect.outputs.has-updates }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: detect
+        run: |
+          nix flake update
+          if git diff --quiet flake.lock; then
+            echo "has-updates=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-updates=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload updated flake.lock
+        if: steps.detect.outputs.has-updates == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: updated-flake-lock
+          path: flake.lock
+          retention-days: 1
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.has-updates == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [yorke, jello, strummer, mackaye, rollins]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download updated flake.lock
+        uses: actions/download-artifact@v4
+        with:
+          name: updated-flake-lock
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            substituters = https://cache.rls.ancoris.ovh https://cache.nixos.org
+            trusted-public-keys = fleischerdesign:7pBdmvIy6gzfOVfp8yonkVfVcyXsGYYMLExwc6bDRkM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+
+      - name: Setup signing key
+        run: |
+          cat << 'SIGNEOF' > /tmp/cache-priv-key
+          ${{ secrets.BINARY_CACHE_SIGNING_KEY }}
+          SIGNEOF
+          chmod 600 /tmp/cache-priv-key
+          echo "secret-key-files = /tmp/cache-priv-key" | sudo tee -a /etc/nix/nix.conf
+
+      - name: Build ${{ matrix.host }}
+        run: |
+          nix build \
+            --print-build-logs \
+            --keep-going \
+            ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel"
+
+      - name: Push to binary cache
+        run: |
+          nix copy --to "https://ci:${{ secrets.BINARY_CACHE_TOKEN }}@cache.rls.ancoris.ovh" \
+            ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel"
+
+  create-pr:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.has-updates == 'true' && success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download updated flake.lock
+        uses: actions/download-artifact@v4
+        with:
+          name: updated-flake-lock
+
+      - name: Generate changelog
+        run: |
+          {
+            echo "## Flake Update"
+            echo
+            echo "All hosts built successfully — auto-merge enabled."
+            echo
+            echo "### Updated Inputs"
+            echo
+            echo '```'
+            git diff flake.lock | grep -E '^[-+].*"(lastModified|narHash|owner|repo|rev|type|url)"' | head -60
+            echo '```'
+          } > changelog.txt
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        id: create-pr
+        with:
+          token: ${{ secrets.WORKFLOW_TOKEN }}
+          commit-message: "chore(deps): update flake inputs"
+          title: "chore(deps): flake update — ✅ pre-validated"
+          branch: flake-update
+          delete-branch: true
+          labels: |
+            dependencies
+            automated
+            ci-verified
+          body-path: changelog.txt
+
+      - name: Enable auto-merge
+        if: steps.create-pr.outputs.pull-request-number
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.WORKFLOW_TOKEN }}
+          pull-request-number: ${{ steps.create-pr.outputs.pull-request-number }}
+          merge-method: squash

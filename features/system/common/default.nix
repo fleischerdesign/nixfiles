@@ -27,10 +27,15 @@ in
 
   config = lib.mkIf cfg.enable {
     # Enable experimental features
-    nix.settings.experimental-features = [
-      "nix-command"
-      "flakes"
-    ];
+    nix.settings = {
+      experimental-features = [
+        "nix-command"
+        "flakes"
+      ];
+
+      substituters = [ "https://cache.rls.ancoris.ovh" ];
+      trusted-public-keys = [ "fleischerdesign:7pBdmvIy6gzfOVfp8yonkVfVcyXsGYYMLExwc6bDRkM=" ];
+    };
 
     # Network manager configuration
     networking.networkmanager.enable = true;
