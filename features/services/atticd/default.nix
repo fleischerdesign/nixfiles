@@ -27,10 +27,7 @@ in
       environmentFile = config.sops.templates.atticd_env.path;
       settings = {
         listen = "127.0.0.1:8080";
-        allowed-hosts = [
-          "cache.rls.ancoris.ovh"
-          "127.0.0.1:8080"
-        ];
+        allowed-hosts = [ "cache.rls.ancoris.ovh" ];
         api-endpoint = "https://cache.rls.ancoris.ovh/";
         database.url = "sqlite:///var/lib/atticd/server.db?mode=rwc";
         storage = {
