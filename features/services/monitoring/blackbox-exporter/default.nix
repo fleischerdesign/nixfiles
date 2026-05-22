@@ -17,23 +17,25 @@ in
     services.prometheus.exporters.blackbox = {
       enable = true;
       port = 9115;
-      configFile = pkgs.writeText "blackbox.yml" (builtins.toJSON {
-        modules = {
-          http_2xx = {
-            prober = "http";
-            timeout = "10s";
-            http = {
-              valid_status_codes = [ ];
-              no_follow_redirects = false;
-              preferred_ip_protocol = "ip4";
+      configFile = pkgs.writeText "blackbox.yml" (
+        builtins.toJSON {
+          modules = {
+            http_2xx = {
+              prober = "http";
+              timeout = "10s";
+              http = {
+                valid_status_codes = [ ];
+                no_follow_redirects = false;
+                preferred_ip_protocol = "ip4";
+              };
+            };
+            tcp_connect = {
+              prober = "tcp";
+              timeout = "5s";
             };
           };
-          tcp_connect = {
-            prober = "tcp";
-            timeout = "5s";
-          };
-        };
-      });
+        }
+      );
     };
 
     my.endpoints.blackbox-exporter = {

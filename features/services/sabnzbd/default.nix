@@ -1,12 +1,10 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
   cfg = config.my.features.services.sabnzbd;
-  domain = "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}";
 in
 {
   options.my.features.services.sabnzbd = {
@@ -52,7 +50,12 @@ in
         misc = {
           port = 8080;
           host = "0.0.0.0";
-          host_whitelist = "${if config.my.endpoints.sabnzbd.subdomain != null then "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}, " else ""}localhost, 127.0.0.1";
+          host_whitelist = "${
+            if config.my.endpoints.sabnzbd.subdomain != null then
+              "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}, "
+            else
+              ""
+          }localhost, 127.0.0.1";
           inet_exposure = 4;
           download_dir = "/data/storage/downloads/incomplete";
           complete_dir = "/data/storage/downloads/complete";

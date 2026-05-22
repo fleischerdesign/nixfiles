@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
@@ -76,7 +75,11 @@ in
         PAPERLESS_DBENGINE = "django.db.backends.postgresql";
         PAPERLESS_DBNAME = "paperless";
         PAPERLESS_DBUSER = "paperless";
-        PAPERLESS_URL = let d = config.my.endpoints.paperless.subdomain; in lib.mkIf (d != null) "https://${d}.${config.my.features.services.caddy.baseDomain}";
+        PAPERLESS_URL =
+          let
+            d = config.my.endpoints.paperless.subdomain;
+          in
+          lib.mkIf (d != null) "https://${d}.${config.my.features.services.caddy.baseDomain}";
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
 

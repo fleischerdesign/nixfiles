@@ -54,7 +54,15 @@ in
         authorization = {
           force_logins = false;
           cors_domains = lib.mkMerge [
-            [ "*.${baseDomain}" "http://localhost" "http://127.0.0.1" "https://app.fluidd.xyz" "http://app.fluidd.xyz" "https://my.mainsail.xyz" "http://my.mainsail.xyz" ]
+            [
+              "*.${baseDomain}"
+              "http://localhost"
+              "http://127.0.0.1"
+              "https://app.fluidd.xyz"
+              "http://app.fluidd.xyz"
+              "https://my.mainsail.xyz"
+              "http://my.mainsail.xyz"
+            ]
             (lib.mkIf (ep.mainsail.subdomain != null) [ "https://${ep.mainsail.subdomain}.${baseDomain}" ])
           ];
           trusted_clients = [
