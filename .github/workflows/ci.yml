@@ -50,15 +50,6 @@ jobs:
             substituters = https://cache.rls.ancoris.ovh https://cache.nixos.org
             trusted-public-keys = cache.rls.ancoris.ovh-1:ZP9Vsn5B5RFJsKrbrvLMEYDytHM1PznmP+PRR4D0ZVg= fleischerdesign:7pBdmvIy6gzfOVfp8yonkVfVcyXsGYYMLExwc6bDRkM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
 
-      - name: Setup signing key
-        if: github.event_name == 'push'
-        run: |
-          cat << 'SIGNEOF' > /tmp/cache-priv-key
-          ${{ secrets.BINARY_CACHE_SIGNING_KEY }}
-          SIGNEOF
-          chmod 600 /tmp/cache-priv-key
-          echo "secret-key-files = /tmp/cache-priv-key" | sudo tee -a /etc/nix/nix.conf
-
       - name: Build ${{ matrix.host }}
         run: |
           nix build \
