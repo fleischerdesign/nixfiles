@@ -1,6 +1,6 @@
 # roles/notebook.nix
 # This role defines the default features for a notebook PC.
-{ lib, ... }:
+{ ... }:
 
 {
   imports = [

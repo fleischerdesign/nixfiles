@@ -1,6 +1,6 @@
 # roles/desktop.nix
 # This role defines the default features for a stationary desktop PC.
-{ lib, ... }:
+{ ... }:
 
 {
   imports = [

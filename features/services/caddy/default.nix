@@ -40,7 +40,7 @@ in
             && (svc.subdomain != null || svc.fullDomain != null)
           ) config.my.endpoints;
 
-          mkVHost = name: conf: {
+          mkVHost = _name: conf: {
             name = if conf.fullDomain != null then conf.fullDomain else "${conf.subdomain}.${cfg.baseDomain}";
             value = {
               extraConfig =

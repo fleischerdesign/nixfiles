@@ -6,7 +6,6 @@
 }:
 let
   cfg = config.my.features.services.authentik.outpost.ldap;
-  mackayeTailscaleIp = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
 in
 {
   options.my.features.services.authentik.outpost.ldap = {

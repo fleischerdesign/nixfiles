@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
@@ -38,7 +37,7 @@ in
         # Heimnetz-Hosts: lokale IP (via LAN oder Subnet-Router)
         # Externe Hosts (mackaye): Tailscale-IP (lokale IP nicht erreichbar)
         customDNS = {
-          mapping = lib.mapAttrs' (name: host: {
+          mapping = lib.mapAttrs' (_name: host: {
             name = host.domain;
             value =
               if host.localIp != null && lib.hasPrefix "192.168.178." host.localIp then
