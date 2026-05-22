@@ -34,7 +34,7 @@ in
       ];
 
       substituters = [ "https://cache.rls.ancoris.ovh/nixfiles" ];
-      trusted-public-keys = [ ];
+      trusted-public-keys = [ "nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE=" ];
     };
 
     # Network manager configuration
