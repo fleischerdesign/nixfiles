@@ -38,10 +38,8 @@ in
         @upload {
           method PUT POST
         }
-        handle @upload {
-          basicauth {
-            ci ${cacheBcryptHash}
-          }
+        basicauth @upload {
+          ci ${cacheBcryptHash}
         }
         reverse_proxy 127.0.0.1:5000
       '';
