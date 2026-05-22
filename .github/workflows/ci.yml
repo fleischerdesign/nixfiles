@@ -3,7 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "overlays/**", "lib/**", "user/**", "media/**", "src/**"]
   pull_request:
+    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "overlays/**", "lib/**", "user/**", "media/**", "src/**"]
   workflow_dispatch:
 
 permissions:
@@ -38,6 +40,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        run: sudo rm -rf /opt/hostedtoolcache /usr/local/.ghcup /usr/share/dotnet /usr/local/lib/android /usr/local/share/powershell 2>/dev/null; true
+
       - uses: cachix/install-nix-action@v27
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
@@ -59,7 +64,7 @@ jobs:
           nix build \
             --json \
             --print-build-logs \
-            --keep-going \
+            --max-jobs 1 \
             ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" \
             | tee build-${{ matrix.host }}.json
 
