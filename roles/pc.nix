@@ -22,7 +22,6 @@
       wayland.enable = lib.mkDefault true;
       fish-shell.enable = lib.mkDefault true;
       printing.enable = lib.mkDefault true;
-      networking.ssh.enable = lib.mkDefault true;
       networking.topology.enable = lib.mkDefault true;
     };
   };
@@ -30,4 +29,6 @@
   environment.systemPackages = [
     inputs.deploy-rs.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
+
+  my.features.system.networking.ssh.enable = lib.mkDefault true;
 }
