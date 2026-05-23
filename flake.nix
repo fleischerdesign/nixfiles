@@ -74,7 +74,6 @@
       # Zentralisierte Overlays
       overlays = [
         (import ./overlays/fix/openldap)
-        (import ./overlays/fix/docs-conflict)
         inputs.nix-vscode-extensions.overlays.default
       ];
 
