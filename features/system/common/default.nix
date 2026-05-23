@@ -92,6 +92,9 @@ in
 
     sops.secrets.attic_push_token = { };
     sops.templates.attic_config = {
+      owner = "philipp";
+      group = "users";
+      mode = "0400";
       content = ''
         default-server = "nixfiles-server"
 
