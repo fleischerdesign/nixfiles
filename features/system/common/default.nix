@@ -113,10 +113,9 @@ in
       '';
     };
 
-    environment.variables.ATTIC_CONFIG = lib.mkIf (attic_user != null) "/etc/attic/config.toml";
-
     systemd.tmpfiles.rules = lib.mkIf (attic_user != null) [
-      "L+ /etc/attic/config.toml 0440 ${attic_user} ${attic_group} - /run/secrets/rendered/attic_config"
+      "d /home/${attic_user}/.config/attic 0700 ${attic_user} ${attic_group} -"
+      "L+ /home/${attic_user}/.config/attic/config.toml 0400 ${attic_user} ${attic_group} - /run/secrets/rendered/attic_config"
     ];
 
     systemd.paths.attic-push-system = lib.mkIf (attic_user != null && attic.autoPush) {
@@ -134,7 +133,6 @@ in
       serviceConfig = {
         Type = "oneshot";
         User = attic_user;
-        Environment = "ATTIC_CONFIG=/etc/attic/config.toml";
         ExecStart = "${pkgs.writeShellScript "attic-push-system" ''
           set -euo pipefail
           CLOSURE=$(${pkgs.coreutils}/bin/readlink /run/current-system)
