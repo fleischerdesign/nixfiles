@@ -14,32 +14,36 @@ let
   deLocale = "de_DE.UTF-8";
 in
 {
-  options.my.features.system.common = {
-    enable = lib.mkEnableOption "Common system-wide settings (nix, network, time, locale, keyboard)";
-  };
+  options = {
+    my = {
+      features.system.common = {
+        enable = lib.mkEnableOption "Common system-wide settings (nix, network, time, locale, keyboard)";
+      };
 
-  options.my.role = lib.mkOption {
-    type = lib.types.enum [
-      "server"
-      "desktop"
-      "notebook"
-    ];
-    default = "server";
-    description = "The role of this machine (server, desktop, notebook).";
-  };
+      role = lib.mkOption {
+        type = lib.types.enum [
+          "server"
+          "desktop"
+          "notebook"
+        ];
+        default = "server";
+        description = "The role of this machine (server, desktop, notebook).";
+      };
 
-  options.my.features.cache.attic = {
-    user = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "User for attic config ownership and auto-push service. Set to enable attic support.";
+      features.cache.attic = {
+        user = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "User for attic config ownership and auto-push service. Set to enable attic support.";
+        };
+        group = lib.mkOption {
+          type = lib.types.str;
+          default = "users";
+          description = "Group for attic config file ownership";
+        };
+        autoPush = lib.mkEnableOption "Automatically push system closure to attic cache after each rebuild";
+      };
     };
-    group = lib.mkOption {
-      type = lib.types.str;
-      default = "users";
-      description = "Group for attic config file ownership";
-    };
-    autoPush = lib.mkEnableOption "Automatically push system closure to attic cache after each rebuild";
   };
 
   config = lib.mkIf cfg.enable {
@@ -96,21 +100,23 @@ in
       ripgrep
     ];
 
-    sops.defaultSopsFile = ../../../secrets/secrets.yaml;
-    sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+    sops = {
+      defaultSopsFile = ../../../secrets/secrets.yaml;
+      age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
-    sops.secrets.attic_push_token = lib.mkIf (attic_user != null) { };
-    sops.templates.attic_config = lib.mkIf (attic_user != null) {
-      owner = attic_user;
-      group = attic_group;
-      mode = "0440";
-      content = ''
-        default-server = "nixfiles-server"
+      secrets.attic_push_token = lib.mkIf (attic_user != null) { };
+      templates.attic_config = lib.mkIf (attic_user != null) {
+        owner = attic_user;
+        group = attic_group;
+        mode = "0440";
+        content = ''
+          default-server = "nixfiles-server"
 
-        [servers.nixfiles-server]
-        endpoint = "https://cache.rls.ancoris.ovh"
-        token = "${config.sops.placeholder.attic_push_token}"
-      '';
+          [servers.nixfiles-server]
+          endpoint = "https://cache.rls.ancoris.ovh"
+          token = "${config.sops.placeholder.attic_push_token}"
+        '';
+      };
     };
 
     systemd.tmpfiles.rules = lib.mkIf (attic_user != null) [
