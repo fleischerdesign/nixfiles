@@ -88,6 +88,7 @@ in
 
     # Global Sops Configuration
     sops.defaultSopsFile = ../../../secrets/secrets.yaml;
+    sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
     sops.secrets.attic_push_token = { };
     sops.templates.attic_config = {
