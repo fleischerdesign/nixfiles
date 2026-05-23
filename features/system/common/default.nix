@@ -100,7 +100,7 @@ in
 
         [servers.nixfiles-server]
         endpoint = "https://cache.rls.ancoris.ovh"
-        token = ${config.sops.placeholder.attic_push_token}
+        token = "${config.sops.placeholder.attic_push_token}"
       '';
     };
   };
