@@ -118,31 +118,11 @@ in
       "L+ /home/${attic_user}/.config/attic/config.toml 0400 ${attic_user} ${attic_group} - /run/secrets/rendered/attic_config"
     ];
 
-    systemd.paths.attic-push-system = lib.mkIf (attic_user != null && attic.autoPush) {
-      wantedBy = [ "multi-user.target" ];
-      pathConfig = {
-        PathChanged = "/run/current-system";
-        Unit = "attic-push-system.service";
-      };
-    };
-
-    systemd.services.attic-push-system = lib.mkIf (attic_user != null && attic.autoPush) {
-      description = "Push current system closure to attic cache after rebuild";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        User = attic_user;
-        ExecStart = "${pkgs.writeShellScript "attic-push-system" ''
-          set -euo pipefail
-          CLOSURE=$(${pkgs.coreutils}/bin/readlink /run/current-system)
-          if [ -z "$CLOSURE" ]; then
-            echo "Error: /run/current-system does not resolve" >&2
-            exit 1
-          fi
-          ${pkgs.attic-client}/bin/attic push nixfiles "$CLOSURE"
-        ''}";
-      };
-    };
+    system.activationScripts.atticPush = lib.mkIf (attic_user != null && attic.autoPush) ''
+      CLOSURE="$(${pkgs.coreutils}/bin/readlink -f /run/current-system)"
+      if [ -n "$CLOSURE" ]; then
+        runuser -u ${attic_user} -- ${pkgs.attic-client}/bin/attic push nixfiles "$CLOSURE" &
+      fi
+    '';
   };
 }
