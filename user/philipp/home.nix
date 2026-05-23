@@ -1,4 +1,6 @@
 {
+  config,
+  lib,
   pkgs,
   osConfig,
   ...
@@ -14,7 +16,8 @@
 
   systemd.user.startServices = "sd-switch";
 
-  home.file.".config/attic/config.toml".source = osConfig.sops.templates.attic_config.path;
+  home.file.".config/attic/config.toml".source =
+    config.lib.file.mkOutOfStoreSymlink osConfig.sops.templates.attic_config.path;
 
   xdg.desktopEntries."ls3d-handler" = {
     name = "WBS Learnspace 3D Handler";
