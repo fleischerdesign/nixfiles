@@ -73,8 +73,7 @@ jobs:
           chmod 600 ~/.config/attic/config.toml
 
           for i in 1 2 3; do
-            nix shell nixpkgs#attic-client -c attic push nixfiles \
-              ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" && exit 0
+            nix shell nixpkgs#attic-client -c attic push nixfiles ./result && exit 0
             echo "Push attempt $i failed, retrying in 10s..."
             sleep 10
           done

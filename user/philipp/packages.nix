@@ -12,6 +12,7 @@ in
     with pkgs;
     [
       # --- CLI / Server Safe ---
+      attic-client
       gemini-cli
       yazi
     ]

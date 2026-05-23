@@ -88,5 +88,16 @@ in
 
     # Global Sops Configuration
     sops.defaultSopsFile = ../../../secrets/secrets.yaml;
+
+    sops.secrets.attic_push_token = { };
+    sops.templates.attic_config = {
+      content = ''
+        default-server = "nixfiles-server"
+
+        [servers.nixfiles-server]
+        endpoint = "https://cache.rls.ancoris.ovh"
+        token = ${config.sops.placeholder.attic_push_token}
+      '';
+    };
   };
 }
