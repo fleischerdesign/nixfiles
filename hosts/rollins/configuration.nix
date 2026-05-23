@@ -41,6 +41,8 @@
 
   my.features.services.atticd.enable = true;
 
+  my.features.cache.attic.user = "philipp";
+
   my.features.services.crowdsec = {
     enable = true;
     role = "agent";

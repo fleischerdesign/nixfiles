@@ -8,6 +8,9 @@
 
 let
   cfg = config.my.features.system.common;
+  attic = config.my.features.cache.attic;
+  attic_user = attic.user;
+  attic_group = attic.group;
   deLocale = "de_DE.UTF-8";
 in
 {
@@ -25,8 +28,21 @@ in
     description = "The role of this machine (server, desktop, notebook).";
   };
 
+  options.my.features.cache.attic = {
+    user = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "User for attic config ownership and auto-push service. Set to enable attic support.";
+    };
+    group = lib.mkOption {
+      type = lib.types.str;
+      default = "users";
+      description = "Group for attic config file ownership";
+    };
+    autoPush = lib.mkEnableOption "Automatically push system closure to attic cache after each rebuild";
+  };
+
   config = lib.mkIf cfg.enable {
-    # Enable experimental features
     nix.settings = {
       experimental-features = [
         "nix-command"
@@ -37,18 +53,14 @@ in
       trusted-public-keys = [ "nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE=" ];
     };
 
-    # Network manager configuration
     networking.networkmanager.enable = true;
 
-    # Set the timezone
     time.timeZone = "Europe/Berlin";
 
-    # Set keyboard layout for graphical environments
     services.xserver = {
       xkb.layout = "de";
     };
 
-    # Internationalization settings
     i18n.defaultLocale = deLocale;
     i18n.extraLocaleSettings = {
       LC_ADDRESS = deLocale;
@@ -63,7 +75,6 @@ in
     };
     console.keyMap = "de";
 
-    # Enable Nh cli helper
     programs.nh = {
       enable = true;
       clean.enable = true;
@@ -71,10 +82,9 @@ in
       flake = "/etc/nixos";
     };
 
-    documentation.man.cache.enable = false; # Disable man cache generation
-    documentation.doc.enable = false; # Disable HTML/Info documentation generation
+    documentation.man.cache.enable = false;
+    documentation.doc.enable = false;
 
-    # System packages to be installed
     environment.systemPackages = with pkgs; [
       wget
       openssl
@@ -86,15 +96,14 @@ in
       ripgrep
     ];
 
-    # Global Sops Configuration
     sops.defaultSopsFile = ../../../secrets/secrets.yaml;
     sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
-    sops.secrets.attic_push_token = { };
-    sops.templates.attic_config = {
-      owner = "philipp";
-      group = "users";
-      mode = "0400";
+    sops.secrets.attic_push_token = lib.mkIf (attic_user != null) { };
+    sops.templates.attic_config = lib.mkIf (attic_user != null) {
+      owner = attic_user;
+      group = attic_group;
+      mode = "0440";
       content = ''
         default-server = "nixfiles-server"
 
@@ -102,6 +111,40 @@ in
         endpoint = "https://cache.rls.ancoris.ovh"
         token = "${config.sops.placeholder.attic_push_token}"
       '';
+    };
+
+    environment.variables.ATTIC_CONFIG = lib.mkIf (attic_user != null) "/etc/attic/config.toml";
+
+    systemd.tmpfiles.rules = lib.mkIf (attic_user != null) [
+      "L+ /etc/attic/config.toml 0440 ${attic_user} ${attic_group} - /run/secrets/rendered/attic_config"
+    ];
+
+    systemd.paths.attic-push-system = lib.mkIf (attic_user != null && attic.autoPush) {
+      wantedBy = [ "multi-user.target" ];
+      pathConfig = {
+        PathChanged = "/run/current-system";
+        Unit = "attic-push-system.service";
+      };
+    };
+
+    systemd.services.attic-push-system = lib.mkIf (attic_user != null && attic.autoPush) {
+      description = "Push current system closure to attic cache after rebuild";
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = attic_user;
+        Environment = "ATTIC_CONFIG=/etc/attic/config.toml";
+        ExecStart = "${pkgs.writeShellScript "attic-push-system" ''
+          set -euo pipefail
+          CLOSURE=$(${pkgs.coreutils}/bin/readlink /run/current-system)
+          if [ -z "$CLOSURE" ]; then
+            echo "Error: /run/current-system does not resolve" >&2
+            exit 1
+          fi
+          ${pkgs.attic-client}/bin/attic push nixfiles "$CLOSURE"
+        ''}";
+      };
     };
   };
 }

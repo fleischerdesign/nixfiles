@@ -25,5 +25,8 @@
   my.features.system.networking.tailscale.enable = true;
   my.features.system.networking.tailscale.acceptRoutes = true;
 
+  my.features.cache.attic.user = "philipp";
+  my.features.cache.attic.autoPush = true;
+
   system.stateVersion = "24.05";
 }
