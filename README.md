@@ -1,6 +1,9 @@
 # NixOS Configuration
 
-Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nixos.wiki/wiki/Flakes), spanning 4 hosts.
+[![CI](https://github.com/fleischerdesign/nixfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/fleischerdesign/nixfiles/actions/workflows/ci.yml)
+[![Lint](https://github.com/fleischerdesign/nixfiles/actions/workflows/lint.yml/badge.svg)](https://github.com/fleischerdesign/nixfiles/actions/workflows/lint.yml)
+
+Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nixos.wiki/wiki/Flakes), spanning 5 hosts.
 
 ## Hosts
 
@@ -9,13 +12,14 @@ Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nix
 | `yorke` | notebook | AMD laptop | Daily driver |
 | `jello` | desktop | Intel desktop | Gaming / workstation |
 | `mackaye` | server | VPS | Central services — Authentik, Grafana, Prometheus, Loki, PostgreSQL, Redis |
-| `strummer` | server | Intel home server | Media server — \*arr stack, Jellyfin, Home Assistant, Klipper, Paperless |
+| `strummer` | server | Intel home server | Media server — \*arr stack, Jellyfin, Home Assistant, Klipper, Paperless, Authentik outposts |
+| `rollins` | server | VPS | Binary cache — Attic server, monitoring exporters, CrowdSec agent |
 
 ## Structure
 
 ```
 .
-├── flake.nix              # Entry point: inputs, outputs, 4 systems, deploy config
+├── flake.nix              # Entry point: inputs, outputs, 5 systems, deploy config
 ├── flake.lock
 ├── lib/
 │   ├── helper.nix          # mkSystem, findModules (auto-discovery)
@@ -28,14 +32,17 @@ Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nix
 ├── features/               # Feature modules (auto-discovered)
 │   ├── desktop/            # niri, gnome
 │   ├── dev/                # android, containers, codium, nixvim
+│   ├── endpoints/          # Service registry — single source of truth for Caddy + Prometheus
 │   ├── media/              # gaming, spotify
-│   ├── services/           # caddy, authentik, *arr, jellyfin, monitoring, ...
+│   ├── services/           # caddy, authentik, *arr, jellyfin, monitoring, attic, ...
+│   │   └── monitoring/     # prometheus, grafana, loki, alloy, exporters
 │   └── system/             # common, audio, bootloader, networking, backups, ...
 ├── hosts/                  # Per-host configuration
 │   ├── yorke/              # configuration.nix + hardware
 │   ├── jello/              # configuration.nix + hardware
 │   ├── mackaye/            # configuration.nix + hardware + disk-config.nix (disko)
-│   └── strummer/           # configuration.nix + hardware
+│   ├── strummer/           # configuration.nix + hardware
+│   └── rollins/            # configuration.nix + hardware + disk-config.nix (disko)
 ├── user/
 │   └── philipp/            # Home Manager config
 │       ├── home.nix
@@ -43,7 +50,7 @@ Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nix
 ├── secrets/                # SOPS-encrypted secrets
 ├── overlays/               # Nixpkgs overlays (openldap fix, docs-conflict fix)
 ├── media/                  # Wallpaper etc.
-├── .github/workflows/      # CI — flake check, weekly flake update
+├── .github/workflows/      # CI — flake check, build all 5 hosts, lint, daily flake update, dependabot
 └── .githooks/              # Pre-commit — nixfmt + deadnix + statix
 ```
 
@@ -78,7 +85,7 @@ The desktop runs **[niri](https://github.com/YaLTeR/niri)** (scrolling-tiling Wa
 
 ### Secrets
 
-All secrets are managed via **[SOPS](https://github.com/getsops/sops)** with age encryption. Encrypted to 4 keys: user key (philipp), host keys (mackaye, strummer), and a CI key. Secrets live in `secrets/secrets.yaml`. Services consume them via SOPS template files.
+All secrets are managed via **[SOPS](https://github.com/getsops/sops)** with age encryption — encrypted to the user key, all host SSH keys, and a CI key. Secrets live in `secrets/secrets.yaml`. Each host decrypts them at build time via its own SSH host key, no manual key distribution needed.
 
 ## Key Features
 
@@ -88,19 +95,21 @@ All secrets are managed via **[SOPS](https://github.com/getsops/sops)** with age
 - **Spotify** with Spicetify theming
 - **VS Codium** with declarative extensions
 - **NixVim** (Neovim configured via Nix) with LSP, Telescope, Treesitter, and German keyboard adaptations
+- **Docker** — container runtime (also on strummer)
 
 ### Server / Services (mackaye)
-- **Authentik** SSO — identity provider with LDAP and proxy outposts
+- **Authentik** SSO — identity provider (server + LDAP outpost)
 - **Grafana** + **Prometheus** + **Loki** — monitoring, metrics, and log aggregation
 - **CrowdSec** — intrusion prevention (master node)
 - **PostgreSQL** + **Redis** — shared databases and caching
-- **Caddy** — reverse proxy with automatic virtual host generation
+- **Caddy** — reverse proxy (mky.ancoris.ovh)
 - **CouchDB** — document database sync (Obsidian)
 - **ntfy** — push notifications
 - **Portfolio** — personal website (fleischer.design)
 
 ### Server / Services (strummer)
 - **Caddy** — reverse proxy (fls.ancoris.ovh)
+- **Authentik** — proxy outpost (forward-auth) + LDAP outpost
 - **Sonarr** + **Radarr** + **Prowlarr** + **Bazarr** + **SABnzbd** + **Jellyseerr** + **Recyclarr** — full \*arr media stack
 - **Jellyfin** — media server with Intel VAAPI hardware decoding
 - **Home Assistant** — smart home (Zigbee, ESPHome, MQTT)
@@ -111,10 +120,15 @@ All secrets are managed via **[SOPS](https://github.com/getsops/sops)** with age
 - **CrowdSec** — intrusion prevention (agent)
 - **Cloudflare DDNS** — dynamic DNS updates
 
-### Shared / All Hosts
+### Server / Services (rollins)
+- **Attic** — Nix binary cache server (cache.rls.ancoris.ovh)
+- **Caddy** — reverse proxy (rls.ancoris.ovh)
+- **CrowdSec** — intrusion prevention (agent)
+
+### Infrastructure (all servers)
+- **Distributed monitoring** — Prometheus/Grafana/Loki on mackaye; **node-exporter**, **Grafana Alloy** (log agent), and **blackbox-exporter** run on mackaye, strummer, and rollins
 - **Tailscale** VPN — all hosts connected, strummer as subnet router (192.168.178.0/24)
-- **Restic** backups — daily encrypted backups with pruning (mackaye + strummer)
-- **Docker** — container runtime (yorke, jello, strummer)
+- **Restic** backups — daily encrypted backups with pruning (mackaye, strummer, rollins)
 - **NixVim** — terminal editor on all hosts
 
 ## Installation / Usage
@@ -141,6 +155,10 @@ Home Manager is integrated — system builds include user configs, no separate `
 ## Tooling
 
 - **Pre-commit hook:** `nixfmt` (format) → `deadnix` (dead code) → `statix` (lint) on staged `.nix` files
-- **GitHub Actions:** `flake check` on PR/push, weekly `flake update` with auto-PR
+- **GitHub Actions:**
+  - **CI** — `nix flake check`, builds all 5 hosts, pushes to Attic binary cache, auto-merges update PRs on success
+  - **Lint** — `nixfmt` + `deadnix` + `statix` on all `.nix` files
+  - **Flake Update** — daily `nix flake update` with auto-PR (merged by CI after validation)
+  - **Dependabot** — weekly GitHub Actions dependency updates
 - **Formatter:** `nixfmt`
 - **Deployment:** `deploy-rs` with auto-rollback
