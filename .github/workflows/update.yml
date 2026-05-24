@@ -69,16 +69,8 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           extra_nix_config: |
-            substituters = https://cache.rls.ancoris.ovh https://cache.nixos.org
-            trusted-public-keys = fleischerdesign:7pBdmvIy6gzfOVfp8yonkVfVcyXsGYYMLExwc6bDRkM= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-
-      - name: Setup signing key
-        run: |
-          cat << 'SIGNEOF' > /tmp/cache-priv-key
-          ${{ secrets.BINARY_CACHE_SIGNING_KEY }}
-          SIGNEOF
-          chmod 600 /tmp/cache-priv-key
-          echo "secret-key-files = /tmp/cache-priv-key" | sudo tee -a /etc/nix/nix.conf
+            substituters = https://cache.rls.ancoris.ovh/nixfiles https://cache.nixos.org
+            trusted-public-keys = nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
 
       - name: Build ${{ matrix.host }}
         run: |
@@ -89,8 +81,23 @@ jobs:
 
       - name: Push to binary cache
         run: |
-          nix copy --to "https://ci:${{ secrets.BINARY_CACHE_TOKEN }}@cache.rls.ancoris.ovh" \
-            ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel"
+          mkdir -p ~/.config/attic
+          cat > ~/.config/attic/config.toml << 'ATTCEOF'
+          default-server = "nixfiles-server"
+
+          [servers.nixfiles-server]
+          endpoint = "https://cache.rls.ancoris.ovh"
+          token = "${{ secrets.ATTIC_PUSH_TOKEN }}"
+          ATTCEOF
+          chmod 600 ~/.config/attic/config.toml
+
+          for i in 1 2 3; do
+            nix shell nixpkgs#attic-client -c attic push nixfiles ./result && exit 0
+            echo "Push attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "Push failed after 3 attempts"
+          exit 1
 
   create-pr:
     needs: [prepare, build]
@@ -134,10 +141,9 @@ jobs:
             ci-verified
           body-path: changelog.txt
 
-      - name: Enable auto-merge
+      - name: Merge PR
         if: steps.create-pr.outputs.pull-request-number
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.WORKFLOW_TOKEN }}
-          pull-request-number: ${{ steps.create-pr.outputs.pull-request-number }}
-          merge-method: squash
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+        run: |
+          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --squash --admin
