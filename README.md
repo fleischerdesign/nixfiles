@@ -135,7 +135,7 @@ All secrets are managed via **[SOPS](https://github.com/getsops/sops)** with age
 
 ```bash
 # Clone
-git clone <repo-url> && cd nixos-config
+git clone https://github.com/fleischerdesign/nixfiles && cd nixfiles
 
 # Dev shell (direnv auto-loads nixfmt, deadnix, statix, sops, etc.)
 direnv allow
