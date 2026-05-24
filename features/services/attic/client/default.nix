@@ -27,7 +27,7 @@ in
     sops.secrets.attic_push_token = { };
     sops.templates.attic_config = {
       owner = cfg.user;
-      group = cfg.group;
+      inherit (cfg) group;
       mode = "0440";
       content = ''
         default-server = "nixfiles-server"
