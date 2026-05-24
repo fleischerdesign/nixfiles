@@ -1,5 +1,6 @@
 result
 log
+changelog.txt
 .direnv
 *.drv
 *.o

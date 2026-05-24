@@ -59,8 +59,11 @@ jobs:
           name: updated-flake-lock
 
       - name: Generate changelog
+        id: changelog
         run: |
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           {
+            printf "changelog<<%s\n" "$EOF"
             echo "## Flake Update"
             echo
             echo "Built by CI on main — auto-merged."
@@ -70,7 +73,8 @@ jobs:
             echo '```'
             git diff flake.lock | grep -E '^[-+].*"(lastModified|narHash|owner|repo|rev|type|url)"' | head -60
             echo '```'
-          } > changelog.txt
+            echo "$EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
@@ -84,12 +88,4 @@ jobs:
           labels: |
             dependencies
             automated
-            ci-verified
-          body-path: changelog.txt
-
-      - name: Merge PR
-        if: steps.create-pr.outputs.pull-request-number
-        env:
-          GITHUB_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
-        run: |
-          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --squash --admin
+          body: ${{ steps.changelog.outputs.changelog }}
