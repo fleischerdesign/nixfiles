@@ -45,63 +45,9 @@ jobs:
           path: flake.lock
           retention-days: 1
 
-  build:
+  create-pr:
     needs: prepare
     if: needs.prepare.outputs.has-updates == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 300
-    strategy:
-      fail-fast: false
-      matrix:
-        host: [yorke, jello, strummer, mackaye, rollins]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download updated flake.lock
-        uses: actions/download-artifact@v4
-        with:
-          name: updated-flake-lock
-
-      - name: Free disk space
-        run: sudo rm -rf /opt/hostedtoolcache /usr/local/.ghcup /usr/share/dotnet /usr/local/lib/android /usr/local/share/powershell 2>/dev/null; true
-
-      - uses: cachix/install-nix-action@v27
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          extra_nix_config: |
-            substituters = https://cache.rls.ancoris.ovh/nixfiles https://cache.nixos.org
-            trusted-public-keys = nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-
-      - name: Build ${{ matrix.host }}
-        run: |
-          nix build \
-            --print-build-logs \
-            --max-jobs 1 \
-            ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel"
-
-      - name: Push to binary cache
-        run: |
-          mkdir -p ~/.config/attic
-          cat > ~/.config/attic/config.toml << 'ATTCEOF'
-          default-server = "nixfiles-server"
-
-          [servers.nixfiles-server]
-          endpoint = "https://cache.rls.ancoris.ovh"
-          token = "${{ secrets.ATTIC_PUSH_TOKEN }}"
-          ATTCEOF
-          chmod 600 ~/.config/attic/config.toml
-
-          for i in 1 2 3; do
-            nix shell nixpkgs#attic-client -c attic push nixfiles ./result && exit 0
-            echo "Push attempt $i failed, retrying in 10s..."
-            sleep 10
-          done
-          echo "Push failed after 3 attempts"
-          exit 1
-
-  create-pr:
-    needs: [prepare, build]
-    if: needs.prepare.outputs.has-updates == 'true' && success()
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -117,7 +63,7 @@ jobs:
           {
             echo "## Flake Update"
             echo
-            echo "All hosts built successfully — auto-merge enabled."
+            echo "Built by CI on main — auto-merged."
             echo
             echo "### Updated Inputs"
             echo
@@ -132,7 +78,7 @@ jobs:
         with:
           token: ${{ secrets.WORKFLOW_TOKEN }}
           commit-message: "chore(deps): update flake inputs"
-          title: "chore(deps): flake update — ✅ pre-validated"
+          title: "chore(deps): flake update"
           branch: flake-update
           delete-branch: true
           labels: |
