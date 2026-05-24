@@ -66,7 +66,5 @@
 
   my.features.dev.nixvim.enable = true;
 
-  my.features.cache.attic.user = "philipp";
-
   system.stateVersion = "24.11";
 }

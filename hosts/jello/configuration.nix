@@ -23,8 +23,11 @@
   my.features.dev.nixvim.enable = true;
   my.features.desktop.niri.enable = true;
 
-  my.features.cache.attic.user = "philipp";
-  my.features.cache.attic.autoPush = true;
+  my.features.services.attic.client = {
+    enable = true;
+    user = "philipp";
+    autoPush = true;
+  };
 
   system.stateVersion = "24.05";
 }

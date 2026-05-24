@@ -5,10 +5,10 @@
 }:
 
 let
-  cfg = config.my.features.services.atticd;
+  cfg = config.my.features.services.attic.server;
 in
 {
-  options.my.features.services.atticd = {
+  options.my.features.services.attic.server = {
     enable = lib.mkEnableOption "Attic Nix binary cache server";
   };
 

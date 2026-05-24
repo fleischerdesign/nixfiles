@@ -39,9 +39,7 @@
   };
   my.features.services.monitoring.blackbox-exporter.enable = true;
 
-  my.features.services.atticd.enable = true;
-
-  my.features.cache.attic.user = "philipp";
+  my.features.services.attic.server.enable = true;
 
   my.features.services.crowdsec = {
     enable = true;

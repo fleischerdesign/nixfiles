@@ -8,9 +8,6 @@
 
 let
   cfg = config.my.features.system.common;
-  attic = config.my.features.cache.attic;
-  attic_user = attic.user;
-  attic_group = attic.group;
   deLocale = "de_DE.UTF-8";
 in
 {
@@ -28,20 +25,6 @@ in
         ];
         default = "server";
         description = "The role of this machine (server, desktop, notebook).";
-      };
-
-      features.cache.attic = {
-        user = lib.mkOption {
-          type = lib.types.nullOr lib.types.str;
-          default = null;
-          description = "User for attic config ownership and auto-push service. Set to enable attic support.";
-        };
-        group = lib.mkOption {
-          type = lib.types.str;
-          default = "users";
-          description = "Group for attic config file ownership";
-        };
-        autoPush = lib.mkEnableOption "Automatically push system closure to attic cache after each rebuild";
       };
     };
   };
@@ -103,32 +86,6 @@ in
     sops = {
       defaultSopsFile = ../../../secrets/secrets.yaml;
       age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-
-      secrets.attic_push_token = lib.mkIf (attic_user != null) { };
-      templates.attic_config = lib.mkIf (attic_user != null) {
-        owner = attic_user;
-        group = attic_group;
-        mode = "0440";
-        content = ''
-          default-server = "nixfiles-server"
-
-          [servers.nixfiles-server]
-          endpoint = "https://cache.rls.ancoris.ovh"
-          token = "${config.sops.placeholder.attic_push_token}"
-        '';
-      };
     };
-
-    systemd.tmpfiles.rules = lib.mkIf (attic_user != null) [
-      "d /home/${attic_user}/.config/attic 0700 ${attic_user} ${attic_group} -"
-      "L+ /home/${attic_user}/.config/attic/config.toml 0400 ${attic_user} ${attic_group} - /run/secrets/rendered/attic_config"
-    ];
-
-    system.activationScripts.atticPush = lib.mkIf (attic_user != null && attic.autoPush) ''
-      CLOSURE="$(${pkgs.coreutils}/bin/readlink -f /run/current-system)"
-      if [ -n "$CLOSURE" ]; then
-        runuser -u ${attic_user} -- ${pkgs.attic-client}/bin/attic push nixfiles "$CLOSURE" &
-      fi
-    '';
   };
 }

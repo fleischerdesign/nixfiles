@@ -86,8 +86,6 @@
       };
     };
 
-    features.cache.attic.user = "philipp";
-
     endpoints = {
       home-assistant.subdomain = "hass";
       esphome = {
