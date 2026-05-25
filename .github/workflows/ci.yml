@@ -112,6 +112,8 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - uses: actions/checkout@v4
+
       - name: Merge PR
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
