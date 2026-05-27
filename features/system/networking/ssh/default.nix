@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -33,6 +34,19 @@ in
       ]
       ++ lib.optional config.services.tailscale.enable "tailscaled.service";
       wants = [ "network-online.target" ];
+
+      preStart =
+        lib.mkIf (config.services.tailscale.enable && ownHost != null && ownHost.tailscaleIp != null)
+          ''
+            echo "Waiting for tailscale0 to get IP ${ownHost.tailscaleIp}..."
+            for i in $(seq 1 60); do
+              if ${pkgs.iproute2}/bin/ip addr show tailscale0 2>/dev/null | ${pkgs.gnugrep}/bin/grep -qF "${ownHost.tailscaleIp}"; then
+                echo "tailscale0 has IP ${ownHost.tailscaleIp}, proceeding."
+                break
+              fi
+              sleep 1
+            done
+          '';
     };
 
     services.openssh = {
