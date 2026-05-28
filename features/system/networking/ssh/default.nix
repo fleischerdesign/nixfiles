@@ -55,7 +55,7 @@ in
         PermitRootLogin = "prohibit-password";
         PasswordAuthentication = false;
       };
-      listenAddresses = listenAddresses;
+      inherit listenAddresses;
     };
 
     users.users.root.openssh.authorizedKeys.keys = userLib.deploy.sshKeys;

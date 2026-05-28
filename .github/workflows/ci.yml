@@ -55,7 +55,7 @@ jobs:
           nix build \
             --json \
             --print-build-logs \
-            --max-jobs 1 \
+            --max-jobs 2 \
             ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" \
             | tee build-${{ matrix.host }}.json
 

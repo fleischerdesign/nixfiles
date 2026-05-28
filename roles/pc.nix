@@ -26,6 +26,8 @@
     };
   };
 
+  services.xserver.xkb.layout = lib.mkDefault "de";
+
   environment.systemPackages = [
     inputs.deploy-rs.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];

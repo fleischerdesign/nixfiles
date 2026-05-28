@@ -37,6 +37,11 @@
               default = "client";
               description = "Host type — clients are excluded from server-targeted probes";
             };
+            gateway = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Default gateway IP of the host";
+            };
           };
         }
       );
@@ -52,6 +57,7 @@
         localIp = "173.249.22.211";
         domain = "mky.ancoris.ovh";
         hostType = "server";
+        gateway = "173.249.22.1";
       };
 
       rollins = {
@@ -59,6 +65,7 @@
         localIp = "37.114.55.91";
         domain = "rls.ancoris.ovh";
         hostType = "server";
+        gateway = "37.114.55.1";
       };
 
       strummer = {

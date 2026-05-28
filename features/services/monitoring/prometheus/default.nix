@@ -118,7 +118,7 @@ in
                     targets = [ "http://127.0.0.1:${toString svc.port}${svc.monitoring.http.path}" ];
                     labels = {
                       service = name;
-                      host = svc.host;
+                      inherit (svc) host;
                       probe_type = "http_local";
                       group = svc.monitoring.http.group;
                     };
@@ -141,7 +141,7 @@ in
                 targets = [ "https://${resolveDomain svc}${svc.monitoring.http.path}" ];
                 labels = {
                   service = name;
-                  host = svc.host;
+                  inherit (svc) host;
                   probe_type = "http_public";
                   group = svc.monitoring.http.group;
                 };
@@ -164,7 +164,7 @@ in
                     targets = [ "127.0.0.1:${toString svc.port}" ];
                     labels = {
                       service = name;
-                      host = svc.host;
+                      inherit (svc) host;
                       probe_type = "tcp_local";
                       group = svc.monitoring.tcp.group;
                     };

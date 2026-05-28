@@ -2,6 +2,9 @@
   config,
   ...
 }:
+let
+  hostTopology = config.my.features.system.networking.topology.hosts.rollins;
+in
 {
   imports = [
     ./hardware-configuration.nix
@@ -20,14 +23,14 @@
 
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = false;
-  networking.defaultGateway = "37.114.55.1";
+  networking.defaultGateway = hostTopology.gateway;
   networking.nameservers = [
     "9.9.9.9"
     "1.1.1.1"
   ];
   networking.interfaces.eth0.ipv4.addresses = [
     {
-      address = "37.114.55.91";
+      address = hostTopology.localIp;
       prefixLength = 24;
     }
   ];

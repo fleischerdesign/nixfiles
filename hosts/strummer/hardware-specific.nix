@@ -1,5 +1,4 @@
-{ ... }:
-{
+_: {
   # 4 TB Storage
   fileSystems."/data/storage" = {
     device = "/dev/disk/by-uuid/7874b65e-816d-4377-9a8d-5c58fe2f65ca";

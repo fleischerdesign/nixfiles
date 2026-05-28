@@ -140,6 +140,9 @@ git clone https://github.com/fleischerdesign/nixfiles && cd nixfiles
 # Dev shell (direnv auto-loads nixfmt, deadnix, statix, sops, etc.)
 direnv allow
 
+# Activate pre-commit hooks
+git config core.hooksPath .githooks
+
 # Build and switch locally
 sudo nixos-rebuild switch --flake .#yorke
 
@@ -154,7 +157,7 @@ Home Manager is integrated — system builds include user configs, no separate `
 
 ## Tooling
 
-- **Pre-commit hook:** `nixfmt` (format) → `deadnix` (dead code) → `statix` (lint) on staged `.nix` files
+- **Pre-commit hook:** `nixfmt` (format) → `deadnix` (dead code) → `statix` (lint) on staged `.nix` files. Activate with `git config core.hooksPath .githooks`
 - **GitHub Actions:**
   - **CI** — `nix flake check`, builds all 5 hosts, pushes to Attic binary cache, auto-merges update PRs on success
   - **Lint** — `nixfmt` + `deadnix` + `statix` on all `.nix` files

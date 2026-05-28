@@ -44,10 +44,6 @@ in
 
     time.timeZone = "Europe/Berlin";
 
-    services.xserver = {
-      xkb.layout = "de";
-    };
-
     i18n.defaultLocale = deLocale;
     i18n.extraLocaleSettings = {
       LC_ADDRESS = deLocale;

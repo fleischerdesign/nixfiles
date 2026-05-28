@@ -5,96 +5,93 @@
 {
   options.my.endpoints = lib.mkOption {
     type = lib.types.attrsOf (
-      lib.types.submodule (
-        { ... }:
-        {
-          options = {
-            host = lib.mkOption {
-              type = lib.types.str;
-              description = "Hostname this service runs on";
-            };
+      lib.types.submodule (_: {
+        options = {
+          host = lib.mkOption {
+            type = lib.types.str;
+            description = "Hostname this service runs on";
+          };
 
-            port = lib.mkOption {
-              type = lib.types.int;
-              description = "Internal port the service listens on";
-            };
+          port = lib.mkOption {
+            type = lib.types.int;
+            description = "Internal port the service listens on";
+          };
 
-            subdomain = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Subdomain for Caddy reverse proxy (null = no HTTP exposure)";
-            };
+          subdomain = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Subdomain for Caddy reverse proxy (null = no HTTP exposure)";
+          };
 
-            fullDomain = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Full domain override (bypasses subdomain + baseDomain resolution)";
-            };
+          fullDomain = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Full domain override (bypasses subdomain + baseDomain resolution)";
+          };
 
-            auth = lib.mkOption {
+          auth = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Protect with Authentik forward-auth";
+          };
+
+          caddy = {
+            enable = lib.mkOption {
               type = lib.types.bool;
-              default = false;
-              description = "Protect with Authentik forward-auth";
+              default = true;
+              description = "Let the Caddy feature manage this service's reverse proxy (set false if service handles Caddy itself)";
             };
+          };
 
-            caddy = {
+          monitoring = {
+            http = {
               enable = lib.mkOption {
                 type = lib.types.bool;
                 default = true;
-                description = "Let the Caddy feature manage this service's reverse proxy (set false if service handles Caddy itself)";
+                description = "Enable HTTP monitoring probe";
+              };
+
+              group = lib.mkOption {
+                type = lib.types.str;
+                default = "HTTP";
+              };
+
+              path = lib.mkOption {
+                type = lib.types.str;
+                default = "/";
               };
             };
 
-            monitoring = {
-              http = {
-                enable = lib.mkOption {
-                  type = lib.types.bool;
-                  default = true;
-                  description = "Enable HTTP monitoring probe";
-                };
-
-                group = lib.mkOption {
-                  type = lib.types.str;
-                  default = "HTTP";
-                };
-
-                path = lib.mkOption {
-                  type = lib.types.str;
-                  default = "/";
-                };
+            tcp = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Enable TCP monitoring probe";
               };
 
-              tcp = {
-                enable = lib.mkOption {
-                  type = lib.types.bool;
-                  default = false;
-                  description = "Enable TCP monitoring probe";
-                };
+              group = lib.mkOption {
+                type = lib.types.str;
+                default = "Infrastructure";
+              };
+            };
 
-                group = lib.mkOption {
-                  type = lib.types.str;
-                  default = "Infrastructure";
-                };
+            scrape = {
+              enable = lib.mkEnableOption "Prometheus scrape target for this service";
+
+              port = lib.mkOption {
+                type = lib.types.int;
+                description = "Port to scrape Prometheus metrics from (may differ from service port)";
               };
 
-              scrape = {
-                enable = lib.mkEnableOption "Prometheus scrape target for this service";
-
-                port = lib.mkOption {
-                  type = lib.types.int;
-                  description = "Port to scrape Prometheus metrics from (may differ from service port)";
-                };
-
-                path = lib.mkOption {
-                  type = lib.types.str;
-                  default = "/metrics";
-                  description = "Metrics endpoint path";
-                };
+              path = lib.mkOption {
+                type = lib.types.str;
+                default = "/metrics";
+                description = "Metrics endpoint path";
               };
             };
           };
-        }
-      )
+        };
+      })
     );
 
     default = { };

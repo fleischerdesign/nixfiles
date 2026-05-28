@@ -3,7 +3,7 @@
 { pkgs, home-manager-unstable, ... }:
 
 let
-  lib = pkgs.lib;
+  inherit (pkgs) lib;
   userLib = import ./users.nix;
 
   findModules =
@@ -35,7 +35,7 @@ let
 
       nixosUsers = lib.listToAttrs (
         map (user: {
-          name = user.name;
+          inherit (user) name;
           value = {
             isNormalUser = true;
             inherit (userLib.${user.name}) description;
@@ -51,7 +51,7 @@ let
 
       homeManagerUsers = lib.listToAttrs (
         map (user: {
-          name = user.name;
+          inherit (user) name;
           value = {
             imports = [ (import (userDir + "/${user.name}/home.nix")) ] ++ (user.homeModules or [ ]);
           };
