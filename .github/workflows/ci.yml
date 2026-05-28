@@ -107,12 +107,19 @@ jobs:
     if: |
       success() &&
       github.event_name == 'pull_request' &&
-      contains(github.event.pull_request.labels.*.name, 'automated')
+      github.event.pull_request.head.ref == 'flake-update'
     permissions:
       contents: write
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Approve PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+        run: |
+          gh pr review ${{ github.event.pull_request.number }} --approve \
+            --body "CI checks passed — auto-approved."
 
       - name: Merge PR
         env:
