@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: update
@@ -21,8 +20,6 @@ jobs:
       has-updates: ${{ steps.detect.outputs.has-updates }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: cachix/install-nix-action@v27
         with:
@@ -45,11 +42,15 @@ jobs:
           path: flake.lock
           retention-days: 1
 
-  create-pr:
+  build:
     needs: prepare
     if: needs.prepare.outputs.has-updates == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [yorke, jello, strummer, mackaye, rollins]
     steps:
       - uses: actions/checkout@v4
 
@@ -58,34 +59,84 @@ jobs:
         with:
           name: updated-flake-lock
 
-      - name: Generate changelog
-        id: changelog
+      - name: Free disk space
         run: |
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          {
-            printf "changelog<<%s\n" "$EOF"
-            echo "## Flake Update"
-            echo
-            echo "Built by CI on main — auto-merged."
-            echo
-            echo "### Updated Inputs"
-            echo
-            echo '```'
-            git diff flake.lock | grep -E '^[-+].*"(lastModified|narHash|owner|repo|rev|type|url)"' | head -60
-            echo '```'
-            echo "$EOF"
-          } >> "$GITHUB_OUTPUT"
+          sudo rm -rf /opt/hostedtoolcache /usr/local/.ghcup /usr/share/dotnet \
+            /usr/local/lib/android /usr/local/share/powershell 2>/dev/null; true
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
-        id: create-pr
+      - uses: cachix/install-nix-action@v27
         with:
-          token: ${{ secrets.WORKFLOW_TOKEN }}
-          commit-message: "chore(deps): update flake inputs"
-          title: "chore(deps): flake update"
-          branch: flake-update
-          delete-branch: true
-          labels: |
-            dependencies
-            automated
-          body: ${{ steps.changelog.outputs.changelog }}
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            substituters = https://cache.rls.ancoris.ovh/nixfiles https://cache.nixos.org
+            trusted-public-keys = nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+
+      - name: Build ${{ matrix.host }}
+        run: |
+          nix build \
+            --json \
+            --print-build-logs \
+            --max-jobs 1 \
+            ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" \
+            | tee build-${{ matrix.host }}.json
+
+      - name: Push to binary cache
+        run: |
+          mkdir -p ~/.config/attic
+          cat > ~/.config/attic/config.toml << 'ATTCEOF'
+          default-server = "nixfiles-server"
+
+          [servers.nixfiles-server]
+          endpoint = "https://cache.rls.ancoris.ovh"
+          token = "${{ secrets.ATTIC_PUSH_TOKEN }}"
+          ATTCEOF
+          chmod 600 ~/.config/attic/config.toml
+
+          for i in 1 2 3; do
+            nix shell nixpkgs#attic-client -c attic push nixfiles ./result && exit 0
+            echo "Push attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "Push failed after 3 attempts"
+          exit 1
+
+      - name: Upload build metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.host }}
+          path: build-${{ matrix.host }}.json
+          retention-days: 30
+
+  build-status:
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "❌ One or more builds failed"
+            exit 1
+          fi
+          echo "✅ All systems built successfully"
+
+  commit:
+    needs: build-status
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download updated flake.lock
+        uses: actions/download-artifact@v4
+        with:
+          name: updated-flake-lock
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add flake.lock
+          git commit -m "chore(deps): update flake inputs"
+          git push origin main
