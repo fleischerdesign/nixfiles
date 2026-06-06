@@ -68,11 +68,14 @@ in
     documentation.man.cache.enable = false;
     documentation.doc.enable = false;
 
+    my.features.dev.git = {
+      enable = true;
+      users = [ "philipp" ];
+    };
+
     environment.systemPackages = with pkgs; [
       wget
       openssl
-      git
-      gh
       btop
       tree
       duf
