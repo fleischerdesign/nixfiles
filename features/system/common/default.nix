@@ -70,7 +70,13 @@ in
 
     my.features.dev.git = {
       enable = true;
-      users = [ "philipp" ];
+      users = [
+        {
+          username = "philipp";
+          gitName = "Philipp Fleischer";
+          gitEmail = "philipp@fleischer.design";
+        }
+      ];
     };
 
     environment.systemPackages = with pkgs; [
