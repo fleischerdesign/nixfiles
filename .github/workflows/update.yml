@@ -59,54 +59,13 @@ jobs:
         with:
           name: updated-flake-lock
 
-      - name: Free disk space
-        run: |
-          sudo rm -rf /opt/hostedtoolcache /usr/local/.ghcup /usr/share/dotnet \
-            /usr/local/lib/android /usr/local/share/powershell 2>/dev/null; true
-
-      - uses: cachix/install-nix-action@v27
+      - uses: ./.github/actions/build-nixos-host
         with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          extra_nix_config: |
-            substituters = https://cache.rls.ancoris.ovh/nixfiles https://cache.nixos.org
-            trusted-public-keys = nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-
-      - name: Build ${{ matrix.host }}
-        run: |
-          nix build \
-            --json \
-            --print-build-logs \
-            --max-jobs 1 \
-            ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel" \
-            | tee build-${{ matrix.host }}.json
-
-      - name: Push to binary cache
-        run: |
-          mkdir -p ~/.config/attic
-          cat > ~/.config/attic/config.toml << 'ATTCEOF'
-          default-server = "nixfiles-server"
-
-          [servers.nixfiles-server]
-          endpoint = "https://cache.rls.ancoris.ovh"
-          token = "${{ secrets.ATTIC_PUSH_TOKEN }}"
-          ATTCEOF
-          chmod 600 ~/.config/attic/config.toml
-
-          for i in 1 2 3; do
-            nix shell nixpkgs#attic-client -c attic push nixfiles ./result && exit 0
-            echo "Push attempt $i failed, retrying in 10s..."
-            sleep 10
-          done
-          echo "Push failed after 3 attempts"
-          exit 1
-
-      - name: Upload build metadata
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.host }}
-          path: build-${{ matrix.host }}.json
-          retention-days: 30
+          host: ${{ matrix.host }}
+          # Niedrigere Priorität, schont Runner-Ressourcen
+          max-jobs: "1"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          attic-push-token: ${{ secrets.ATTIC_PUSH_TOKEN }}
 
   build-status:
     runs-on: ubuntu-latest

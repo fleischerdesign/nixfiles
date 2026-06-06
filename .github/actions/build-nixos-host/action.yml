@@ -1,0 +1,72 @@
+name: Build NixOS host
+description: Build a NixOS host configuration and push to Attic cache
+
+inputs:
+  host:
+    description: Hostname to build
+    required: true
+  max-jobs:
+    description: Maximum parallel Nix build jobs
+    required: false
+    default: "2"
+  github-token:
+    description: GitHub token for Nix install action
+    required: true
+  attic-push-token:
+    description: Token for Attic binary cache push
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Free disk space
+      shell: bash
+      run: |
+        sudo rm -rf /opt/hostedtoolcache /usr/local/.ghcup /usr/share/dotnet \
+          /usr/local/lib/android /usr/local/share/powershell 2>/dev/null || true
+
+    - uses: cachix/install-nix-action@v27
+      with:
+        github_access_token: ${{ inputs.github-token }}
+        extra_nix_config: |
+          substituters = https://cache.rls.ancoris.ovh/nixfiles https://cache.nixos.org
+          trusted-public-keys = nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+
+    - name: Build ${{ inputs.host }}
+      shell: bash
+      run: |
+        nix build \
+          --json \
+          --print-build-logs \
+          --max-jobs ${{ inputs.max-jobs }} \
+          ".#nixosConfigurations.${{ inputs.host }}.config.system.build.toplevel" \
+          | tee build-${{ inputs.host }}.json
+
+    - name: Push to Attic cache
+      shell: bash
+      run: |
+        mkdir -p ~/.config/attic
+        cat > ~/.config/attic/config.toml << 'ATTCEOF'
+        default-server = "nixfiles-server"
+
+        [servers.nixfiles-server]
+        endpoint = "https://cache.rls.ancoris.ovh"
+        token = "${{ inputs.attic-push-token }}"
+        ATTCEOF
+        chmod 600 ~/.config/attic/config.toml
+
+        for i in 1 2 3; do
+          nix shell nixpkgs#attic-client -c attic push nixfiles ./result && exit 0
+          echo "Push attempt $i failed, retrying in 10s..."
+          sleep 10
+        done
+        echo "Push failed after 3 attempts"
+        exit 1
+
+    - name: Upload build metadata
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-${{ inputs.host }}
+        path: build-${{ inputs.host }}.json
+        retention-days: 30

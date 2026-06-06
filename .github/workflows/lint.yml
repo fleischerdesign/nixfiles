@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -12,7 +15,7 @@ concurrency:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -20,11 +23,11 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: nixfmt
-        run: git ls-files '*.nix' | xargs nix fmt -- --check
+      - name: Check formatting (nixfmt)
+        run: git ls-files '*.nix' | xargs -r nix fmt -- --check
 
-      - name: deadnix
-        run: git ls-files '*.nix' | xargs nix run nixpkgs#deadnix -- --fail
+      - name: Check dead code (deadnix)
+        run: git ls-files '*.nix' | xargs -r nix run nixpkgs#deadnix -- --fail
 
-      - name: statix
+      - name: Lint (statix)
         run: nix run nixpkgs#statix -- check
