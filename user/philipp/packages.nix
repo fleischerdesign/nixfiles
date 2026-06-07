@@ -38,6 +38,7 @@ in
       bluetuith
       karere
       cameractrls-gtk4
+      dbeaver-bin
     ];
 
   programs.ghostty = lib.mkIf (role != "server") {
