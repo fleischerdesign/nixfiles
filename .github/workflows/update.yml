@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: update
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -19,11 +19,9 @@ jobs:
     outputs:
       has-updates: ${{ steps.detect.outputs.has-updates }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: cachix/install-nix-action@v27
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/nix-installer-action@v22
 
       - id: detect
         run: |
@@ -36,7 +34,7 @@ jobs:
 
       - name: Upload updated flake.lock
         if: steps.detect.outputs.has-updates == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: updated-flake-lock
           path: flake.lock
@@ -52,19 +50,18 @@ jobs:
       matrix:
         host: [yorke, jello, strummer, mackaye, rollins]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download updated flake.lock
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: updated-flake-lock
 
       - uses: ./.github/actions/build-nixos-host
         with:
           host: ${{ matrix.host }}
-          # Niedrigere Priorität, schont Runner-Ressourcen
+          # Low priority, conserves runner resources
           max-jobs: "1"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           attic-push-token: ${{ secrets.ATTIC_PUSH_TOKEN }}
 
   build-status:
@@ -85,10 +82,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download updated flake.lock
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: updated-flake-lock
 

@@ -9,9 +9,6 @@ inputs:
     description: Maximum parallel Nix build jobs
     required: false
     default: "2"
-  github-token:
-    description: GitHub token for Nix install action
-    required: true
   attic-push-token:
     description: Token for Attic binary cache push
     required: true
@@ -25,10 +22,9 @@ runs:
         sudo rm -rf /opt/hostedtoolcache /usr/local/.ghcup /usr/share/dotnet \
           /usr/local/lib/android /usr/local/share/powershell 2>/dev/null || true
 
-    - uses: cachix/install-nix-action@v27
+    - uses: DeterminateSystems/nix-installer-action@v22
       with:
-        github_access_token: ${{ inputs.github-token }}
-        extra_nix_config: |
+        extra-conf: |
           substituters = https://cache.rls.ancoris.ovh/nixfiles https://cache.nixos.org
           trusted-public-keys = nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
 
@@ -65,7 +61,7 @@ runs:
 
     - name: Upload build metadata
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: build-${{ inputs.host }}
         path: build-${{ inputs.host }}.json
