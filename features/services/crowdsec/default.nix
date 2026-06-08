@@ -20,6 +20,11 @@ in
       default = "agent";
       description = "Role of this host: master (LAPI server) or agent (client).";
     };
+    excludeLogPatterns = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Regex patterns for log files to exclude from acquisition.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -48,6 +53,7 @@ in
       localConfig.acquisitions = [
         {
           filenames = [ "/var/log/caddy/access-*.log" ];
+          exclude_regexps = cfg.excludeLogPatterns;
           labels.type = "caddy";
         }
         {

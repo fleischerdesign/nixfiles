@@ -47,6 +47,7 @@ in
   my.features.services.crowdsec = {
     enable = true;
     role = "agent";
+    excludeLogPatterns = [ ".*cache.*" ];
   };
 
   my.features.dev.nixvim.enable = true;
