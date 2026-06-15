@@ -18,6 +18,11 @@ in
       default = "deepseek-v4-pro";
       description = "Default model for Hermes Agent.";
     };
+    hostUsers = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "philipp" ];
+      description = "Interactive host users who should have access to the hermes group.";
+    };
   };
 
   imports = [
@@ -44,7 +49,9 @@ in
       restartUnits = [ "hermes-agent.service" ];
     };
 
-    # Add philipp to the hermes group so the CLI can write to state files
-    users.users.philipp.extraGroups = [ "hermes" ];
+    # Dynamically add all configured host users to the hermes group
+    users.users = lib.genAttrs cfg.hostUsers (_user: {
+      extraGroups = [ "hermes" ];
+    });
   };
 }
