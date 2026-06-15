@@ -13,7 +13,7 @@ in
     [
       # --- CLI / Server Safe ---
       attic-client
-      gemini-cli
+      antigravity-cli
       yazi
     ]
     ++ lib.optionals (role != "server") [
