@@ -20,7 +20,7 @@ in
     };
     hostUsers = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [ "philipp" ];
+      default = [ ];
       description = "Interactive host users who should have access to the hermes group.";
     };
   };
