@@ -52,5 +52,8 @@ in
 
   my.features.dev.nixvim.enable = true;
 
+  my.features.services.hermes-agent.enable = true;
+  services.hermes-agent.settings.telegram.home_channel = "5838211825";
+
   system.stateVersion = "24.11";
 }

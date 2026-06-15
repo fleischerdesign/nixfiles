@@ -1,5 +1,8 @@
 {
   pkgs,
+  hostname,
+  lib,
+  osConfig,
   ...
 }:
 {
@@ -35,6 +38,8 @@
       enable = true;
       shellAliases = {
         c = "codium";
+      } // lib.optionalAttrs (hostname != "rollins") {
+        hermes = "ssh -t philipp@${osConfig.my.features.system.networking.topology.hosts.rollins.tailscaleIp} hermes";
       };
       interactiveShellInit = ''
         set -gx SOPS_AGE_KEY_FILE /home/philipp/.config/sops/age/keys.txt
