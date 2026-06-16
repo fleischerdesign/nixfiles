@@ -18,7 +18,7 @@ in
     virtualisation.oci-containers = {
       backend = "docker";
       containers.camofox = {
-        image = "jo-inc/camofox-browser:latest";
+        image = "ghcr.io/jo-inc/camofox-browser:latest";
         autoStart = true;
         ports = [ "127.0.0.1:9377:9377" ];
         volumes = [ "/var/lib/camofox:/root/.camofox" ];
