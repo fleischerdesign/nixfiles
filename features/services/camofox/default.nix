@@ -20,6 +20,7 @@ in
       containers.camofox = {
         image = "ghcr.io/jo-inc/camofox-browser:latest";
         autoStart = true;
+        pull = "always";
         ports = [ "127.0.0.1:9377:9377" ];
         volumes = [ "/var/lib/camofox:/root/.camofox" ];
       };
