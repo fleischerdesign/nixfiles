@@ -54,7 +54,7 @@ in
 
   my.features.services.hermes-agent.enable = true;
   my.features.services.hermes-agent.hostUsers = [ "philipp" ];
-  services.hermes-agent.settings.telegram.home_channel = "5838211825";
+  services.hermes-agent.settings.platforms.telegram.home_channel = "5838211825";
   services.hermes-agent.container.enable = true;
   services.hermes-agent.container.hostUsers = [ "philipp" ];
 
