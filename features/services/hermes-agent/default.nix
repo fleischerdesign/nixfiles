@@ -36,6 +36,8 @@ in
       extraDependencyGroups = [ "messaging" ];
       container.extraOptions = [
         "--env"
+        "UMASK=0007"
+        "--env"
         "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
       ];
       environment = {
@@ -110,10 +112,10 @@ in
       '';
     };
 
-    # Dynamically add all configured host users to the hermes group
+    # Dynamically add all configured host users to the hermes and docker groups
     users.users =
       (lib.genAttrs cfg.hostUsers (_user: {
-        extraGroups = [ "hermes" ];
+        extraGroups = [ "hermes" "docker" ];
       }))
       // {
         hermes = {
@@ -121,18 +123,5 @@ in
         };
       };
 
-    # Grant hostUsers passwordless docker so they can exec into the
-    # hermes-agent container (docker uses per-user namespaces).
-    security.sudo.extraRules = lib.mkIf config.services.hermes-agent.container.enable (
-      map (user: {
-        users = [ user ];
-        commands = [
-          {
-            command = "${pkgs.docker}/bin/docker";
-            options = [ "NOPASSWD" ];
-          }
-        ];
-      }) cfg.hostUsers
-    );
   };
 }
