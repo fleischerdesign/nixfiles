@@ -58,5 +58,7 @@ in
   services.hermes-agent.container.enable = true;
   services.hermes-agent.container.hostUsers = [ "philipp" ];
 
+  my.features.services.camofox.enable = true;
+
   system.stateVersion = "24.11";
 }

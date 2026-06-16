@@ -42,6 +42,7 @@ in
         MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
         HASS_URL = "https://hass.fls.ancoris.ovh";
         PAPERLESS_URL = "https://paperless.fls.ancoris.ovh";
+        CAMOFOX_URL = "http://127.0.0.1:9377";
       };
       settings = {
         approvals = {
