@@ -41,6 +41,7 @@ in
       environment = {
         MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
         HASS_URL = "https://hass.fls.ancoris.ovh";
+        PAPERLESS_URL = "https://paperless.fls.ancoris.ovh";
       };
       settings = {
         model = {
