@@ -128,6 +128,14 @@ in
       '';
     };
 
+    # Fix permissions after upstream activation regenerates .env with restrictive umask
+    system.activationScripts."hermes-agent-fix-perms" = lib.stringAfter [ "hermes-agent-setup" ] ''
+      chmod 0640 /var/lib/hermes/.hermes/.env
+      chmod 2750 /var/lib/hermes/.hermes
+      find /var/lib/hermes/.hermes -type d ! -perm /g=rx -exec chmod g+rx {} \; 2>/dev/null || true
+      find /var/lib/hermes/.hermes -type f ! -perm /g=r -exec chmod g+r {} \; 2>/dev/null || true
+    '';
+
     # Dynamically add all configured host users to the hermes and docker groups
     users.users =
       (lib.genAttrs cfg.hostUsers (_user: {
