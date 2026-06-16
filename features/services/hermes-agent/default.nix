@@ -34,6 +34,10 @@ in
       enable = true;
       addToSystemPackages = true;
       extraDependencyGroups = [ "messaging" ];
+      container.extraOptions = [
+        "--env"
+        "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
+      ];
       environment = {
         MNEMOSYNE_EMBEDDING_MODEL = "intfloat/multilingual-e5-small";
       };
@@ -68,7 +72,7 @@ in
         RemainAfterExit = false;
         User = "root";
       };
-      path = with pkgs; [ docker ];
+      path = with pkgs; [ docker systemd ];
       script = ''
         for i in $(seq 1 30); do
           if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
@@ -76,10 +80,21 @@ in
           fi
           sleep 2
         done
+
+        NEEDS_RESTART=false
+        if ! docker exec hermes-agent /home/hermes/.venv/bin/python -c "import fastembed" 2>/dev/null; then
+          NEEDS_RESTART=true
+        fi
+
         docker exec hermes-agent \
-          /home/hermes/.venv/bin/pip install -q "mnemosyne-hermes[embeddings]"
+          /home/hermes/.venv/bin/pip install -q mnemosyne-hermes "mnemosyne-memory[embeddings]"
         docker exec hermes-agent \
           /home/hermes/.venv/bin/mnemosyne-hermes --hermes-home /data/.hermes install --force
+
+        if [ "$NEEDS_RESTART" = "true" ]; then
+          sleep 3
+          systemctl restart --no-block hermes-agent.service
+        fi
       '';
     };
 
