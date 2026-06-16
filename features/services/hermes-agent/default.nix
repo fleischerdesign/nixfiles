@@ -111,8 +111,28 @@ in
     };
 
     # Dynamically add all configured host users to the hermes group
-    users.users = lib.genAttrs cfg.hostUsers (_user: {
-      extraGroups = [ "hermes" ];
-    });
+    users.users =
+      (lib.genAttrs cfg.hostUsers (_user: {
+        extraGroups = [ "hermes" ];
+      }))
+      // {
+        hermes = {
+          homeMode = "2750";
+        };
+      };
+
+    # Grant hostUsers passwordless docker so they can exec into the
+    # hermes-agent container (docker uses per-user namespaces).
+    security.sudo.extraRules = lib.mkIf config.services.hermes-agent.container.enable (
+      map (user: {
+        users = [ user ];
+        commands = [
+          {
+            command = "${pkgs.docker}/bin/docker";
+            options = [ "NOPASSWD" ];
+          }
+        ];
+      }) cfg.hostUsers
+    );
   };
 }
