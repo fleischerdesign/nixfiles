@@ -64,6 +64,22 @@ in
             provider = "openrouter";
             model = "google/gemini-3.5-flash";
           };
+          title_generation = {
+            provider = "deepseek";
+            model = "deepseek-v4-flash";
+          };
+          compression = {
+            provider = "deepseek";
+            model = "deepseek-v4-flash";
+          };
+          approval = {
+            provider = "deepseek";
+            model = "deepseek-v4-flash";
+          };
+          web_extract = {
+            provider = "deepseek";
+            model = "deepseek-v4-flash";
+          };
         };
       };
       environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
