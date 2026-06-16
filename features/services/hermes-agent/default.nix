@@ -39,7 +39,7 @@ in
         "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
       ];
       environment = {
-        MNEMOSYNE_EMBEDDING_MODEL = "intfloat/multilingual-e5-small";
+        MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
       };
       settings = {
         model = {
