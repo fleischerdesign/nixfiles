@@ -98,7 +98,7 @@ in
         fi
 
         docker exec hermes-agent \
-          /home/hermes/.venv/bin/pip install -q mnemosyne-hermes "mnemosyne-memory[embeddings]"
+          /home/hermes/.venv/bin/pip install -q mnemosyne-hermes "mnemosyne-memory[embeddings]" ddgs
         docker exec hermes-agent \
           /home/hermes/.venv/bin/mnemosyne-hermes --hermes-home /data/.hermes install --force
 
