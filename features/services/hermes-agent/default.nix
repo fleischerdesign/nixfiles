@@ -52,6 +52,12 @@ in
           memory_enabled = false;
           user_profile_enabled = false;
         };
+        auxiliary = {
+          vision = {
+            provider = "openrouter";
+            model = "google/gemini-3.5-flash";
+          };
+        };
       };
       environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
     };
