@@ -102,7 +102,10 @@ in
         RemainAfterExit = false;
         User = "root";
       };
-      path = with pkgs; [ docker systemd ];
+      path = with pkgs; [
+        docker
+        systemd
+      ];
       script = ''
         for i in $(seq 1 30); do
           if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
@@ -139,7 +142,10 @@ in
     # Dynamically add all configured host users to the hermes and docker groups
     users.users =
       (lib.genAttrs cfg.hostUsers (_user: {
-        extraGroups = [ "hermes" "docker" ];
+        extraGroups = [
+          "hermes"
+          "docker"
+        ];
       }))
       // {
         hermes = {
