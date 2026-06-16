@@ -59,8 +59,8 @@ in
         };
         auxiliary = {
           vision = {
-            provider = "openrouter";
-            model = "google/gemini-3.5-flash";
+            provider = "deepseek";
+            model = "deepseek-v4-flash";
           };
         };
       };
