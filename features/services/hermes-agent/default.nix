@@ -44,6 +44,9 @@ in
         PAPERLESS_URL = "https://paperless.fls.ancoris.ovh";
       };
       settings = {
+        approvals = {
+          mode = "smart";
+        };
         model = {
           default = cfg.model;
           provider = "deepseek";
