@@ -222,7 +222,7 @@ in
         :4480 {
           import /data/.hermes/caddy/routes/*
         }
-        CADDYEOF
+      CADDYEOF
         fi'
 
         # Start Caddy in background inside container
