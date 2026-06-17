@@ -70,6 +70,9 @@ in
         "UMASK=0007"
         "--env"
         "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
+      ] ++ lib.optionals cfg.subdomainDelegation [
+        "--publish"
+        "127.0.0.1:4480:4480"
       ];
       environment = {
         MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
