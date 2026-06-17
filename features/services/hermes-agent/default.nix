@@ -141,7 +141,7 @@ in
     sops.secrets.cloudflare_api_token = lib.mkIf cfg.subdomainDelegation { };
 
     sops.templates.caddy_env.content = lib.mkIf cfg.subdomainDelegation ''
-      CLOUDFLARE_API_TOKEN=${config.sops.placeholder.cloudflare_api_token}
+      CLOUDFLARE_API_TOKEN=${conf...ken}
     '';
 
     services.caddy.environmentFile = lib.mkIf cfg.subdomainDelegation config.sops.templates.caddy_env.path;
@@ -239,32 +239,33 @@ in
         # Install Caddy inside container (copy Nix-built binary)
         docker cp ${pkgs.caddy}/bin/caddy hermes-agent:/usr/local/bin/caddy 2>/dev/null || true
 
-        # Write initial Caddyfile if it doesn't exist
+        # Write/update Caddyfile
         docker exec hermes-agent mkdir -p /data/.hermes/caddy
-        docker exec hermes-agent sh -c 'if [ ! -f /data/.hermes/caddy/Caddyfile ]; then cat > /data/.hermes/caddy/Caddyfile << "CADDYEOF"
+        docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/Caddyfile << "CADDYEOF"
         {
           admin off
+          auto_https off
         }
 
         127.0.0.1:4480 {
           import /data/.hermes/caddy/routes/*
         }
-      CADDYEOF
-        fi'
+      CADDYEOF'
 
         # Start Caddy in background inside container
         docker exec -d hermes-agent caddy run --config /data/.hermes/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true
 
-        # Create initial webhook route if it doesn't exist
+        # Create/update webhook route
         docker exec hermes-agent mkdir -p /data/.hermes/caddy/routes
-        docker exec hermes-agent sh -c 'if [ ! -f /data/.hermes/caddy/routes/webhook ]; then cat > /data/.hermes/caddy/routes/webhook << ROUTEEOF
+        docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/routes/webhook << ROUTEEOF
       @webhook host webhook.moebius.${config.my.features.services.caddy.baseDomain}
       handle @webhook {
         rewrite * /webhooks{path}
-        reverse_proxy 127.0.0.1:8644
+        reverse_proxy 127.0.0.1:8644 {
+          transport http
+        }
       }
-      ROUTEEOF
-      fi'
+      ROUTEEOF'
         docker exec hermes-agent caddy reload --config /data/.hermes/caddy/Caddyfile 2>/dev/null || true
       '';
     };
