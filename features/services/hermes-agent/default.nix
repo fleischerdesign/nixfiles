@@ -89,6 +89,7 @@ in
         platforms.webhook = {
           enabled = cfg.subdomainDelegation;
           extra.port = 8644;
+          extra.host = "127.0.0.1";
         };
       };
       environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
