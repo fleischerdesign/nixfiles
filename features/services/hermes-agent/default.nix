@@ -247,7 +247,7 @@ in
           auto_https off
         }
 
-        127.0.0.1:4480 {
+        :4480 {
           import /data/.hermes/caddy/routes/*
         }
       CADDYEOF'
