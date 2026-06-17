@@ -244,6 +244,7 @@ in
         docker exec hermes-agent sh -c 'if [ ! -f /data/.hermes/caddy/routes/webhook ]; then cat > /data/.hermes/caddy/routes/webhook << ROUTEEOF
       @webhook host webhook.moebius.${config.my.features.services.caddy.baseDomain}
       handle @webhook {
+        rewrite * /webhooks{path}
         reverse_proxy 127.0.0.1:8644
       }
       ROUTEEOF
