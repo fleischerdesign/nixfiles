@@ -23,6 +23,11 @@ in
       default = [ ];
       description = "Interactive host users who should have access to the hermes group.";
     };
+    moebius = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Enable Moebius subdomain delegation (*.moebius → Hermes container Caddy)";
+    };
   };
 
   imports = [
@@ -81,6 +86,10 @@ in
             model = "deepseek-v4-flash";
           };
         };
+        platforms.webhook = lib.mkIf cfg.moebius {
+          enabled = true;
+          extra.port = 8644;
+        };
       };
       environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
     };
@@ -89,6 +98,19 @@ in
     sops.secrets.hermes_agent_env = {
       owner = "hermes";
       restartUnits = [ "hermes-agent.service" ];
+    };
+
+    # Moebius subdomain delegation — wildcard → Hermes container Caddy
+    services.caddy.virtualHosts."moebius.rls.ancoris.ovh" = lib.mkIf cfg.moebius {
+      extraConfig = ''
+        tls {
+          on_demand
+        }
+        @moebius host *.moebius.rls.ancoris.ovh
+        handle @moebius {
+          reverse_proxy 127.0.0.1:4480
+        }
+      '';
     };
 
     # Bootstrap Mnemosyne memory provider inside the container
@@ -138,6 +160,58 @@ in
       find /var/lib/hermes/.hermes -type d ! -perm /g=rx -exec chmod g+rx {} \; 2>/dev/null || true
       find /var/lib/hermes/.hermes -type f ! -perm /g=r -exec chmod g+r {} \; 2>/dev/null || true
     '';
+
+    # Moebius — container Caddy bootstrap (install + start)
+    systemd.services.hermes-agent-moebius-bootstrap = lib.mkIf cfg.moebius {
+      description = "Bootstrap Caddy inside Hermes container for Moebius subdomain routing";
+      wantedBy = [ "hermes-agent.service" ];
+      after = [ "hermes-agent.service" ];
+      requires = [ "hermes-agent.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = false;
+        User = "root";
+      };
+      path = with pkgs; [ docker ];
+      script = ''
+        # Wait for container
+        for i in $(seq 1 30); do
+          if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
+            break
+          fi
+          sleep 2
+        done
+
+        # Install Caddy inside container (copy Nix-built binary)
+        docker cp ${pkgs.caddy}/bin/caddy hermes-agent:/usr/local/bin/caddy 2>/dev/null || true
+
+        # Write initial Caddyfile if it doesn't exist
+        docker exec hermes-agent mkdir -p /data/.hermes/caddy
+        docker exec hermes-agent sh -c 'if [ ! -f /data/.hermes/caddy/Caddyfile ]; then cat > /data/.hermes/caddy/Caddyfile << "CADDYEOF"
+        {
+          admin off
+        }
+
+        :4480 {
+          import /data/.hermes/caddy/routes/*
+        }
+        CADDYEOF
+        fi'
+
+        # Start Caddy in background inside container
+        docker exec -d hermes-agent caddy run --config /data/.hermes/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true
+
+        # Create initial webhook route if it doesn't exist
+        docker exec hermes-agent mkdir -p /data/.hermes/caddy/routes
+        docker exec hermes-agent sh -c 'if [ ! -f /data/.hermes/caddy/routes/webhook ]; then cat > /data/.hermes/caddy/routes/webhook << "ROUTEEOF"
+      webhook.moebius.rls.ancoris.ovh {
+        reverse_proxy 127.0.0.1:8644
+      }
+      ROUTEEOF
+      fi'
+        docker exec hermes-agent caddy reload --config /data/.hermes/caddy/Caddyfile 2>/dev/null || true
+      '';
+    };
 
     # Dynamically add all configured host users to the hermes and docker groups
     users.users =
