@@ -101,12 +101,12 @@ in
     };
 
     # Moebius subdomain delegation — wildcard → Hermes container Caddy
-    services.caddy.virtualHosts."moebius.rls.ancoris.ovh" = lib.mkIf cfg.moebius {
+    services.caddy.virtualHosts."moebius.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.moebius {
       extraConfig = ''
         tls {
           on_demand
         }
-        @moebius host *.moebius.rls.ancoris.ovh
+        @moebius host *.moebius.${config.my.features.services.caddy.baseDomain}
         handle @moebius {
           reverse_proxy 127.0.0.1:4480
         }
@@ -203,8 +203,8 @@ in
 
         # Create initial webhook route if it doesn't exist
         docker exec hermes-agent mkdir -p /data/.hermes/caddy/routes
-        docker exec hermes-agent sh -c 'if [ ! -f /data/.hermes/caddy/routes/webhook ]; then cat > /data/.hermes/caddy/routes/webhook << "ROUTEEOF"
-      webhook.moebius.rls.ancoris.ovh {
+        docker exec hermes-agent sh -c 'if [ ! -f /data/.hermes/caddy/routes/webhook ]; then cat > /data/.hermes/caddy/routes/webhook << ROUTEEOF
+      webhook.moebius.${config.my.features.services.caddy.baseDomain} {
         reverse_proxy 127.0.0.1:8644
       }
       ROUTEEOF
