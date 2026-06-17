@@ -133,7 +133,7 @@ in
     # Moebius subdomain delegation — wildcard TLS via Cloudflare DNS challenge
     services.caddy.package = lib.mkIf cfg.subdomainDelegation (
       pkgs.caddy.withPlugins {
-        plugins = [ "github.com/caddy-dns/cloudflare" ];
+        plugins = [ "github.com/caddy-dns/cloudflare@v0.2.4" ];
         hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
       }
     );
