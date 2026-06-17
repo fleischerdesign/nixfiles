@@ -9,6 +9,32 @@
 
 let
   cfg = config.my.features.services.hermes-agent;
+
+  # Extract mnemosyne bootstrap script so it can be hashed for restartTriggers.
+  # When the script changes, NixOS re-runs the oneshot on switch-to-configuration.
+  mnemosyneBootstrapScript = ''
+    for i in $(seq 1 30); do
+      if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
+        break
+      fi
+      sleep 2
+    done
+
+    NEEDS_RESTART=false
+    if ! docker exec hermes-agent /home/hermes/.venv/bin/python -c "import fastembed" 2>/dev/null; then
+      NEEDS_RESTART=true
+    fi
+
+    docker exec hermes-agent \
+      /home/hermes/.venv/bin/pip install -q mnemosyne-hermes "mnemosyne-memory[embeddings]" ddgs aiohttp
+    docker exec hermes-agent \
+      /home/hermes/.venv/bin/mnemosyne-hermes --hermes-home /data/.hermes install --force
+
+    if [ "$NEEDS_RESTART" = "true" ]; then
+      sleep 3
+      systemctl restart --no-block hermes-agent.service
+    fi
+  '';
 in
 {
   options.my.features.services.hermes-agent = {
@@ -129,29 +155,10 @@ in
         docker
         systemd
       ];
-      script = ''
-        for i in $(seq 1 30); do
-          if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
-            break
-          fi
-          sleep 2
-        done
-
-        NEEDS_RESTART=false
-        if ! docker exec hermes-agent /home/hermes/.venv/bin/python -c "import fastembed" 2>/dev/null; then
-          NEEDS_RESTART=true
-        fi
-
-        docker exec hermes-agent \
-          /home/hermes/.venv/bin/pip install -q mnemosyne-hermes "mnemosyne-memory[embeddings]" ddgs aiohttp
-        docker exec hermes-agent \
-          /home/hermes/.venv/bin/mnemosyne-hermes --hermes-home /data/.hermes install --force
-
-        if [ "$NEEDS_RESTART" = "true" ]; then
-          sleep 3
-          systemctl restart --no-block hermes-agent.service
-        fi
-      '';
+      script = mnemosyneBootstrapScript;
+      restartTriggers = [
+        (builtins.hashString "sha256" mnemosyneBootstrapScript)
+      ];
     };
 
     # Fix permissions and migrate config after upstream activation
