@@ -153,8 +153,35 @@ in
       '';
     };
 
-    # Fix permissions after upstream activation regenerates .env with restrictive umask
+    # Fix permissions and migrate config after upstream activation
     system.activationScripts."hermes-agent-fix-perms" = lib.stringAfter [ "hermes-agent-setup" ] ''
+      # TODO: remove when upstream hermes-agent handles legacy string home_channel format
+      ${pkgs.python3.withPackages (ps: [ ps.pyyaml ])}/bin/python3 << 'PYEOF'
+      import yaml
+      path = "/var/lib/hermes/.hermes/config.yaml"
+      try:
+          with open(path) as f:
+              cfg = yaml.safe_load(f)
+      except Exception:
+          raise SystemExit(0)
+      changed = False
+      nc = {"platform": "telegram", "chat_id": "5838211825"}
+      for section in ("telegram",):
+          if section in cfg and isinstance(cfg[section], dict):
+              hc = cfg[section].get("home_channel")
+              if isinstance(hc, str):
+                  cfg[section]["home_channel"] = nc
+                  changed = True
+      if "platforms" in cfg and isinstance(cfg.get("platforms"), dict):
+          p = cfg["platforms"].get("telegram")
+          if isinstance(p, dict) and isinstance(p.get("home_channel"), str):
+              p["home_channel"] = nc
+              changed = True
+      if changed:
+          with open(path, "w") as f:
+              yaml.safe_dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+      PYEOF
+
       chmod 0640 /var/lib/hermes/.hermes/.env
       chmod 2750 /var/lib/hermes/.hermes
       find /var/lib/hermes/.hermes -type d ! -perm /g=rx -exec chmod g+rx {} \; 2>/dev/null || true
