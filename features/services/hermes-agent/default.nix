@@ -130,15 +130,27 @@ in
       restartUnits = [ "hermes-agent.service" ];
     };
 
-    # Moebius subdomain delegation — wildcard → Hermes container Caddy
-    services.caddy.globalConfig = lib.mkIf cfg.subdomainDelegation ''
-      on_demand_tls {
+    # Moebius subdomain delegation — wildcard TLS via Cloudflare DNS challenge
+    services.caddy.package = lib.mkIf cfg.subdomainDelegation (
+      pkgs.caddy.withPlugins {
+        plugins = [ "github.com/caddy-dns/cloudflare" ];
+        hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
       }
+    );
+
+    sops.secrets.cloudflare_api_token = lib.mkIf cfg.subdomainDelegation { };
+
+    sops.templates.caddy_env.content = lib.mkIf cfg.subdomainDelegation ''
+      CLOUDFLARE_API_TOKEN=${config.sops.placeholder.cloudflare_api_token}
     '';
-    services.caddy.virtualHosts."moebius.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.subdomainDelegation {
+
+    services.caddy.environmentFile = lib.mkIf cfg.subdomainDelegation config.sops.templates.caddy_env.path;
+
+    services.caddy.virtualHosts."*.moebius.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.subdomainDelegation {
+      serverAliases = [ "moebius.${config.my.features.services.caddy.baseDomain}" ];
       extraConfig = ''
         tls {
-          on_demand
+          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
         }
         @moebius host *.moebius.${config.my.features.services.caddy.baseDomain}
         handle @moebius {
@@ -234,7 +246,7 @@ in
           admin off
         }
 
-        :4480 {
+        127.0.0.1:4480 {
           import /data/.hermes/caddy/routes/*
         }
       CADDYEOF
