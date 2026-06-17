@@ -141,7 +141,7 @@ in
     sops.secrets.cloudflare_api_token = lib.mkIf cfg.subdomainDelegation { };
 
     sops.templates.caddy_env.content = lib.mkIf cfg.subdomainDelegation ''
-      CLOUDFLARE_API_TOKEN=${conf...ken}
+      CLOUDFLARE_API_TOKEN=${config.sops.placeholder.cloudflare_api_token}
     '';
 
     services.caddy.environmentFile = lib.mkIf cfg.subdomainDelegation config.sops.templates.caddy_env.path;
