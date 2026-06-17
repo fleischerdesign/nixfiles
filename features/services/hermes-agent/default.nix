@@ -23,10 +23,10 @@ in
       default = [ ];
       description = "Interactive host users who should have access to the hermes group.";
     };
-    moebius = lib.mkOption {
+    subdomainDelegation = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Enable Moebius subdomain delegation (*.moebius → Hermes container Caddy)";
+      description = "Enable subdomain delegation (*.moebius → Hermes container Caddy)";
     };
   };
 
@@ -86,7 +86,7 @@ in
             model = "deepseek-v4-flash";
           };
         };
-        platforms.webhook = lib.mkIf cfg.moebius {
+        platforms.webhook = lib.mkIf cfg.subdomainDelegation {
           enabled = true;
           extra.port = 8644;
         };
@@ -101,7 +101,7 @@ in
     };
 
     # Moebius subdomain delegation — wildcard → Hermes container Caddy
-    services.caddy.virtualHosts."moebius.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.moebius {
+    services.caddy.virtualHosts."moebius.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.subdomainDelegation {
       extraConfig = ''
         tls {
           on_demand
@@ -162,7 +162,7 @@ in
     '';
 
     # Moebius — container Caddy bootstrap (install + start)
-    systemd.services.hermes-agent-moebius-bootstrap = lib.mkIf cfg.moebius {
+    systemd.services.hermes-agent-moebius-bootstrap = lib.mkIf cfg.subdomainDelegation {
       description = "Bootstrap Caddy inside Hermes container for Moebius subdomain routing";
       wantedBy = [ "hermes-agent.service" ];
       after = [ "hermes-agent.service" ];
