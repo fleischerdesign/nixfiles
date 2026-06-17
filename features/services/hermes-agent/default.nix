@@ -131,6 +131,10 @@ in
     };
 
     # Moebius subdomain delegation — wildcard → Hermes container Caddy
+    services.caddy.globalConfig = lib.mkIf cfg.subdomainDelegation ''
+      on_demand_tls {
+      }
+    '';
     services.caddy.virtualHosts."moebius.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.subdomainDelegation {
       extraConfig = ''
         tls {
