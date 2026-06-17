@@ -86,8 +86,8 @@ in
             model = "deepseek-v4-flash";
           };
         };
-        platforms.webhook = lib.mkIf cfg.subdomainDelegation {
-          enabled = true;
+        platforms.webhook = {
+          enabled = cfg.subdomainDelegation;
           extra.port = 8644;
         };
       };
