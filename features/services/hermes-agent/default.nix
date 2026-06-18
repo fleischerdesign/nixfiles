@@ -204,6 +204,10 @@ in
           if isinstance(p, dict) and isinstance(p.get("home_channel"), str):
               p["home_channel"] = nc
               changed = True
+      # Persistent Camofox browser sessions
+      if not cfg.get("browser", {}).get("camofox", {}).get("managed_persistence"):
+          cfg.setdefault("browser", {}).setdefault("camofox", {})["managed_persistence"] = True
+          changed = True
       if changed:
           with open(path, "w") as f:
               yaml.safe_dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
