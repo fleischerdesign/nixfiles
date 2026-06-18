@@ -70,7 +70,8 @@ in
         "UMASK=0007"
         "--env"
         "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
-      ] ++ lib.optionals cfg.subdomainDelegation [
+      ]
+      ++ lib.optionals cfg.subdomainDelegation [
         "--publish"
         "127.0.0.1:4480:4480"
       ];
@@ -146,18 +147,20 @@ in
 
     services.caddy.environmentFile = lib.mkIf cfg.subdomainDelegation config.sops.templates.caddy_env.path;
 
-    services.caddy.virtualHosts."*.moebius.${config.my.features.services.caddy.baseDomain}" = lib.mkIf cfg.subdomainDelegation {
-      serverAliases = [ "moebius.${config.my.features.services.caddy.baseDomain}" ];
-      extraConfig = ''
-        tls {
-          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-        }
-        @moebius host *.moebius.${config.my.features.services.caddy.baseDomain}
-        handle @moebius {
-          reverse_proxy 127.0.0.1:4480
-        }
-      '';
-    };
+    services.caddy.virtualHosts."*.moebius.${config.my.features.services.caddy.baseDomain}" =
+      lib.mkIf cfg.subdomainDelegation
+        {
+          serverAliases = [ "moebius.${config.my.features.services.caddy.baseDomain}" ];
+          extraConfig = ''
+            tls {
+              dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+            }
+            @moebius host *.moebius.${config.my.features.services.caddy.baseDomain}
+            handle @moebius {
+              reverse_proxy 127.0.0.1:4480
+            }
+          '';
+        };
 
     # Bootstrap Mnemosyne memory provider inside the container
     systemd.services.hermes-agent-mnemosyne-bootstrap = {
@@ -232,45 +235,45 @@ in
       };
       path = with pkgs; [ docker ];
       script = ''
-        # Wait for container
-        for i in $(seq 1 30); do
-          if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
-            break
-          fi
-          sleep 2
-        done
+          # Wait for container
+          for i in $(seq 1 30); do
+            if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
+              break
+            fi
+            sleep 2
+          done
 
-        # Install Caddy inside container (copy Nix-built binary)
-        docker cp ${pkgs.caddy}/bin/caddy hermes-agent:/usr/local/bin/caddy 2>/dev/null || true
+          # Install Caddy inside container (copy Nix-built binary)
+          docker cp ${pkgs.caddy}/bin/caddy hermes-agent:/usr/local/bin/caddy 2>/dev/null || true
 
-        # Write/update Caddyfile
-        docker exec hermes-agent mkdir -p /data/.hermes/caddy
-        docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/Caddyfile << "CADDYEOF"
-        {
-          admin off
-          auto_https off
+          # Write/update Caddyfile
+          docker exec hermes-agent mkdir -p /data/.hermes/caddy
+          docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/Caddyfile << "CADDYEOF"
+          {
+            admin off
+            auto_https off
+          }
+
+          :4480 {
+            import /data/.hermes/caddy/routes/*
+          }
+        CADDYEOF'
+
+          # Start Caddy in background inside container
+          docker exec -d hermes-agent caddy run --config /data/.hermes/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true
+
+          # Create/update webhook route
+          docker exec hermes-agent mkdir -p /data/.hermes/caddy/routes
+          docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/routes/webhook << ROUTEEOF
+        @webhook host webhook.moebius.${config.my.features.services.caddy.baseDomain}
+        handle @webhook {
+          rewrite * /webhooks{path}
+          reverse_proxy 127.0.0.1:8644 {
+            transport http
+          }
         }
-
-        :4480 {
-          import /data/.hermes/caddy/routes/*
-        }
-      CADDYEOF'
-
-        # Start Caddy in background inside container
-        docker exec -d hermes-agent caddy run --config /data/.hermes/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true
-
-        # Create/update webhook route
-        docker exec hermes-agent mkdir -p /data/.hermes/caddy/routes
-        docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/routes/webhook << ROUTEEOF
-      @webhook host webhook.moebius.${config.my.features.services.caddy.baseDomain}
-      handle @webhook {
-        rewrite * /webhooks{path}
-        reverse_proxy 127.0.0.1:8644 {
-          transport http
-        }
-      }
-      ROUTEEOF'
-        docker exec hermes-agent caddy reload --config /data/.hermes/caddy/Caddyfile 2>/dev/null || true
+        ROUTEEOF'
+          docker exec hermes-agent caddy reload --config /data/.hermes/caddy/Caddyfile 2>/dev/null || true
       '';
     };
 
