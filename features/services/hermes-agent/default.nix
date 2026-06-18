@@ -274,6 +274,15 @@ in
         }
         ROUTEEOF'
           docker exec hermes-agent caddy reload --config /data/.hermes/caddy/Caddyfile 2>/dev/null || true
+
+          # Run container bootstrap scripts (user-managed, survives rebuilds)
+          docker exec -d hermes-agent sh -c '
+            if [ -d /data/.hermes/bootstrap ]; then
+              for script in /data/.hermes/bootstrap/*; do
+                [ -f "$script" ] && [ -x "$script" ] && "$script" &
+              done
+            fi
+          '
       '';
     };
 
