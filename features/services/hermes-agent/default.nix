@@ -61,23 +61,16 @@ in
   ];
 
   config = lib.mkIf cfg.enable {
-    sops.secrets.camofox_api_key = {
-      restartUnits = [ "hermes-agent.service" ];
-    };
-
     services.hermes-agent = {
       enable = true;
       addToSystemPackages = true;
       extraDependencyGroups = [ "messaging" ];
+      container.extraVolumes = [ "/var/lib/camofox:/var/lib/camofox:ro" ];
       container.extraOptions = [
         "--env"
         "UMASK=0007"
         "--env"
         "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
-        "--env"
-        "CAMOFOX_API_KEY=${config.sops.placeholder.camofox_api_key}"
-        "--volume"
-        "/var/lib/camofox:/var/lib/camofox:ro"
       ]
       ++ lib.optionals cfg.subdomainDelegation [
         "--publish"
