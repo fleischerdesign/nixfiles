@@ -14,6 +14,8 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    sops.secrets.camofox_api_key = { };
+
     virtualisation.oci-containers = {
       backend = "docker";
       containers.camofox = {
@@ -22,6 +24,8 @@ in
         pull = "always";
         ports = [ "127.0.0.1:9377:9377" ];
         volumes = [ "/var/lib/camofox:/root/.camofox" ];
+        environment = {
+          CAMOFOX_API_KEY=config.sops.placeholder.camofox_api_key;        };
       };
     };
   };
