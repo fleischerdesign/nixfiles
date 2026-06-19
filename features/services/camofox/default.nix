@@ -25,7 +25,7 @@ in
         ports = [ "127.0.0.1:9377:9377" ];
         volumes = [ "/var/lib/camofox:/root/.camofox" ];
         environment = {
-CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
+          CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
         };
       };
     };
