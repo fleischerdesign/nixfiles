@@ -151,7 +151,6 @@ in
     services.caddy.virtualHosts."*.moebius.${config.my.features.services.caddy.baseDomain}" =
       lib.mkIf cfg.subdomainDelegation
         {
-          serverAliases = [ "moebius.${config.my.features.services.caddy.baseDomain}" ];
           extraConfig = ''
             tls {
               dns cloudflare {env.CLOUDFLARE_API_TOKEN}
@@ -251,7 +250,7 @@ in
           docker exec hermes-agent mkdir -p /data/.hermes/caddy
           docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/Caddyfile << "CADDYEOF"
           {
-            admin off
+            admin localhost:2020
             auto_https off
           }
 
@@ -274,7 +273,7 @@ in
           }
         }
         ROUTEEOF'
-          docker exec hermes-agent caddy reload --config /data/.hermes/caddy/Caddyfile 2>/dev/null || true
+          docker exec hermes-agent caddy reload --config /data/.hermes/caddy/Caddyfile --address localhost:2020 2>/dev/null || true
 
           # Run container bootstrap scripts (user-managed, survives rebuilds)
           docker exec -d hermes-agent sh -c '

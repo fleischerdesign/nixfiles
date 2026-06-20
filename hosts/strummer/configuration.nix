@@ -37,7 +37,10 @@
           domains = [ "fls.ancoris.ovh" ];
         };
         klipper.enable = true;
-        authentik.outpost.proxy.enable = true;
+        authentik.outpost.proxy = {
+          enable = true;
+          tokenSecretName = "authentik_outpost_proxy_token_strummer";
+        };
         authentik.outpost.ldap = {
           enable = true;
           coreAddress = "http://${config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp}:9055";

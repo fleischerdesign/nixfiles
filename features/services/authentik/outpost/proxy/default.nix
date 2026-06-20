@@ -9,12 +9,18 @@ let
   authentikHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
 in
 {
-  options.my.features.services.authentik.outpost.proxy.enable =
-    lib.mkEnableOption "Authentik Proxy Outpost";
+  options.my.features.services.authentik.outpost.proxy = {
+    enable = lib.mkEnableOption "Authentik Proxy Outpost";
+    tokenSecretName = lib.mkOption {
+      type = lib.types.str;
+      default = "authentik_outpost_proxy_token";
+      description = "The name of the secret in sops containing the Authentik proxy token.";
+    };
+  };
 
   config = lib.mkIf cfg.enable {
     # 1. Secrets Setup
-    sops.secrets."authentik_outpost_proxy_token" = {
+    sops.secrets."${cfg.tokenSecretName}" = {
       owner = "authentik-outpost";
       # Restart service when secret changes
       restartUnits = [ "authentik-outpost-proxy.service" ];
@@ -23,7 +29,7 @@ in
     # 2. Template to format the token as Environment Variable
     # Creates a file with: AUTHENTIK_TOKEN=value
     sops.templates."authentik-outpost.env".content = ''
-      AUTHENTIK_TOKEN=${config.sops.placeholder."authentik_outpost_proxy_token"}
+      AUTHENTIK_TOKEN=${config.sops.placeholder."${cfg.tokenSecretName}"}
     '';
 
     # Create system user and group for the service

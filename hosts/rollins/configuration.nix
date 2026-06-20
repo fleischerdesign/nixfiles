@@ -64,6 +64,22 @@ in
   };
   services.hermes-agent.container.enable = true;
   services.hermes-agent.container.hostUsers = [ "philipp" ];
+  services.hermes-agent.environment = {
+    API_SERVER_ENABLED = "true";
+    API_SERVER_HOST = "127.0.0.1";
+    API_SERVER_PORT = "8642";
+  };
+
+  my.features.services.hermes-webui.enable = true;
+  my.features.services.authentik.outpost.proxy = {
+    enable = true;
+    tokenSecretName = "authentik_outpost_proxy_token_rollins";
+  };
+
+  my.endpoints.hermes-webui = {
+    subdomain = "moebius";
+    auth = true;
+  };
 
   my.features.services.camofox.enable = true;
 
