@@ -54,7 +54,7 @@ in
         server = {
           http_addr = "127.0.0.1";
           http_port = 3000;
-          domain = cfg.domain;
+          inherit (cfg) domain;
           root_url = "https://${cfg.domain}";
         };
 
