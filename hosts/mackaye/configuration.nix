@@ -1,7 +1,4 @@
 { config, ... }:
-let
-  hostTopology = config.my.features.system.networking.topology.hosts.mackaye;
-in
 {
   imports = [
     ./hardware-configuration.nix

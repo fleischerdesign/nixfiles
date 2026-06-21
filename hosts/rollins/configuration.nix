@@ -1,7 +1,4 @@
 { config, ... }:
-let
-  hostTopology = config.my.features.system.networking.topology.hosts.rollins;
-in
 {
   imports = [
     ./hardware-configuration.nix

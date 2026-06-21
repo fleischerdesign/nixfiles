@@ -94,7 +94,6 @@ in
           pkgs,
           config,
           lib,
-          hostname,
           ...
         }:
         {
