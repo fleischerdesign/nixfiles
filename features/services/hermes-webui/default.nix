@@ -76,6 +76,7 @@ in
             -e HERMES_WEBUI_AUTO_INSTALL=1 \
             -e PIP_USER=true \
             -e PYTHONUSERBASE=/python-packages \
+            -e HOME=/python-packages \
             -e PATH=/python-packages/bin:/persistent-bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
             --env-file /run/hermes-webui/env \
             -v /nix/store:/nix/store:ro \

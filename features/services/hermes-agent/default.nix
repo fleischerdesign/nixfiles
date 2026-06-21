@@ -162,6 +162,7 @@ in
           docker_env = {
             PIP_USER = "true";
             PYTHONUSERBASE = "/python-packages";
+            HOME = "/python-packages";
             PATH = "/python-packages/bin:/persistent-bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
           };
         };
