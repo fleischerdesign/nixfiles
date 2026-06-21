@@ -2,13 +2,47 @@
   config,
   lib,
   ...
-}:
-let
+}: let
   cfg = config.my.features.services.sabnzbd;
-in
-{
+in {
   options.my.features.services.sabnzbd = {
     enable = lib.mkEnableOption "SABnzbd Usenet Downloader";
+    downloadDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/data/storage/downloads";
+      description = "Base download directory for SABnzbd.";
+    };
+    server = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Configure default Usenet server connection.";
+      };
+      name = lib.mkOption {
+        type = lib.types.str;
+        default = "Newsgroup Ninja";
+      };
+      host = lib.mkOption {
+        type = lib.types.str;
+        default = "news.newsgroup.ninja";
+      };
+      port = lib.mkOption {
+        type = lib.types.int;
+        default = 563;
+      };
+      ssl = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+      };
+      connections = lib.mkOption {
+        type = lib.types.int;
+        default = 50;
+      };
+      username = lib.mkOption {
+        type = lib.types.str;
+        default = "Butchey";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -44,35 +78,31 @@ in
       group = "media";
       allowConfigWrite = false;
       configFile = null;
-      secretFiles = [ config.sops.templates."sabnzbd-secret.ini".path ];
+      secretFiles = [config.sops.templates."sabnzbd-secret.ini".path];
 
       settings = {
         misc = {
           port = 8080;
           host = "0.0.0.0";
           host_whitelist = "${
-            if config.my.endpoints.sabnzbd.subdomain != null then
-              "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}, "
-            else
-              ""
+            if config.my.endpoints.sabnzbd.subdomain != null
+            then "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}, "
+            else ""
           }localhost, 127.0.0.1";
           inet_exposure = 4;
-          download_dir = "/data/storage/downloads/incomplete";
-          complete_dir = "/data/storage/downloads/complete";
+          download_dir = "${cfg.downloadDir}/incomplete";
+          complete_dir = "${cfg.downloadDir}/complete";
           permissions = "775";
           cache_limit = "512M";
           bandwidth_max = "12.5M";
           bandwidth_perc = 90;
         };
-        servers.ninja = {
-          name = "Newsgroup Ninja";
-          displayname = "Newsgroup Ninja";
-          host = "news.newsgroup.ninja";
-          port = 563;
-          ssl = true;
-          connections = 50;
-          username = "Butchey";
-          enable = true;
+        servers = lib.mkIf cfg.server.enable {
+          ninja = {
+            inherit (cfg.server) name host port ssl connections username;
+            displayname = cfg.server.name;
+            enable = true;
+          };
         };
         categories = {
           movies = {
@@ -88,17 +118,17 @@ in
     };
 
     # Hoheit über den Download-Ordner
-    users.groups.media = { };
-    users.users.sabnzbd.extraGroups = [ "media" ];
+    users.groups.media = {};
+    users.users.sabnzbd.extraGroups = ["media"];
 
     systemd.tmpfiles.rules = [
-      "d /data/storage/downloads 0775 sabnzbd media -"
-      "d /data/storage/downloads/incomplete 0775 sabnzbd media -"
-      "d /data/storage/downloads/complete 0775 sabnzbd media -"
+      "d ${cfg.downloadDir} 0775 sabnzbd media -"
+      "d ${cfg.downloadDir}/incomplete 0775 sabnzbd media -"
+      "d ${cfg.downloadDir}/complete 0775 sabnzbd media -"
     ];
 
     systemd.services.sabnzbd.serviceConfig = {
-      ReadWritePaths = [ "/data/storage/downloads" ];
+      ReadWritePaths = [cfg.downloadDir];
       UMask = lib.mkForce "0002";
     };
 

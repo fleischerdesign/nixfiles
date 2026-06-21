@@ -5,11 +5,13 @@
   pkgs,
   inputs,
   ...
-}:
-let
+}: let
   cfg = config.my.features.services.hermes-webui;
-in
-{
+  envPath =
+    if config.sops.secrets ? hermes_agent_env
+    then config.sops.secrets.hermes_agent_env.path
+    else "/dev/null";
+in {
   options.my.features.services.hermes-webui = {
     enable = lib.mkEnableOption "Hermes WebUI";
     port = lib.mkOption {
@@ -20,21 +22,28 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = config.my.features.services.hermes-agent.enable or false;
+        message = "hermes-webui requires hermes-agent to be enabled on the same host.";
+      }
+    ];
+
     systemd.services.hermes-webui = {
       description = "Hermes WebUI container service";
-      wantedBy = [ "multi-user.target" ];
+      wantedBy = ["multi-user.target"];
       after = [
         "docker.service"
         "hermes-agent.service"
       ];
-      requires = [ "docker.service" ];
+      requires = ["docker.service"];
 
       preStart = ''
         ${pkgs.docker}/bin/docker pull ghcr.io/nesquena/hermes-webui:latest || true
         ${pkgs.docker}/bin/docker rm -f hermes-webui || true
         mkdir -p /run/hermes-webui
         # Filter out environment variables starting with a digit (invalid in POSIX/bash)
-        ${pkgs.gnugrep}/bin/grep -vE '^[0-9]' ${config.sops.secrets.hermes_agent_env.path} > /run/hermes-webui/env || true
+        ${pkgs.gnugrep}/bin/grep -vE '^[0-9]' ${envPath} > /run/hermes-webui/env || true
         chmod 600 /run/hermes-webui/env
 
         # Copy the agent source so that it can be owned by hermes and pass the trust check

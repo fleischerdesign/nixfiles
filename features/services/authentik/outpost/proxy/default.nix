@@ -3,18 +3,25 @@
   lib,
   pkgs,
   ...
-}:
-let
+}: let
   cfg = config.my.features.services.authentik.outpost.proxy;
-  authentikHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
-in
-{
+in {
   options.my.features.services.authentik.outpost.proxy = {
     enable = lib.mkEnableOption "Authentik Proxy Outpost";
     tokenSecretName = lib.mkOption {
       type = lib.types.str;
       default = "authentik_outpost_proxy_token";
       description = "The name of the secret in sops containing the Authentik proxy token.";
+    };
+    coreAddress = lib.mkOption {
+      type = lib.types.str;
+      default = "http://${config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp}:9055";
+      description = "Internal address of the Authentik Core instance.";
+    };
+    browserUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh";
+      description = "Public browser facing URL of the Authentik Core instance.";
     };
   };
 
@@ -23,7 +30,7 @@ in
     sops.secrets."${cfg.tokenSecretName}" = {
       owner = "authentik-outpost";
       # Restart service when secret changes
-      restartUnits = [ "authentik-outpost-proxy.service" ];
+      restartUnits = ["authentik-outpost-proxy.service"];
     };
 
     # 2. Template to format the token as Environment Variable
@@ -37,13 +44,13 @@ in
       isSystemUser = true;
       group = "authentik-outpost";
     };
-    users.groups.authentik-outpost = { };
+    users.groups.authentik-outpost = {};
 
     # 3. Systemd Service Definition
     systemd.services.authentik-outpost-proxy = {
       description = "Authentik Proxy Outpost";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" ];
+      wantedBy = ["multi-user.target"];
+      after = ["network.target"];
 
       serviceConfig = {
         # Use lib.getExe to resolve the binary name automatically
@@ -54,8 +61,8 @@ in
 
         # Configure connection to Authentik Core via Tailscale
         Environment = [
-          "AUTHENTIK_HOST=http://${authentikHost}:9055"
-          "AUTHENTIK_HOST_BROWSER=https://auth.ancoris.ovh"
+          "AUTHENTIK_HOST=${cfg.coreAddress}"
+          "AUTHENTIK_HOST_BROWSER=${cfg.browserUrl}"
           "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
           # Listen on localhost:9000
           "AUTHENTIK_HTTP_ADDRESS=127.0.0.1:9000"
@@ -71,11 +78,7 @@ in
         Group = "authentik-outpost";
 
         StateDirectory = "authentik-outpost-proxy";
-
       };
-
     };
-
   };
-
 }

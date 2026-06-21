@@ -1,11 +1,6 @@
-{
-  config,
-  ...
-}:
-let
+{config, ...}: let
   hostTopology = config.my.features.system.networking.topology.hosts.mackaye;
-in
-{
+in {
   imports = [
     ./hardware-configuration.nix
     ./hardware-specific.nix
@@ -23,19 +18,7 @@ in
   my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.common.geoip.enable = true;
 
-  networking.useDHCP = false;
-  networking.interfaces.eth0.useDHCP = false;
-  networking.defaultGateway = hostTopology.gateway;
-  networking.nameservers = [
-    "9.9.9.9"
-    "1.1.1.1"
-  ];
-  networking.interfaces.eth0.ipv4.addresses = [
-    {
-      address = hostTopology.localIp;
-      prefixLength = 24;
-    }
-  ];
+  my.features.system.networking.static.enable = true;
 
   my.features.services.monitoring.node-exporter.enable = true;
   my.features.services.monitoring.alloy = {

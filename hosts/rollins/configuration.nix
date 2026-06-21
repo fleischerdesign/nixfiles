@@ -1,11 +1,6 @@
-{
-  config,
-  ...
-}:
-let
+{config, ...}: let
   hostTopology = config.my.features.system.networking.topology.hosts.rollins;
-in
-{
+in {
   imports = [
     ./hardware-configuration.nix
     ./hardware-specific.nix
@@ -21,19 +16,7 @@ in
   my.features.system.networking.tailscale.enable = true;
   my.features.system.networking.tailscale.acceptRoutes = true;
 
-  networking.useDHCP = false;
-  networking.interfaces.eth0.useDHCP = false;
-  networking.defaultGateway = hostTopology.gateway;
-  networking.nameservers = [
-    "9.9.9.9"
-    "1.1.1.1"
-  ];
-  networking.interfaces.eth0.ipv4.addresses = [
-    {
-      address = hostTopology.localIp;
-      prefixLength = 24;
-    }
-  ];
+  my.features.system.networking.static.enable = true;
 
   my.features.services.monitoring.node-exporter.enable = true;
   my.features.services.monitoring.alloy = {
@@ -56,14 +39,14 @@ in
   my.features.dev.nixvim.enable = true;
 
   my.features.services.hermes-agent.enable = true;
-  my.features.services.hermes-agent.hostUsers = [ "philipp" ];
+  my.features.services.hermes-agent.hostUsers = ["philipp"];
   my.features.services.hermes-agent.subdomainDelegation = true;
   services.hermes-agent.settings.platforms.telegram.home_channel = {
     platform = "telegram";
     chat_id = "5838211825";
   };
   services.hermes-agent.container.enable = true;
-  services.hermes-agent.container.hostUsers = [ "philipp" ];
+  services.hermes-agent.container.hostUsers = ["philipp"];
   services.hermes-agent.environment = {
     API_SERVER_ENABLED = "true";
     API_SERVER_HOST = "127.0.0.1";

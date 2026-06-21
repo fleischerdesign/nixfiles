@@ -5,9 +5,7 @@
   pkgs,
   inputs,
   ...
-}:
-
-let
+}: let
   cfg = config.my.features.services.hermes-agent;
 
   # Extract mnemosyne bootstrap script so it can be hashed for restartTriggers.
@@ -35,8 +33,7 @@ let
       systemctl restart --no-block hermes-agent.service
     fi
   '';
-in
-{
+in {
   options.my.features.services.hermes-agent = {
     enable = lib.mkEnableOption "Hermes Agent";
     model = lib.mkOption {
@@ -46,13 +43,39 @@ in
     };
     hostUsers = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [ ];
+      default = [];
       description = "Interactive host users who should have access to the hermes group.";
     };
     subdomainDelegation = lib.mkOption {
       type = lib.types.bool;
       default = false;
       description = "Enable subdomain delegation (*.moebius → Hermes container Caddy)";
+    };
+    hassUrl = lib.mkOption {
+      type = lib.types.str;
+      default =
+        if config.my.endpoints ? home-assistant && config.my.endpoints.home-assistant.subdomain != null
+        then "https://${config.my.endpoints.home-assistant.subdomain}.${config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh"}"
+        else "https://hass.fls.ancoris.ovh";
+      description = "Home Assistant connection URL.";
+    };
+    paperlessUrl = lib.mkOption {
+      type = lib.types.str;
+      default =
+        if config.my.endpoints ? paperless && config.my.endpoints.paperless.subdomain != null
+        then "https://${config.my.endpoints.paperless.subdomain}.${config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh"}"
+        else "https://paperless.fls.ancoris.ovh";
+      description = "Paperless connection URL.";
+    };
+    telegramChatId = lib.mkOption {
+      type = lib.types.str;
+      default = "5838211825";
+      description = "Telegram Chat ID to inject into configuration updates.";
+    };
+    camofoxUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "http://127.0.0.1:9377";
+      description = "Camofox anti-detection browser local URL.";
     };
   };
 
@@ -64,23 +87,24 @@ in
     services.hermes-agent = {
       enable = true;
       addToSystemPackages = true;
-      extraDependencyGroups = [ "messaging" ];
-      container.extraVolumes = [ "/var/lib/camofox:/var/lib/camofox:ro" ];
-      container.extraOptions = [
-        "--env"
-        "UMASK=0007"
-        "--env"
-        "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
-      ]
-      ++ lib.optionals cfg.subdomainDelegation [
-        "--publish"
-        "127.0.0.1:4480:4480"
-      ];
+      extraDependencyGroups = ["messaging"];
+      container.extraVolumes = ["/var/lib/camofox:/var/lib/camofox:ro"];
+      container.extraOptions =
+        [
+          "--env"
+          "UMASK=0007"
+          "--env"
+          "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
+        ]
+        ++ lib.optionals cfg.subdomainDelegation [
+          "--publish"
+          "127.0.0.1:4480:4480"
+        ];
       environment = {
         MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
-        HASS_URL = "https://hass.fls.ancoris.ovh";
-        PAPERLESS_URL = "https://paperless.fls.ancoris.ovh";
-        CAMOFOX_URL = "http://127.0.0.1:9377";
+        HASS_URL = cfg.hassUrl;
+        PAPERLESS_URL = cfg.paperlessUrl;
+        CAMOFOX_URL = cfg.camofoxUrl;
       };
       settings = {
         approvals = {
@@ -123,24 +147,24 @@ in
           extra.host = "127.0.0.1";
         };
       };
-      environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
+      environmentFiles = [config.sops.secrets.hermes_agent_env.path];
     };
 
     # Secret environment file containing API keys like OPENROUTER_API_KEY
     sops.secrets.hermes_agent_env = {
       owner = "hermes";
-      restartUnits = [ "hermes-agent.service" ];
+      restartUnits = ["hermes-agent.service"];
     };
 
     # Moebius subdomain delegation — wildcard TLS via Cloudflare DNS challenge
     services.caddy.package = lib.mkIf cfg.subdomainDelegation (
       pkgs.caddy.withPlugins {
-        plugins = [ "github.com/caddy-dns/cloudflare@v0.2.4" ];
+        plugins = ["github.com/caddy-dns/cloudflare@v0.2.4"];
         hash = "sha256-8yZDrejNKsaUnUaTUFYbarWNmxafqp2z2rWo+XRsxV8=";
       }
     );
 
-    sops.secrets.cloudflare_api_token = lib.mkIf cfg.subdomainDelegation { };
+    sops.secrets.cloudflare_api_token = lib.mkIf cfg.subdomainDelegation {};
 
     sops.templates.caddy_env.content = lib.mkIf cfg.subdomainDelegation ''
       CLOUDFLARE_API_TOKEN=${config.sops.placeholder.cloudflare_api_token}
@@ -150,24 +174,24 @@ in
 
     services.caddy.virtualHosts."*.moebius.${config.my.features.services.caddy.baseDomain}" =
       lib.mkIf cfg.subdomainDelegation
-        {
-          extraConfig = ''
-            tls {
-              dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-            }
-            @moebius host *.moebius.${config.my.features.services.caddy.baseDomain}
-            handle @moebius {
-              reverse_proxy 127.0.0.1:4480
-            }
-          '';
-        };
+      {
+        extraConfig = ''
+          tls {
+            dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+          }
+          @moebius host *.moebius.${config.my.features.services.caddy.baseDomain}
+          handle @moebius {
+            reverse_proxy 127.0.0.1:4480
+          }
+        '';
+      };
 
     # Bootstrap Mnemosyne memory provider inside the container
     systemd.services.hermes-agent-mnemosyne-bootstrap = {
       description = "Bootstrap Mnemosyne memory provider inside Hermes container";
-      wantedBy = [ "hermes-agent.service" ];
-      after = [ "hermes-agent.service" ];
-      requires = [ "hermes-agent.service" ];
+      wantedBy = ["hermes-agent.service"];
+      after = ["hermes-agent.service"];
+      requires = ["hermes-agent.service"];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = false;
@@ -184,9 +208,9 @@ in
     };
 
     # Fix permissions and migrate config after upstream activation
-    system.activationScripts."hermes-agent-fix-perms" = lib.stringAfter [ "hermes-agent-setup" ] ''
+    system.activationScripts."hermes-agent-fix-perms" = lib.stringAfter ["hermes-agent-setup"] ''
       # TODO: remove when upstream hermes-agent handles legacy string home_channel format
-      ${pkgs.python3.withPackages (ps: [ ps.pyyaml ])}/bin/python3 << 'PYEOF'
+      ${pkgs.python3.withPackages (ps: [ps.pyyaml])}/bin/python3 << 'PYEOF'
       import yaml
       path = "/var/lib/hermes/.hermes/config.yaml"
       try:
@@ -195,7 +219,7 @@ in
       except Exception:
           raise SystemExit(0)
       changed = False
-      nc = {"platform": "telegram", "chat_id": "5838211825"}
+      nc = {"platform": "telegram", "chat_id": "${cfg.telegramChatId}"}
       for section in ("telegram",):
           if section in cfg and isinstance(cfg[section], dict):
               hc = cfg[section].get("home_channel")
@@ -225,15 +249,15 @@ in
     # Moebius — container Caddy bootstrap (install + start)
     systemd.services.hermes-agent-moebius-bootstrap = lib.mkIf cfg.subdomainDelegation {
       description = "Bootstrap Caddy inside Hermes container for Moebius subdomain routing";
-      wantedBy = [ "hermes-agent.service" ];
-      after = [ "hermes-agent.service" ];
-      requires = [ "hermes-agent.service" ];
+      wantedBy = ["hermes-agent.service"];
+      after = ["hermes-agent.service"];
+      requires = ["hermes-agent.service"];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = false;
         User = "root";
       };
-      path = with pkgs; [ docker ];
+      path = with pkgs; [docker];
       script = ''
           # Wait for container
           for i in $(seq 1 30); do
@@ -299,6 +323,5 @@ in
           homeMode = "2750";
         };
       };
-
   };
 }

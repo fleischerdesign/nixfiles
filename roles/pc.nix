@@ -5,25 +5,18 @@
   inputs,
   pkgs,
   ...
-}:
+}: {
+  imports = [
+    ./base.nix
+  ];
 
-{
   hardware.enableRedistributableFirmware = lib.mkDefault true;
+
   # It enables a baseline set of features common to all graphical systems.
-  my.features = {
-    system = {
-      common.enable = lib.mkDefault true;
-      audio.enable = lib.mkDefault true;
-      bootloader = {
-        enable = lib.mkDefault true;
-        provider = lib.mkDefault "systemd-boot";
-      };
-      kernel.enable = lib.mkDefault true;
-      wayland.enable = lib.mkDefault true;
-      fish-shell.enable = lib.mkDefault true;
-      printing.enable = lib.mkDefault true;
-      networking.topology.enable = lib.mkDefault true;
-    };
+  my.features.system = {
+    audio.enable = lib.mkDefault true;
+    wayland.enable = lib.mkDefault true;
+    printing.enable = lib.mkDefault true;
   };
 
   services.xserver.xkb.layout = lib.mkDefault "de";
@@ -31,6 +24,4 @@
   environment.systemPackages = [
     inputs.deploy-rs.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
-
-  my.features.system.networking.ssh.enable = lib.mkDefault true;
 }
