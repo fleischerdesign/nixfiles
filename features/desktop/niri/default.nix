@@ -154,7 +154,7 @@ in
                 argv = [
                   "axis-shell"
                   "--wallpaper"
-                  "${../../../../media/wallpaper.jpg}"
+                  "${../../../media/wallpaper.jpg}"
                   "--locked"
                 ];
               }
