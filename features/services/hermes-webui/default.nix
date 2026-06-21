@@ -76,6 +76,7 @@ in
             -e HERMES_WEBUI_AUTO_INSTALL=1 \
             -e PIP_USER=true \
             -e PYTHONUSERBASE=/python-packages \
+            -e PATH=/python-packages/bin:/persistent-bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
             --env-file /run/hermes-webui/env \
             -v /nix/store:/nix/store:ro \
             -v /run/hermes-webui/hermes-agent:/agent \
@@ -84,6 +85,7 @@ in
             -v /var/lib/hermes/workspace:/workspace \
             -v /var/lib/camofox:/var/lib/camofox:ro \
             -v /var/lib/hermes/python-packages:/python-packages \
+            -v /var/lib/hermes/bin:/persistent-bin \
             ghcr.io/nesquena/hermes-webui:latest
         '';
         ExecStop = "${pkgs.docker}/bin/docker stop -t 10 hermes-webui";

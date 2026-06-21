@@ -157,10 +157,12 @@ in
           docker_volumes = [
             "/var/lib/camofox:/var/lib/camofox:ro"
             "/var/lib/hermes/python-packages:/python-packages"
+            "/var/lib/hermes/bin:/persistent-bin"
           ];
           docker_env = {
             PIP_USER = "true";
             PYTHONUSERBASE = "/python-packages";
+            PATH = "/python-packages/bin:/persistent-bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
           };
         };
       };
@@ -329,6 +331,7 @@ in
 
     systemd.tmpfiles.rules = [
       "d /var/lib/hermes/python-packages 0777 hermes hermes -"
+      "d /var/lib/hermes/bin 0777 hermes hermes -"
     ];
 
     # Dynamically add all configured host users to the hermes and docker groups
