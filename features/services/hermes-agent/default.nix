@@ -153,6 +153,16 @@ in
           extra.port = 8644;
           extra.host = "127.0.0.1";
         };
+        terminal = {
+          docker_volumes = [
+            "/var/lib/camofox:/var/lib/camofox:ro"
+            "/var/lib/hermes/python-packages:/python-packages"
+          ];
+          docker_env = {
+            PIP_USER = "true";
+            PYTHONUSERBASE = "/python-packages";
+          };
+        };
       };
       environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
     };
@@ -316,6 +326,10 @@ in
           '
       '';
     };
+
+    systemd.tmpfiles.rules = [
+      "d /var/lib/hermes/python-packages 0777 hermes hermes -"
+    ];
 
     # Dynamically add all configured host users to the hermes and docker groups
     users.users =
