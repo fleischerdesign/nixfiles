@@ -5,13 +5,16 @@
   pkgs,
   inputs,
   ...
-}: let
+}:
+let
   cfg = config.my.features.services.hermes-webui;
   envPath =
-    if config.sops.secrets ? hermes_agent_env
-    then config.sops.secrets.hermes_agent_env.path
-    else "/dev/null";
-in {
+    if config.sops.secrets ? hermes_agent_env then
+      config.sops.secrets.hermes_agent_env.path
+    else
+      "/dev/null";
+in
+{
   options.my.features.services.hermes-webui = {
     enable = lib.mkEnableOption "Hermes WebUI";
     port = lib.mkOption {
@@ -31,12 +34,12 @@ in {
 
     systemd.services.hermes-webui = {
       description = "Hermes WebUI container service";
-      wantedBy = ["multi-user.target"];
+      wantedBy = [ "multi-user.target" ];
       after = [
         "docker.service"
         "hermes-agent.service"
       ];
-      requires = ["docker.service"];
+      requires = [ "docker.service" ];
 
       preStart = ''
         ${pkgs.docker}/bin/docker pull ghcr.io/nesquena/hermes-webui:latest || true

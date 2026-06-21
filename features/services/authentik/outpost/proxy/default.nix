@@ -3,9 +3,11 @@
   lib,
   pkgs,
   ...
-}: let
+}:
+let
   cfg = config.my.features.services.authentik.outpost.proxy;
-in {
+in
+{
   options.my.features.services.authentik.outpost.proxy = {
     enable = lib.mkEnableOption "Authentik Proxy Outpost";
     tokenSecretName = lib.mkOption {
@@ -30,7 +32,7 @@ in {
     sops.secrets."${cfg.tokenSecretName}" = {
       owner = "authentik-outpost";
       # Restart service when secret changes
-      restartUnits = ["authentik-outpost-proxy.service"];
+      restartUnits = [ "authentik-outpost-proxy.service" ];
     };
 
     # 2. Template to format the token as Environment Variable
@@ -44,13 +46,13 @@ in {
       isSystemUser = true;
       group = "authentik-outpost";
     };
-    users.groups.authentik-outpost = {};
+    users.groups.authentik-outpost = { };
 
     # 3. Systemd Service Definition
     systemd.services.authentik-outpost-proxy = {
       description = "Authentik Proxy Outpost";
-      wantedBy = ["multi-user.target"];
-      after = ["network.target"];
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network.target" ];
 
       serviceConfig = {
         # Use lib.getExe to resolve the binary name automatically

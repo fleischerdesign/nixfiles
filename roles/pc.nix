@@ -5,7 +5,8 @@
   inputs,
   pkgs,
   ...
-}: {
+}:
+{
   imports = [
     ./base.nix
   ];

@@ -2,9 +2,11 @@
   config,
   lib,
   ...
-}: let
+}:
+let
   cfg = config.my.features.services.sabnzbd;
-in {
+in
+{
   options.my.features.services.sabnzbd = {
     enable = lib.mkEnableOption "SABnzbd Usenet Downloader";
     downloadDir = lib.mkOption {
@@ -78,16 +80,17 @@ in {
       group = "media";
       allowConfigWrite = false;
       configFile = null;
-      secretFiles = [config.sops.templates."sabnzbd-secret.ini".path];
+      secretFiles = [ config.sops.templates."sabnzbd-secret.ini".path ];
 
       settings = {
         misc = {
           port = 8080;
           host = "0.0.0.0";
           host_whitelist = "${
-            if config.my.endpoints.sabnzbd.subdomain != null
-            then "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}, "
-            else ""
+            if config.my.endpoints.sabnzbd.subdomain != null then
+              "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}, "
+            else
+              ""
           }localhost, 127.0.0.1";
           inet_exposure = 4;
           download_dir = "${cfg.downloadDir}/incomplete";
@@ -99,7 +102,14 @@ in {
         };
         servers = lib.mkIf cfg.server.enable {
           ninja = {
-            inherit (cfg.server) name host port ssl connections username;
+            inherit (cfg.server)
+              name
+              host
+              port
+              ssl
+              connections
+              username
+              ;
             displayname = cfg.server.name;
             enable = true;
           };
@@ -118,8 +128,8 @@ in {
     };
 
     # Hoheit über den Download-Ordner
-    users.groups.media = {};
-    users.users.sabnzbd.extraGroups = ["media"];
+    users.groups.media = { };
+    users.users.sabnzbd.extraGroups = [ "media" ];
 
     systemd.tmpfiles.rules = [
       "d ${cfg.downloadDir} 0775 sabnzbd media -"
@@ -128,7 +138,7 @@ in {
     ];
 
     systemd.services.sabnzbd.serviceConfig = {
-      ReadWritePaths = [cfg.downloadDir];
+      ReadWritePaths = [ cfg.downloadDir ];
       UMask = lib.mkForce "0002";
     };
 

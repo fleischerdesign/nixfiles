@@ -1,6 +1,8 @@
-{config, ...}: let
+{ config, ... }:
+let
   hostTopology = config.my.features.system.networking.topology.hosts.rollins;
-in {
+in
+{
   imports = [
     ./hardware-configuration.nix
     ./hardware-specific.nix
@@ -39,14 +41,14 @@ in {
   my.features.dev.nixvim.enable = true;
 
   my.features.services.hermes-agent.enable = true;
-  my.features.services.hermes-agent.hostUsers = ["philipp"];
+  my.features.services.hermes-agent.hostUsers = [ "philipp" ];
   my.features.services.hermes-agent.subdomainDelegation = true;
   services.hermes-agent.settings.platforms.telegram.home_channel = {
     platform = "telegram";
     chat_id = "5838211825";
   };
   services.hermes-agent.container.enable = true;
-  services.hermes-agent.container.hostUsers = ["philipp"];
+  services.hermes-agent.container.hostUsers = [ "philipp" ];
   services.hermes-agent.environment = {
     API_SERVER_ENABLED = "true";
     API_SERVER_HOST = "127.0.0.1";

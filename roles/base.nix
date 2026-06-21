@@ -1,6 +1,6 @@
 # roles/base.nix
 # Base system configurations applicable to all hosts (servers and personal computers).
-{lib, ...}: {
+{ lib, ... }: {
   my.features = {
     system = {
       common.enable = lib.mkDefault true;

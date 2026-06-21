@@ -4,9 +4,11 @@
   lib,
   pkgs,
   ...
-}: let
+}:
+let
   cfg = config.my.features.system.bluetooth;
-in {
+in
+{
   options.my.features.system.bluetooth = {
     enable = lib.mkEnableOption "Bluetooth support with audio optimizations";
   };

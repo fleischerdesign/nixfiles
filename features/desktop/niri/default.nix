@@ -5,31 +5,34 @@
   pkgs,
   hostname,
   ...
-}: let
+}:
+let
   cfg = config.my.features.desktop.niri;
-in {
+in
+{
   options.my.features.desktop.niri = {
     enable = lib.mkEnableOption "Niri desktop environment";
     outputs = lib.mkOption {
       type = lib.types.attrs;
       default =
-        if hostname == "jello"
-        then {
-          "DP-1" = {
-            position = {
-              x = 320;
-              y = 0;
+        if hostname == "jello" then
+          {
+            "DP-1" = {
+              position = {
+                x = 320;
+                y = 0;
+              };
             };
-          };
-          "HDMI-A-2" = {
-            position = {
-              x = 0;
-              y = 1080;
+            "HDMI-A-2" = {
+              position = {
+                x = 0;
+                y = 1080;
+              };
+              focus-at-startup = true;
             };
-            focus-at-startup = true;
-          };
-        }
-        else {};
+          }
+        else
+          { };
       description = "Niri output configurations (positions, scales, etc.)";
     };
   };
@@ -76,7 +79,7 @@ in {
 
     xdg.portal = {
       enable = true;
-      config.common.default = ["gnome"];
+      config.common.default = [ "gnome" ];
       extraPortals = [
         pkgs.xdg-desktop-portal-gtk
         pkgs.xdg-desktop-portal-gnome
@@ -93,7 +96,8 @@ in {
           lib,
           hostname,
           ...
-        }: {
+        }:
+        {
           home.packages = [
             inputs.axis.packages.${pkgs.stdenv.hostPlatform.system}.default
             pkgs.adwaita-icon-theme
@@ -116,7 +120,7 @@ in {
 
             window-rules = [
               {
-                matches = [];
+                matches = [ ];
                 focus-ring.active.color = "#364A2B";
                 geometry-corner-radius = {
                   top-left = 10.0;
@@ -127,7 +131,7 @@ in {
                 clip-to-geometry = true;
               }
               {
-                matches = [{title = "^Bild im Bild$";}];
+                matches = [ { title = "^Bild im Bild$"; } ];
                 open-floating = true;
                 open-focused = false;
                 default-column-width.fixed = 480;
