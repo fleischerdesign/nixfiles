@@ -160,7 +160,7 @@ in
               }
             ];
 
-            outputs = cfg.outputs;
+            inherit (cfg) outputs;
 
             binds = {
               "Mod+Return".action = spawn "ghostty";
