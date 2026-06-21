@@ -10,6 +10,26 @@ in
 {
   options.my.features.services.homarr = {
     enable = lib.mkEnableOption "Homarr Dashboard";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "ancoris.ovh";
+      description = "Domain name for Homarr.";
+    };
+    ssoAuthority = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/homarr/";
+      description = "Authentik SSO authority issuer.";
+    };
+    ssoAuthorizeUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/authorize";
+      description = "Authentik OIDC authorize endpoint.";
+    };
+    ssoLogoutRedirectUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/homarr/end-session/";
+      description = "SSO Logout redirect URL.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -26,8 +46,8 @@ in
         SECRET_ENCRYPTION_KEY=${config.sops.placeholder.homarr_encryption_key}
 
         # URLs
-        BASE_URL=https://ancoris.ovh
-        NEXTAUTH_URL=https://ancoris.ovh
+        BASE_URL=https://${cfg.domain}
+        NEXTAUTH_URL=https://${cfg.domain}
 
         # Redis (Using Mackaye's native redis)
         REDIS_IS_EXTERNAL=true
@@ -40,11 +60,11 @@ in
         AUTH_OIDC_CLIENT_NAME=Authentik
         AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
         AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder.homarr_oidc_client_secret}
-        AUTH_OIDC_ISSUER=https://auth.ancoris.ovh/application/o/homarr/
-        AUTH_OIDC_URI=https://auth.ancoris.ovh/application/o/authorize
+        AUTH_OIDC_ISSUER=${cfg.ssoAuthority}
+        AUTH_OIDC_URI=${cfg.ssoAuthorizeUrl}
         AUTH_OIDC_SCOPE_OVERWRITE=openid email profile groups
         AUTH_OIDC_GROUPS_ATTRIBUTE=groups
-        AUTH_LOGOUT_REDIRECT_URL=https://auth.ancoris.ovh/application/o/homarr/end-session/
+        AUTH_LOGOUT_REDIRECT_URL=${cfg.ssoLogoutRedirectUrl}
         ADMIN_GROUP="Homarr Admins"
       '';
     };
@@ -68,7 +88,7 @@ in
     my.endpoints.homarr = {
       host = config.networking.hostName;
       port = 7575;
-      fullDomain = "ancoris.ovh";
+      fullDomain = cfg.domain;
     };
   };
 }

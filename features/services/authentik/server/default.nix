@@ -12,6 +12,11 @@ in
 {
   options.my.features.services.authentik.server = {
     enable = lib.mkEnableOption "Authentik Identity Provider (Server)";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "auth.ancoris.ovh";
+      description = "FQDN of the Authentik identity server.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -100,7 +105,7 @@ in
     my.endpoints.authentik = {
       host = config.networking.hostName;
       port = 9055;
-      fullDomain = "auth.ancoris.ovh";
+      fullDomain = cfg.domain;
       monitoring = {
         scrape.enable = true;
         scrape.port = 9300;

@@ -10,6 +10,11 @@ in
 {
   options.my.features.services.attic.server = {
     enable = lib.mkEnableOption "Attic Nix binary cache server";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "cache.rls.ancoris.ovh";
+      description = "Full domain name for atticd.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -27,8 +32,8 @@ in
       environmentFile = config.sops.templates.atticd_env.path;
       settings = {
         listen = "127.0.0.1:8080";
-        allowed-hosts = [ "cache.rls.ancoris.ovh" ];
-        api-endpoint = "https://cache.rls.ancoris.ovh/";
+        allowed-hosts = [ cfg.domain ];
+        api-endpoint = "https://${cfg.domain}/";
         database.url = "sqlite:///var/lib/atticd/server.db?mode=rwc";
         storage = {
           type = "local";
@@ -37,7 +42,7 @@ in
       };
     };
 
-    services.caddy.virtualHosts."cache.rls.ancoris.ovh" = {
+    services.caddy.virtualHosts."${cfg.domain}" = {
       extraConfig = ''
         tls {
           alpn http/1.1

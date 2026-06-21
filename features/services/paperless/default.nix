@@ -9,6 +9,11 @@ in
 {
   options.my.features.services.paperless = {
     enable = lib.mkEnableOption "Paperless-ngx Document Management";
+    ssoServerUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/paperless";
+      description = "OIDC Issuer/Server URL for Authentik.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -32,7 +37,7 @@ in
                   client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
                   secret = config.sops.placeholder.paperless_oidc_secret;
                   settings = {
-                    server_url = "https://auth.ancoris.ovh/application/o/paperless";
+                    server_url = cfg.ssoServerUrl;
                   };
                 }
               ];

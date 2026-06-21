@@ -10,6 +10,16 @@ in
 {
   options.my.features.services.vaultwarden = {
     enable = lib.mkEnableOption "Vaultwarden";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "vault.ancoris.ovh";
+      description = "Full domain name for Vaultwarden.";
+    };
+    ssoAuthority = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/vaultwarden/";
+      description = "OIDC Issuer/Authority URL for single sign-on.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -17,13 +27,13 @@ in
       enable = true;
       dbBackend = "postgresql";
       config = {
-        DOMAIN = "https://vault.ancoris.ovh";
+        DOMAIN = "https://${cfg.domain}";
         SIGNUPS_ALLOWED = false;
 
         # OIDC / Authentik
         SSO_ENABLED = true;
         SSO_ONLY = true;
-        SSO_AUTHORITY = "https://auth.ancoris.ovh/application/o/vaultwarden/";
+        SSO_AUTHORITY = cfg.ssoAuthority;
         SSO_SCOPES = "email profile offline_access";
         SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION = true;
 
@@ -50,7 +60,7 @@ in
     my.endpoints.vaultwarden = {
       host = config.networking.hostName;
       port = 8082;
-      fullDomain = "vault.ancoris.ovh";
+      fullDomain = cfg.domain;
     };
 
     # Secrets

@@ -14,6 +14,12 @@ in
       type = lib.types.str;
       description = "Base domain for exposed services (e.g. fls.ancoris.ovh)";
     };
+
+    authentikOutpostAddress = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1:9000";
+      description = "Local socket address of the Authentik outpost proxy.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -25,7 +31,7 @@ in
         (authentik) {
           # Handle outpost paths (callback, sign_out, etc) directly
           handle /outpost.goauthentik.io/* {
-            reverse_proxy 127.0.0.1:9000
+            reverse_proxy ${cfg.authentikOutpostAddress}
           }
         }
       '';
@@ -48,7 +54,7 @@ in
                   ''
                     import authentik
                     handle {
-                      forward_auth 127.0.0.1:9000 {
+                      forward_auth ${cfg.authentikOutpostAddress} {
                         uri /outpost.goauthentik.io/auth/caddy
                         copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
                         trusted_proxies private_ranges

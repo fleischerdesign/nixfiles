@@ -10,6 +10,21 @@ in
 {
   options.my.features.services.monitoring.grafana = {
     enable = lib.mkEnableOption "Grafana Dashboard";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "grafana.mky.ancoris.ovh";
+      description = "FQDN of the Grafana instance.";
+    };
+    ssoAuthority = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o";
+      description = "Base SSO authority URL.";
+    };
+    ntfyAlertUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
+      description = "Ntfy webhook URL for Grafana alerts.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -39,8 +54,8 @@ in
         server = {
           http_addr = "127.0.0.1";
           http_port = 3000;
-          domain = "grafana.mky.ancoris.ovh";
-          root_url = "https://grafana.mky.ancoris.ovh";
+          domain = cfg.domain;
+          root_url = "https://${cfg.domain}";
         };
 
         security = {
@@ -59,9 +74,9 @@ in
           client_id = "$__ENV{GF_AUTH_GENERIC_OAUTH_CLIENT_ID}";
           client_secret = "$__ENV{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}";
           scopes = "openid profile email";
-          auth_url = "https://auth.ancoris.ovh/application/o/authorize/";
-          token_url = "https://auth.ancoris.ovh/application/o/token/";
-          api_url = "https://auth.ancoris.ovh/application/o/userinfo/";
+          auth_url = "${cfg.ssoAuthority}/authorize/";
+          token_url = "${cfg.ssoAuthority}/token/";
+          api_url = "${cfg.ssoAuthority}/userinfo/";
           role_attribute_path = "contains(groups, 'Grafana Admins') && 'Admin' || 'Viewer'";
         };
       };
@@ -76,7 +91,7 @@ in
                   uid = "ntfy-alerts";
                   type = "webhook";
                   settings = {
-                    url = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
+                    url = cfg.ntfyAlertUrl;
                     httpMethod = "POST";
                     authorization_credentials = "$NTFY_TOKEN";
                   };

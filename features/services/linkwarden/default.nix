@@ -10,6 +10,16 @@ in
 {
   options.my.features.services.linkwarden = {
     enable = lib.mkEnableOption "Linkwarden";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "linkwarden.mky.ancoris.ovh";
+      description = "Domain name for Linkwarden.";
+    };
+    ssoAuthority = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/linkwarden";
+      description = "SSO Authority URL for Linkwarden.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -27,10 +37,10 @@ in
 
       environment = {
         NEXT_PUBLIC_AUTHENTIK_ENABLED = "true";
-        AUTHENTIK_ISSUER = "https://auth.ancoris.ovh/application/o/linkwarden";
+        AUTHENTIK_ISSUER = cfg.ssoAuthority;
         # Linkwarden specific: NEXTAUTH_URL must end with /api/v1/auth
-        NEXTAUTH_URL = "https://linkwarden.mky.ancoris.ovh/api/v1/auth";
-        BASE_URL = "https://linkwarden.mky.ancoris.ovh";
+        NEXTAUTH_URL = "https://${cfg.domain}/api/v1/auth";
+        BASE_URL = "https://${cfg.domain}";
 
         NEXT_PUBLIC_DISABLE_REGISTRATION = "true";
         NEXT_PUBLIC_CREDENTIALS_ENABLED = "false";
@@ -54,7 +64,7 @@ in
     my.endpoints.linkwarden = {
       host = config.networking.hostName;
       port = 3010;
-      fullDomain = "linkwarden.mky.ancoris.ovh";
+      fullDomain = cfg.domain;
     };
 
     # Secrets

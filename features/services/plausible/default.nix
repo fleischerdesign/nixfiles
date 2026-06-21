@@ -10,6 +10,11 @@ in
 {
   options.my.features.services.plausible = {
     enable = lib.mkEnableOption "Plausible Analytics";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "plausible.mky.ancoris.ovh";
+      description = "Domain name for Plausible instance.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -27,7 +32,7 @@ in
       enable = true;
 
       server = {
-        baseUrl = "https://plausible.mky.ancoris.ovh";
+        baseUrl = "https://${cfg.domain}";
         secretKeybaseFile = config.sops.secrets.plausible_secret_key_base.path;
         port = 8000;
         listenAddress = "127.0.0.1";

@@ -11,6 +11,21 @@ in
 {
   options.my.features.services.mail = {
     enable = lib.mkEnableOption "Stalwart Mail Server";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "mail.ancoris.ovh";
+      description = "Full domain name of the mail server.";
+    };
+    baseDomain = lib.mkOption {
+      type = lib.types.str;
+      default = "ancoris.ovh";
+      description = "Base domain name.";
+    };
+    ssoAuthority = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/stalwart/";
+      description = "SSO Authority/Issuer URL.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -19,7 +34,7 @@ in
       openFirewall = true;
 
       settings = {
-        server.hostname = "mail.ancoris.ovh";
+        server.hostname = cfg.domain;
 
         # Force local configuration for managed sections
         config.local-keys = [
@@ -53,8 +68,8 @@ in
         };
 
         lookup.default = {
-          hostname = "mail.ancoris.ovh";
-          domain = "ancoris.ovh";
+          hostname = cfg.domain;
+          domain = cfg.baseDomain;
         };
 
         # 1. PostgreSQL Store via TCP
@@ -173,7 +188,7 @@ in
           bind = [ "127.0.0.1:9081" ];
           protocol = "http";
           oidc = {
-            issuer = "https://auth.ancoris.ovh/application/o/stalwart/";
+            issuer = cfg.ssoAuthority;
             client-id = "%{file:${config.sops.secrets.stalwart_oidc_id.path}}%";
             client-secret = "%{file:${config.sops.secrets.stalwart_oidc_secret.path}}%";
             scopes = [
@@ -187,31 +202,31 @@ in
         server.listener.smtp = {
           bind = [ "[::]:25" ];
           protocol = "smtp";
-          hostname = "mail.ancoris.ovh";
+          hostname = cfg.domain;
         };
         server.listener.submissions = {
           bind = [ "[::]:465" ];
           protocol = "smtp";
           tls.implicit = true;
-          hostname = "mail.ancoris.ovh";
+          hostname = cfg.domain;
         };
         server.listener.submission = {
           bind = [ "[::]:587" ];
           protocol = "smtp";
           tls.enable = true;
-          hostname = "mail.ancoris.ovh";
+          hostname = cfg.domain;
         };
         server.listener.imaps = {
           bind = [ "[::]:993" ];
           protocol = "imap";
           tls.implicit = true;
-          hostname = "mail.ancoris.ovh";
+          hostname = cfg.domain;
         };
         server.listener.imap = {
           bind = [ "[::]:143" ];
           protocol = "imap";
           tls.enable = true;
-          hostname = "mail.ancoris.ovh";
+          hostname = cfg.domain;
         };
 
         authentication.fallback-admin = {
@@ -255,8 +270,8 @@ in
       };
       script = ''
         mkdir -p ${certDir}
-        cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.crt ${certDir}/mail.crt
-        cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/mail.ancoris.ovh/mail.ancoris.ovh.key ${certDir}/mail.key
+        cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${cfg.domain}/${cfg.domain}.crt ${certDir}/mail.crt
+        cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${cfg.domain}/${cfg.domain}.key ${certDir}/mail.key
         chown -R stalwart-mail:stalwart-mail ${certDir}
         chmod 750 ${certDir}
         chmod 640 ${certDir}/*
@@ -276,7 +291,7 @@ in
     my.endpoints.mail = {
       host = config.networking.hostName;
       port = 9081;
-      fullDomain = "mail.ancoris.ovh";
+      fullDomain = cfg.domain;
     };
 
     systemd.tmpfiles.rules = [

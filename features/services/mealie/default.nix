@@ -9,6 +9,16 @@ in
 {
   options.my.features.services.mealie = {
     enable = lib.mkEnableOption "Mealie Recipe Manager";
+    smtpFromEmail = lib.mkOption {
+      type = lib.types.str;
+      default = "noreply@ancoris.ovh";
+      description = "From address for SMTP outgoing mails.";
+    };
+    ssoConfigurationUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/mealie/.well-known/openid-configuration";
+      description = "OIDC discovery configuration endpoint URL.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -54,13 +64,13 @@ in
         SMTP_PORT = "2525";
         SMTP_FROM_NAME = "Mealie";
         SMTP_AUTH_STRATEGY = "TLS";
-        SMTP_FROM_EMAIL = "noreply@ancoris.ovh";
+        SMTP_FROM_EMAIL = cfg.smtpFromEmail;
         SMTP_USER = "ancoris";
 
         # OIDC Configuration
         OIDC_AUTH_ENABLED = "True";
         OIDC_SIGNUP_ENABLED = "True";
-        OIDC_CONFIGURATION_URL = "https://auth.ancoris.ovh/application/o/mealie/.well-known/openid-configuration";
+        OIDC_CONFIGURATION_URL = cfg.ssoConfigurationUrl;
         OIDC_CLIENT_ID = "uwxlwWIofaSVKwAJTyzhzT75kUMDfoCpmlSs4M1E";
         OIDC_ADMIN_GROUP = "Mealie Admins";
         OIDC_AUTO_REDIRECT = "True";

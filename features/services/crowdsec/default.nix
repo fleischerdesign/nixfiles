@@ -7,11 +7,16 @@ let
   cfg = config.my.features.services.crowdsec;
   isMaster = cfg.role == "master";
   # Use topology host definitions for IPs
-  masterIP = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
+  masterIP = config.my.features.system.networking.topology.hosts.${cfg.masterHost}.tailscaleIp;
 in
 {
   options.my.features.services.crowdsec = {
     enable = lib.mkEnableOption "CrowdSec IPS";
+    masterHost = lib.mkOption {
+      type = lib.types.str;
+      default = "mackaye";
+      description = "The name of the CrowdSec master host (LAPI server) in the topology.";
+    };
     role = lib.mkOption {
       type = lib.types.enum [
         "master"

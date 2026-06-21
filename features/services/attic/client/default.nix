@@ -21,6 +21,11 @@ in
       description = "Group for attic config file ownership";
     };
     autoPush = lib.mkEnableOption "Automatically push system closure to attic cache after each rebuild";
+    endpoint = lib.mkOption {
+      type = lib.types.str;
+      default = "https://cache.rls.ancoris.ovh";
+      description = "Attic cache server endpoint URL.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -33,7 +38,7 @@ in
         default-server = "nixfiles-server"
 
         [servers.nixfiles-server]
-        endpoint = "https://cache.rls.ancoris.ovh"
+        endpoint = "${cfg.endpoint}"
         token = "${config.sops.placeholder.attic_push_token}"
       '';
     };

@@ -11,6 +11,11 @@ in
 {
   options.my.features.services.couchdb = {
     enable = lib.mkEnableOption "CouchDB Server";
+    domain = lib.mkOption {
+      type = lib.types.str;
+      default = "couchdb.mky.ancoris.ovh";
+      description = "Full domain name for CouchDB.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -60,7 +65,7 @@ in
     my.endpoints.couchdb = {
       host = config.networking.hostName;
       port = 5984;
-      fullDomain = "couchdb.mky.ancoris.ovh";
+      fullDomain = cfg.domain;
     };
   };
 }

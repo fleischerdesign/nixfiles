@@ -23,26 +23,32 @@ in
       name = lib.mkOption {
         type = lib.types.str;
         default = "Newsgroup Ninja";
+        description = "Friendly display name of the Usenet server.";
       };
       host = lib.mkOption {
         type = lib.types.str;
         default = "news.newsgroup.ninja";
+        description = "Usenet server hostname.";
       };
       port = lib.mkOption {
         type = lib.types.int;
         default = 563;
+        description = "Usenet server connection port.";
       };
       ssl = lib.mkOption {
         type = lib.types.bool;
         default = true;
+        description = "Enable SSL/TLS for Usenet server connection.";
       };
       connections = lib.mkOption {
         type = lib.types.int;
         default = 50;
+        description = "Number of concurrent connections to the Usenet server.";
       };
       username = lib.mkOption {
         type = lib.types.str;
         default = "Butchey";
+        description = "Usenet server account username.";
       };
     };
   };
