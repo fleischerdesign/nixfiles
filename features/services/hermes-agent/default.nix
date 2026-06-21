@@ -40,7 +40,7 @@ in
     enable = lib.mkEnableOption "Hermes Agent";
     model = lib.mkOption {
       type = lib.types.str;
-      default = "deepseek-v4-pro";
+      default = "deepseek-v4-flash";
       description = "Default model for Hermes Agent.";
     };
     hostUsers = lib.mkOption {
