@@ -8,6 +8,7 @@
 }:
 let
   cfg = config.my.features.services.hermes-webui;
+  agentCfg = config.my.features.services.hermes-agent;
   envPath =
     if config.sops.secrets ? hermes_agent_env then
       config.sops.secrets.hermes_agent_env.path
@@ -78,6 +79,11 @@ in
             -e PYTHONUSERBASE=/python-packages \
             -e HOME=/python-packages \
             -e PATH=/python-packages/bin:/persistent-bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
+            -e MNEMOSYNE_EMBEDDING_MODEL="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" \
+            -e HASS_URL="${agentCfg.hassUrl}" \
+            -e PAPERLESS_URL="${agentCfg.paperlessUrl}" \
+            -e CAMOFOX_URL="${agentCfg.camofoxUrl}" \
+            -e PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages \
             --env-file /run/hermes-webui/env \
             -v /nix/store:/nix/store:ro \
             -v /run/hermes-webui/hermes-agent:/agent \
@@ -87,6 +93,7 @@ in
             -v /var/lib/camofox:/var/lib/camofox:ro \
             -v /var/lib/hermes/python-packages:/python-packages \
             -v /var/lib/hermes/bin:/persistent-bin \
+            -v /var/lib/hermes/home:/home/hermes \
             ghcr.io/nesquena/hermes-webui:latest
         '';
         ExecStop = "${pkgs.docker}/bin/docker stop -t 10 hermes-webui";
