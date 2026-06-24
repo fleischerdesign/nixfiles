@@ -95,6 +95,8 @@ in
             -v /var/lib/hermes/bin:/persistent-bin \
             -v /var/lib/hermes/.gemini:/home/hermeswebui/.gemini \
             -v /var/lib/hermes/.config/gh:/home/hermeswebui/.config/gh \
+            -v /var/lib/hermes/home/.gitconfig:/home/hermeswebui/.gitconfig \
+            -v /var/lib/hermes/home/.git-credentials:/home/hermeswebui/.git-credentials \
             -v /var/lib/hermes/home:/home/hermes \
             ghcr.io/nesquena/hermes-webui:latest
         '';

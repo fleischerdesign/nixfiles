@@ -164,6 +164,8 @@ in
             "/var/lib/hermes/bin:/persistent-bin"
             "/var/lib/hermes/.gemini:/python-packages/.gemini"
             "/var/lib/hermes/.config/gh:/python-packages/.config/gh"
+            "/var/lib/hermes/home/.gitconfig:/python-packages/.gitconfig"
+            "/var/lib/hermes/home/.git-credentials:/python-packages/.git-credentials"
           ];
           docker_env = {
             PIP_USER = "true";
