@@ -96,7 +96,11 @@ in
       enable = true;
       addToSystemPackages = true;
       extraDependencyGroups = [ "messaging" ];
-      container.extraVolumes = [ "/var/lib/camofox:/var/lib/camofox:ro" ];
+      container.extraVolumes = [
+        "/var/lib/camofox:/var/lib/camofox:ro"
+        "/var/lib/hermes/.gemini:/home/hermes/.gemini"
+        "/var/lib/hermes/.config/gh:/home/hermes/.config/gh"
+      ];
       container.extraOptions = [
         "--env"
         "UMASK=0007"
@@ -158,6 +162,8 @@ in
             "/var/lib/camofox:/var/lib/camofox:ro"
             "/var/lib/hermes/python-packages:/python-packages"
             "/var/lib/hermes/bin:/persistent-bin"
+            "/var/lib/hermes/.gemini:/python-packages/.gemini"
+            "/var/lib/hermes/.config/gh:/python-packages/.config/gh"
           ];
           docker_env = {
             PIP_USER = "true";
@@ -333,6 +339,11 @@ in
     systemd.tmpfiles.rules = [
       "d /var/lib/hermes/python-packages 0777 hermes hermes -"
       "d /var/lib/hermes/bin 0777 hermes hermes -"
+      "L+ /var/lib/hermes/bin/gh - - - - ${pkgs.gh}/bin/gh"
+      "L+ /var/lib/hermes/bin/agy - - - - ${pkgs.antigravity-cli}/bin/agy"
+      "d /var/lib/hermes/.gemini 0770 hermes hermes -"
+      "d /var/lib/hermes/.config 0770 hermes hermes -"
+      "d /var/lib/hermes/.config/gh 0770 hermes hermes -"
     ];
 
     # Dynamically add all configured host users to the hermes and docker groups

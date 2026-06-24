@@ -93,6 +93,8 @@ in
             -v /var/lib/camofox:/var/lib/camofox:ro \
             -v /var/lib/hermes/python-packages:/python-packages \
             -v /var/lib/hermes/bin:/persistent-bin \
+            -v /var/lib/hermes/.gemini:/home/hermeswebui/.gemini \
+            -v /var/lib/hermes/.config/gh:/home/hermeswebui/.config/gh \
             -v /var/lib/hermes/home:/home/hermes \
             ghcr.io/nesquena/hermes-webui:latest
         '';
