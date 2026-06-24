@@ -97,6 +97,10 @@ in
             -v /var/lib/hermes/.config/gh:/home/hermeswebui/.config/gh \
             -v /var/lib/hermes/home/.gitconfig:/home/hermeswebui/.gitconfig \
             -v /var/lib/hermes/home/.git-credentials:/home/hermeswebui/.git-credentials \
+            -v /var/lib/hermes/.gemini:/python-packages/.gemini \
+            -v /var/lib/hermes/.config/gh:/python-packages/.config/gh \
+            -v /var/lib/hermes/home/.gitconfig:/python-packages/.gitconfig \
+            -v /var/lib/hermes/home/.git-credentials:/python-packages/.git-credentials \
             -v /var/lib/hermes/home:/home/hermes \
             ghcr.io/nesquena/hermes-webui:latest
         '';
