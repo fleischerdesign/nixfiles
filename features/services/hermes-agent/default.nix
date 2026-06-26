@@ -94,6 +94,7 @@ in
   config = lib.mkIf cfg.enable {
     services.hermes-agent = {
       enable = true;
+      package = pkgs.hermes-agent;
       addToSystemPackages = true;
       extraDependencyGroups = [ "messaging" ];
       container.extraVolumes = [

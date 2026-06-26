@@ -79,6 +79,7 @@
       # Zentralisierte Overlays
       overlays = [
         (import ./overlays/fix/openldap)
+        (import ./overlays/fix/hermes-agent inputs)
         inputs.nix-vscode-extensions.overlays.default
       ];
 
