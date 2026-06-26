@@ -4,7 +4,7 @@ inputs: final: prev: {
       baseOverlay = inputs.hermes-agent.overlays.default final prev;
       baseHermesAgent = baseOverlay.hermes-agent;
 
-      esbuild_0_28_1 = final.esbuild.overrideAttrs (old: rec {
+      esbuild_0_28_1 = final.esbuild.overrideAttrs (_: rec {
         version = "0.28.1";
         src = final.fetchFromGitHub {
           owner = "evanw";
