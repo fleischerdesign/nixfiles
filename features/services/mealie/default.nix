@@ -88,6 +88,11 @@ in
       };
     };
 
+    # Workaround for nltk 3.9.2 requiring a writable download directory
+    # when NLTK_DATA points to a read-only Nix store path.
+    # TODO: remove when nixpkgs fixes this upstream.
+    systemd.services.mealie.environment.HOME = "/var/lib/mealie";
+
     # Register with Caddy Feature
     my.endpoints.mealie = {
       host = config.networking.hostName;
