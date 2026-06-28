@@ -134,7 +134,7 @@ in
       environment = {
         PUID = "315";
         PGID = "987";
-        IP = "192.168.178.62";
+        IP = "192.168.178.109";
         LABEL = "paperless";
         TZ = "Europe/Berlin";
         PATTERN = "\"scan\"_dd-mm-yyyy_hh-MM-ss";
