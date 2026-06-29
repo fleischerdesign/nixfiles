@@ -86,7 +86,12 @@
       # Zentrale Nixpkgs Instanz mit globaler Config
       pkgs = import nixpkgs-unstable {
         inherit system overlays;
-        config.allowUnfree = true;
+        config = {
+          allowUnfree = true;
+          # TODO: remove when nixpkgs fixes pnpm 10.34.0 CVEs upstream
+          # pnpm_10_34_0 was pinned for packages that don't support 10.34.1+ breaking change
+          permittedInsecurePackages = [ "pnpm-10.34.0" ];
+        };
       };
 
       helpers = import ./lib/helper.nix {
