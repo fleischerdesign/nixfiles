@@ -100,6 +100,11 @@
 
       globalModules = [
         inputs.sops-nix.nixosModules.sops
+        # TODO: remove when nixpkgs fixes pnpm 10.34.0 CVEs upstream
+        # pnpm_10_34_0 was pinned for packages that don't support 10.34.1+ breaking change
+        {
+          nixpkgs.config.permittedInsecurePackages = [ "pnpm-10.34.0" ];
+        }
       ];
     in
     {
