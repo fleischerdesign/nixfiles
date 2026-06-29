@@ -19,6 +19,9 @@ in
       {
         programs.nixvim = {
           enable = true;
+          # Reuse the central nixpkgs instance (inherits permittedInsecurePackages,
+          # allowUnfree, overlays) instead of nixvim constructing its own.
+          nixpkgs.useGlobalPackages = true;
           defaultEditor = true; # Sets vim as the default editor
           viAlias = true; # Creates a vi alias to vim
           vimAlias = true; # Creates a vim alias to nvim
