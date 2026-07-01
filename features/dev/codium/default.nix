@@ -38,6 +38,7 @@ in
               bbenoist.qml
               svelte.svelte-vscode
               rust-lang.rust-analyzer
+              ms-python.python
             ];
             userSettings = {
               "extensions.autoUpdate" = false;
