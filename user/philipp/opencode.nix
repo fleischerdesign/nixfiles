@@ -33,6 +33,7 @@ in
       plugin = [
         "context-mode"
         "opencode-pty"
+        "opencode-direnv"
       ];
     };
   };
