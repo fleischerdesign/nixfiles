@@ -8,6 +8,7 @@
 {
   imports = [
     ./packages.nix
+    ./opencode.nix
   ];
 
   home.username = "philipp";
