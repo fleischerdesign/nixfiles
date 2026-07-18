@@ -44,23 +44,22 @@
     platform = "telegram";
     chat_id = "5838211825";
   };
-  services.hermes-agent.container.enable = true;
-  services.hermes-agent.container.hostUsers = [ "philipp" ];
+  services.hermes-agent.container.enable = false;
   services.hermes-agent.environment = {
     API_SERVER_ENABLED = "true";
     API_SERVER_HOST = "127.0.0.1";
     API_SERVER_PORT = "8642";
   };
 
-  my.features.services.hermes-webui.enable = true;
-  my.features.services.authentik.outpost.proxy = {
+  my.features.services.hermes-webui = {
     enable = true;
-    tokenSecretName = "authentik_outpost_proxy_token_rollins";
+    oidcClientId = "WLcmhxTlLrbN9R4e7bfnlSNYi387OW1ynQWu27dG";
+    oidcIssuer = "https://auth.ancoris.ovh/application/o/hermes/";
   };
 
   my.endpoints.hermes-webui = {
     subdomain = "moebius";
-    auth = true;
+    auth = false;
   };
 
   my.features.services.camofox.enable = true;

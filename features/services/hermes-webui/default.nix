@@ -8,12 +8,6 @@
 }:
 let
   cfg = config.my.features.services.hermes-webui;
-  agentCfg = config.my.features.services.hermes-agent;
-  envPath =
-    if config.sops.secrets ? hermes_agent_env then
-      config.sops.secrets.hermes_agent_env.path
-    else
-      "/dev/null";
 in
 {
   options.my.features.services.hermes-webui = {
@@ -21,9 +15,33 @@ in
     port = lib.mkOption {
       type = lib.types.int;
       default = 8787;
-      description = "Port the Hermes WebUI container listens on";
+      description = "Port the Hermes WebUI listens on";
+    };
+    oidcIssuer = lib.mkOption {
+      type = lib.types.str;
+      default = "https://auth.ancoris.ovh/application/o/moebius";
+      description = "OIDC Issuer URL (Authentik application endpoint).";
+    };
+    oidcClientId = lib.mkOption {
+      type = lib.types.str;
+      default = "moebius-webui";
+      description = "OIDC Client ID.";
+    };
+    oidcAllowClaim = lib.mkOption {
+      type = lib.types.str;
+      default = "email";
+      description = "OIDC claim used to validate access.";
+    };
+    oidcAllowValues = lib.mkOption {
+      type = lib.types.str;
+      default = "philipp@fleischer.design";
+      description = "Comma-separated allowed values for the claim.";
     };
   };
+
+  imports = [
+    inputs.hermes-webui.nixosModules.default
+  ];
 
   config = lib.mkIf cfg.enable {
     assertions = [
@@ -33,87 +51,52 @@ in
       }
     ];
 
-    systemd.services.hermes-webui = {
-      description = "Hermes WebUI container service";
-      wantedBy = [ "multi-user.target" ];
-      after = [
-        "docker.service"
-        "hermes-agent.service"
+    # Configure native WebUI service
+    services.hermes-webui = {
+      enable = true;
+      port = cfg.port;
+      host = "127.0.0.1";
+      
+      # Run as hermes user/group to seamlessly share folders
+      user = "hermes";
+      group = "hermes";
+      
+      # State and home path mapping (same as Docker container mounts)
+      stateDir = "/var/lib/hermes/.hermes/webui";
+      hermesHome = "/var/lib/hermes/.hermes";
+      
+      # Derive paths from the agent package
+      agent.package = pkgs.hermes-agent;
+      agent.dir = "${inputs.hermes-agent}";
+      
+      # Inject secret environment file containing API keys + OIDC client secret
+      environmentFiles = lib.optionals (config.sops.secrets ? hermes_agent_env) [
+        config.sops.secrets.hermes_agent_env.path
       ];
-      requires = [ "docker.service" ];
-
-      preStart = ''
-        ${pkgs.docker}/bin/docker pull ghcr.io/nesquena/hermes-webui:latest || true
-        ${pkgs.docker}/bin/docker rm -f hermes-webui || true
-        mkdir -p /run/hermes-webui
-        # Filter out environment variables starting with a digit (invalid in POSIX/bash)
-        ${pkgs.gnugrep}/bin/grep -vE '^[0-9]' ${envPath} > /run/hermes-webui/env || true
-        chmod 600 /run/hermes-webui/env
-
-        # Copy the agent source so that it can be owned by hermes and pass the trust check
-        rm -rf /run/hermes-webui/hermes-agent
-        cp -r ${inputs.hermes-agent} /run/hermes-webui/hermes-agent
-        chown -R hermes:hermes /run/hermes-webui/hermes-agent
-        chmod -R u+rwX,go-w /run/hermes-webui/hermes-agent
-      '';
-
-      serviceConfig = {
-        ExecStart = pkgs.writeShellScript "hermes-webui-start" ''
-          HERMES_UID=$(${pkgs.coreutils}/bin/id -u hermes)
-          HERMES_GID=$(${pkgs.coreutils}/bin/id -g hermes)
-          exec ${pkgs.docker}/bin/docker run \
-            --name hermes-webui \
-            --rm \
-            --network=host \
-            -e WANTED_UID="$HERMES_UID" \
-            -e WANTED_GID="$HERMES_GID" \
-            -e HERMES_WEBUI_PORT=${toString cfg.port} \
-            -e HERMES_WEBUI_HOST=127.0.0.1 \
-            -e HERMES_API_URL=http://127.0.0.1:8642 \
-            -e HERMES_HOME=/home/hermeswebui/.hermes \
-            -e HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui \
-            -e HERMES_WEBUI_DEFAULT_WORKSPACE=/workspace \
-            -e HERMES_WEBUI_AGENT_DIR=/agent \
-            -e HERMES_WEBUI_AUTO_INSTALL=1 \
-            -e PIP_USER=true \
-            -e PYTHONUSERBASE=/python-packages \
-            -e HOME=/python-packages \
-            -e PATH=/python-packages/bin:/persistent-bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
-            -e MNEMOSYNE_EMBEDDING_MODEL="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" \
-            -e HASS_URL="${agentCfg.hassUrl}" \
-            -e PAPERLESS_URL="${agentCfg.paperlessUrl}" \
-            -e CAMOFOX_URL="${agentCfg.camofoxUrl}" \
-            -e PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages \
-            --env-file /run/hermes-webui/env \
-            -v /nix/store:/nix/store:ro \
-            -v /run/hermes-webui/hermes-agent:/agent \
-            -v /var/lib/hermes/webui-venv:/app/venv \
-            -v /var/lib/hermes/.hermes:/home/hermeswebui/.hermes \
-            -v /var/lib/hermes/workspace:/workspace \
-            -v /var/lib/camofox:/var/lib/camofox:ro \
-            -v /var/lib/hermes/python-packages:/python-packages \
-            -v /var/lib/hermes/bin:/persistent-bin \
-            -v /var/lib/hermes/.gemini:/home/hermeswebui/.gemini \
-            -v /var/lib/hermes/.config/gh:/home/hermeswebui/.config/gh \
-            -v /var/lib/hermes/home/.gitconfig:/home/hermeswebui/.gitconfig \
-            -v /var/lib/hermes/home/.git-credentials:/home/hermeswebui/.git-credentials \
-            -v /var/lib/hermes/.gemini:/python-packages/.gemini \
-            -v /var/lib/hermes/.config/gh:/python-packages/.config/gh \
-            -v /var/lib/hermes/home/.gitconfig:/python-packages/.gitconfig \
-            -v /var/lib/hermes/home/.git-credentials:/python-packages/.git-credentials \
-            -v /var/lib/hermes/home:/home/hermes \
-            ghcr.io/nesquena/hermes-webui:latest
-        '';
-        ExecStop = "${pkgs.docker}/bin/docker stop -t 10 hermes-webui";
-        Restart = "always";
-        RestartSec = "10s";
+      
+      # Inject OIDC config variables
+      extraEnvironment = lib.filterAttrs (_: v: v != null) {
+        HERMES_WEBUI_OIDC_ISSUER = cfg.oidcIssuer;
+        HERMES_WEBUI_OIDC_CLIENT_ID = cfg.oidcClientId;
+        HERMES_WEBUI_OIDC_ALLOW_CLAIM = cfg.oidcAllowClaim;
+        HERMES_WEBUI_OIDC_ALLOW_VALUES = cfg.oidcAllowValues;
+        HERMES_WEBUI_OIDC_REDIRECT_URI =
+          let
+            ep = config.my.endpoints.hermes-webui or { };
+            baseDomain = config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh";
+            domain = if ep ? fullDomain && ep.fullDomain != null then ep.fullDomain else if ep ? subdomain && ep.subdomain != null then "${ep.subdomain}.${baseDomain}" else null;
+          in
+          if domain != null then "https://${domain}/api/auth/oidc/callback" else null;
+        
+        # Override locations
+        HERMES_API_URL = "http://127.0.0.1:8642";
+        HERMES_WEBUI_DEFAULT_WORKSPACE = "/var/lib/hermes/workspace";
+        HASS_URL = config.my.features.services.hermes-agent.hassUrl;
+        PAPERLESS_URL = config.my.features.services.hermes-agent.paperlessUrl;
+        CAMOFOX_URL = config.my.features.services.hermes-agent.camofoxUrl;
+        MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
       };
     };
-
-    systemd.tmpfiles.rules = [
-      "d /var/lib/hermes/workspace 0750 hermes hermes -"
-      "d /var/lib/hermes/webui-venv 0750 hermes hermes -"
-    ];
 
     my.endpoints.hermes-webui = {
       host = config.networking.hostName;

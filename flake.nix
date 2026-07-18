@@ -63,6 +63,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    hermes-webui = {
+      url = "github:nesquena/hermes-webui";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
   };
 
   outputs =

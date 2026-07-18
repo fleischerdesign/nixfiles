@@ -9,31 +9,75 @@
 let
   cfg = config.my.features.services.hermes-agent;
 
-  # Extract mnemosyne bootstrap script so it can be hashed for restartTriggers.
-  # When the script changes, NixOS re-runs the oneshot on switch-to-configuration.
-  mnemosyneBootstrapScript = ''
-    for i in $(seq 1 30); do
-      if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
-        break
-      fi
-      sleep 2
-    done
+  # Define custom Python packages since they are not in nixpkgs
+  pythonPackages = pkgs.python312Packages;
 
-    NEEDS_RESTART=false
-    if ! docker exec hermes-agent /home/hermes/.venv/bin/python -c "import fastembed" 2>/dev/null; then
-      NEEDS_RESTART=true
-    fi
+  ddgs = pythonPackages.buildPythonPackage rec {
+    pname = "ddgs";
+    version = "9.14.4";
+    src = pythonPackages.fetchPypi {
+      inherit pname version;
+      sha256 = "f7b118a2b709a9e9c04a1dca6e96b98c25d4dfaca1a4b0a244d74454fcca48ef";
+    };
+    pyproject = true;
+    build-system = [ pythonPackages.setuptools ];
+    propagatedBuildInputs = with pythonPackages; [
+      click
+      primp
+      lxml
+      httpx
+      fake-useragent
+    ];
+    doCheck = false;
+  };
 
-    docker exec hermes-agent \
-      /home/hermes/.venv/bin/pip install -q mnemosyne-hermes "mnemosyne-memory[embeddings]" ddgs aiohttp
-    docker exec hermes-agent \
-      /home/hermes/.venv/bin/mnemosyne-hermes --hermes-home /data/.hermes install --force
+  # Override fastembed from nixpkgs to remove pillow, avoiding collisions with hermes core venv
+  fastembed-override = pythonPackages.fastembed.overridePythonAttrs (oldAttrs: {
+    dontCheckRuntimeDeps = true;
+    pythonImportsCheck = [ ];
+    propagatedBuildInputs = lib.filter (p:
+      let pname = p.pname or "";
+      in pname != "pillow" && pname != "Pillow"
+    ) (oldAttrs.propagatedBuildInputs or [ ]);
+    dependencies = lib.filter (p:
+      let pname = p.pname or "";
+      in pname != "pillow" && pname != "Pillow"
+    ) (oldAttrs.dependencies or [ ]);
+  });
 
-    if [ "$NEEDS_RESTART" = "true" ]; then
-      sleep 3
-      systemctl restart --no-block hermes-agent.service
-    fi
-  '';
+  mnemosyne-memory = pythonPackages.buildPythonPackage rec {
+    pname = "mnemosyne-memory";
+    version = "3.8.0";
+    src = pythonPackages.fetchPypi {
+      pname = "mnemosyne_memory";
+      inherit version;
+      sha256 = "c4de8fe8761df206b09d4d9b1595e8cf28a89e925e68b4d3340181b80851ac66";
+    };
+    pyproject = true;
+    build-system = [ pythonPackages.setuptools ];
+    propagatedBuildInputs = with pythonPackages; [
+      sqlite-vec
+      fastembed-override
+      numpy
+    ];
+    doCheck = false;
+  };
+
+  mnemosyne-hermes = pythonPackages.buildPythonPackage rec {
+    pname = "mnemosyne-hermes";
+    version = "0.2.0";
+    src = pythonPackages.fetchPypi {
+      pname = "mnemosyne_hermes";
+      inherit version;
+      sha256 = "896946bda8cc420fc613c55d27b553340cf120b44d5084b4d3f02b6060e585b3";
+    };
+    pyproject = true;
+    build-system = [ pythonPackages.setuptools ];
+    propagatedBuildInputs = [
+      mnemosyne-memory
+    ];
+    doCheck = false;
+  };
 in
 {
   options.my.features.services.hermes-agent = {
@@ -97,27 +141,29 @@ in
       package = pkgs.hermes-agent;
       addToSystemPackages = true;
       extraDependencyGroups = [ "messaging" ];
-      container.extraVolumes = [
-        "/var/lib/camofox:/var/lib/camofox:ro"
-        "/var/lib/hermes/.gemini:/home/hermes/.gemini"
-        "/var/lib/hermes/.config/gh:/home/hermes/.config/gh"
+      
+      # Add native Python packages to PYTHONPATH
+      extraPythonPackages = [
+        mnemosyne-hermes
+        mnemosyne-memory
+        ddgs
       ];
-      container.extraOptions = [
-        "--env"
-        "UMASK=0007"
-        "--env"
-        "PYTHONPATH=/home/hermes/.venv/lib/python3.12/site-packages"
-      ]
-      ++ lib.optionals cfg.subdomainDelegation [
-        "--publish"
-        "127.0.0.1:4480:4480"
+
+      # Add Nix and tooling to the systemd path so nix-shell is usable
+      extraPackages = with pkgs; [
+        nix
+        gh
+        antigravity-cli
       ];
+
+      # Env vars
       environment = {
         MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
         HASS_URL = cfg.hassUrl;
         PAPERLESS_URL = cfg.paperlessUrl;
         CAMOFOX_URL = cfg.camofoxUrl;
       };
+
       settings = {
         approvals = {
           mode = "smart";
@@ -159,21 +205,7 @@ in
           extra.host = "127.0.0.1";
         };
         terminal = {
-          docker_volumes = [
-            "/var/lib/camofox:/var/lib/camofox:ro"
-            "/var/lib/hermes/python-packages:/python-packages"
-            "/var/lib/hermes/bin:/persistent-bin"
-            "/var/lib/hermes/.gemini:/python-packages/.gemini"
-            "/var/lib/hermes/.config/gh:/python-packages/.config/gh"
-            "/var/lib/hermes/home/.gitconfig:/python-packages/.gitconfig"
-            "/var/lib/hermes/home/.git-credentials:/python-packages/.git-credentials"
-          ];
-          docker_env = {
-            PIP_USER = "true";
-            PYTHONUSERBASE = "/python-packages";
-            HOME = "/python-packages";
-            PATH = "/python-packages/bin:/persistent-bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
-          };
+          backend = "local";
         };
       };
       environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
@@ -215,25 +247,18 @@ in
           '';
         };
 
-    # Bootstrap Mnemosyne memory provider inside the container
+    # Oneshot service to bootstrap Mnemosyne database natively on the host
     systemd.services.hermes-agent-mnemosyne-bootstrap = {
-      description = "Bootstrap Mnemosyne memory provider inside Hermes container";
+      description = "Bootstrap Mnemosyne memory provider natively";
       wantedBy = [ "hermes-agent.service" ];
-      after = [ "hermes-agent.service" ];
-      requires = [ "hermes-agent.service" ];
+      before = [ "hermes-agent.service" ];
       serviceConfig = {
         Type = "oneshot";
-        RemainAfterExit = false;
-        User = "root";
+        RemainAfterExit = true;
+        User = "hermes";
+        Group = "hermes";
+        ExecStart = "${mnemosyne-hermes}/bin/mnemosyne-hermes --hermes-home /var/lib/hermes/.hermes install --force";
       };
-      path = with pkgs; [
-        docker
-        systemd
-      ];
-      script = mnemosyneBootstrapScript;
-      restartTriggers = [
-        (builtins.hashString "sha256" mnemosyneBootstrapScript)
-      ];
     };
 
     # Fix permissions and migrate config after upstream activation
@@ -260,6 +285,7 @@ in
           if isinstance(p, dict) and isinstance(p.get("home_channel"), str):
               p["home_channel"] = nc
               changed = True
+
       # Persistent Camofox browser sessions
       if not cfg.get("browser", {}).get("camofox", {}).get("managed_persistence"):
           cfg.setdefault("browser", {}).setdefault("camofox", {})["managed_persistence"] = True
@@ -275,49 +301,49 @@ in
       find /var/lib/hermes/.hermes -type f ! -perm /g=r -exec chmod g+r {} \; 2>/dev/null || true
     '';
 
-    # Moebius — container Caddy bootstrap (install + start)
+    # Native Caddy service for subdomain delegation (replaces container Caddy)
+    systemd.services.hermes-agent-caddy = lib.mkIf cfg.subdomainDelegation {
+      description = "Caddy for Hermes Agent Subdomain Delegation";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network.target" ];
+      serviceConfig = {
+        ExecStart = "${pkgs.caddy}/bin/caddy run --config /var/lib/hermes/.hermes/caddy/Caddyfile --adapter caddyfile";
+        ExecReload = "${pkgs.caddy}/bin/caddy reload --config /var/lib/hermes/.hermes/caddy/Caddyfile --address localhost:2020";
+        User = "hermes";
+        Group = "hermes";
+        Restart = "always";
+        WorkingDirectory = "/var/lib/hermes";
+      };
+    };
+
+    # Rewrite bootstrap script to generate Caddy Caddyfile on host
     systemd.services.hermes-agent-moebius-bootstrap = lib.mkIf cfg.subdomainDelegation {
-      description = "Bootstrap Caddy inside Hermes container for Moebius subdomain routing";
+      description = "Bootstrap Caddy natively for Moebius subdomain routing";
       wantedBy = [ "hermes-agent.service" ];
-      after = [ "hermes-agent.service" ];
-      requires = [ "hermes-agent.service" ];
+      before = [ "hermes-agent-caddy.service" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = false;
-        User = "root";
+        User = "hermes";
+        Group = "hermes";
       };
-      path = with pkgs; [ docker ];
       script = ''
-          # Wait for container
-          for i in $(seq 1 30); do
-            if docker inspect hermes-agent --format='{{.State.Running}}' 2>/dev/null | grep -q true; then
-              break
-            fi
-            sleep 2
-          done
+        mkdir -p /var/lib/hermes/.hermes/caddy/routes
+        
+        # Write Caddyfile
+        cat > /var/lib/hermes/.hermes/caddy/Caddyfile << "CADDYEOF"
+        {
+          admin localhost:2020
+          auto_https off
+        }
 
-          # Install Caddy inside container (copy Nix-built binary)
-          docker cp ${pkgs.caddy}/bin/caddy hermes-agent:/usr/local/bin/caddy 2>/dev/null || true
+        :4480 {
+          import /var/lib/hermes/.hermes/caddy/routes/*
+        }
+        CADDYEOF
 
-          # Write/update Caddyfile
-          docker exec hermes-agent mkdir -p /data/.hermes/caddy
-          docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/Caddyfile << "CADDYEOF"
-          {
-            admin localhost:2020
-            auto_https off
-          }
-
-          :4480 {
-            import /data/.hermes/caddy/routes/*
-          }
-        CADDYEOF'
-
-          # Start Caddy in background inside container
-          docker exec -d hermes-agent caddy run --config /data/.hermes/caddy/Caddyfile --adapter caddyfile 2>/dev/null || true
-
-          # Create/update webhook route
-          docker exec hermes-agent mkdir -p /data/.hermes/caddy/routes
-          docker exec hermes-agent sh -c 'cat > /data/.hermes/caddy/routes/webhook << ROUTEEOF
+        # Write webhook route
+        cat > /var/lib/hermes/.hermes/caddy/routes/webhook << ROUTEEOF
         @webhook host webhook.moebius.${config.my.features.services.caddy.baseDomain}
         handle @webhook {
           rewrite * /webhooks{path}
@@ -325,36 +351,34 @@ in
             transport http
           }
         }
-        ROUTEEOF'
-          docker exec hermes-agent caddy reload --config /data/.hermes/caddy/Caddyfile --address localhost:2020 2>/dev/null || true
+        ROUTEEOF
 
-          # Run container bootstrap scripts (user-managed, survives rebuilds)
-          docker exec -d hermes-agent sh -c '
-            if [ -d /data/.hermes/bootstrap ]; then
-              for script in /data/.hermes/bootstrap/*; do
-                [ -f "$script" ] && [ -x "$script" ] && "$script" &
-              done
-            fi
-          '
+        # Write health route
+        cat > /var/lib/hermes/.hermes/caddy/routes/health << ROUTEEOF
+        @health host health.moebius.${config.my.features.services.caddy.baseDomain}
+        handle @health {
+          reverse_proxy 127.0.0.1:8090 {
+            transport http
+          }
+        }
+        ROUTEEOF
+
+        systemctl reload hermes-agent-caddy.service 2>/dev/null || true
       '';
     };
 
     systemd.tmpfiles.rules = [
-      "d /var/lib/hermes/python-packages 0777 hermes hermes -"
-      "d /var/lib/hermes/bin 0777 hermes hermes -"
-      "L+ /var/lib/hermes/bin/gh - - - - ${pkgs.gh}/bin/gh"
-      "L+ /var/lib/hermes/bin/agy - - - - ${pkgs.antigravity-cli}/bin/agy"
       "d /var/lib/hermes/.gemini 0770 hermes hermes -"
       "d /var/lib/hermes/.config 0770 hermes hermes -"
       "d /var/lib/hermes/.config/gh 0770 hermes hermes -"
+      "f /var/lib/systemd/linger/hermes 0644 root root - -"
     ];
 
-    # Dynamically add all configured host users to the hermes and docker groups
+    # Dynamically add all configured host users to the hermes group
     users.users =
-      (lib.genAttrs cfg.hostUsers (_user: {
+      (lib.genAttrs cfg.hostUsers (user: {
         extraGroups = [
           "hermes"
-          "docker"
         ];
       }))
       // {

@@ -231,6 +231,26 @@
         "type": "github"
       }
     },
+    "hermes-webui": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1784388935,
+        "narHash": "sha256-KpYkkukROM63O9OydSpTrEOgCPrXSLuGft2v/WeGtHg=",
+        "owner": "nesquena",
+        "repo": "hermes-webui",
+        "rev": "0a31a4a1e2a0977d55673b91ca15eea73d2e06c9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nesquena",
+        "repo": "hermes-webui",
+        "type": "github"
+      }
+    },
     "home-manager-unstable": {
       "inputs": {
         "nixpkgs": [
@@ -549,6 +569,7 @@
         "deploy-rs": "deploy-rs",
         "disko": "disko",
         "hermes-agent": "hermes-agent",
+        "hermes-webui": "hermes-webui",
         "home-manager-unstable": "home-manager-unstable",
         "niri": "niri",
         "nix-vscode-extensions": "nix-vscode-extensions",

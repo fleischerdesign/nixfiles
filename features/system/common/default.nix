@@ -36,6 +36,12 @@ in
         "flakes"
       ];
 
+      trusted-users = [
+        "root"
+        "@wheel"
+        "hermes"
+      ];
+
       substituters = [ "https://cache.rls.ancoris.ovh/nixfiles" ];
       trusted-public-keys = [ "nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE=" ];
     };
