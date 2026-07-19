@@ -9,27 +9,7 @@
 let
   cfg = config.my.features.services.hermes-agent;
 
-  # Define custom Python packages since they are not in nixpkgs
   pythonPackages = pkgs.python312Packages;
-
-  ddgs = pythonPackages.buildPythonPackage rec {
-    pname = "ddgs";
-    version = "9.14.4";
-    src = pythonPackages.fetchPypi {
-      inherit pname version;
-      sha256 = "f7b118a2b709a9e9c04a1dca6e96b98c25d4dfaca1a4b0a244d74454fcca48ef";
-    };
-    pyproject = true;
-    build-system = [ pythonPackages.setuptools ];
-    propagatedBuildInputs = with pythonPackages; [
-      click
-      primp
-      lxml
-      httpx
-      fake-useragent
-    ];
-    doCheck = false;
-  };
 
   # Override fastembed from nixpkgs to remove pillow, avoiding collisions with hermes core venv
   fastembed-override = pythonPackages.fastembed.overridePythonAttrs (oldAttrs: {
@@ -51,38 +31,9 @@ let
     ) (oldAttrs.dependencies or [ ]);
   });
 
-  mnemosyne-memory = pythonPackages.buildPythonPackage rec {
-    pname = "mnemosyne-memory";
-    version = "3.8.0";
-    src = pythonPackages.fetchPypi {
-      pname = "mnemosyne_memory";
-      inherit version;
-      sha256 = "c4de8fe8761df206b09d4d9b1595e8cf28a89e925e68b4d3340181b80851ac66";
-    };
-    pyproject = true;
-    build-system = [ pythonPackages.setuptools ];
-    propagatedBuildInputs = with pythonPackages; [
-      sqlite-vec
-      fastembed-override
-      numpy
-    ];
-    doCheck = false;
-  };
-
-  mnemosyne-hermes = pythonPackages.buildPythonPackage rec {
-    pname = "mnemosyne-hermes";
-    version = "0.2.0";
-    src = pythonPackages.fetchPypi {
-      pname = "mnemosyne_hermes";
-      inherit version;
-      sha256 = "896946bda8cc420fc613c55d27b553340cf120b44d5084b4d3f02b6060e585b3";
-    };
-    pyproject = true;
-    build-system = [ pythonPackages.setuptools ];
-    propagatedBuildInputs = [
-      mnemosyne-memory
-    ];
-    doCheck = false;
+  hermesPkgs = import ./python-packages.nix {
+    inherit pkgs;
+    fastembed-override = fastembed-override;
   };
 in
 {
@@ -150,9 +101,9 @@ in
 
       # Add native Python packages to PYTHONPATH
       extraPythonPackages = [
-        mnemosyne-hermes
-        mnemosyne-memory
-        ddgs
+        hermesPkgs.mnemosyne-hermes
+        hermesPkgs.mnemosyne-memory
+        hermesPkgs.ddgs
       ];
 
       # Add Nix and tooling to the systemd path so nix-shell is usable
@@ -263,7 +214,7 @@ in
         RemainAfterExit = true;
         User = "hermes";
         Group = "hermes";
-        ExecStart = "${mnemosyne-hermes}/bin/mnemosyne-hermes --hermes-home /var/lib/hermes/.hermes install --force";
+        ExecStart = "${hermesPkgs.mnemosyne-hermes}/bin/mnemosyne-hermes --hermes-home /var/lib/hermes/.hermes install --force";
       };
     };
 

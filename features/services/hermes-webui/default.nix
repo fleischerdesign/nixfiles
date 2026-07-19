@@ -8,6 +8,7 @@
 }:
 let
   cfg = config.my.features.services.hermes-webui;
+  hermesPkgs = import ../hermes-agent/python-packages.nix { inherit pkgs; };
 in
 {
   options.my.features.services.hermes-webui = {
@@ -101,6 +102,9 @@ in
         PAPERLESS_URL = config.my.features.services.hermes-agent.paperlessUrl;
         CAMOFOX_URL = config.my.features.services.hermes-agent.camofoxUrl;
         MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
+        PYTHONPATH = lib.mkBefore (
+          "${hermesPkgs.mnemosyne-hermes}/${pkgs.python3.sitePackages}:${hermesPkgs.mnemosyne-memory}/${pkgs.python3.sitePackages}"
+        );
       };
     };
 
