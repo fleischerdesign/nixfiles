@@ -9,20 +9,14 @@
 
   networking.hostName = "rollins";
 
-  my.features.services.caddy.enable = true;
   my.features.services.caddy.baseDomain = "rls.ancoris.ovh";
 
-  my.features.system.networking.tailscale.enable = true;
   my.features.system.networking.tailscale.acceptRoutes = true;
 
-  my.features.system.networking.static.enable = true;
-
-  my.features.services.monitoring.node-exporter.enable = true;
   my.features.services.monitoring.alloy = {
     enable = true;
     lokiHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
   };
-  my.features.services.monitoring.blackbox-exporter.enable = true;
 
   my.features.services.attic.server.enable = true;
 
@@ -34,8 +28,6 @@
       ".*moebius.*"
     ];
   };
-
-  my.features.dev.nixvim.enable = true;
 
   my.features.services.hermes-agent.enable = true;
   my.features.services.hermes-agent.hostUsers = [ "philipp" ];

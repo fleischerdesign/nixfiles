@@ -10,16 +10,11 @@
   networking.hostName = "mackaye";
 
   # Features
-  my.features.services.caddy.enable = true;
   my.features.services.caddy.baseDomain = "mky.ancoris.ovh";
 
-  my.features.system.networking.tailscale.enable = true;
   my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.common.geoip.enable = true;
 
-  my.features.system.networking.static.enable = true;
-
-  my.features.services.monitoring.node-exporter.enable = true;
   my.features.services.monitoring.alloy = {
     enable = true;
     lokiHost = "127.0.0.1";
@@ -27,8 +22,6 @@
   my.features.services.monitoring.prometheus.enable = true;
   my.features.services.monitoring.loki.enable = true;
   my.features.services.monitoring.grafana.enable = true;
-  my.features.services.monitoring.blackbox-exporter.enable = true;
-
   my.features.services.crowdsec.enable = true;
   my.features.services.crowdsec.role = "master";
 
@@ -49,8 +42,6 @@
     enable = true;
     environmentFile = "restic_env_mackaye";
   };
-
-  my.features.dev.nixvim.enable = true;
 
   system.stateVersion = "24.11";
 }

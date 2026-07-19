@@ -16,7 +16,6 @@
     features = {
       services = {
         caddy = {
-          enable = true;
           baseDomain = "fls.ancoris.ovh";
         };
         home-assistant.enable = true;
@@ -46,12 +45,10 @@
           coreAddress = "http://${config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp}:9055";
           tokenSecretName = "authentik_outpost_ldap_token_strummer";
         };
-        monitoring.node-exporter.enable = true;
         monitoring.alloy = {
           enable = true;
           lokiHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
         };
-        monitoring.blackbox-exporter.enable = true;
         crowdsec = {
           enable = true;
           role = "agent";
@@ -59,7 +56,6 @@
       };
       system = {
         networking.tailscale = {
-          enable = true;
           subnetRouter = {
             enable = true;
             routes = [ "192.168.178.0/24" ];
@@ -81,7 +77,6 @@
         };
       };
       dev = {
-        nixvim.enable = true;
         containers = {
           enable = true;
           users = [ "philipp" ];

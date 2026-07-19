@@ -20,6 +20,17 @@
     printing.enable = lib.mkDefault true;
   };
 
+  my.features.dev = {
+    containers.enable = lib.mkDefault true;
+    codium.enable = lib.mkDefault true;
+    nixvim.enable = lib.mkDefault true;
+  };
+
+  my.features.media = {
+    gaming.enable = lib.mkDefault true;
+    spotify.enable = lib.mkDefault true;
+  };
+
   services.xserver.xkb.layout = lib.mkDefault "de";
 
   environment.systemPackages = [
