@@ -32,8 +32,7 @@ let
   });
 
   hermesPkgs = import ./python-packages.nix {
-    inherit pkgs;
-    fastembed-override = fastembed-override;
+    inherit pkgs fastembed-override;
   };
 in
 {

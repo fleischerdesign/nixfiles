@@ -102,9 +102,7 @@ in
         PAPERLESS_URL = config.my.features.services.hermes-agent.paperlessUrl;
         CAMOFOX_URL = config.my.features.services.hermes-agent.camofoxUrl;
         MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
-        PYTHONPATH = lib.mkBefore (
-          "${hermesPkgs.mnemosyne-hermes}/${pkgs.python312.sitePackages}:${hermesPkgs.mnemosyne-memory}/${pkgs.python312.sitePackages}"
-        );
+        PYTHONPATH = lib.mkBefore "${hermesPkgs.mnemosyne-hermes}/${pkgs.python312.sitePackages}:${hermesPkgs.mnemosyne-memory}/${pkgs.python312.sitePackages}";
       };
     };
 
