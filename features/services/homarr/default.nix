@@ -88,7 +88,10 @@ in
     my.endpoints.homarr = {
       host = config.networking.hostName;
       port = 7575;
-      fullDomain = cfg.domain;
+      proxy = {
+        enable = true;
+        inherit (cfg) domain;
+      };
     };
   };
 }

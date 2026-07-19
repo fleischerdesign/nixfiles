@@ -60,7 +60,10 @@ in
     my.endpoints.vaultwarden = {
       host = config.networking.hostName;
       port = 8082;
-      fullDomain = cfg.domain;
+      proxy = {
+        enable = true;
+        inherit (cfg) domain;
+      };
     };
 
     # Secrets

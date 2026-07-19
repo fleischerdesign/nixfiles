@@ -65,7 +65,10 @@ in
     my.endpoints.couchdb = {
       host = config.networking.hostName;
       port = 5984;
-      fullDomain = cfg.domain;
+      proxy = {
+        enable = true;
+        inherit (cfg) domain;
+      };
     };
   };
 }

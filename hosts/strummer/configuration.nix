@@ -90,44 +90,72 @@
     };
 
     endpoints = {
-      home-assistant.subdomain = "hass";
-      esphome = {
+      home-assistant.proxy.subdomain = "hass";
+      home-assistant.proxy.enable = true;
+      home-assistant.directAccess.enable = true;
+
+      esphome.proxy = {
+        enable = true;
         subdomain = "esphome";
         auth = true;
       };
-      mealie.subdomain = "mealie";
-      paperless.subdomain = "paperless";
-      prowlarr = {
+
+      mealie.proxy.subdomain = "mealie";
+      mealie.proxy.enable = true;
+
+      paperless.proxy.subdomain = "paperless";
+      paperless.proxy.enable = true;
+
+      prowlarr.proxy = {
+        enable = true;
         subdomain = "prowlarr";
         auth = true;
       };
-      radarr = {
+
+      radarr.proxy = {
+        enable = true;
         subdomain = "radarr";
         auth = true;
       };
-      sabnzbd = {
+
+      sabnzbd.proxy = {
+        enable = true;
         subdomain = "sabnzbd";
         auth = true;
       };
-      sonarr = {
+
+      sonarr.proxy = {
+        enable = true;
         subdomain = "sonarr";
         auth = true;
       };
-      jellyfin.subdomain = "jellyfin";
-      bazarr = {
+
+      jellyfin.proxy.subdomain = "jellyfin";
+      jellyfin.proxy.enable = true;
+
+      bazarr.proxy = {
+        enable = true;
         subdomain = "bazarr";
         auth = true;
       };
-      jellyseerr.subdomain = "seerr";
-      mainsail = {
+
+      jellyseerr.proxy.subdomain = "seerr";
+      jellyseerr.proxy.enable = true;
+
+      mainsail.proxy = {
+        enable = true;
         subdomain = "mainsail";
         auth = true;
       };
-      moonraker = {
+
+      moonraker.proxy = {
+        enable = true;
         subdomain = "moonraker";
         auth = true;
       };
-      mainsail-cam.subdomain = "cam.moonraker";
+
+      mainsail-cam.proxy.subdomain = "cam.moonraker";
+      mainsail-cam.proxy.enable = true;
     };
   };
 

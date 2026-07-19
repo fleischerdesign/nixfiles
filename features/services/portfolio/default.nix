@@ -80,7 +80,10 @@ in
     my.endpoints.portfolio = {
       host = config.networking.hostName;
       port = 3005;
-      fullDomain = "fleischer.design";
+      proxy = {
+        enable = true;
+        domain = "fleischer.design";
+      };
     };
 
     # Secrets

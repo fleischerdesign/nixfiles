@@ -291,7 +291,10 @@ in
     my.endpoints.mail = {
       host = config.networking.hostName;
       port = 9081;
-      fullDomain = cfg.domain;
+      proxy = {
+        enable = true;
+        inherit (cfg) domain;
+      };
     };
 
     systemd.tmpfiles.rules = [

@@ -84,12 +84,9 @@ in
         HERMES_WEBUI_OIDC_REDIRECT_URI =
           let
             ep = config.my.endpoints.hermes-webui or { };
-            baseDomain = config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh";
             domain =
-              if ep ? fullDomain && ep.fullDomain != null then
-                ep.fullDomain
-              else if ep ? subdomain && ep.subdomain != null then
-                "${ep.subdomain}.${baseDomain}"
+              if ep ? proxy && ep.proxy.subdomain != null then
+                "${ep.proxy.subdomain}.${ep.proxy.domain}"
               else
                 null;
           in

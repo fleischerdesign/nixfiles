@@ -105,7 +105,10 @@ in
     my.endpoints.authentik = {
       host = config.networking.hostName;
       port = 9055;
-      fullDomain = cfg.domain;
+      proxy = {
+        enable = true;
+        inherit (cfg) domain;
+      };
       monitoring = {
         scrape.enable = true;
         scrape.port = 9300;

@@ -93,8 +93,8 @@ in
           port = 8080;
           host = "0.0.0.0";
           host_whitelist = "${
-            if config.my.endpoints.sabnzbd.subdomain != null then
-              "${config.my.endpoints.sabnzbd.subdomain}.${config.my.features.services.caddy.baseDomain}, "
+            if config.my.endpoints.sabnzbd.proxy.subdomain != null then
+              "${config.my.endpoints.sabnzbd.proxy.subdomain}.${config.my.endpoints.sabnzbd.proxy.domain}, "
             else
               ""
           }localhost, 127.0.0.1";

@@ -98,8 +98,7 @@ in
       };
     };
 
-    # Open firewall port
-    networking.firewall.allowedTCPPorts = [ 8123 ];
+    # Firewall port is auto-managed via endpoints.directAccess.enable
 
     # Allow Home Assistant to access Zigbee USB sticks
     users.users.hass = {

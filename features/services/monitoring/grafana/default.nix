@@ -298,7 +298,10 @@ in
     my.endpoints.grafana = {
       host = config.networking.hostName;
       port = 3000;
-      subdomain = "grafana";
+      proxy = {
+        enable = true;
+        subdomain = "grafana";
+      };
     };
   };
 }

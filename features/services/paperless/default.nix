@@ -82,9 +82,9 @@ in
         PAPERLESS_DBUSER = "paperless";
         PAPERLESS_URL =
           let
-            d = config.my.endpoints.paperless.subdomain;
+            d = config.my.endpoints.paperless.proxy.subdomain;
           in
-          lib.mkIf (d != null) "https://${d}.${config.my.features.services.caddy.baseDomain}";
+          lib.mkIf (d != null) "https://${d}.${config.my.endpoints.paperless.proxy.domain}";
         PAPERLESS_TIME_ZONE = "Europe/Berlin";
         PAPERLESS_OCR_LANGUAGE = "deu+eng";
 

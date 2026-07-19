@@ -58,8 +58,11 @@
   };
 
   my.endpoints.hermes-webui = {
-    subdomain = "moebius";
-    auth = false;
+    proxy = {
+      enable = true;
+      subdomain = "moebius";
+      auth = false;
+    };
   };
 
   my.features.services.camofox.enable = true;

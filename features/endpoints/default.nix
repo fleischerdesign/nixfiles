@@ -1,4 +1,5 @@
 {
+  config,
   lib,
   ...
 }:
@@ -17,29 +18,43 @@
             description = "Internal port the service listens on";
           };
 
-          subdomain = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "Subdomain for Caddy reverse proxy (null = no HTTP exposure)";
-          };
-
-          fullDomain = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "Full domain override (bypasses subdomain + baseDomain resolution)";
-          };
-
-          auth = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            description = "Protect with Authentik forward-auth";
-          };
-
-          caddy = {
+          proxy = {
             enable = lib.mkOption {
               type = lib.types.bool;
-              default = true;
-              description = "Let the Caddy feature manage this service's reverse proxy (set false if service handles Caddy itself)";
+              default = false;
+              description = "Expose this service through the Caddy reverse proxy";
+            };
+
+            subdomain = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Subdomain for reverse proxy (null = no subdomain)";
+            };
+
+            domain = lib.mkOption {
+              type = lib.types.str;
+              default = config.my.features.services.caddy.baseDomain or "";
+              description = "Domain for reverse proxy (defaults to caddy.baseDomain if set)";
+            };
+
+            auth = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Protect with Authentik forward-auth";
+            };
+
+            websocket = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Enable WebSocket passthrough in reverse proxy";
+            };
+          };
+
+          directAccess = {
+            enable = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Open this port directly in the firewall (e.g. for native apps, APIs outside Caddy)";
             };
           };
 
@@ -95,6 +110,6 @@
     );
 
     default = { };
-    description = "Central service endpoints — single source of truth for Caddy, monitoring, and future consumers";
+    description = "Central service endpoints — single source of truth for Caddy, firewall, monitoring, and future consumers";
   };
 }

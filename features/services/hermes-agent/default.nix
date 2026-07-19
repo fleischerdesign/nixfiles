@@ -56,8 +56,10 @@ in
     hassUrl = lib.mkOption {
       type = lib.types.str;
       default =
-        if config.my.endpoints ? home-assistant && config.my.endpoints.home-assistant.subdomain != null then
-          "https://${config.my.endpoints.home-assistant.subdomain}.${
+        if
+          config.my.endpoints ? home-assistant && config.my.endpoints.home-assistant.proxy.subdomain != null
+        then
+          "https://${config.my.endpoints.home-assistant.proxy.subdomain}.${
             config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh"
           }"
         else
@@ -67,8 +69,8 @@ in
     paperlessUrl = lib.mkOption {
       type = lib.types.str;
       default =
-        if config.my.endpoints ? paperless && config.my.endpoints.paperless.subdomain != null then
-          "https://${config.my.endpoints.paperless.subdomain}.${
+        if config.my.endpoints ? paperless && config.my.endpoints.paperless.proxy.subdomain != null then
+          "https://${config.my.endpoints.paperless.proxy.subdomain}.${
             config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh"
           }"
         else

@@ -64,7 +64,10 @@ in
     my.endpoints.linkwarden = {
       host = config.networking.hostName;
       port = 3010;
-      fullDomain = cfg.domain;
+      proxy = {
+        enable = true;
+        inherit (cfg) domain;
+      };
     };
 
     # Secrets

@@ -55,9 +55,9 @@ in
         TZ = "Europe/Berlin";
         BASE_URL =
           let
-            d = config.my.endpoints.mealie.subdomain;
+            d = config.my.endpoints.mealie.proxy.subdomain;
           in
-          lib.mkIf (d != null) "https://${d}.${config.my.features.services.caddy.baseDomain}";
+          lib.mkIf (d != null) "https://${d}.${config.my.endpoints.mealie.proxy.domain}";
 
         # SMTP Configuration
         SMTP_HOST = "mail.smtp2go.com";

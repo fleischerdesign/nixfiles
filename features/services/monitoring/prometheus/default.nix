@@ -12,13 +12,13 @@ let
 
   resolveDomain =
     svc:
-    if svc.fullDomain != null then
-      svc.fullDomain
-    else if svc.subdomain != null then
+    if svc.proxy.domain != null then
+      svc.proxy.domain
+    else if svc.proxy.subdomain != null then
       let
         hostDomain = hosts.${svc.host}.domain or svc.host;
       in
-      "${svc.subdomain}.${hostDomain}"
+      "${svc.proxy.subdomain}.${hostDomain}"
     else
       null;
 

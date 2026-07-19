@@ -42,32 +42,41 @@ in
           localServices = lib.filterAttrs (
             _: svc:
             svc.host == config.networking.hostName
-            && svc.caddy.enable
-            && (svc.subdomain != null || svc.fullDomain != null)
+            && svc.proxy.enable
+            && (svc.proxy.subdomain != null || svc.proxy.domain != null)
           ) config.my.endpoints;
 
-          mkVHost = _name: conf: {
-            name = if conf.fullDomain != null then conf.fullDomain else "${conf.subdomain}.${cfg.baseDomain}";
-            value = {
-              extraConfig =
-                if conf.auth then
-                  ''
-                    import authentik
-                    handle {
-                      forward_auth ${cfg.authentikOutpostAddress} {
-                        uri /outpost.goauthentik.io/auth/caddy
-                        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
-                        trusted_proxies private_ranges
-                      }
-                      reverse_proxy 127.0.0.1:${toString conf.port}
-                    }
-                  ''
+          mkVHost =
+            _name: conf:
+            let
+              name =
+                if conf.proxy.subdomain != null then
+                  "${conf.proxy.subdomain}.${conf.proxy.domain}"
                 else
-                  ''
-                    reverse_proxy 127.0.0.1:${toString conf.port}
-                  '';
+                  conf.proxy.domain;
+            in
+            {
+              inherit name;
+              value = {
+                extraConfig =
+                  if conf.proxy.auth then
+                    ''
+                      import authentik
+                      handle {
+                        forward_auth ${cfg.authentikOutpostAddress} {
+                          uri /outpost.goauthentik.io/auth/caddy
+                          copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
+                          trusted_proxies private_ranges
+                        }
+                        reverse_proxy 127.0.0.1:${toString conf.port}
+                      }
+                    ''
+                  else
+                    ''
+                      reverse_proxy 127.0.0.1:${toString conf.port}
+                    '';
+              };
             };
-          };
         in
         lib.listToAttrs (lib.mapAttrsToList mkVHost localServices);
     };
