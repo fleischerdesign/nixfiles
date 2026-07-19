@@ -28,301 +28,307 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    services.stalwart = {
-      enable = true;
-      openFirewall = true;
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (features.requires [ "services.postgresql" "services.redis" ] config)
 
-      settings = {
-        server.hostname = cfg.domain;
-
-        # Force local configuration for managed sections
-        config.local-keys = [
-          "store.*"
-          "storage.*"
-          "directory.authentik.*"
-          "server.*"
-          "session.*"
-          "remote.*"
-          "authentication.fallback-admin.*"
-          "certificate.default.*"
-          "lookup.*"
-          "spam.*"
-          "mta.*"
-          "queue.strategy.*"
-          "queue.route.*"
-          "tracer.*"
-          "tracing.*"
-          "metrics.*"
-        ];
-
-        certificate."default" = {
-          cert = "%{file:${certDir}/mail.crt}%";
-          private-key = "%{file:${certDir}/mail.key}%";
-          default = true;
-        };
-
-        server.tls = {
-          certificate = "default";
+      {
+        services.stalwart = {
           enable = true;
-        };
+          openFirewall = true;
 
-        lookup.default = {
-          hostname = cfg.domain;
-          domain = cfg.baseDomain;
-        };
+          settings = {
+            server.hostname = cfg.domain;
 
-        # 1. PostgreSQL Store via TCP
-        store."db" = {
-          type = "postgresql";
-          host = "127.0.0.1";
-          port = 5432;
-          database = "stalwart";
-          user = "stalwart";
-          password = "%{file:/run/credentials/stalwart.service/db_password}%";
-          tls.enable = false;
-          pool.max-connections = 10;
-        };
-
-        # 2. Redis Store
-        store."redis" = {
-          type = "redis";
-          redis-type = "single";
-          urls = [ "redis://127.0.0.1:6379" ];
-        };
-
-        # 3. RocksDB Store for Telemetry
-        store."rocksdb" = {
-          type = "rocksdb";
-          path = "/var/lib/stalwart-mail/rocksdb";
-        };
-
-        # Storage Assignments
-        storage.data = "db";
-        storage.lookup = "db";
-        storage.fts = "db";
-        storage.blob = "db";
-        storage.directory = "authentik";
-        storage.tracer = "rocksdb";
-        storage.history = "rocksdb";
-
-        # Telemetry Configuration
-        tracing.history = {
-          enable = true;
-          store = "rocksdb";
-          retention = "7d";
-        };
-
-        metrics.history = {
-          enable = true;
-          store = "rocksdb";
-          retention = "30d";
-        };
-
-        metrics.prometheus = {
-          enable = true;
-        };
-
-        tracer.log = {
-          type = "log";
-          level = "info";
-          path = "/var/lib/stalwart-mail/logs";
-          prefix = "stalwart.log";
-          enable = true;
-        };
-
-        # Routing Strategy
-        queue.strategy.route = [
-          {
-            "if" = "is_local_domain('', rcpt_domain)";
-            "then" = "'local'";
-          }
-          { "else" = "'brevo'"; }
-        ];
-
-        queue.route."local" = {
-          type = "local";
-        };
-
-        queue.route."brevo" = {
-          type = "relay";
-          address = "smtp-relay.brevo.com";
-          port = 587;
-          protocol = "smtp";
-          tls.implicit = false;
-          auth = {
-            username = "%{file:/run/credentials/stalwart.service/brevo_user}%";
-            secret = "%{file:/run/credentials/stalwart.service/brevo_secret}%";
-          };
-        };
-        # LDAP Directory Configuration with CamelCase attributes
-        directory."authentik" = {
-          type = "ldap";
-          url = "ldap://127.0.0.1:3389";
-          base-dn = "dc=ldap,dc=goauthentik,dc=io";
-          bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
-          bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
-          bind.auth.method = "lookup";
-
-          # Use CamelCase attributes to avoid Stalwart filter parser bugs
-          filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
-          filter.email = "(&(objectClass=inetOrgPerson)(|(stalwartMail=?)(stalwartAliases=?)))";
-
-          attributes = {
-            name = "cn";
-            email = "stalwartMail";
-            email-alias = "stalwartAliases";
-            groups = "memberOf";
-            secret-changed = "pwdChangedTime";
-          };
-        };
-
-        # MTA Signing
-        mta.sign.dkim = {
-          enable = false;
-          # selector = "202602r";
-        };
-
-        # Listeners
-        server.listener.management = {
-          bind = [ "127.0.0.1:9081" ];
-          protocol = "http";
-          oidc = {
-            issuer = cfg.ssoAuthority;
-            client-id = "%{file:${config.sops.secrets.stalwart_oidc_id.path}}%";
-            client-secret = "%{file:${config.sops.secrets.stalwart_oidc_secret.path}}%";
-            scopes = [
-              "openid"
-              "profile"
-              "email"
+            # Force local configuration for managed sections
+            config.local-keys = [
+              "store.*"
+              "storage.*"
+              "directory.authentik.*"
+              "server.*"
+              "session.*"
+              "remote.*"
+              "authentication.fallback-admin.*"
+              "certificate.default.*"
+              "lookup.*"
+              "spam.*"
+              "mta.*"
+              "queue.strategy.*"
+              "queue.route.*"
+              "tracer.*"
+              "tracing.*"
+              "metrics.*"
             ];
+
+            certificate."default" = {
+              cert = "%{file:${certDir}/mail.crt}%";
+              private-key = "%{file:${certDir}/mail.key}%";
+              default = true;
+            };
+
+            server.tls = {
+              certificate = "default";
+              enable = true;
+            };
+
+            lookup.default = {
+              hostname = cfg.domain;
+              domain = cfg.baseDomain;
+            };
+
+            # 1. PostgreSQL Store via TCP
+            store."db" = {
+              type = "postgresql";
+              host = "127.0.0.1";
+              port = 5432;
+              database = "stalwart";
+              user = "stalwart";
+              password = "%{file:/run/credentials/stalwart.service/db_password}%";
+              tls.enable = false;
+              pool.max-connections = 10;
+            };
+
+            # 2. Redis Store
+            store."redis" = {
+              type = "redis";
+              redis-type = "single";
+              urls = [ "redis://127.0.0.1:6379" ];
+            };
+
+            # 3. RocksDB Store for Telemetry
+            store."rocksdb" = {
+              type = "rocksdb";
+              path = "/var/lib/stalwart-mail/rocksdb";
+            };
+
+            # Storage Assignments
+            storage.data = "db";
+            storage.lookup = "db";
+            storage.fts = "db";
+            storage.blob = "db";
+            storage.directory = "authentik";
+            storage.tracer = "rocksdb";
+            storage.history = "rocksdb";
+
+            # Telemetry Configuration
+            tracing.history = {
+              enable = true;
+              store = "rocksdb";
+              retention = "7d";
+            };
+
+            metrics.history = {
+              enable = true;
+              store = "rocksdb";
+              retention = "30d";
+            };
+
+            metrics.prometheus = {
+              enable = true;
+            };
+
+            tracer.log = {
+              type = "log";
+              level = "info";
+              path = "/var/lib/stalwart-mail/logs";
+              prefix = "stalwart.log";
+              enable = true;
+            };
+
+            # Routing Strategy
+            queue.strategy.route = [
+              {
+                "if" = "is_local_domain('', rcpt_domain)";
+                "then" = "'local'";
+              }
+              { "else" = "'brevo'"; }
+            ];
+
+            queue.route."local" = {
+              type = "local";
+            };
+
+            queue.route."brevo" = {
+              type = "relay";
+              address = "smtp-relay.brevo.com";
+              port = 587;
+              protocol = "smtp";
+              tls.implicit = false;
+              auth = {
+                username = "%{file:/run/credentials/stalwart.service/brevo_user}%";
+                secret = "%{file:/run/credentials/stalwart.service/brevo_secret}%";
+              };
+            };
+            # LDAP Directory Configuration with CamelCase attributes
+            directory."authentik" = {
+              type = "ldap";
+              url = "ldap://127.0.0.1:3389";
+              base-dn = "dc=ldap,dc=goauthentik,dc=io";
+              bind.dn = "cn=stalwart,ou=users,dc=ldap,dc=goauthentik,dc=io";
+              bind.secret = "%{file:/run/credentials/stalwart.service/ldap_password}%";
+              bind.auth.method = "lookup";
+
+              # Use CamelCase attributes to avoid Stalwart filter parser bugs
+              filter.name = "(&(objectClass=inetOrgPerson)(cn=?))";
+              filter.email = "(&(objectClass=inetOrgPerson)(|(stalwartMail=?)(stalwartAliases=?)))";
+
+              attributes = {
+                name = "cn";
+                email = "stalwartMail";
+                email-alias = "stalwartAliases";
+                groups = "memberOf";
+                secret-changed = "pwdChangedTime";
+              };
+            };
+
+            # MTA Signing
+            mta.sign.dkim = {
+              enable = false;
+              # selector = "202602r";
+            };
+
+            # Listeners
+            server.listener.management = {
+              bind = [ "127.0.0.1:9081" ];
+              protocol = "http";
+              oidc = {
+                issuer = cfg.ssoAuthority;
+                client-id = "%{file:${config.sops.secrets.stalwart_oidc_id.path}}%";
+                client-secret = "%{file:${config.sops.secrets.stalwart_oidc_secret.path}}%";
+                scopes = [
+                  "openid"
+                  "profile"
+                  "email"
+                ];
+              };
+            };
+
+            server.listener.smtp = {
+              bind = [ "[::]:25" ];
+              protocol = "smtp";
+              hostname = cfg.domain;
+            };
+            server.listener.submissions = {
+              bind = [ "[::]:465" ];
+              protocol = "smtp";
+              tls.implicit = true;
+              hostname = cfg.domain;
+            };
+            server.listener.submission = {
+              bind = [ "[::]:587" ];
+              protocol = "smtp";
+              tls.enable = true;
+              hostname = cfg.domain;
+            };
+            server.listener.imaps = {
+              bind = [ "[::]:993" ];
+              protocol = "imap";
+              tls.implicit = true;
+              hostname = cfg.domain;
+            };
+            server.listener.imap = {
+              bind = [ "[::]:143" ];
+              protocol = "imap";
+              tls.enable = true;
+              hostname = cfg.domain;
+            };
+
+            authentication.fallback-admin = {
+              user = "admin";
+              secret = "%{file:${config.sops.secrets.mail_admin_password.path}}%";
+            };
+          };
+
+          credentials = {
+            "brevo_user" = config.sops.secrets.brevo_smtp_user.path;
+            "brevo_secret" = config.sops.secrets.brevo_smtp_key.path;
+            "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
+            "db_password" = config.sops.secrets.stalwart_db_password.path;
           };
         };
 
-        server.listener.smtp = {
-          bind = [ "[::]:25" ];
-          protocol = "smtp";
-          hostname = cfg.domain;
-        };
-        server.listener.submissions = {
-          bind = [ "[::]:465" ];
-          protocol = "smtp";
-          tls.implicit = true;
-          hostname = cfg.domain;
-        };
-        server.listener.submission = {
-          bind = [ "[::]:587" ];
-          protocol = "smtp";
-          tls.enable = true;
-          hostname = cfg.domain;
-        };
-        server.listener.imaps = {
-          bind = [ "[::]:993" ];
-          protocol = "imap";
-          tls.implicit = true;
-          hostname = cfg.domain;
-        };
-        server.listener.imap = {
-          bind = [ "[::]:143" ];
-          protocol = "imap";
-          tls.enable = true;
-          hostname = cfg.domain;
+        # One-shot service to ensure postgres user has the correct password
+        systemd.services.stalwart-db-init = {
+          description = "Ensure Stalwart DB user has correct password";
+          after = [ "postgresql.service" ];
+          before = [ "stalwart.service" ];
+          wantedBy = [ "stalwart.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            User = "postgres";
+          };
+          script = ''
+            ${config.services.postgresql.package}/bin/psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='stalwart'" | grep -q 1 || exit 0
+            ${config.services.postgresql.package}/bin/psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${config.sops.secrets.stalwart_db_password.path})';"
+          '';
         };
 
-        authentication.fallback-admin = {
-          user = "admin";
-          secret = "%{file:${config.sops.secrets.mail_admin_password.path}}%";
+        systemd.services.stalwart-cert-deploy = {
+          description = "Deploy Caddy certificates to Stalwart";
+          after = [ "caddy.service" ];
+          before = [ "stalwart.service" ];
+          wantedBy = [ "stalwart.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            User = "root";
+          };
+          script = ''
+            mkdir -p ${certDir}
+            cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${cfg.domain}/${cfg.domain}.crt ${certDir}/mail.crt
+            cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${cfg.domain}/${cfg.domain}.key ${certDir}/mail.key
+            chown -R stalwart-mail:stalwart-mail ${certDir}
+            chmod 750 ${certDir}
+            chmod 640 ${certDir}/*
+          '';
         };
-      };
 
-      credentials = {
-        "brevo_user" = config.sops.secrets.brevo_smtp_user.path;
-        "brevo_secret" = config.sops.secrets.brevo_smtp_key.path;
-        "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
-        "db_password" = config.sops.secrets.stalwart_db_password.path;
-      };
-    };
+        services.postgresql = {
+          ensureDatabases = [ "stalwart" ];
+          ensureUsers = [
+            {
+              name = "stalwart";
+              ensureDBOwnership = true;
+            }
+          ];
+        };
 
-    # One-shot service to ensure postgres user has the correct password
-    systemd.services.stalwart-db-init = {
-      description = "Ensure Stalwart DB user has correct password";
-      after = [ "postgresql.service" ];
-      before = [ "stalwart.service" ];
-      wantedBy = [ "stalwart.service" ];
-      serviceConfig = {
-        Type = "oneshot";
-        User = "postgres";
-      };
-      script = ''
-        ${config.services.postgresql.package}/bin/psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='stalwart'" | grep -q 1 || exit 0
-        ${config.services.postgresql.package}/bin/psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${config.sops.secrets.stalwart_db_password.path})';"
-      '';
-    };
+        my.endpoints.mail = {
+          host = config.networking.hostName;
+          port = 9081;
+          proxy = {
+            enable = true;
+            inherit (cfg) domain;
+          };
+        };
 
-    systemd.services.stalwart-cert-deploy = {
-      description = "Deploy Caddy certificates to Stalwart";
-      after = [ "caddy.service" ];
-      before = [ "stalwart.service" ];
-      wantedBy = [ "stalwart.service" ];
-      serviceConfig = {
-        Type = "oneshot";
-        User = "root";
-      };
-      script = ''
-        mkdir -p ${certDir}
-        cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${cfg.domain}/${cfg.domain}.crt ${certDir}/mail.crt
-        cp /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${cfg.domain}/${cfg.domain}.key ${certDir}/mail.key
-        chown -R stalwart-mail:stalwart-mail ${certDir}
-        chmod 750 ${certDir}
-        chmod 640 ${certDir}/*
-      '';
-    };
+        systemd.tmpfiles.rules = [
+          "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
+          "d /var/lib/stalwart-mail/rocksdb 0750 stalwart-mail stalwart-mail -"
+          "d /var/lib/stalwart-mail/logs 0750 stalwart-mail stalwart-mail -"
+        ];
 
-    services.postgresql = {
-      ensureDatabases = [ "stalwart" ];
-      ensureUsers = [
-        {
-          name = "stalwart";
-          ensureDBOwnership = true;
-        }
-      ];
-    };
-
-    my.endpoints.mail = {
-      host = config.networking.hostName;
-      port = 9081;
-      proxy = {
-        enable = true;
-        inherit (cfg) domain;
-      };
-    };
-
-    systemd.tmpfiles.rules = [
-      "d /var/lib/stalwart-mail 0750 stalwart-mail stalwart-mail -"
-      "d /var/lib/stalwart-mail/rocksdb 0750 stalwart-mail stalwart-mail -"
-      "d /var/lib/stalwart-mail/logs 0750 stalwart-mail stalwart-mail -"
-    ];
-
-    sops.secrets.brevo_smtp_user = {
-      owner = "stalwart-mail";
-    };
-    sops.secrets.brevo_smtp_key = {
-      owner = "stalwart-mail";
-    };
-    sops.secrets.mail_admin_password = {
-      owner = "stalwart-mail";
-    };
-    sops.secrets.stalwart_oidc_id = {
-      owner = "stalwart-mail";
-    };
-    sops.secrets.stalwart_oidc_secret = {
-      owner = "stalwart-mail";
-    };
-    sops.secrets.stalwart_ldap_password = {
-      owner = "stalwart-mail";
-    };
-    sops.secrets.stalwart_db_password = {
-      owner = "postgres";
-    };
-  };
+        sops.secrets.brevo_smtp_user = {
+          owner = "stalwart-mail";
+        };
+        sops.secrets.brevo_smtp_key = {
+          owner = "stalwart-mail";
+        };
+        sops.secrets.mail_admin_password = {
+          owner = "stalwart-mail";
+        };
+        sops.secrets.stalwart_oidc_id = {
+          owner = "stalwart-mail";
+        };
+        sops.secrets.stalwart_oidc_secret = {
+          owner = "stalwart-mail";
+        };
+        sops.secrets.stalwart_ldap_password = {
+          owner = "stalwart-mail";
+        };
+        sops.secrets.stalwart_db_password = {
+          owner = "postgres";
+        };
+      }
+    ]
+  );
 }

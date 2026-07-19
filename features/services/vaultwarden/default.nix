@@ -22,54 +22,60 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    services.vaultwarden = {
-      enable = true;
-      dbBackend = "postgresql";
-      config = {
-        DOMAIN = "https://${cfg.domain}";
-        SIGNUPS_ALLOWED = false;
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (features.requires [ "services.postgresql" ] config)
 
-        # OIDC / Authentik
-        SSO_ENABLED = true;
-        SSO_ONLY = true;
-        SSO_AUTHORITY = cfg.ssoAuthority;
-        SSO_SCOPES = "email profile offline_access";
-        SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION = true;
+      {
+        services.vaultwarden = {
+          enable = true;
+          dbBackend = "postgresql";
+          config = {
+            DOMAIN = "https://${cfg.domain}";
+            SIGNUPS_ALLOWED = false;
 
-        DATABASE_URL = "postgresql://%2Frun%2Fpostgresql/vaultwarden";
+            # OIDC / Authentik
+            SSO_ENABLED = true;
+            SSO_ONLY = true;
+            SSO_AUTHORITY = cfg.ssoAuthority;
+            SSO_SCOPES = "email profile offline_access";
+            SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION = true;
 
-        ROCKET_ADDRESS = "127.0.0.1";
-        ROCKET_PORT = 8082;
-      };
-      environmentFile = config.sops.secrets.vaultwarden_env.path;
-    };
+            DATABASE_URL = "postgresql://%2Frun%2Fpostgresql/vaultwarden";
 
-    # Ensure Postgres DB exists
-    services.postgresql = {
-      ensureDatabases = [ "vaultwarden" ];
-      ensureUsers = [
-        {
-          name = "vaultwarden";
-          ensureDBOwnership = true;
-        }
-      ];
-    };
+            ROCKET_ADDRESS = "127.0.0.1";
+            ROCKET_PORT = 8082;
+          };
+          environmentFile = config.sops.secrets.vaultwarden_env.path;
+        };
 
-    # Caddy Reverse Proxy
-    my.endpoints.vaultwarden = {
-      host = config.networking.hostName;
-      port = 8082;
-      proxy = {
-        enable = true;
-        inherit (cfg) domain;
-      };
-    };
+        # Ensure Postgres DB exists
+        services.postgresql = {
+          ensureDatabases = [ "vaultwarden" ];
+          ensureUsers = [
+            {
+              name = "vaultwarden";
+              ensureDBOwnership = true;
+            }
+          ];
+        };
 
-    # Secrets
-    # Should contain SSO_CLIENT_ID and SSO_CLIENT_SECRET
-    sops.secrets.vaultwarden_env = {
-      owner = "vaultwarden";
-    };
-  };
+        # Caddy Reverse Proxy
+        my.endpoints.vaultwarden = {
+          host = config.networking.hostName;
+          port = 8082;
+          proxy = {
+            enable = true;
+            inherit (cfg) domain;
+          };
+        };
+
+        # Secrets
+        # Should contain SSO_CLIENT_ID and SSO_CLIENT_SECRET
+        sops.secrets.vaultwarden_env = {
+          owner = "vaultwarden";
+        };
+      }
+    ]
+  );
 }

@@ -64,7 +64,10 @@ let
     in
     inputs.nixpkgs-unstable.lib.nixosSystem {
       inherit system;
-      specialArgs = { inherit inputs hostname flake; };
+      specialArgs = {
+        inherit inputs hostname flake;
+        features = import ../lib/features.nix { inherit (pkgs) lib; };
+      };
       modules = [
         { nixpkgs.pkgs = pkgs; }
         { users.users = nixosUsers; }

@@ -11,71 +11,77 @@ in
     enable = lib.mkEnableOption "Radarr Movie Manager";
   };
 
-  config = lib.mkIf cfg.enable {
-    # Ensure media group exists
-    users.groups.media = { };
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (features.requires [ "services.postgresql" ] config)
 
-    # Explicitly define user and group to avoid SOPS evaluation issues
-    users.users.radarr = {
-      isSystemUser = true;
-      group = "radarr";
-      extraGroups = [ "media" ];
-    };
-    users.groups.radarr = { };
+      {
+        # Ensure media group exists
+        users.groups.media = { };
 
-    # SOPS Secret for API Key
-    sops.secrets.radarr_api_key = {
-      owner = "radarr";
-    };
-    sops.templates."radarr.env" = {
-      owner = "radarr";
-      content = "RADARR__AUTH__APIKEY=${config.sops.placeholder.radarr_api_key}";
-    };
-
-    # Ownership management for storage
-    systemd.tmpfiles.rules = [
-      "d /data/storage/movies 2775 radarr media -"
-    ];
-
-    services.radarr = {
-      enable = true;
-      environmentFiles = [ config.sops.templates."radarr.env".path ];
-      settings = {
-        auth.method = "External";
-        postgres = {
-          host = "/run/postgresql";
-          maindb = "radarr-main";
-          logdb = "radarr-log";
-          user = "radarr";
+        # Explicitly define user and group to avoid SOPS evaluation issues
+        users.users.radarr = {
+          isSystemUser = true;
+          group = "radarr";
+          extraGroups = [ "media" ];
         };
-      };
-    };
+        users.groups.radarr = { };
 
-    services.postgresql = {
-      ensureDatabases = [
-        "radarr-main"
-        "radarr-log"
-      ];
-      ensureUsers = [
-        {
-          name = "radarr";
-          ensureDBOwnership = false;
-          ensureClauses.superuser = true;
-        }
-      ];
-    };
+        # SOPS Secret for API Key
+        sops.secrets.radarr_api_key = {
+          owner = "radarr";
+        };
+        sops.templates."radarr.env" = {
+          owner = "radarr";
+          content = "RADARR__AUTH__APIKEY=${config.sops.placeholder.radarr_api_key}";
+        };
 
-    systemd.services.radarr.serviceConfig = {
-      ReadWritePaths = [
-        "/data/storage/movies"
-        "/data/storage/downloads"
-      ];
-      UMask = lib.mkForce "0002";
-    };
+        # Ownership management for storage
+        systemd.tmpfiles.rules = [
+          "d /data/storage/movies 2775 radarr media -"
+        ];
 
-    my.endpoints.radarr = {
-      host = config.networking.hostName;
-      port = 7878;
-    };
-  };
+        services.radarr = {
+          enable = true;
+          environmentFiles = [ config.sops.templates."radarr.env".path ];
+          settings = {
+            auth.method = "External";
+            postgres = {
+              host = "/run/postgresql";
+              maindb = "radarr-main";
+              logdb = "radarr-log";
+              user = "radarr";
+            };
+          };
+        };
+
+        services.postgresql = {
+          ensureDatabases = [
+            "radarr-main"
+            "radarr-log"
+          ];
+          ensureUsers = [
+            {
+              name = "radarr";
+              ensureDBOwnership = false;
+              ensureClauses.superuser = true;
+            }
+          ];
+        };
+
+        systemd.services.radarr.serviceConfig = {
+          ReadWritePaths = [
+            "/data/storage/movies"
+            "/data/storage/downloads"
+          ];
+          UMask = lib.mkForce "0002";
+        };
+
+        my.endpoints.radarr = {
+          host = config.networking.hostName;
+          port = 7878;
+        };
+      }
+    ]
+  );
 }

@@ -16,138 +16,144 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    # Dependencies
-    my.features.services.postgresql.enable = true;
-    my.features.services.redis.enable = true;
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (features.requires [ "services.postgresql" "services.redis" ] config)
 
-    # 1. SOPS Secret for OIDC
-    sops.secrets.paperless_oidc_secret = { };
+      {
+        # Dependencies
+        my.features.services.postgresql.enable = true;
+        my.features.services.redis.enable = true;
 
-    # 2. Template for the sensitive JSON Auth variable
-    sops.templates."paperless.env" = {
-      content = ''
-        PAPERLESS_SOCIALACCOUNT_PROVIDERS=${
-          builtins.toJSON {
-            openid_connect = {
-              APPS = [
-                {
-                  provider_id = "authentik";
-                  name = "Authentik";
-                  client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
-                  secret = config.sops.placeholder.paperless_oidc_secret;
-                  settings = {
-                    server_url = cfg.ssoServerUrl;
-                  };
-                }
-              ];
-              OAUTH_PKCE_ENABLED = "True";
-            };
-          }
-        }
-      '';
-    };
+        # 1. SOPS Secret for OIDC
+        sops.secrets.paperless_oidc_secret = { };
 
-    # Ensure media group exists
-    users.groups.media = { };
+        # 2. Template for the sensitive JSON Auth variable
+        sops.templates."paperless.env" = {
+          content = ''
+            PAPERLESS_SOCIALACCOUNT_PROVIDERS=${
+              builtins.toJSON {
+                openid_connect = {
+                  APPS = [
+                    {
+                      provider_id = "authentik";
+                      name = "Authentik";
+                      client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
+                      secret = config.sops.placeholder.paperless_oidc_secret;
+                      settings = {
+                        server_url = cfg.ssoServerUrl;
+                      };
+                    }
+                  ];
+                  OAUTH_PKCE_ENABLED = "True";
+                };
+              }
+            }
+          '';
+        };
 
-    # Explicitly define user to avoid ownership issues
-    users.users.paperless = {
-      isSystemUser = true;
-      group = "paperless";
-      extraGroups = [ "media" ];
-    };
-    users.groups.paperless = { };
+        # Ensure media group exists
+        users.groups.media = { };
 
-    # Create and enforce permissions recursively (Z)
-    systemd.tmpfiles.rules = [
-      "d /data/storage/docs 0775 paperless media -"
-      "Z /data/storage/docs/media 0775 paperless media -"
-      "Z /data/storage/docs/consume 0775 paperless media -"
-    ];
+        # Explicitly define user to avoid ownership issues
+        users.users.paperless = {
+          isSystemUser = true;
+          group = "paperless";
+          extraGroups = [ "media" ];
+        };
+        users.groups.paperless = { };
 
-    services.paperless = {
-      enable = true;
-      port = 28981;
-      address = "127.0.0.1";
+        # Create and enforce permissions recursively (Z)
+        systemd.tmpfiles.rules = [
+          "d /data/storage/docs 0775 paperless media -"
+          "Z /data/storage/docs/media 0775 paperless media -"
+          "Z /data/storage/docs/consume 0775 paperless media -"
+        ];
 
-      mediaDir = "/data/storage/docs/media";
-      consumptionDir = "/data/storage/docs/consume";
+        services.paperless = {
+          enable = true;
+          port = 28981;
+          address = "127.0.0.1";
 
-      settings = {
-        PAPERLESS_REDIS = "redis://localhost:6379";
-        PAPERLESS_DBHOST = "/run/postgresql";
-        PAPERLESS_DBENGINE = "django.db.backends.postgresql";
-        PAPERLESS_DBNAME = "paperless";
-        PAPERLESS_DBUSER = "paperless";
-        PAPERLESS_URL =
-          let
-            d = config.my.endpoints.paperless.proxy.subdomain;
-          in
-          lib.mkIf (d != null) "https://${d}.${config.my.endpoints.paperless.proxy.domain}";
-        PAPERLESS_TIME_ZONE = "Europe/Berlin";
-        PAPERLESS_OCR_LANGUAGE = "deu+eng";
+          mediaDir = "/data/storage/docs/media";
+          consumptionDir = "/data/storage/docs/consume";
 
-        # Stability and Proxy Fixes
-        PAPERLESS_SOCIALACCOUNT_REQUESTS_TIMEOUT = "30";
-        PAPERLESS_USE_X_FORWARD_HOST = "true";
-        PAPERLESS_USE_X_FORWARDED_PORT = "true";
-        PAPERLESS_FORWARDED_ALLOW_IPS = "*";
-        PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
+          settings = {
+            PAPERLESS_REDIS = "redis://localhost:6379";
+            PAPERLESS_DBHOST = "/run/postgresql";
+            PAPERLESS_DBENGINE = "django.db.backends.postgresql";
+            PAPERLESS_DBNAME = "paperless";
+            PAPERLESS_DBUSER = "paperless";
+            PAPERLESS_URL =
+              let
+                d = config.my.endpoints.paperless.proxy.subdomain;
+              in
+              lib.mkIf (d != null) "https://${d}.${config.my.endpoints.paperless.proxy.domain}";
+            PAPERLESS_TIME_ZONE = "Europe/Berlin";
+            PAPERLESS_OCR_LANGUAGE = "deu+eng";
 
-        # Enable OIDC
-        PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
-        PAPERLESS_DEBUG = "false";
-      };
-    };
+            # Stability and Proxy Fixes
+            PAPERLESS_SOCIALACCOUNT_REQUESTS_TIMEOUT = "30";
+            PAPERLESS_USE_X_FORWARD_HOST = "true";
+            PAPERLESS_USE_X_FORWARDED_PORT = "true";
+            PAPERLESS_FORWARDED_ALLOW_IPS = "*";
+            PAPERLESS_PROXY_SSL_HEADER = "[\"HTTP_X_FORWARDED_PROTO\", \"https\"]";
 
-    # Ensure PostgreSQL database and user exist for Paperless
-    services.postgresql = {
-      ensureDatabases = [ "paperless" ];
-      ensureUsers = [
-        {
-          name = "paperless";
-          ensureDBOwnership = true;
-        }
-      ];
-    };
+            # Enable OIDC
+            PAPERLESS_APPS = "allauth.socialaccount.providers.openid_connect";
+            PAPERLESS_DEBUG = "false";
+          };
+        };
 
-    # Systemd overrides
-    systemd.services.paperless-web = {
-      serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-      environment = {
-        SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-        REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-      };
-    };
-    systemd.services.paperless-consumer.serviceConfig.EnvironmentFile =
-      config.sops.templates."paperless.env".path;
-    systemd.services.paperless-task-queue.serviceConfig.EnvironmentFile =
-      config.sops.templates."paperless.env".path;
-    systemd.services.paperless-scheduler.serviceConfig.EnvironmentFile =
-      config.sops.templates."paperless.env".path;
+        # Ensure PostgreSQL database and user exist for Paperless
+        services.postgresql = {
+          ensureDatabases = [ "paperless" ];
+          ensureUsers = [
+            {
+              name = "paperless";
+              ensureDBOwnership = true;
+            }
+          ];
+        };
 
-    # Scanner Service
-    virtualisation.oci-containers.backend = "podman";
-    virtualisation.oci-containers.containers."node-hp-scan-to" = {
-      image = "docker.io/manuc66/node-hp-scan-to:latest";
-      environment = {
-        PUID = "315";
-        PGID = "987";
-        IP = "192.168.178.109";
-        LABEL = "paperless";
-        TZ = "Europe/Berlin";
-        PATTERN = "\"scan\"_dd-mm-yyyy_hh-MM-ss";
-      };
-      volumes = [
-        "/data/storage/docs/consume:/scan"
-      ];
-    };
+        # Systemd overrides
+        systemd.services.paperless-web = {
+          serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
+          environment = {
+            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
+            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
+          };
+        };
+        systemd.services.paperless-consumer.serviceConfig.EnvironmentFile =
+          config.sops.templates."paperless.env".path;
+        systemd.services.paperless-task-queue.serviceConfig.EnvironmentFile =
+          config.sops.templates."paperless.env".path;
+        systemd.services.paperless-scheduler.serviceConfig.EnvironmentFile =
+          config.sops.templates."paperless.env".path;
 
-    # Register with Caddy Feature
-    my.endpoints.paperless = {
-      host = config.networking.hostName;
-      port = 28981;
-    };
-  };
+        # Scanner Service
+        virtualisation.oci-containers.backend = "podman";
+        virtualisation.oci-containers.containers."node-hp-scan-to" = {
+          image = "docker.io/manuc66/node-hp-scan-to:latest";
+          environment = {
+            PUID = "315";
+            PGID = "987";
+            IP = "192.168.178.109";
+            LABEL = "paperless";
+            TZ = "Europe/Berlin";
+            PATTERN = "\"scan\"_dd-mm-yyyy_hh-MM-ss";
+          };
+          volumes = [
+            "/data/storage/docs/consume:/scan"
+          ];
+        };
+
+        # Register with Caddy Feature
+        my.endpoints.paperless = {
+          host = config.networking.hostName;
+          port = 28981;
+        };
+      }
+    ]
+  );
 }

@@ -11,63 +11,69 @@ in
     enable = lib.mkEnableOption "Prowlarr Indexer Manager";
   };
 
-  config = lib.mkIf cfg.enable {
-    # Ensure media group exists
-    users.groups.media = { };
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (features.requires [ "services.postgresql" ] config)
 
-    # Explicitly define user and group to avoid SOPS evaluation issues
-    users.users.prowlarr = {
-      isSystemUser = true;
-      group = "prowlarr";
-      extraGroups = [ "media" ];
-    };
-    users.groups.prowlarr = { };
+      {
+        # Ensure media group exists
+        users.groups.media = { };
 
-    # SOPS Secret for API Key
-    sops.secrets.prowlarr_api_key = {
-      owner = "prowlarr";
-    };
-    sops.templates."prowlarr.env" = {
-      owner = "prowlarr";
-      content = "PROWLARR__AUTH__APIKEY=${config.sops.placeholder.prowlarr_api_key}";
-    };
-
-    services.prowlarr = {
-      enable = true;
-      environmentFiles = [ config.sops.templates."prowlarr.env".path ];
-      settings = {
-        auth = {
-          method = "External";
+        # Explicitly define user and group to avoid SOPS evaluation issues
+        users.users.prowlarr = {
+          isSystemUser = true;
+          group = "prowlarr";
+          extraGroups = [ "media" ];
         };
-        # PostgreSQL Configuration
-        postgres = {
-          host = "/run/postgresql";
-          maindb = "prowlarr-main";
-          logdb = "prowlarr-log";
-          user = "prowlarr";
+        users.groups.prowlarr = { };
+
+        # SOPS Secret for API Key
+        sops.secrets.prowlarr_api_key = {
+          owner = "prowlarr";
         };
-      };
-    };
+        sops.templates."prowlarr.env" = {
+          owner = "prowlarr";
+          content = "PROWLARR__AUTH__APIKEY=${config.sops.placeholder.prowlarr_api_key}";
+        };
 
-    # Ensure PostgreSQL database and user exist for Prowlarr
-    services.postgresql = {
-      ensureDatabases = [
-        "prowlarr-main"
-        "prowlarr-log"
-      ];
-      ensureUsers = [
-        {
-          name = "prowlarr";
-          ensureDBOwnership = false;
-          ensureClauses.superuser = true;
-        }
-      ];
-    };
+        services.prowlarr = {
+          enable = true;
+          environmentFiles = [ config.sops.templates."prowlarr.env".path ];
+          settings = {
+            auth = {
+              method = "External";
+            };
+            # PostgreSQL Configuration
+            postgres = {
+              host = "/run/postgresql";
+              maindb = "prowlarr-main";
+              logdb = "prowlarr-log";
+              user = "prowlarr";
+            };
+          };
+        };
 
-    # Register with Caddy Feature
-    my.endpoints.prowlarr = {
-      host = config.networking.hostName;
-      port = 9696;
-    };
-  };
+        # Ensure PostgreSQL database and user exist for Prowlarr
+        services.postgresql = {
+          ensureDatabases = [
+            "prowlarr-main"
+            "prowlarr-log"
+          ];
+          ensureUsers = [
+            {
+              name = "prowlarr";
+              ensureDBOwnership = false;
+              ensureClauses.superuser = true;
+            }
+          ];
+        };
+
+        # Register with Caddy Feature
+        my.endpoints.prowlarr = {
+          host = config.networking.hostName;
+          port = 9696;
+        };
+      }
+    ]
+  );
 }

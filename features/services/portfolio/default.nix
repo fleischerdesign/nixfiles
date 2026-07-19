@@ -14,81 +14,87 @@ in
     enable = lib.mkEnableOption "Portfolio Website";
   };
 
-  config = lib.mkIf cfg.enable {
-    # Systemd Service for the Nuxt Portfolio
-    systemd.services.portfolio = {
-      description = "Nuxt Portfolio Service";
-      wantedBy = [ "multi-user.target" ];
-      after = [
-        "network.target"
-        "postgresql.service"
-      ];
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (features.requires [ "services.postgresql" ] config)
 
-      environment = {
-        PORT = "3005";
-        NITRO_PORT = "3005";
-        NODE_ENV = "production";
+      {
+        # Systemd Service for the Nuxt Portfolio
+        systemd.services.portfolio = {
+          description = "Nuxt Portfolio Service";
+          wantedBy = [ "multi-user.target" ];
+          after = [
+            "network.target"
+            "postgresql.service"
+          ];
 
-        # Database URL for Drizzle/Libsql (Absolute Path)
-        NUXT_DB_URL = "file:/var/lib/portfolio/.data/db.sqlite";
+          environment = {
+            PORT = "3005";
+            NITRO_PORT = "3005";
+            NODE_ENV = "production";
 
-        # Puppeteer runtime fix: Use system chromium
-        PUPPETEER_EXECUTABLE_PATH = "${pkgs.google-chrome}/bin/google-chrome-stable";
-      };
+            # Database URL for Drizzle/Libsql (Absolute Path)
+            NUXT_DB_URL = "file:/var/lib/portfolio/.data/db.sqlite";
 
-      serviceConfig = {
-        # Use the package from the flake input
-        ExecStart = "${inputs.portfolio.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/portfolio";
-        User = "portfolio";
-        Group = "portfolio";
+            # Puppeteer runtime fix: Use system chromium
+            PUPPETEER_EXECUTABLE_PATH = "${pkgs.google-chrome}/bin/google-chrome-stable";
+          };
 
-        # Persistent state directory
-        StateDirectory = "portfolio";
-        WorkingDirectory = "/var/lib/portfolio";
+          serviceConfig = {
+            # Use the package from the flake input
+            ExecStart = "${inputs.portfolio.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/portfolio";
+            User = "portfolio";
+            Group = "portfolio";
 
-        Restart = "always";
-        # Load all variables from the .env backup
-        EnvironmentFile = config.sops.secrets.portfolio_env.path;
-      };
-    };
+            # Persistent state directory
+            StateDirectory = "portfolio";
+            WorkingDirectory = "/var/lib/portfolio";
 
-    # Ensure all required data directories exist
-    systemd.tmpfiles.rules = [
-      "d /var/lib/portfolio 0750 portfolio portfolio -"
-      "d /var/lib/portfolio/.data 0750 portfolio portfolio -"
-      "d /var/lib/portfolio/.data/applications 0750 portfolio portfolio -"
-      "d /var/lib/portfolio/.data/content 0750 portfolio portfolio -"
-      "d /var/lib/portfolio/.data/uploads 0750 portfolio portfolio -"
+            Restart = "always";
+            # Load all variables from the .env backup
+            EnvironmentFile = config.sops.secrets.portfolio_env.path;
+          };
+        };
 
-      # Link migrations from the store to the working directory
-      "d /var/lib/portfolio/server 0750 portfolio portfolio -"
-      "d /var/lib/portfolio/server/db 0750 portfolio portfolio -"
-      "L+ /var/lib/portfolio/server/db/migrations - - - - ${
-        inputs.portfolio.packages.${pkgs.stdenv.hostPlatform.system}.default
-      }/lib/portfolio/server/db/migrations"
-    ];
+        # Ensure all required data directories exist
+        systemd.tmpfiles.rules = [
+          "d /var/lib/portfolio 0750 portfolio portfolio -"
+          "d /var/lib/portfolio/.data 0750 portfolio portfolio -"
+          "d /var/lib/portfolio/.data/applications 0750 portfolio portfolio -"
+          "d /var/lib/portfolio/.data/content 0750 portfolio portfolio -"
+          "d /var/lib/portfolio/.data/uploads 0750 portfolio portfolio -"
 
-    # Define user and group
-    users.users.portfolio = {
-      isSystemUser = true;
-      group = "portfolio";
-      home = "/var/lib/portfolio";
-    };
-    users.groups.portfolio = { };
+          # Link migrations from the store to the working directory
+          "d /var/lib/portfolio/server 0750 portfolio portfolio -"
+          "d /var/lib/portfolio/server/db 0750 portfolio portfolio -"
+          "L+ /var/lib/portfolio/server/db/migrations - - - - ${
+            inputs.portfolio.packages.${pkgs.stdenv.hostPlatform.system}.default
+          }/lib/portfolio/server/db/migrations"
+        ];
 
-    # Caddy Reverse Proxy
-    my.endpoints.portfolio = {
-      host = config.networking.hostName;
-      port = 3005;
-      proxy = {
-        enable = true;
-        domain = "fleischer.design";
-      };
-    };
+        # Define user and group
+        users.users.portfolio = {
+          isSystemUser = true;
+          group = "portfolio";
+          home = "/var/lib/portfolio";
+        };
+        users.groups.portfolio = { };
 
-    # Secrets
-    sops.secrets.portfolio_env = {
-      owner = "portfolio";
-    };
-  };
+        # Caddy Reverse Proxy
+        my.endpoints.portfolio = {
+          host = config.networking.hostName;
+          port = 3005;
+          proxy = {
+            enable = true;
+            domain = "fleischer.design";
+          };
+        };
+
+        # Secrets
+        sops.secrets.portfolio_env = {
+          owner = "portfolio";
+        };
+      }
+    ]
+  );
 }

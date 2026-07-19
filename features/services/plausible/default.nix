@@ -17,63 +17,69 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    # ClickHouse Database (Required for Plausible)
-    services.clickhouse.enable = true;
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (features.requires [ "services.postgresql" ] config)
 
-    # Create user/group explicitly so sops can assign secrets
-    users.users.plausible = {
-      isSystemUser = true;
-      group = "plausible";
-    };
-    users.groups.plausible = { };
+      {
+        # ClickHouse Database (Required for Plausible)
+        services.clickhouse.enable = true;
 
-    services.plausible = {
-      enable = true;
-
-      server = {
-        baseUrl = "https://${cfg.domain}";
-        secretKeybaseFile = config.sops.secrets.plausible_secret_key_base.path;
-        port = 8000;
-        listenAddress = "127.0.0.1";
-        disableRegistration = true;
-      };
-
-      database = {
-        clickhouse.url = "http://127.0.0.1:8123/plausible_events_db";
-        postgres = {
-          dbname = "plausible";
-          socket = "/run/postgresql";
+        # Create user/group explicitly so sops can assign secrets
+        users.users.plausible = {
+          isSystemUser = true;
+          group = "plausible";
         };
-      };
-    };
+        users.groups.plausible = { };
 
-    # Inject GeoIP path from the central geoipupdate service
-    systemd.services.plausible.serviceConfig.Environment = [
-      "IP_GEOLOCATION_DB=/var/lib/GeoIP/GeoLite2-City.mmdb"
-    ];
+        services.plausible = {
+          enable = true;
 
-    # Ensure Postgres DB exists in the central instance
-    services.postgresql = {
-      ensureDatabases = [ "plausible" ];
-      ensureUsers = [
-        {
-          name = "plausible";
-          ensureDBOwnership = true;
-        }
-      ];
-    };
+          server = {
+            baseUrl = "https://${cfg.domain}";
+            secretKeybaseFile = config.sops.secrets.plausible_secret_key_base.path;
+            port = 8000;
+            listenAddress = "127.0.0.1";
+            disableRegistration = true;
+          };
 
-    # Caddy Reverse Proxy
-    my.endpoints.plausible = {
-      host = config.networking.hostName;
-      port = 8000;
-      subdomain = "plausible";
-    };
+          database = {
+            clickhouse.url = "http://127.0.0.1:8123/plausible_events_db";
+            postgres = {
+              dbname = "plausible";
+              socket = "/run/postgresql";
+            };
+          };
+        };
 
-    # Secrets
-    sops.secrets.plausible_secret_key_base = {
-      owner = "plausible";
-    };
-  };
+        # Inject GeoIP path from the central geoipupdate service
+        systemd.services.plausible.serviceConfig.Environment = [
+          "IP_GEOLOCATION_DB=/var/lib/GeoIP/GeoLite2-City.mmdb"
+        ];
+
+        # Ensure Postgres DB exists in the central instance
+        services.postgresql = {
+          ensureDatabases = [ "plausible" ];
+          ensureUsers = [
+            {
+              name = "plausible";
+              ensureDBOwnership = true;
+            }
+          ];
+        };
+
+        # Caddy Reverse Proxy
+        my.endpoints.plausible = {
+          host = config.networking.hostName;
+          port = 8000;
+          subdomain = "plausible";
+        };
+
+        # Secrets
+        sops.secrets.plausible_secret_key_base = {
+          owner = "plausible";
+        };
+      }
+    ]
+  );
 }
