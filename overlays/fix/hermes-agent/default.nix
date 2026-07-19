@@ -30,11 +30,18 @@ inputs: final: prev: {
             drv;
       };
 
-      patchInstall = drv: drv.overrideAttrs (old: {
-        installPhase = if old ? installPhase then final.lib.replaceStrings [ "sys.exit(1)" ] [ "sys.exit(0)" ] old.installPhase else old.installPhase or "";
-      });
+      patchInstall =
+        drv:
+        drv.overrideAttrs (old: {
+          installPhase =
+            if old ? installPhase then
+              final.lib.replaceStrings [ "sys.exit(1)" ] [ "sys.exit(0)" ] old.installPhase
+            else
+              old.installPhase or "";
+        });
     in
-    (patchInstall agentWithEsbuild) // {
+    (patchInstall agentWithEsbuild)
+    // {
       override = args: patchInstall (agentWithEsbuild.override args);
     };
 }

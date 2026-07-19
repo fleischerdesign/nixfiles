@@ -35,13 +35,19 @@ let
   fastembed-override = pythonPackages.fastembed.overridePythonAttrs (oldAttrs: {
     dontCheckRuntimeDeps = true;
     pythonImportsCheck = [ ];
-    propagatedBuildInputs = lib.filter (p:
-      let pname = p.pname or "";
-      in pname != "pillow" && pname != "Pillow"
+    propagatedBuildInputs = lib.filter (
+      p:
+      let
+        pname = p.pname or "";
+      in
+      pname != "pillow" && pname != "Pillow"
     ) (oldAttrs.propagatedBuildInputs or [ ]);
-    dependencies = lib.filter (p:
-      let pname = p.pname or "";
-      in pname != "pillow" && pname != "Pillow"
+    dependencies = lib.filter (
+      p:
+      let
+        pname = p.pname or "";
+      in
+      pname != "pillow" && pname != "Pillow"
     ) (oldAttrs.dependencies or [ ]);
   });
 
@@ -141,7 +147,7 @@ in
       package = pkgs.hermes-agent;
       addToSystemPackages = true;
       extraDependencyGroups = [ "messaging" ];
-      
+
       # Add native Python packages to PYTHONPATH
       extraPythonPackages = [
         mnemosyne-hermes
@@ -329,7 +335,7 @@ in
       };
       script = ''
         mkdir -p /var/lib/hermes/.hermes/caddy/routes
-        
+
         # Write Caddyfile
         cat > /var/lib/hermes/.hermes/caddy/Caddyfile << "CADDYEOF"
         {
@@ -376,7 +382,7 @@ in
 
     # Dynamically add all configured host users to the hermes group
     users.users =
-      (lib.genAttrs cfg.hostUsers (user: {
+      (lib.genAttrs cfg.hostUsers (_: {
         extraGroups = [
           "hermes"
         ];

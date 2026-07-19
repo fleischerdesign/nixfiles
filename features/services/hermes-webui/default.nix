@@ -54,26 +54,26 @@ in
     # Configure native WebUI service
     services.hermes-webui = {
       enable = true;
-      port = cfg.port;
+      inherit (cfg) port;
       host = "127.0.0.1";
-      
+
       # Run as hermes user/group to seamlessly share folders
       user = "hermes";
       group = "hermes";
-      
+
       # State and home path mapping (same as Docker container mounts)
       stateDir = "/var/lib/hermes/.hermes/webui";
       hermesHome = "/var/lib/hermes/.hermes";
-      
+
       # Derive paths from the agent package
       agent.package = pkgs.hermes-agent;
       agent.dir = "${inputs.hermes-agent}";
-      
+
       # Inject secret environment file containing API keys + OIDC client secret
       environmentFiles = lib.optionals (config.sops.secrets ? hermes_agent_env) [
         config.sops.secrets.hermes_agent_env.path
       ];
-      
+
       # Inject OIDC config variables
       extraEnvironment = lib.filterAttrs (_: v: v != null) {
         HERMES_WEBUI_OIDC_ISSUER = cfg.oidcIssuer;
@@ -84,10 +84,16 @@ in
           let
             ep = config.my.endpoints.hermes-webui or { };
             baseDomain = config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh";
-            domain = if ep ? fullDomain && ep.fullDomain != null then ep.fullDomain else if ep ? subdomain && ep.subdomain != null then "${ep.subdomain}.${baseDomain}" else null;
+            domain =
+              if ep ? fullDomain && ep.fullDomain != null then
+                ep.fullDomain
+              else if ep ? subdomain && ep.subdomain != null then
+                "${ep.subdomain}.${baseDomain}"
+              else
+                null;
           in
           if domain != null then "https://${domain}/api/auth/oidc/callback" else null;
-        
+
         # Override locations
         HERMES_API_URL = "http://127.0.0.1:8642";
         HERMES_WEBUI_DEFAULT_WORKSPACE = "/var/lib/hermes/workspace";
