@@ -1,7 +1,5 @@
 {
   pkgs,
-  hostname,
-  lib,
   osConfig,
   ...
 }:
@@ -9,6 +7,7 @@
   imports = [
     ./packages.nix
     ./opencode.nix
+    ./fish.nix
   ];
 
   home.username = osConfig.my.user.name;
@@ -19,7 +18,7 @@
 
   xdg.desktopEntries."ls3d-handler" = {
     name = "WBS Learnspace 3D Handler";
-    exec = "/home/philipp/ls3d-handler.sh %u";
+    exec = "/home/${osConfig.my.user.name}/ls3d-handler.sh %u";
     type = "Application";
     terminal = false;
     noDisplay = true;
@@ -34,15 +33,6 @@
     direnv = {
       enable = true;
       nix-direnv.enable = true;
-    };
-    fish = {
-      enable = true;
-      shellAliases = {
-        c = "codium";
-      }
-      // lib.optionalAttrs (hostname != "rollins") {
-        hermes = "ssh -t ${osConfig.my.user.name}@${osConfig.my.features.system.networking.topology.hosts.rollins.tailscaleIp} hermes";
-      };
     };
 
     home-manager.enable = true;
