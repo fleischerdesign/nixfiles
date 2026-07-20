@@ -45,9 +45,11 @@
           coreAddress = "http://${config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp}:9055";
           tokenSecretName = "authentik_outpost_ldap_token_strummer";
         };
-        monitoring.alloy = {
-          enable = true;
-          lokiHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
+        monitoring = {
+          pipeline = {
+            enable = true;
+            role = "collector";
+          };
         };
         crowdsec = {
           enable = true;

@@ -1,4 +1,4 @@
-{ config, ... }:
+{ ... }:
 {
   imports = [
     ./hardware-configuration.nix
@@ -13,9 +13,11 @@
 
   my.features.system.networking.tailscale.acceptRoutes = true;
 
-  my.features.services.monitoring.alloy = {
-    enable = true;
-    lokiHost = config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp;
+  my.features.services.monitoring = {
+    pipeline = {
+      enable = true;
+      role = "collector";
+    };
   };
 
   my.features.services.attic.server.enable = true;

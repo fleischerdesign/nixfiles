@@ -15,13 +15,12 @@
   my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.common.geoip.enable = true;
 
-  my.features.services.monitoring.alloy = {
-    enable = true;
-    lokiHost = "127.0.0.1";
+  my.features.services.monitoring = {
+    pipeline = {
+      enable = true;
+      role = "full";
+    };
   };
-  my.features.services.monitoring.prometheus.enable = true;
-  my.features.services.monitoring.loki.enable = true;
-  my.features.services.monitoring.grafana.enable = true;
   my.features.services.crowdsec.enable = true;
   my.features.services.crowdsec.role = "master";
 
