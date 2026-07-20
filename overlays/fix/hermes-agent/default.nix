@@ -1,9 +1,10 @@
 inputs: final: prev: {
   hermes-agent =
     let
-      # Apply inline-snapshot doCheck fix at Hermes scope level.
-      # The upstream overlay builds its own Python environment
-      # that doesn't pick up global python3Packages overrides.
+      # TEMPORARY FIX — inline-snapshot 0.32.5 docs tests are broken upstream.
+      # doCheck = false at Hermes scope because Hermes builds its own Python
+      # environment that doesn't pick up global python3Packages overrides.
+      # Remove when upstream inline-snapshot publishes fixed tests.
       prevFixed = prev // {
         python3Packages = prev.python3Packages // {
           inline-snapshot = prev.python3Packages.inline-snapshot.overridePythonAttrs (_: {
