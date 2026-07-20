@@ -68,10 +68,28 @@ in
       };
     };
 
-    # Open Firewall Ports for LDAP and LDAPS
-    networking.firewall.allowedTCPPorts = [
-      389
-      636
-    ];
+    my.endpoints = {
+      authentik-ldap = {
+        host = config.networking.hostName;
+        port = 389;
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "all";
+        };
+        monitoring.http.enable = false;
+      };
+
+      authentik-ldaps = {
+        host = config.networking.hostName;
+        port = 636;
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "all";
+        };
+        monitoring.http.enable = false;
+      };
+    };
   };
 }

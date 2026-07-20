@@ -17,7 +17,16 @@ in
       port = 6052;
     };
 
-    networking.firewall.allowedUDPPorts = [ 5353 ];
+    my.endpoints.esphome-mdns = {
+      host = config.networking.hostName;
+      port = 5353;
+      directAccess = {
+        enable = true;
+        protocol = "udp";
+        interface = "all";
+      };
+      monitoring.http.enable = false;
+    };
 
     my.endpoints.esphome = {
       host = config.networking.hostName;

@@ -45,7 +45,7 @@ in
     };
     hostUsers = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [ ];
+      default = [ config.my.user.name ];
       description = "Interactive host users who should have access to the hermes group.";
     };
     subdomainDelegation = lib.mkOption {

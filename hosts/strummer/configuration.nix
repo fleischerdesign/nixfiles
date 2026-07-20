@@ -78,12 +78,7 @@
           ];
         };
       };
-      dev = {
-        containers = {
-          enable = true;
-          users = [ "philipp" ];
-        };
-      };
+      dev.containers.enable = true;
     };
 
     endpoints = {

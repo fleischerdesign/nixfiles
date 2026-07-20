@@ -88,9 +88,16 @@ in
           };
         };
 
-        # Open DNS ports in the firewall
-        networking.firewall.allowedUDPPorts = [ 53 ];
-        networking.firewall.allowedTCPPorts = [ 53 ];
+        my.endpoints.blocky-dns = {
+          host = config.networking.hostName;
+          port = 53;
+          directAccess = {
+            enable = true;
+            protocol = "both";
+            interface = "all";
+          };
+          monitoring.http.enable = false;
+        };
 
         my.endpoints.blocky = {
           host = config.networking.hostName;

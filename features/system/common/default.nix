@@ -35,6 +35,7 @@ in
         "nix-command"
         "flakes"
       ];
+      auto-optimise-store = true;
 
       trusted-users = [
         "root"
@@ -44,23 +45,6 @@ in
 
       substituters = [ "https://cache.rls.ancoris.ovh/nixfiles" ];
       trusted-public-keys = [ "nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE=" ];
-
-      post-build-hook = pkgs.writeShellScript "attic-push-hook" ''
-        set -e
-        STAMP_DIR="/var/lib/attic-push-stamps"
-        mkdir -p "$STAMP_DIR"
-
-        for out in $2; do
-          case "$out" in
-            *nixos-system-*)
-              stamp="$STAMP_DIR/$(basename "$out")"
-              if [ ! -f "$stamp" ]; then
-                ${pkgs.attic-client}/bin/attic push nixfiles "$out" 2>/dev/null && touch "$stamp" || true
-              fi
-              ;;
-          esac
-        done
-      '';
     };
 
     networking.networkmanager.enable = true;
@@ -95,9 +79,9 @@ in
       enable = true;
       users = [
         {
-          username = "philipp";
-          gitName = "Philipp Fleischer";
-          gitEmail = "philipp@fleischer.design";
+          username = config.my.user.name;
+          gitName = config.my.user.fullName;
+          gitEmail = config.my.user.email;
         }
       ];
     };
@@ -115,25 +99,5 @@ in
       defaultSopsFile = ../../../secrets/secrets.yaml;
       age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
     };
-
-    sops.secrets.attic_push_token = { };
-
-    sops.templates.attic_root_config = {
-      owner = "root";
-      group = "root";
-      mode = "0400";
-      content = ''
-        default-server = "nixfiles-server"
-
-        [servers.nixfiles-server]
-        endpoint = "https://cache.rls.ancoris.ovh"
-        token = "${config.sops.placeholder.attic_push_token}"
-      '';
-    };
-
-    systemd.tmpfiles.rules = [
-      "d /root/.config/attic 0700 root root -"
-      "L+ /root/.config/attic/config.toml 0400 root root - /run/secrets/rendered/attic_root_config"
-    ];
   };
 }

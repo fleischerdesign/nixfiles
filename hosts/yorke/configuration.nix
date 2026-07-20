@@ -13,9 +13,7 @@
   # Features
   my.features.desktop.niri.enable = true;
 
-  my.features.dev.containers = {
-    users = [ "philipp" ];
-  };
+  my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
 
   my.features.media.gaming.sunshine.enable = false;
@@ -24,7 +22,7 @@
 
   my.features.services.attic.client = {
     enable = true;
-    user = "philipp";
+    autoPush = true;
   };
 
   system.stateVersion = "24.05";

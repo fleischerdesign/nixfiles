@@ -61,7 +61,7 @@ in
         settings = {
           default_session = {
             command = "${pkgs.niri}/bin/niri-session";
-            user = "philipp";
+            user = config.my.user.name;
           };
         };
       };

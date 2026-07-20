@@ -81,11 +81,29 @@ in
         lib.listToAttrs (lib.mapAttrsToList mkVHost localServices);
     };
 
-    networking.firewall.allowedTCPPorts = [
-      80
-      443
-    ];
-    networking.firewall.allowedUDPPorts = [ 443 ]; # QUIC / HTTP/3
+    my.endpoints = {
+      caddy-http = {
+        host = config.networking.hostName;
+        port = 80;
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "all";
+        };
+        monitoring.http.enable = false;
+      };
+
+      caddy-https = {
+        host = config.networking.hostName;
+        port = 443;
+        directAccess = {
+          enable = true;
+          protocol = "both";
+          interface = "all";
+        };
+        monitoring.http.enable = false;
+      };
+    };
 
     # Allow group read access to logs (for CrowdSec and Alloy)
     systemd.services.caddy.serviceConfig.UMask = "0027";

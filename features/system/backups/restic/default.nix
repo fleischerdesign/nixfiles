@@ -1,3 +1,5 @@
+# features/system/backups/restic/default.nix
+# Declarative automated Restic backup feature module with SOPS credentials integration.
 {
   config,
   lib,
@@ -9,7 +11,7 @@ let
 in
 {
   options.my.features.system.backups.restic = {
-    enable = lib.mkEnableOption "restic";
+    enable = lib.mkEnableOption "Restic automated encrypted backups";
 
     paths = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -17,6 +19,7 @@ in
         "/var/lib"
         "/etc/nixos"
       ];
+      description = "List of filesystem paths to include in the daily backup snapshot.";
     };
 
     exclude = lib.mkOption {
@@ -26,10 +29,13 @@ in
         "**/.cache"
         "/var/lib/docker"
       ];
+      description = "List of file patterns or directories to exclude from backup snapshots.";
     };
 
     environmentFile = lib.mkOption {
       type = lib.types.str;
+      description = "Name of the SOPS secret containing environment variables for Restic repository credentials.";
+      example = "restic_environment_strummer";
     };
   };
 

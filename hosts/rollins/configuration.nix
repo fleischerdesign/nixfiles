@@ -32,7 +32,6 @@
   };
 
   my.features.services.hermes-agent.enable = true;
-  my.features.services.hermes-agent.hostUsers = [ "philipp" ];
   my.features.services.hermes-agent.subdomainDelegation = true;
   services.hermes-agent.settings.platforms.telegram.home_channel = {
     platform = "telegram";

@@ -8,7 +8,6 @@ let
   cfg = config.my.features.system.networking.ssh;
   hosts = config.my.features.system.networking.topology.hosts;
   ownHost = hosts.${config.networking.hostName} or null;
-  userLib = import ../../../../lib/users.nix;
   listenAddresses = lib.mkIf (ownHost != null) (
     lib.optional (ownHost.localIp != null) {
       addr = ownHost.localIp;
@@ -23,6 +22,13 @@ in
 {
   options.my.features.system.networking.ssh = {
     enable = lib.mkEnableOption "SSH server, bound to LAN and Tailscale only";
+    deployKeys = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAUtA5kA9lDxzQjtgfMDKC+RLOaqSuUWF1gSaO8tjGCR deploy-rs"
+      ];
+      description = "Authorized SSH public keys for root deploy-rs access.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -58,7 +64,7 @@ in
       inherit listenAddresses;
     };
 
-    users.users.root.openssh.authorizedKeys.keys = userLib.deploy.sshKeys;
+    users.users.root.openssh.authorizedKeys.keys = cfg.deployKeys;
 
     warnings = lib.optionals (cfg.enable && ownHost == null) [
       "SSH feature: host '${config.networking.hostName}' not found in topology — SSH will bind to all interfaces."

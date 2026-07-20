@@ -48,6 +48,14 @@
       default = { };
       description = "Definition of all known hosts in the network";
     };
+    trustedSubnets = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "192.168.178.0/24"
+        "100.64.0.0/10"
+      ];
+      description = "Trusted IP subnets (LAN and Tailscale CGNAT range) for internal access and IPS whitelisting.";
+    };
   };
 
   config = lib.mkIf config.my.features.system.networking.topology.enable {

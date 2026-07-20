@@ -14,7 +14,7 @@ in
 
     users = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [ ];
+      default = [ config.my.user.name ];
       description = "List of system users to add to the 'docker' group.";
     };
   };

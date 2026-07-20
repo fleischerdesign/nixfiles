@@ -1,8 +1,52 @@
+# features/endpoints/default.nix
+# Central service endpoints — single source of truth for Caddy, firewall, monitoring, and future consumers.
 {
   config,
   lib,
   ...
 }:
+
+let
+  cfg = config.my.endpoints;
+
+  ownEndpoints = lib.filterAttrs (
+    _: ep: ep.host == config.networking.hostName && ep.directAccess.enable
+  ) cfg;
+
+  allTcp = lib.concatMap (
+    ep:
+    lib.optional
+      (ep.directAccess.interface == "all" && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both"))
+      ep.port
+  ) (lib.attrValues ownEndpoints);
+
+  allUdp = lib.concatMap (
+    ep:
+    lib.optional
+      (ep.directAccess.interface == "all" && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both"))
+      ep.port
+  ) (lib.attrValues ownEndpoints);
+
+  tailscaleTcp = lib.concatMap (
+    ep:
+    lib.optional
+      (
+        ep.directAccess.interface == "tailscale"
+        && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
+      )
+      ep.port
+  ) (lib.attrValues ownEndpoints);
+
+  tailscaleUdp = lib.concatMap (
+    ep:
+    lib.optional
+      (
+        ep.directAccess.interface == "tailscale"
+        && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
+      )
+      ep.port
+  ) (lib.attrValues ownEndpoints);
+in
 {
   options.my.endpoints = lib.mkOption {
     type = lib.types.attrsOf (
@@ -55,6 +99,26 @@
               type = lib.types.bool;
               default = false;
               description = "Open this port directly in the firewall (e.g. for native apps, APIs outside Caddy)";
+            };
+
+            protocol = lib.mkOption {
+              type = lib.types.enum [
+                "tcp"
+                "udp"
+                "both"
+              ];
+              default = "tcp";
+              description = "Network protocol to open in the firewall (tcp, udp, or both)";
+            };
+
+            interface = lib.mkOption {
+              type = lib.types.enum [
+                "all"
+                "tailscale"
+                "local"
+              ];
+              default = "all";
+              description = "Network interface to bind firewall rule (all, tailscale, or local)";
             };
           };
 
@@ -111,5 +175,16 @@
 
     default = { };
     description = "Central service endpoints — single source of truth for Caddy, firewall, monitoring, and future consumers";
+  };
+
+  config = {
+    networking.firewall = {
+      allowedTCPPorts = allTcp;
+      allowedUDPPorts = allUdp;
+      interfaces.tailscale0 = {
+        allowedTCPPorts = tailscaleTcp;
+        allowedUDPPorts = tailscaleUdp;
+      };
+    };
   };
 }

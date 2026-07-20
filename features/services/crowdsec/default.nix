@@ -42,10 +42,7 @@ in
           description = "Whitelist internal LAN and Tailscale IPs";
           whitelist = {
             reason = "trusted internal network";
-            cidr = [
-              "192.168.178.0/24"
-              "100.64.0.0/10"
-            ];
+            cidr = config.my.features.system.networking.topology.trustedSubnets;
           };
         }
       ];

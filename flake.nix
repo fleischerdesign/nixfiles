@@ -100,8 +100,8 @@
         };
       };
 
-      helpers = import ./lib/helper.nix {
-        inherit pkgs home-manager-unstable;
+      helpers = import ./lib {
+        inherit home-manager-unstable;
       };
 
       globalModules = [
@@ -110,6 +110,16 @@
     in
     {
       formatter.${system} = pkgs.nixfmt;
+
+      checks.${system} = {
+        eval-hosts = pkgs.runCommandLocal "eval-all-hosts" { } ''
+          echo "yorke: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.yorke.config.system.build.toplevel.drvPath}" > $out
+          echo "jello: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.jello.config.system.build.toplevel.drvPath}" >> $out
+          echo "strummer: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.strummer.config.system.build.toplevel.drvPath}" >> $out
+          echo "mackaye: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.mackaye.config.system.build.toplevel.drvPath}" >> $out
+          echo "rollins: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.rollins.config.system.build.toplevel.drvPath}" >> $out
+        '';
+      };
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
@@ -138,7 +148,6 @@
           ];
           users = [
             {
-              name = "philipp";
               extraGroups = [
                 "networkmanager"
                 "wheel"
@@ -169,7 +178,6 @@
           ];
           users = [
             {
-              name = "philipp";
               extraGroups = [
                 "networkmanager"
                 "wheel"
@@ -196,7 +204,6 @@
           hostname = "strummer";
           users = [
             {
-              name = "philipp";
               extraGroups = [
                 "networkmanager"
                 "wheel"
@@ -218,7 +225,6 @@
           extraModules = [ inputs.disko.nixosModules.disko ];
           users = [
             {
-              name = "philipp";
               extraGroups = [
                 "networkmanager"
                 "wheel"
@@ -239,7 +245,6 @@
           extraModules = [ inputs.disko.nixosModules.disko ];
           users = [
             {
-              name = "philipp";
               extraGroups = [
                 "networkmanager"
                 "wheel"
