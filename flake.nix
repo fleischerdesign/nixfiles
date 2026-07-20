@@ -84,6 +84,7 @@
       # Zentralisierte Overlays
       overlays = [
         (import ./overlays/fix/hermes-agent inputs)
+        (import ./overlays/fix/patool)
         inputs.nix-vscode-extensions.overlays.default
       ];
 
