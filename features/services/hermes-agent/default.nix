@@ -94,6 +94,10 @@ in
   ];
 
   config = lib.mkIf cfg.enable {
+    sops.secrets.camofox_api_key = {
+      restartUnits = [ "hermes-agent.service" ];
+    };
+
     services.hermes-agent = {
       enable = true;
       package = pkgs.hermes-agent;
@@ -120,6 +124,7 @@ in
         HASS_URL = cfg.hassUrl;
         PAPERLESS_URL = cfg.paperlessUrl;
         CAMOFOX_URL = cfg.camofoxUrl;
+        CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
       };
 
       settings = {
