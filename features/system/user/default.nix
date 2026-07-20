@@ -1,5 +1,5 @@
 # features/system/user/default.nix
-# Declarative user identity module for the primary system user.
+# Declarative user identity module for system users with dynamic metadata lookup.
 {
   config,
   lib,
@@ -8,25 +8,26 @@
 
 let
   cfg = config.my.user;
-  userMeta = import ../../../user/philipp/metadata.nix;
+  userMetaPath = ../../../user + "/${cfg.name}/metadata.nix";
+  userMeta = if builtins.pathExists userMetaPath then import userMetaPath else { };
 in
 {
   options.my.user = {
     name = lib.mkOption {
       type = lib.types.str;
-      default = userMeta.username;
+      default = "philipp";
       description = "Primary user account name.";
     };
 
     fullName = lib.mkOption {
       type = lib.types.str;
-      default = userMeta.fullName;
+      default = userMeta.fullName or cfg.name;
       description = "Full display name of the primary user.";
     };
 
     email = lib.mkOption {
       type = lib.types.str;
-      default = userMeta.email;
+      default = userMeta.email or "";
       description = "Primary email address of the user.";
     };
 
@@ -41,7 +42,7 @@ in
 
     sshKeys = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = userMeta.sshKeys;
+      default = userMeta.sshKeys or [ ];
       description = "Authorized SSH public keys for the primary user.";
     };
 
@@ -49,6 +50,12 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = "Path to SOPS-managed hashedPassword file for zero-trust declarative user auth.";
+    };
+
+    sopsAgeKeyFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "/home/${cfg.name}/.config/sops/age/keys.txt";
+      description = "Path to the user's Age key file for SOPS CLI decryption.";
     };
   };
 
@@ -58,6 +65,10 @@ in
     };
 
     my.user.hashedPasswordFile = lib.mkDefault config.sops.secrets."users/${cfg.name}/password".path;
+
+    environment.sessionVariables = lib.mkIf (cfg.sopsAgeKeyFile != null) {
+      SOPS_AGE_KEY_FILE = cfg.sopsAgeKeyFile;
+    };
 
     users.users.${cfg.name} = {
       isNormalUser = true;

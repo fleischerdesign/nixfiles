@@ -41,11 +41,8 @@
         c = "codium";
       }
       // lib.optionalAttrs (hostname != "rollins") {
-        hermes = "ssh -t philipp@${osConfig.my.features.system.networking.topology.hosts.rollins.tailscaleIp} hermes";
+        hermes = "ssh -t ${osConfig.my.user.name}@${osConfig.my.features.system.networking.topology.hosts.rollins.tailscaleIp} hermes";
       };
-      interactiveShellInit = ''
-        set -gx SOPS_AGE_KEY_FILE /home/philipp/.config/sops/age/keys.txt
-      '';
     };
 
     home-manager.enable = true;
