@@ -30,15 +30,16 @@ let
 
       if [ ! -f "$STAMP" ]; then
         echo "Pushing current system closure $CURRENT_SYSTEM to Attic cache..."
-        if attic push nixfiles "$CURRENT_SYSTEM"; then
-          touch "$STAMP"
-          echo "Successfully pushed $CURRENT_SYSTEM to Attic cache."
-          notify-send -u low "Attic Binary Cache" "System-Closure erfolgreich in den Cache hochgeladen! 🚀" || true
-        else
-          echo "Failed to push $CURRENT_SYSTEM to Attic cache." >&2
-          notify-send -u critical "Attic Binary Cache" "Fehler beim Upload der System-Closure!" || true
-          exit 1
-        fi
+        for i in 1 2 3; do
+          if attic push nixfiles "$CURRENT_SYSTEM"; then
+            touch "$STAMP"
+            echo "Successfully pushed $CURRENT_SYSTEM to Attic cache."
+            exit 0
+          fi
+          echo "Attempt $i failed, retrying in 5 seconds..."
+          sleep 5
+        done
+        echo "Network or Attic server unreachable, skipping background push for now."
       else
         echo "Current system closure $CURRENT_SYSTEM is already cached."
       fi
@@ -109,8 +110,14 @@ in
     systemd.services.attic-auto-push = lib.mkIf cfg.autoPush {
       description = "Asynchronous Attic Binary Cache Push Service";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
+      after = [
+        "network-online.target"
+        "tailscaled.service"
+      ];
+      wants = [
+        "network-online.target"
+        "tailscaled.service"
+      ];
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${pushScript}/bin/attic-auto-push";
