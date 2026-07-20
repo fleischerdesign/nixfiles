@@ -11,9 +11,11 @@
 #
 # Impact: blocks bottles (Wine prefix manager) on desktop hosts.
 _final: prev: {
-  python3Packages = prev.python3Packages // {
-    patool = prev.python3Packages.patool.overridePythonAttrs (_: {
-      doCheck = false;
-    });
-  };
+  python3Packages = prev.python3Packages.overrideScope (
+    _pyFinal: pyPrev: {
+      patool = pyPrev.patool.overridePythonAttrs (_: {
+        doCheck = false;
+      });
+    }
+  );
 }
