@@ -25,7 +25,6 @@
   my.features.services.attic.client = {
     enable = true;
     user = "philipp";
-    autoPush = true;
   };
 
   system.stateVersion = "24.05";

@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 
@@ -13,14 +12,13 @@ in
     enable = lib.mkEnableOption "attic binary cache client";
     user = lib.mkOption {
       type = lib.types.str;
-      description = "User for attic config ownership and auto-push service.";
+      description = "User for attic config ownership.";
     };
     group = lib.mkOption {
       type = lib.types.str;
       default = "users";
       description = "Group for attic config file ownership";
     };
-    autoPush = lib.mkEnableOption "Automatically push system closure to attic cache after each rebuild";
     endpoint = lib.mkOption {
       type = lib.types.str;
       default = "https://cache.rls.ancoris.ovh";
@@ -29,8 +27,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    sops.secrets.attic_push_token = { };
-    sops.templates.attic_config = {
+    sops.templates.attic_user_config = {
       owner = cfg.user;
       inherit (cfg) group;
       mode = "0440";
@@ -45,14 +42,7 @@ in
 
     systemd.tmpfiles.rules = [
       "d /home/${cfg.user}/.config/attic 0700 ${cfg.user} ${cfg.group} -"
-      "L+ /home/${cfg.user}/.config/attic/config.toml 0400 ${cfg.user} ${cfg.group} - /run/secrets/rendered/attic_config"
+      "L+ /home/${cfg.user}/.config/attic/config.toml 0400 ${cfg.user} ${cfg.group} - /run/secrets/rendered/attic_user_config"
     ];
-
-    system.activationScripts.atticPush = lib.mkIf cfg.autoPush ''
-      CLOSURE="$(${pkgs.coreutils}/bin/readlink -f /run/current-system)"
-      if [ -n "$CLOSURE" ]; then
-        runuser -u ${cfg.user} -- ${pkgs.attic-client}/bin/attic push nixfiles "$CLOSURE" &
-      fi
-    '';
   };
 }
