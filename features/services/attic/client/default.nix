@@ -119,7 +119,7 @@ in
         "tailscaled.service"
       ];
       serviceConfig = {
-        Type = "oneshot";
+        Type = "simple";
         ExecStart = "${pushScript}/bin/attic-auto-push";
         Nice = 19;
         IOSchedulingClass = "idle";
