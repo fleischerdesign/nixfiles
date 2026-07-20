@@ -50,8 +50,10 @@ in
     my.endpoints.ntfy = {
       host = config.networking.hostName;
       port = 8083;
-      subdomain = "ntfy";
-      auth = false;
+      proxy = {
+        enable = true;
+        subdomain = "ntfy";
+      };
     };
   };
 }

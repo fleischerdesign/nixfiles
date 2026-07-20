@@ -140,19 +140,16 @@
       jellyseerr.proxy.enable = true;
 
       mainsail.proxy = {
-        enable = true;
         subdomain = "mainsail";
         auth = true;
       };
 
       moonraker.proxy = {
-        enable = true;
         subdomain = "moonraker";
         auth = true;
       };
 
       mainsail-cam.proxy.subdomain = "cam.moonraker";
-      mainsail-cam.proxy.enable = true;
     };
   };
 
