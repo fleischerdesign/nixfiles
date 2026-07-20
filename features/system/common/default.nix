@@ -46,7 +46,7 @@ in
       trusted-public-keys = [ "nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE=" ];
 
       post-build-hook = pkgs.writeShellScript "attic-push-hook" ''
-        set -eu
+        set -e
         STAMP_DIR="/var/lib/attic-push-stamps"
         mkdir -p "$STAMP_DIR"
 
@@ -55,7 +55,7 @@ in
             *nixos-system-*)
               stamp="$STAMP_DIR/$(basename "$out")"
               if [ ! -f "$stamp" ]; then
-                ${pkgs.attic-client}/bin/attic push nixfiles "$out" && touch "$stamp"
+                ${pkgs.attic-client}/bin/attic push nixfiles "$out" 2>/dev/null && touch "$stamp" || true
               fi
               ;;
           esac
