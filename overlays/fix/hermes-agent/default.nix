@@ -6,8 +6,8 @@ inputs: final: prev: {
       # environment that doesn't pick up global python3Packages overrides.
       # Remove when upstream inline-snapshot publishes fixed tests.
       prevFixed = prev // {
-        python3Packages = prev.python3Packages // {
-          inline-snapshot = prev.python3Packages.inline-snapshot.overridePythonAttrs (_: {
+        python312Packages = prev.python312Packages // {
+          inline-snapshot = prev.python312Packages.inline-snapshot.overridePythonAttrs (_: {
             doCheck = false;
           });
         };
