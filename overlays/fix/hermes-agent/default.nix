@@ -1,7 +1,17 @@
 inputs: final: prev: {
   hermes-agent =
     let
-      baseOverlay = inputs.hermes-agent.overlays.default final prev;
+      # Apply inline-snapshot doCheck fix at Hermes scope level.
+      # The upstream overlay builds its own Python environment
+      # that doesn't pick up global python3Packages overrides.
+      prevFixed = prev // {
+        python3Packages = prev.python3Packages // {
+          inline-snapshot = prev.python3Packages.inline-snapshot.overridePythonAttrs (_: {
+            doCheck = false;
+          });
+        };
+      };
+      baseOverlay = inputs.hermes-agent.overlays.default final prevFixed;
       baseHermesAgent = baseOverlay.hermes-agent;
 
       esbuild_0_28_1 = final.esbuild.overrideAttrs (_: rec {
