@@ -4,9 +4,10 @@
 # (list_bzip2, list_lzma, list_xz, list_lzip) that the
 # new py_tarfile/tar modules no longer export.
 #
-# Upstream status: no fix PR exists yet (2026-07-20).
-# Last checked nixpkgs-unstable rev a16c3fde2ffe — patool 4.0.5
-# still has the same broken test assertions.
+# Upstream fix: https://github.com/NixOS/nixpkgs/pull/540742 (merged 2026-07-11)
+# fixes file's landlock sandbox → patool's MIME detection.
+# patool tests still fail in Nix build sandbox after the fix,
+# so doCheck = false remains the workaround until resolved.
 #
 # Impact: blocks bottles (Wine prefix manager) on desktop hosts.
 _final: prev: {
