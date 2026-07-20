@@ -45,6 +45,10 @@ in
   ];
 
   config = lib.mkIf cfg.enable {
+    sops.secrets.camofox_api_key = {
+      restartUnits = [ "hermes-webui.service" ];
+    };
+
     assertions = [
       {
         assertion = config.my.features.services.hermes-agent.enable or false;
@@ -98,6 +102,7 @@ in
         HASS_URL = config.my.features.services.hermes-agent.hassUrl;
         PAPERLESS_URL = config.my.features.services.hermes-agent.paperlessUrl;
         CAMOFOX_URL = config.my.features.services.hermes-agent.camofoxUrl;
+        CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
         MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
         PYTHONPATH = lib.mkBefore "${hermesPkgs.mnemosyne-hermes}/${pkgs.python312.sitePackages}:${hermesPkgs.mnemosyne-memory}/${pkgs.python312.sitePackages}";
       };
