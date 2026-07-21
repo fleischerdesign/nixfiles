@@ -4,7 +4,13 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+if [ -d "$PWD/packages/custom" ]; then
+  REPO_ROOT="$PWD"
+elif [ -d "/etc/nixos/packages/custom" ]; then
+  REPO_ROOT="/etc/nixos"
+else
+  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+fi
 CUSTOM_PKGS_DIR="$REPO_ROOT/packages/custom"
 TARGET_PKG="${1:-all}"
 
