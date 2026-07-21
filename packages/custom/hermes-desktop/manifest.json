@@ -1,11 +1,11 @@
 {
   "name": "hermes-desktop",
   "version": "0.7.0",
-  "hash": "sha256-sbDDs81W+IYc5wG7b195LuJx7TJkj/m1RUXMhiwRDEE=",
+  "srcHash": "sha256-KEhrliJGabzrfse3MVKVcQOkqpYnN0vB2VseQAN7kVo=",
+  "cargoHash": "sha256-upyAkq8nvQy243ej71x1HTAfsudBk6Gnz8xIkU4bpaM=",
   "upstream": {
-    "type": "github-release",
+    "type": "github-source",
     "owner": "hermes-webui",
-    "repo": "hermes-desktop-rust",
-    "assetName": "Hermes.WebUI.Desktop_0.7.0_lin_x86_64.AppImage"
+    "repo": "hermes-desktop-rust"
   }
 }
