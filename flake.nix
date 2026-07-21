@@ -87,11 +87,7 @@
         (import ./packages/overlays/fix/inline-snapshot)
         (import ./packages/overlays/fix/hermes-agent inputs)
         inputs.nix-vscode-extensions.overlays.default
-        (_: prev: {
-          custom = {
-            hermes-desktop = prev.callPackage ./packages/custom/hermes-desktop { };
-          };
-        })
+        (import ./packages/custom)
       ];
 
       # Zentrale Nixpkgs Instanz mit globaler Config
