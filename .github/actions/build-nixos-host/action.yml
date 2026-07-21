@@ -26,8 +26,11 @@ runs:
       with:
         extra-conf: |
           fallback = true
+          eval-cache = true
           substituters = https://cache.rls.ancoris.ovh/nixfiles https://cache.nixos.org
           trusted-public-keys = nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+
+    - uses: DeterminateSystems/magic-nix-cache-action@v9
 
     - name: Build ${{ inputs.host }}
       shell: bash

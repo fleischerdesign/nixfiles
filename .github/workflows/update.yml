@@ -23,6 +23,8 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@v22
 
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+
       - id: detect
         run: |
           nix flake update

@@ -24,6 +24,8 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@v22
 
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+
       - name: Check flake
         run: nix flake check --print-build-logs
 
