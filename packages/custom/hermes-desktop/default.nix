@@ -47,11 +47,8 @@ appimageTools.wrapType2 {
     ];
 
   extraProfile = ''
-    if [ -d "$(pwd -P 2>/dev/null)" ]; then
-      cd "$(pwd -P 2>/dev/null)"
-    else
-      cd "$HOME"
-    fi
+    export PWD="$HOME"
+    cd "$HOME"
   '';
 
   extraInstallPhase = ''

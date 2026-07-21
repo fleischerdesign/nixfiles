@@ -116,6 +116,11 @@
     {
       formatter.${system} = pkgs.nixfmt;
 
+      packages.${system} = {
+        hermes-desktop = pkgs.custom.hermes-desktop;
+        default = pkgs.custom.hermes-desktop;
+      };
+
       apps.${system}.update-custom-packages = {
         type = "app";
         program = "${pkgs.writeShellApplication {
