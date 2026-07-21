@@ -60,6 +60,18 @@ in
               command = "${pkgs.nix}/bin/nix-collect-garbage";
               options = [ "NOPASSWD" ];
             }
+            {
+              command = "/nix/store/*-nixos-system-*/bin/switch";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/nix/store/*-nixos-system-*/bin/boot";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/nix/store/*-nixos-system-*/bin/test";
+              options = [ "NOPASSWD" ];
+            }
           ];
         }
       ];
