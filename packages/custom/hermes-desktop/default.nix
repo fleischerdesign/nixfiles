@@ -49,11 +49,18 @@ appimageTools.wrapType2 {
       libxext
       libxfixes
       libxrandr
+      libglvnd
+      libGL
+      mesa
+      vulkan-loader
+      librsvg
     ];
 
   extraProfile = ''
     export PWD="$HOME"
     cd "$HOME"
+    export HERMES_DESKTOP_SAFE_RENDER=1
+    export WEBKIT_DISABLE_DMABUF_RENDERER=1
   '';
 
   extraInstallPhase = ''
