@@ -131,6 +131,9 @@
           ];
           text = "exec ${./lib/updaters/update-custom-packages.sh} \"$@\"";
         }}/bin/update-custom-packages-app";
+        meta = {
+          description = "Auto-update engine for custom packages in packages/custom";
+        };
       };
 
       checks.${system} = {
