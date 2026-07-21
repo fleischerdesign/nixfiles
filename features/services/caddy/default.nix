@@ -43,20 +43,13 @@ in
             _: svc:
             svc.host == config.networking.hostName
             && svc.proxy.enable
-            && (svc.proxy.subdomain != null || svc.proxy.domain != null)
+            && svc.canonicalDomain != null
           ) config.my.endpoints;
 
           mkVHost =
             _name: conf:
-            let
-              name =
-                if conf.proxy.subdomain != null then
-                  "${conf.proxy.subdomain}.${conf.proxy.domain}"
-                else
-                  conf.proxy.domain;
-            in
             {
-              inherit name;
+              name = conf.canonicalDomain;
               value = {
                 extraConfig =
                   if conf.proxy.auth then

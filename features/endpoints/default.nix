@@ -50,7 +50,7 @@ in
 {
   options.my.endpoints = lib.mkOption {
     type = lib.types.attrsOf (
-      lib.types.submodule (_: {
+      lib.types.submodule (submod: {
         options = {
           host = lib.mkOption {
             type = lib.types.str;
@@ -169,6 +169,55 @@ in
               };
             };
           };
+
+          # Computed Read-Only Options
+          canonicalDomain = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            readOnly = true;
+            description = "The fully resolved FQDN of the service (e.g. grafana.mky.ancoris.ovh or fleischer.design).";
+          };
+
+          publicUrl = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            readOnly = true;
+            description = "The public HTTPS URL of the service. Null if proxy is disabled.";
+          };
+
+          localUrl = lib.mkOption {
+            type = lib.types.str;
+            readOnly = true;
+            description = "The local loopback HTTP URL used for internal health probes.";
+          };
+        };
+
+        config = {
+          canonicalDomain =
+            let
+              epConfig = submod.config;
+            in
+            if !epConfig.proxy.enable then
+              null
+            else if epConfig.proxy.subdomain != null && epConfig.proxy.subdomain != "" then
+              "${epConfig.proxy.subdomain}.${epConfig.proxy.domain}"
+            else if epConfig.proxy.domain != null && epConfig.proxy.domain != "" then
+              epConfig.proxy.domain
+            else
+              null;
+
+          publicUrl =
+            let
+              epConfig = submod.config;
+            in
+            if epConfig.canonicalDomain != null then
+              "https://${epConfig.canonicalDomain}"
+            else
+              null;
+
+          localUrl =
+            let
+              epConfig = submod.config;
+            in
+            "http://127.0.0.1:${toString epConfig.port}";
         };
       })
     );
@@ -186,5 +235,10 @@ in
         allowedUDPPorts = tailscaleUdp;
       };
     };
+
+    assertions = lib.mapAttrsToList (name: ep: {
+      assertion = if ep.proxy.enable then ep.canonicalDomain != null else true;
+      message = "Endpoint configuration error for service '${name}': proxy is enabled but canonicalDomain resolved to null.";
+    }) cfg;
   };
 }
