@@ -39,6 +39,10 @@ in
           type = "local";
           path = "/var/lib/atticd/storage";
         };
+        garbage-collection = {
+          interval = "12 hours";
+          default-retention-period = "90 days";
+        };
       };
     };
 
