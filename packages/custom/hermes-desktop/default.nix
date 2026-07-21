@@ -13,6 +13,7 @@
   dbus,
   librsvg,
   glib,
+  glib-networking,
 }:
 
 let
@@ -44,6 +45,7 @@ rustPlatform.buildRustPackage {
     dbus
     librsvg
     glib
+    glib-networking
   ];
 
   postInstall = ''
