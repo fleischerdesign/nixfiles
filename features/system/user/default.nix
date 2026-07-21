@@ -8,6 +8,16 @@
 
 let
   cfg = config.my.user;
+  userDir = ../../../user;
+  discoveredUsers =
+    if builtins.pathExists userDir then
+      lib.filter (
+        name: builtins.pathExists (userDir + "/${name}/metadata.nix")
+      ) (builtins.attrNames (builtins.readDir userDir))
+    else
+      [ ];
+  defaultUserName = if discoveredUsers != [ ] then lib.head discoveredUsers else "philipp";
+
   userMetaPath = ../../../user + "/${cfg.name}/metadata.nix";
   userMeta = if builtins.pathExists userMetaPath then import userMetaPath else { };
 in
@@ -15,7 +25,7 @@ in
   options.my.user = {
     name = lib.mkOption {
       type = lib.types.str;
-      default = "philipp";
+      default = defaultUserName;
       description = "Primary user account name.";
     };
 

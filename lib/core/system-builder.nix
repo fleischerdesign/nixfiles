@@ -33,13 +33,22 @@ let
             config.allowUnfree = true;
           };
 
-      userMeta = import ../../user/philipp/metadata.nix;
+      userDir = ../../user;
+      discoveredUsers =
+        if builtins.pathExists userDir then
+          lib.filter (
+            name: builtins.pathExists (userDir + "/${name}/home.nix")
+          ) (builtins.attrNames (builtins.readDir userDir))
+        else
+          [ ];
+
+      defaultUserName = if discoveredUsers != [ ] then lib.head discoveredUsers else "philipp";
 
       normalizedUsers =
         if users == [ ] then
-          [ { name = userMeta.username; } ]
+          map (name: { inherit name; }) discoveredUsers
         else
-          map (u: u // { name = u.name or userMeta.username; }) users;
+          map (u: u // { name = u.name or defaultUserName; }) users;
 
       homeManagerUsers = lib.listToAttrs (
         map (user: {
