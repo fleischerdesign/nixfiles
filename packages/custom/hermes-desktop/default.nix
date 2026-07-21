@@ -24,6 +24,11 @@ in
 appimageTools.wrapType2 {
   inherit pname version src;
 
+  extraBwrapArgs = [
+    "--chdir"
+    "/"
+  ];
+
   extraPkgs =
     pkgs: with pkgs; [
       webkitgtk_4_1
