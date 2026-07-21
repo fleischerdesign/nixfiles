@@ -46,6 +46,14 @@ appimageTools.wrapType2 {
       libxrandr
     ];
 
+  extraProfile = ''
+    if [ -d "$(pwd -P 2>/dev/null)" ]; then
+      cd "$(pwd -P 2>/dev/null)"
+    else
+      cd "$HOME"
+    fi
+  '';
+
   extraInstallPhase = ''
     install -m 444 -D ${appimageContents}/Hermes.WebUI.Desktop.desktop $out/share/applications/hermes-desktop.desktop || true
     install -m 444 -D ${appimageContents}/usr/share/icons/hicolor/512x512/apps/Hermes.WebUI.Desktop.png $out/share/icons/hicolor/512x512/apps/hermes-desktop.png || true
