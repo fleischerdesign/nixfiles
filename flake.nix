@@ -119,6 +119,20 @@
           echo "mackaye: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.mackaye.config.system.build.toplevel.drvPath}" >> $out
           echo "rollins: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.rollins.config.system.build.toplevel.drvPath}" >> $out
         '';
+
+        statix = pkgs.runCommandLocal "statix-check" {
+          nativeBuildInputs = [ pkgs.statix ];
+        } ''
+          statix check ${./.} || true
+          touch $out
+        '';
+
+        deadnix = pkgs.runCommandLocal "deadnix-check" {
+          nativeBuildInputs = [ pkgs.deadnix ];
+        } ''
+          deadnix --fail ${./.}
+          touch $out
+        '';
       };
 
       devShells.${system}.default = pkgs.mkShell {
