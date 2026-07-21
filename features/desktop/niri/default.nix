@@ -4,12 +4,18 @@
   lib,
   pkgs,
   hostname,
+  inputs,
   ...
 }:
 let
   cfg = config.my.features.desktop.niri;
 in
 {
+  imports = [
+    inputs.niri.nixosModules.niri
+    inputs.axis.nixosModules.default
+  ];
+
   options.my.features.desktop.niri = {
     enable = lib.mkEnableOption "Niri desktop environment";
     outputs = lib.mkOption {

@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  inputs,
   ...
 }:
 
@@ -16,6 +17,7 @@ in
 
   config = lib.mkIf cfg.enable {
     home-manager.sharedModules = [
+      inputs.nixvim.homeModules.nixvim
       {
         programs.nixvim = {
           enable = true;

@@ -23,6 +23,7 @@ in
     # This feature is purely for Home Manager.
     # It injects its configuration into all users that get this feature.
     home-manager.sharedModules = [
+      inputs.spicetify-nix.homeManagerModules.default
       {
         programs.spicetify = {
           enable = true;

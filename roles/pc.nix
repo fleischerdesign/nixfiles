@@ -13,6 +13,14 @@
 
   hardware.enableRedistributableFirmware = lib.mkDefault true;
 
+  my.user.extraGroups = lib.mkDefault [
+    "networkmanager"
+    "wheel"
+    "adbusers"
+    "input"
+    "uinput"
+  ];
+
   # It enables a baseline set of features common to all graphical systems.
   my.features.system = {
     audio.enable = lib.mkDefault true;

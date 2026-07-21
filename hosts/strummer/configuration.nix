@@ -11,6 +11,12 @@
 
   networking.hostName = "strummer";
 
+  my.user.extraGroups = [
+    "networkmanager"
+    "wheel"
+    "media"
+  ];
+
   # Features
   my = {
     features = {

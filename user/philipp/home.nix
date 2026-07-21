@@ -1,6 +1,7 @@
 {
   pkgs,
   osConfig,
+  inputs,
   ...
 }:
 {
@@ -8,6 +9,7 @@
     ./packages.nix
     ./opencode.nix
     ./fish.nix
+    inputs.nixcord.homeModules.nixcord
   ];
 
   home.username = osConfig.my.user.name;

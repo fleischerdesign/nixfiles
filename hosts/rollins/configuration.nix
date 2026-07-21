@@ -1,6 +1,7 @@
-{ ... }:
+{ inputs, ... }:
 {
   imports = [
+    inputs.disko.nixosModules.disko
     ./hardware-configuration.nix
     ./hardware-specific.nix
     ./disk-config.nix

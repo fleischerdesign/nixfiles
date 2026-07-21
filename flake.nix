@@ -108,6 +108,11 @@
       globalModules = [
         inputs.sops-nix.nixosModules.sops
       ];
+      hostNames = nixpkgs-unstable.lib.attrNames (
+        nixpkgs-unstable.lib.filterAttrs (
+          name: type: type == "directory" && builtins.pathExists (./hosts + "/${name}/configuration.nix")
+        ) (builtins.readDir ./hosts)
+      );
     in
     {
       formatter.${system} = pkgs.nixfmt;
@@ -116,46 +121,56 @@
 
       apps.${system}.update-custom-packages = {
         type = "app";
-        program = "${pkgs.writeShellApplication {
-          name = "update-custom-packages-app";
-          runtimeInputs = with pkgs; [
-            bash
-            curl
-            jq
-            nix
-            coreutils
-            gnused
-            findutils
-          ];
-          text = "exec ${./lib/updaters/update-custom-packages.sh} \"$@\"";
-        }}/bin/update-custom-packages-app";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "update-custom-packages-app";
+            runtimeInputs = with pkgs; [
+              bash
+              curl
+              jq
+              nix
+              coreutils
+              gnused
+              findutils
+            ];
+            text = "exec ${./lib/updaters/update-custom-packages.sh} \"$@\"";
+          }
+        }/bin/update-custom-packages-app";
         meta = {
           description = "Auto-update engine for custom packages in packages/custom";
         };
       };
 
       checks.${system} = {
-        eval-hosts = pkgs.runCommandLocal "eval-all-hosts" { } ''
-          echo "yorke: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.yorke.config.system.build.toplevel.drvPath}" > $out
-          echo "jello: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.jello.config.system.build.toplevel.drvPath}" >> $out
-          echo "strummer: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.strummer.config.system.build.toplevel.drvPath}" >> $out
-          echo "mackaye: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.mackaye.config.system.build.toplevel.drvPath}" >> $out
-          echo "rollins: ${builtins.unsafeDiscardStringContext self.nixosConfigurations.rollins.config.system.build.toplevel.drvPath}" >> $out
-        '';
+        eval-hosts = pkgs.runCommandLocal "eval-all-hosts" { } (
+          nixpkgs-unstable.lib.concatMapStringsSep "\n" (
+            name:
+            "echo \"${name}: ${
+              builtins.unsafeDiscardStringContext
+                self.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
+            }\" >> $out"
+          ) hostNames
+        );
 
-        statix = pkgs.runCommandLocal "statix-check" {
-          nativeBuildInputs = [ pkgs.statix ];
-        } ''
-          statix check ${./.} || true
-          touch $out
-        '';
+        statix =
+          pkgs.runCommandLocal "statix-check"
+            {
+              nativeBuildInputs = [ pkgs.statix ];
+            }
+            ''
+              statix check ${./.} || true
+              touch $out
+            '';
 
-        deadnix = pkgs.runCommandLocal "deadnix-check" {
-          nativeBuildInputs = [ pkgs.deadnix ];
-        } ''
-          deadnix --fail ${./.}
-          touch $out
-        '';
+        deadnix =
+          pkgs.runCommandLocal "deadnix-check"
+            {
+              nativeBuildInputs = [ pkgs.deadnix ];
+            }
+            ''
+              deadnix --fail ${./.}
+              touch $out
+            '';
       };
 
       devShells.${system}.default = pkgs.mkShell {
@@ -169,128 +184,19 @@
         ];
       };
 
-      nixosConfigurations = {
-        yorke = helpers.mkSystem {
+      nixosConfigurations = nixpkgs-unstable.lib.genAttrs hostNames (
+        hostname:
+        helpers.mkSystem {
           inherit
             system
             pkgs
             inputs
             flake
             globalModules
+            hostname
             ;
-          hostname = "yorke";
-          extraModules = [
-            inputs.niri.nixosModules.niri
-            inputs.axis.nixosModules.default
-          ];
-          users = [
-            {
-              extraGroups = [
-                "networkmanager"
-                "wheel"
-                "adbusers"
-                "input"
-                "uinput"
-              ];
-              homeModules = [
-                inputs.nixcord.homeModules.nixcord
-                inputs.spicetify-nix.homeManagerModules.default
-                inputs.nixvim.homeModules.nixvim
-              ];
-            }
-          ];
-        };
-        jello = helpers.mkSystem {
-          inherit
-            system
-            pkgs
-            inputs
-            flake
-            globalModules
-            ;
-          hostname = "jello";
-          extraModules = [
-            inputs.niri.nixosModules.niri
-            inputs.axis.nixosModules.default
-          ];
-          users = [
-            {
-              extraGroups = [
-                "networkmanager"
-                "wheel"
-                "adbusers"
-                "input"
-                "uinput"
-              ];
-              homeModules = [
-                inputs.nixcord.homeModules.nixcord
-                inputs.spicetify-nix.homeManagerModules.default
-                inputs.nixvim.homeModules.nixvim
-              ];
-            }
-          ];
-        };
-        strummer = helpers.mkSystem {
-          inherit
-            system
-            pkgs
-            inputs
-            flake
-            globalModules
-            ;
-          hostname = "strummer";
-          users = [
-            {
-              extraGroups = [
-                "networkmanager"
-                "wheel"
-                "media"
-              ];
-              homeModules = [ inputs.nixvim.homeModules.nixvim ];
-            }
-          ];
-        };
-        mackaye = helpers.mkSystem {
-          inherit
-            system
-            pkgs
-            inputs
-            flake
-            globalModules
-            ;
-          hostname = "mackaye";
-          extraModules = [ inputs.disko.nixosModules.disko ];
-          users = [
-            {
-              extraGroups = [
-                "networkmanager"
-                "wheel"
-              ];
-              homeModules = [ inputs.nixvim.homeModules.nixvim ];
-            }
-          ];
-        };
-        rollins = helpers.mkSystem {
-          inherit
-            system
-            pkgs
-            inputs
-            flake
-            globalModules
-            ;
-          hostname = "rollins";
-          extraModules = [ inputs.disko.nixosModules.disko ];
-          users = [
-            {
-              extraGroups = [
-                "networkmanager"
-                "wheel"
-              ];
-              homeModules = [ inputs.nixvim.homeModules.nixvim ];
-            }
-          ];
-        };
-      };
+        }
+      );
 
       deploy = {
         autoRollback = true;
