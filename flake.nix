@@ -83,10 +83,15 @@
 
       # Zentralisierte Overlays
       overlays = [
-        (import ./overlays/fix/patool)
-        (import ./overlays/fix/inline-snapshot)
-        (import ./overlays/fix/hermes-agent inputs)
+        (import ./packages/overlays/fix/patool)
+        (import ./packages/overlays/fix/inline-snapshot)
+        (import ./packages/overlays/fix/hermes-agent inputs)
         inputs.nix-vscode-extensions.overlays.default
+        (_: prev: {
+          custom = {
+            hermes-desktop = prev.callPackage ./packages/custom/hermes-desktop { };
+          };
+        })
       ];
 
       # Zentrale Nixpkgs Instanz mit globaler Config
@@ -110,6 +115,23 @@
     in
     {
       formatter.${system} = pkgs.nixfmt;
+
+      apps.${system}.update-custom-packages = {
+        type = "app";
+        program = "${pkgs.writeShellApplication {
+          name = "update-custom-packages-app";
+          runtimeInputs = with pkgs; [
+            bash
+            curl
+            jq
+            nix
+            coreutils
+            gnused
+            findutils
+          ];
+          text = "exec ${./lib/updaters/update-custom-packages.sh} \"$@\"";
+        }}/bin/update-custom-packages-app";
+      };
 
       checks.${system} = {
         eval-hosts = pkgs.runCommandLocal "eval-all-hosts" { } ''

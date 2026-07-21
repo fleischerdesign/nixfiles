@@ -26,9 +26,12 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@v9
 
       - id: detect
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           nix flake update
-          if git diff --quiet flake.lock; then
+          nix run .#update-custom-packages || true
+          if git diff --quiet flake.lock packages/custom; then
             echo "has-updates=false" >> "$GITHUB_OUTPUT"
           else
             echo "has-updates=true" >> "$GITHUB_OUTPUT"
@@ -95,6 +98,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add flake.lock
-          git commit -m "chore(deps): update flake inputs"
+          git add flake.lock packages/custom
+          git commit -m "chore(deps): update flake inputs and custom packages"
           git push origin main
