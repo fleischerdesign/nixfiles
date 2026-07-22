@@ -25,6 +25,11 @@
           if test (count $argv) -eq 0
               echo "Usage:   tpl <template-name> [target-directory]"
               echo "Example: tpl c my-app"
+
+              set -l tpls (curl -s "https://api.github.com/users/fleischerdesign/repos?per_page=100" | string match -r '"name": "nix-([^"]+)-template"' | string replace -r '"name": "nix-([^"]+)-template"' '$1' | string sort -u)
+              if test -n "$tpls"
+                  echo "Available: "(string join ", " $tpls)
+              end
               echo "Source:  github:fleischerdesign/nix-<name>-template"
               return 1
           end
