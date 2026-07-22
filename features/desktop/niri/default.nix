@@ -112,6 +112,17 @@ in
             pkgs.polkit_gnome
           ];
 
+          programs.niri.config = lib.mkOptionDefault [
+            {
+              name = "include";
+              arguments = [ "~/.config/axis/niri.kdl" ];
+              properties = {
+                optional = true;
+              };
+              children = [ ];
+            }
+          ];
+
           programs.niri.settings = with config.lib.niri.actions; {
             cursor = {
               theme = "Adwaita";
