@@ -41,6 +41,7 @@ in
               ms-python.python
             ];
             userSettings = {
+              "workbench.experimental.modernUI" = true;
               "extensions.autoUpdate" = false;
               "git.confirmSync" = false;
               "git.autofetch" = true;
