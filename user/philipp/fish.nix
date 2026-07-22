@@ -26,7 +26,7 @@
               echo "Usage:   tpl <template-name> [target-directory]"
               echo "Example: tpl c my-app"
 
-              set -l tpls (curl -s "https://api.github.com/users/fleischerdesign/repos?per_page=100" | string match -r '"name": "nix-([^"]+)-template"' | string replace -r '"name": "nix-([^"]+)-template"' '$1' | string sort -u)
+              set -l tpls (curl -s "https://api.github.com/users/fleischerdesign/repos?per_page=100" | string match -r -g '"name": "nix-([^"]+)-template"' | sort -u)
               if test -n "$tpls"
                   echo "Available: "(string join ", " $tpls)
               end
