@@ -64,14 +64,13 @@ in
           case "$ACTION" in
             up|dhcp4-change)
               if ${pkgs.iproute2}/bin/ip addr show dev "$IFACE" 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "192.168.178."; then
-                GW_MAC=$(${pkgs.iproute2}/bin/ip neighbor show 192.168.178.1 dev "$IFACE" 2>/dev/null | ${pkgs.gawk}/bin/awk '{print $5}')
-
-                if [ -z "$GW_MAC" ]; then
-                  ${pkgs.iputils}/bin/arping -c 1 -I "$IFACE" 192.168.178.1 >/dev/null 2>&1 || true
-                  GW_MAC=$(${pkgs.iproute2}/bin/ip neighbor show 192.168.178.1 dev "$IFACE" 2>/dev/null | ${pkgs.gawk}/bin/awk '{print $5}')
+                GW_INFO=$(${pkgs.iproute2}/bin/ip neighbor show 192.168.178.1 dev "$IFACE" 2>/dev/null)
+                if ! echo "$GW_INFO" | ${pkgs.gnugrep}/bin/grep -qi "${cfg.homeGatewayMac}"; then
+                  ${pkgs.iputils}/bin/arping -c 2 -w 2 -I "$IFACE" 192.168.178.1 >/dev/null 2>&1 || true
+                  GW_INFO=$(${pkgs.iproute2}/bin/ip neighbor show 192.168.178.1 dev "$IFACE" 2>/dev/null)
                 fi
 
-                if [ "$GW_MAC" = "${cfg.homeGatewayMac}" ]; then
+                if echo "$GW_INFO" | ${pkgs.gnugrep}/bin/grep -qi "${cfg.homeGatewayMac}"; then
                   ${pkgs.iproute2}/bin/ip rule del priority 500 2>/dev/null || true
                   ${pkgs.iproute2}/bin/ip rule add to 192.168.178.0/24 lookup main priority 500
                 else
