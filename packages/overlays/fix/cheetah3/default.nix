@@ -7,22 +7,11 @@
 # Impact: Blocks SABnzbd service (features/services/sabnzbd) on host strummer.
 # Remove when upstream nixpkgs fixes python314Packages.cheetah3 metadata checks.
 _final: prev: {
-  python314 = prev.python314.override (old: {
-    packageOverrides = prev.lib.composeExtensions (old.packageOverrides or (_: _: { })) (
-      _pyFinal: pyPrev: {
-        cheetah3 = pyPrev.cheetah3.overridePythonAttrs (_: {
-          dontCheckPythonMetadata = true;
-        });
-      }
-    );
-  });
-  python3 = prev.python3.override (old: {
-    packageOverrides = prev.lib.composeExtensions (old.packageOverrides or (_: _: { })) (
-      _pyFinal: pyPrev: {
-        cheetah3 = pyPrev.cheetah3.overridePythonAttrs (_: {
-          dontCheckPythonMetadata = true;
-        });
-      }
-    );
-  });
+  pythonPackagesExtensions = (prev.pythonPackagesExtensions or [ ]) ++ [
+    (_pythonFinal: pythonPrev: {
+      cheetah3 = pythonPrev.cheetah3.overridePythonAttrs (_: {
+        dontCheckPythonMetadata = true;
+      });
+    })
+  ];
 }

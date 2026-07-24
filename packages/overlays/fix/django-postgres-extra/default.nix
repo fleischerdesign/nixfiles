@@ -3,27 +3,16 @@
 #
 # django-postgres-extra derivation specifies version 2.0.9, but .dist-info/METADATA specifies version 2.0.9rc4.
 # Python 3.14 metadata check strictly enforces version equality and fails.
-# We set dontCheckPythonMetadata = true for django-postgres-extra across all python scopes.
+# We append to pythonPackagesExtensions so all Python interpreters and sub-scopes receive the fix.
 #
 # Impact: Blocks Authentik service (features/services/authentik) on host mackaye.
 # Remove when upstream nixpkgs fixes version metadata in django-postgres-extra package definition.
 _final: prev: {
-  python314 = prev.python314.override (old: {
-    packageOverrides = prev.lib.composeExtensions (old.packageOverrides or (_: _: { })) (
-      _pyFinal: pyPrev: {
-        django-postgres-extra = pyPrev.django-postgres-extra.overridePythonAttrs (_: {
-          dontCheckPythonMetadata = true;
-        });
-      }
-    );
-  });
-  python3 = prev.python3.override (old: {
-    packageOverrides = prev.lib.composeExtensions (old.packageOverrides or (_: _: { })) (
-      _pyFinal: pyPrev: {
-        django-postgres-extra = pyPrev.django-postgres-extra.overridePythonAttrs (_: {
-          dontCheckPythonMetadata = true;
-        });
-      }
-    );
-  });
+  pythonPackagesExtensions = (prev.pythonPackagesExtensions or [ ]) ++ [
+    (_pythonFinal: pythonPrev: {
+      django-postgres-extra = pythonPrev.django-postgres-extra.overridePythonAttrs (_: {
+        dontCheckPythonMetadata = true;
+      });
+    })
+  ];
 }
