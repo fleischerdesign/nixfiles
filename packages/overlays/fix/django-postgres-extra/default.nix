@@ -8,25 +8,22 @@
 # Impact: Blocks Authentik service (features/services/authentik) on host mackaye.
 # Remove when upstream nixpkgs fixes version metadata in django-postgres-extra package definition.
 _final: prev: {
-  python314Packages = prev.python314Packages.overrideScope (
-    _pyFinal: pyPrev: {
-      django-postgres-extra = pyPrev.django-postgres-extra.overridePythonAttrs (_: {
-        dontCheckPythonMetadata = true;
-      });
-    }
-  );
-  python3Packages = prev.python3Packages.overrideScope (
-    _pyFinal: pyPrev: {
-      django-postgres-extra = pyPrev.django-postgres-extra.overridePythonAttrs (_: {
-        dontCheckPythonMetadata = true;
-      });
-    }
-  );
-  python3 = prev.python3.override {
-    packageOverrides = _finalPy: pyPrev: {
-      django-postgres-extra = pyPrev.django-postgres-extra.overridePythonAttrs (_: {
-        dontCheckPythonMetadata = true;
-      });
-    };
-  };
+  python314 = prev.python314.override (old: {
+    packageOverrides = prev.lib.composeExtensions (old.packageOverrides or (_: _: { })) (
+      _pyFinal: pyPrev: {
+        django-postgres-extra = pyPrev.django-postgres-extra.overridePythonAttrs (_: {
+          dontCheckPythonMetadata = true;
+        });
+      }
+    );
+  });
+  python3 = prev.python3.override (old: {
+    packageOverrides = prev.lib.composeExtensions (old.packageOverrides or (_: _: { })) (
+      _pyFinal: pyPrev: {
+        django-postgres-extra = pyPrev.django-postgres-extra.overridePythonAttrs (_: {
+          dontCheckPythonMetadata = true;
+        });
+      }
+    );
+  });
 }
