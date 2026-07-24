@@ -88,6 +88,7 @@
         (import ./packages/overlays/fix/bottles)
         (import ./packages/overlays/fix/cheetah3)
         (import ./packages/overlays/fix/django-tenants)
+        (import ./packages/overlays/fix/django-postgres-extra)
         (import ./packages/overlays/fix/ak-guardian)
         (import ./packages/overlays/fix/hermes-agent inputs)
         inputs.nix-vscode-extensions.overlays.default
