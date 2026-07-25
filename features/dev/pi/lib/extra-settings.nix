@@ -21,7 +21,11 @@
 { lib }:
 
 let
-  scalarType = lib.types.oneOf [ lib.types.str lib.types.int lib.types.bool ];
+  scalarType = lib.types.oneOf [
+    lib.types.str
+    lib.types.int
+    lib.types.bool
+  ];
 in
 
 {
@@ -30,20 +34,16 @@ in
     description = "Additional JSON config keys — flat scalars only (no nested objects or lists).";
   };
 
-  mkCheckShadowing = pathName: knownKeys: cfg:
+  mkCheckShadowing =
+    pathName: knownKeys: cfg:
     let
-      extra = lib.attrByPath
-        (lib.splitString "." pathName ++ [ "extraSettings" ])
-        { }
-        cfg;
+      extra = lib.attrByPath (lib.splitString "." pathName ++ [ "extraSettings" ]) { } cfg;
       shadowed = builtins.filter (k: builtins.elem k knownKeys) (builtins.attrNames extra);
     in
     lib.optionals (shadowed != [ ]) [
       {
         assertion = false;
-        message = "Option ${pathName}.extraSettings contains key(s) that shadow real options: ${
-          builtins.concatStringsSep ", " shadowed
-        }. Remove them — they are silently ignored.";
+        message = "Option ${pathName}.extraSettings contains key(s) that shadow real options: ${builtins.concatStringsSep ", " shadowed}. Remove them — they are silently ignored.";
       }
     ];
 }

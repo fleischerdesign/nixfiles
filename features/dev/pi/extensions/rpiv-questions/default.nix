@@ -34,7 +34,9 @@ in
     assertions = piLib.mkCheckShadowing extPath knownKeys config;
 
     my.features.dev.pi.extensions.rpiv-questions._files.config.".config/rpiv-ask-user-question/config.json" =
-      { collapseKey = cfg.collapseKey; }
-      // cfg.extraSettings;
+    {
+      inherit (cfg) collapseKey;
+    }
+    // cfg.extraSettings;
   };
 }

@@ -8,8 +8,13 @@ let
   };
   extPath = "my.features.dev.pi.extensions.pi-subagents";
   knownKeys = [
-    "maxConcurrent" "defaultMaxTurns" "graceTurns" "defaultJoinMode"
-    "schedulingEnabled" "scopeModels" "widgetMode"
+    "maxConcurrent"
+    "defaultMaxTurns"
+    "graceTurns"
+    "defaultJoinMode"
+    "schedulingEnabled"
+    "scopeModels"
+    "widgetMode"
   ];
 
   # ── Agent frontmatter validation ───────────────────────────────────────
@@ -23,8 +28,9 @@ let
 
   agentsDir = ./agents;
   agentNames = builtins.filter (n: n != null) (
-    builtins.map (n: if builtins.match ".*\\.md" n != null then n else null)
-      (builtins.attrNames (builtins.readDir agentsDir))
+    builtins.map (n: if builtins.match ".*\\.md" n != null then n else null) (
+      builtins.attrNames (builtins.readDir agentsDir)
+    )
   );
 
   # Extract frontmatter (text between first two "---" markers).
@@ -51,18 +57,18 @@ let
     matches != null;
 
   # For each agent, check every frontmatter line
-  agentChecks =
-    builtins.map (name:
-      let
-        content = builtins.readFile (agentsDir + "/${name}");
-        fm = extractFM content;
-        lines = builtins.filter (l: l != "") (lib.splitString "\n" fm);
-        bad = builtins.filter hasNestedColon lines;
-      in
-      {
-        inherit name bad;
-      }
-    ) agentNames;
+  agentChecks = builtins.map (
+    name:
+    let
+      content = builtins.readFile (agentsDir + "/${name}");
+      fm = extractFM content;
+      lines = builtins.filter (l: l != "") (lib.splitString "\n" fm);
+      bad = builtins.filter hasNestedColon lines;
+    in
+    {
+      inherit name bad;
+    }
+  ) agentNames;
 in
 {
   options.my.features.dev.pi.extensions.pi-subagents = {
@@ -85,7 +91,11 @@ in
       default = 3;
     };
     defaultJoinMode = lib.mkOption {
-      type = lib.types.enum [ "smart" "group" "individual" ];
+      type = lib.types.enum [
+        "smart"
+        "group"
+        "individual"
+      ];
       default = "smart";
     };
     schedulingEnabled = lib.mkOption {
@@ -97,7 +107,11 @@ in
       default = false;
     };
     widgetMode = lib.mkOption {
-      type = lib.types.enum [ "all" "background" "off" ];
+      type = lib.types.enum [
+        "all"
+        "background"
+        "off"
+      ];
       default = "background";
     };
     extraSettings = lib.mkOption ({ default = { }; } // piLib.scalarExtraSettings);
@@ -112,8 +126,9 @@ in
   config = lib.mkIf cfg.enable {
     assertions =
       piLib.mkCheckShadowing extPath knownKeys config
-      ++ (lib.concatMap (check:
-        lib.optionals (check.bad != []) [
+      ++ (lib.concatMap (
+        check:
+        lib.optionals (check.bad != [ ]) [
           {
             assertion = false;
             message = ''
@@ -128,17 +143,18 @@ in
       ) agentChecks);
 
     my.features.dev.pi.extensions.pi-subagents._files = {
-      config.".pi/agent/subagents.json" =
-        {
-          maxConcurrent = cfg.maxConcurrent;
-          defaultMaxTurns = cfg.defaultMaxTurns;
-          graceTurns = cfg.graceTurns;
-          defaultJoinMode = cfg.defaultJoinMode;
-          schedulingEnabled = cfg.schedulingEnabled;
-          scopeModels = cfg.scopeModels;
-          widgetMode = cfg.widgetMode;
-        }
-        // cfg.extraSettings;
+      config.".pi/agent/subagents.json" = {
+        inherit (cfg)
+          maxConcurrent
+          defaultMaxTurns
+          graceTurns
+          defaultJoinMode
+          schedulingEnabled
+          scopeModels
+          widgetMode
+          ;
+      }
+      // cfg.extraSettings;
 
       assets.".pi/agent/agents" = ./agents;
     };

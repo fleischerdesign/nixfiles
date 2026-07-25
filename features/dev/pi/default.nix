@@ -48,7 +48,7 @@ let
       processEntry =
         name: type:
         if type == "regular" then
-          [ { relPath = (if prefix == "" then name else "${prefix}/${name}"); } ]
+          [ { relPath = if prefix == "" then name else "${prefix}/${name}"; } ]
         else if type == "directory" then
           collectDir (dir + "/${name}") (if prefix == "" then name else "${prefix}/${name}")
         else
@@ -89,20 +89,17 @@ let
 
       fields = lib.mapAttrsToList (k: v: ''"${k}": ${renderVal v}'') attrs;
     in
-    ''{
-      ${lib.concatStringsSep "\n,   " fields}
-    }'';
+    ''
+      {
+            ${lib.concatStringsSep "\n,   " fields}
+          }'';
 
   # ── Auth helpers ───────────────────────────────────────────────────────
 
   # Convert a SOPS secret path to pi's native !cat shell-command syntax.
   # Pi resolves !command in auth.json keys at runtime (resolveConfigValue step 2).
   toAuthKey =
-    key:
-    if lib.isString key && lib.hasPrefix "/run/secrets/" key then
-      "!cat ${key}"
-    else
-      key;
+    key: if lib.isString key && lib.hasPrefix "/run/secrets/" key then "!cat ${key}" else key;
 in
 {
   imports = map (name: extensionsDir + "/${name}/default.nix") extensionNames;
@@ -147,7 +144,10 @@ in
     # ── UI ───────────────────────────────────────────────
 
     theme = lib.mkOption {
-      type = lib.types.enum [ "dark" "light" ];
+      type = lib.types.enum [
+        "dark"
+        "light"
+      ];
       default = "dark";
       description = "Pi UI theme.";
     };
@@ -180,7 +180,13 @@ in
     # ── Catch-all ─────────────────────────────────────────
 
     extraSettings = lib.mkOption {
-      type = lib.types.attrsOf (lib.types.oneOf [ lib.types.str lib.types.int lib.types.bool ]);
+      type = lib.types.attrsOf (
+        lib.types.oneOf [
+          lib.types.str
+          lib.types.int
+          lib.types.bool
+        ]
+      );
       default = { };
       description = "Additional settings.json fields (flat scalars only).";
     };
@@ -226,11 +232,13 @@ in
           in
           overlaid
           // {
-            defaultProvider = cfg.provider;
-            defaultModel = cfg.defaultModel;
-            defaultThinkingLevel = cfg.thinkingLevel;
-            theme = cfg.theme;
-            enableSkillCommands = cfg.enableSkillCommands;
+            inherit (cfg)
+              defaultProvider
+              defaultModel
+              defaultThinkingLevel
+              theme
+              enableSkillCommands
+              ;
             inherit packages;
           };
 

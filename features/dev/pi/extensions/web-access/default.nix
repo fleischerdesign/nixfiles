@@ -8,9 +8,17 @@ let
   };
   extPath = "my.features.dev.pi.extensions.web-access";
   knownKeys = [
-    "workflow" "chromeProfile" "allowBrowserCookies" "geminiBaseUrl"
-    "braveApiKey" "exaApiKey" "geminiApiKey" "cloudflareApiKey"
-    "tavilyApiKey" "parallelApiKey" "perplexityApiKey"
+    "workflow"
+    "chromeProfile"
+    "allowBrowserCookies"
+    "geminiBaseUrl"
+    "braveApiKey"
+    "exaApiKey"
+    "geminiApiKey"
+    "cloudflareApiKey"
+    "tavilyApiKey"
+    "parallelApiKey"
+    "perplexityApiKey"
   ];
 in
 {
@@ -22,7 +30,11 @@ in
       description = "NPM package specifier for this extension.";
     };
     workflow = lib.mkOption {
-      type = lib.types.enum [ "none" "summary-review" "auto-summary" ];
+      type = lib.types.enum [
+        "none"
+        "summary-review"
+        "auto-summary"
+      ];
       default = "auto-summary";
     };
     chromeProfile = lib.mkOption {
@@ -81,17 +93,19 @@ in
       lib.filterAttrs (_: v: v != null && v != false)
         (
           {
-            workflow = cfg.workflow;
-            chromeProfile = cfg.chromeProfile;
-            allowBrowserCookies = cfg.allowBrowserCookies;
-            geminiBaseUrl = cfg.geminiBaseUrl;
-            braveApiKey = cfg.braveApiKey;
-            exaApiKey = cfg.exaApiKey;
-            geminiApiKey = cfg.geminiApiKey;
-            cloudflareApiKey = cfg.cloudflareApiKey;
-            tavilyApiKey = cfg.tavilyApiKey;
-            parallelApiKey = cfg.parallelApiKey;
-            perplexityApiKey = cfg.perplexityApiKey;
+            inherit (cfg)
+              workflow
+              chromeProfile
+              allowBrowserCookies
+              geminiBaseUrl
+              braveApiKey
+              exaApiKey
+              geminiApiKey
+              cloudflareApiKey
+              tavilyApiKey
+              parallelApiKey
+              perplexityApiKey
+              ;
           }
           // cfg.extraSettings
         );
