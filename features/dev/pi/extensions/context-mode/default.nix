@@ -6,5 +6,10 @@
 {
   options.my.features.dev.pi.extensions.context-mode = {
     enable = lib.mkEnableOption "context-mode — context window savings engine";
+    package = lib.mkOption {
+      type = lib.types.str;
+      default = "npm:context-mode";
+      description = "NPM package specifier for this extension.";
+    };
   };
 }

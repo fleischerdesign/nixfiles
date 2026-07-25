@@ -5,12 +5,22 @@
 #   ./                 Orchestrator: deploys AGENTS.md + skills, auto-discovers extensions
 #   ./skills/          pi-core engineering harness
 #   ./extensions/      One directory per extension — pure Nix options + _files contract
+#   ./lib/             Shared types (extension-files, extra-settings)
 #
 # Extension contract:
 #   Each extension declares `my.features.dev.pi.extensions.<name>.*` options
 #   and sets `_files.config` (attrsets → JSON) and/or `_files.assets` (dirs → deployed).
 #   Extensions never touch home.file, home.activation, or SOPS logic.
 #   The orchestrator handles all deployment and SOPS resolution.
+#
+# Auth:
+#   Provider API keys are resolved via pi's native `!cat` shell-command syntax
+#   (pi's resolveConfigValue resolution step 2). No activation scripts, no
+#   shell heredocs — the key field in auth.json is a static string.
+#
+# Extension configs with SOPS values:
+#   Values referencing /run/secrets/… are rendered as $(cat <path>) in a shell
+#   heredoc activation script. This is the only activation script remaining.
 
 {
   config,
@@ -30,15 +40,6 @@ let
       name: entries.${name} == "directory" && builtins.pathExists (extensionsDir + "/${name}/default.nix")
     ) (builtins.attrNames entries);
 
-  extensionPackageMap = {
-    web-access = "npm:pi-web-access";
-    mcp-adapter = "npm:pi-mcp-adapter";
-    pi-lens = "npm:pi-lens";
-    context-mode = "npm:context-mode";
-    rpiv-questions = "npm:@juicesharp/rpiv-ask-user-question";
-    pi-subagents = "npm:@tintinweb/pi-subagents";
-  };
-
   # Recursively collect files from a directory
   collectDir =
     dir: prefix:
@@ -57,7 +58,7 @@ let
 
   skillFiles = collectDir ./skills "";
 
-  # ── SOPS helpers ──────────────────────────────────────────────────
+  # ── SOPS helpers (extension configs only — auth uses pi-native !cat) ──
 
   # True if any leaf string value in the attrset starts with /run/secrets/
   hasSopsSecret =
@@ -72,29 +73,36 @@ let
         false
     ) (builtins.attrValues attrs);
 
-  # Render a nested attrset as a shell heredoc fragment.
-  # Literal values → JSON-baked at build time.
-  # SOPS paths (/run/secrets/…) → $(cat <path>) resolved at activation time.
-  renderFields =
+  # Render an attrset as a shell heredoc fragment for SOPS-resolved values.
+  # Literal values → JSON-baked. SOPS paths → $(cat <path>) resolved at activation.
+  renderConfig =
     attrs:
     let
       renderVal =
         v:
         if lib.isString v && lib.hasPrefix "/run/secrets/" v then
-          ''"$(cat ${lib.escapeShellArg v} 2>/dev/null || true)"''
+          ''"$(cat ${lib.escapeShellArg v})"''
         else if lib.isAttrs v then
-          renderObj v
+          throw "nested objects in extension config SOPS not supported — flatten your config"
         else
           builtins.toJSON v;
 
-      renderObj =
-        obj:
-        let
-          fields = lib.mapAttrsToList (k: v: ''"${k}": ${renderVal v}'') obj;
-        in
-        "{\n    ${builtins.concatStringsSep ",\n    " fields}\n  }";
+      fields = lib.mapAttrsToList (k: v: ''"${k}": ${renderVal v}'') attrs;
     in
-    renderObj attrs;
+    ''{
+      ${lib.concatStringsSep "\n,   " fields}
+    }'';
+
+  # ── Auth helpers ───────────────────────────────────────────────────────
+
+  # Convert a SOPS secret path to pi's native !cat shell-command syntax.
+  # Pi resolves !command in auth.json keys at runtime (resolveConfigValue step 2).
+  toAuthKey =
+    key:
+    if lib.isString key && lib.hasPrefix "/run/secrets/" key then
+      "!cat ${key}"
+    else
+      key;
 in
 {
   imports = map (name: extensionsDir + "/${name}/default.nix") extensionNames;
@@ -136,7 +144,21 @@ in
       description = "Model patterns for Ctrl+P cycling (e.g. [\"deepseek-*\"]).";
     };
 
-    # ── Auth (SOPS) ───────────────────────────────────────
+    # ── UI ───────────────────────────────────────────────
+
+    theme = lib.mkOption {
+      type = lib.types.enum [ "dark" "light" ];
+      default = "dark";
+      description = "Pi UI theme.";
+    };
+
+    enableSkillCommands = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable /skill-name slash commands.";
+    };
+
+    # ── Auth ─────────────────────────────────────────────
 
     auth = lib.mkOption {
       type = lib.types.attrsOf (
@@ -144,24 +166,23 @@ in
           options.apiKey = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
-            description = "API key or SOPS secret path (/run/secrets/…).";
+            description = ''
+              API key or SOPS secret path.  For SOPS secrets, use the !cat
+              resolution path (e.g. config.sops.secrets."deepseek-key".path).
+              Pi will resolve the secret at runtime via !cat <path>.
+            '';
           };
         }
       );
       default = { };
-      description = ''
-        Provider credentials. Each key is a provider name.
-        Use SOPS secret paths for production:
-          auth.deepseek.apiKey = config.sops.secrets."deepseek-api-key".path;
-      '';
     };
 
     # ── Catch-all ─────────────────────────────────────────
 
     extraSettings = lib.mkOption {
-      type = lib.types.attrsOf lib.types.anything;
+      type = lib.types.attrsOf (lib.types.oneOf [ lib.types.str lib.types.int lib.types.bool ]);
       default = { };
-      description = "Additional settings.json fields — future-proof catch-all.";
+      description = "Additional settings.json fields (flat scalars only).";
     };
   };
 
@@ -182,7 +203,7 @@ in
         ) extensionNames;
 
         packages = builtins.filter (p: p != null) (
-          map (name: extensionPackageMap.${name} or null) enabledNames
+          map (name: config.my.features.dev.pi.extensions.${name}.package or null) enabledNames
         );
 
         # ── settings.json ────────────────────────────────────────
@@ -191,8 +212,8 @@ in
           defaultProvider = cfg.provider;
           defaultModel = cfg.defaultModel;
           defaultThinkingLevel = cfg.thinkingLevel;
-          theme = "dark";
-          enableSkillCommands = true;
+          theme = cfg.theme;
+          enableSkillCommands = cfg.enableSkillCommands;
           inherit packages;
         }
         // lib.optionalAttrs (cfg.enabledModels != [ ]) {
@@ -208,8 +229,9 @@ in
             defaultProvider = cfg.provider;
             defaultModel = cfg.defaultModel;
             defaultThinkingLevel = cfg.thinkingLevel;
+            theme = cfg.theme;
+            enableSkillCommands = cfg.enableSkillCommands;
             inherit packages;
-            enableSkillCommands = true;
           };
 
         # ── Collect _files from all enabled extensions ───────────
@@ -224,7 +246,7 @@ in
           ext: lib.mapAttrsToList (path: content: { inherit path content; }) (ext.files.config or { })
         ) extOutputs;
 
-        # asset dirs: { path = "..."; source = ./agents; }
+        # asset dirs: { path = "..."; source = <dir>; }
         extAssets = lib.concatMap (
           ext: lib.mapAttrsToList (path: source: { inherit path source; }) (ext.files.assets or { })
         ) extOutputs;
@@ -234,7 +256,7 @@ in
         sopsConfigs = builtins.filter (f: hasSopsSecret f.content) extConfigs;
         staticConfigs = builtins.filter (f: !hasSopsSecret f.content) extConfigs;
 
-        # ── Home-manager: static files (settings, AGENTS, skills, ext configs, assets) ──
+        # ── Home-manager: static files ───────────────────────────
 
         # Extension JSON configs (no SOPS)
         extConfigFiles = builtins.listToAttrs (
@@ -257,55 +279,39 @@ in
           }) extAssets
         );
 
-        # ── Home-manager: activation scripts (SOPS configs + auth) ──
+        # ── Auth (pi-native !cat, static file) ──────────────────
 
-        # Auth providers (from cfg.auth, filtered to non-null apiKeys)
         authAttrs = lib.mapAttrs' (
           provider: cred:
           lib.nameValuePair provider {
             type = "api_key";
-            key = cred.apiKey;
+            key = toAuthKey cred.apiKey;
           }
         ) (lib.filterAttrs (_: cred: cred.apiKey != null) cfg.auth);
 
-        hasAuth = authAttrs != { };
+        # ── Home-manager: activation scripts (SOPS extension configs) ──
 
-        # Combine extension SOPS configs + auth (if configured)
-        sopsActivation =
-          (builtins.listToAttrs (
-            map (f: {
-              name = "pi-sops-${builtins.hashString "md5" f.path}";
-              value =
-                let
-                  rendered = renderFields f.content;
-                in
-                ''
-                  mkdir -p "$(dirname "$HOME/${f.path}")"
-                  cat > "$HOME/${f.path}" <<PIEOF
-                  ${rendered}
-                  PIEOF
-                  chmod 600 "$HOME/${f.path}"
-                '';
-            }) sopsConfigs
-          ))
-          // lib.optionalAttrs hasAuth {
-            "pi-auth" =
+        sopsActivation = builtins.listToAttrs (
+          map (f: {
+            name = "pi-sops-${builtins.hashString "md5" f.path}";
+            value =
               let
-                rendered = renderFields authAttrs;
+                rendered = renderConfig f.content;
               in
               ''
-                mkdir -p "$HOME/.pi/agent"
-                cat > "$HOME/.pi/agent/auth.json" <<PIEOF
+                mkdir -p "$(dirname "$HOME/${f.path}")"
+                cat > "$HOME/${f.path}" <<PIEOF
                 ${rendered}
                 PIEOF
-                chmod 600 "$HOME/.pi/agent/auth.json"
+                chmod 600 "$HOME/${f.path}"
               '';
-          };
+          }) sopsConfigs
+        );
       in
       {
         environment.systemPackages = [
           pkgs.pi-coding-agent
-          pkgs.nodejs # Required for pi extension npm install operations
+          pkgs.nodejs
         ];
 
         home-manager.users = lib.mkIf (config.my.user.name or null != null) {
@@ -328,6 +334,12 @@ in
                   };
                 }) skillFiles
               )
+              # auth.json (static — pi resolves !cat at runtime)
+              // (lib.optionalAttrs (authAttrs != { }) {
+                ".pi/agent/auth.json" = {
+                  text = builtins.toJSON authAttrs;
+                };
+              })
               # Extension static config JSON
               // extConfigFiles
               # Extension assets

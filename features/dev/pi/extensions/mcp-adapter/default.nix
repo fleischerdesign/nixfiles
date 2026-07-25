@@ -6,5 +6,10 @@
 {
   options.my.features.dev.pi.extensions.mcp-adapter = {
     enable = lib.mkEnableOption "pi-mcp-adapter — MCP protocol bridge";
+    package = lib.mkOption {
+      type = lib.types.str;
+      default = "npm:pi-mcp-adapter";
+      description = "NPM package specifier for this extension.";
+    };
   };
 }

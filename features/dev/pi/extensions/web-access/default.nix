@@ -2,16 +2,27 @@
 { config, lib, ... }:
 let
   cfg = config.my.features.dev.pi.extensions.web-access;
+  piLib = {
+    inherit (import ../../lib/extension-files.nix { inherit lib; }) filesModule;
+    inherit (import ../../lib/extra-settings.nix { inherit lib; }) scalarExtraSettings mkCheckShadowing;
+  };
+  extPath = "my.features.dev.pi.extensions.web-access";
+  knownKeys = [
+    "workflow" "chromeProfile" "allowBrowserCookies" "geminiBaseUrl"
+    "braveApiKey" "exaApiKey" "geminiApiKey" "cloudflareApiKey"
+    "tavilyApiKey" "parallelApiKey" "perplexityApiKey"
+  ];
 in
 {
   options.my.features.dev.pi.extensions.web-access = {
     enable = lib.mkEnableOption "pi-web-access";
+    package = lib.mkOption {
+      type = lib.types.str;
+      default = "npm:pi-web-access";
+      description = "NPM package specifier for this extension.";
+    };
     workflow = lib.mkOption {
-      type = lib.types.enum [
-        "none"
-        "summary-review"
-        "auto-summary"
-      ];
+      type = lib.types.enum [ "none" "summary-review" "auto-summary" ];
       default = "auto-summary";
     };
     chromeProfile = lib.mkOption {
@@ -54,28 +65,18 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
     };
-    extraSettings = lib.mkOption {
-      type = lib.types.attrsOf lib.types.anything;
-      default = { };
-    };
+    extraSettings = lib.mkOption ({ default = { }; } // piLib.scalarExtraSettings);
 
     _files = lib.mkOption {
-      type = lib.types.submodule {
-        options.config = lib.mkOption {
-          type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
-          default = { };
-        };
-        options.assets = lib.mkOption {
-          type = lib.types.attrsOf lib.types.path;
-          default = { };
-        };
-      };
+      type = piLib.filesModule;
       default = { };
       description = "Files to deploy (set by extension, read by orchestrator).";
     };
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = piLib.mkCheckShadowing extPath knownKeys config;
+
     my.features.dev.pi.extensions.web-access._files.config.".pi/web-search.json" =
       lib.filterAttrs (_: v: v != null && v != false)
         (
