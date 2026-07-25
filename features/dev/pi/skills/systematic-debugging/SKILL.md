@@ -14,6 +14,10 @@ Debugging is not patching. It is the application of the scientific method to a m
 - **Five Whys** (Toyota Production System): For each symptom, ask "why did this happen?" until you reach the root cause — typically 3-5 levels deep. Stop when the answer is a process failure, not a code failure (e.g., "no test covered this edge case" is a root cause; "the variable was null" is not).
 - **Reproduction is Everything**: A bug you cannot reproduce is a bug you cannot fix. Without reproduction, you are not debugging — you are speculating with a keyboard.
 
+## Prerequisite
+
+If the bug's location is unknown — you have an error message but don't know where it originates — load **`systematic-exploration`** first. Guessing the location wastes time; mapping the affected modules makes every subsequent step faster.
+
 ## Trigger
 
 Load this skill when:

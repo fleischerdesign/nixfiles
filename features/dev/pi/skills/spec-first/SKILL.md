@@ -13,6 +13,10 @@ You do not start with code. You start with a specification. The spec is the cont
 - **Behavior-Driven Development** (North 2006): Specifications expressed as concrete examples are testable, unambiguous, and serve as living documentation.
 - **Given-When-Then** (Gherkin): A structured format that forces explicit thinking about preconditions, actions, and postconditions.
 
+## Prerequisite
+
+If you have not yet read the code affected by this change, load **`systematic-exploration`** first. A specification written without code-level evidence is fiction.
+
 ## Trigger
 
 Load this skill when:
