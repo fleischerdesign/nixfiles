@@ -246,10 +246,16 @@ in
 
         # ── Collect _files from all enabled extensions ───────────
 
-        extOutputs = builtins.map (name: {
-          inherit name;
-          files = config.my.features.dev.pi.extensions.${name}._files or { };
-        }) enabledNames;
+        extOutputs = builtins.map (
+          name:
+          let
+            ext = config.my.features.dev.pi.extensions.${name};
+          in
+          {
+            inherit name;
+            files = ext._files or { };
+          }
+        ) enabledNames;
 
         # config files: { path = "..."; content = {…}; }
         extConfigs = lib.concatMap (
