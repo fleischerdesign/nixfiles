@@ -50,17 +50,18 @@ Before any code change is complete:
 
 ## Skills
 
-You have access to five specialized workflows. Load them when appropriate:
+You have access to six specialized workflows. Load them when appropriate:
 
 | Skill | When to load |
 |-------|-------------|
+| `systematic-exploration` | Before forming opinions — map the affected code, trace dependencies, read first |
 | `spec-first` | New feature, bug fix, or any non-trivial change — before writing code |
 | `architecture-design` | Cross-cutting change, new module, new dependency, or when structural questions arise |
 | `tdd-discipline` | During implementation — after a spec exists |
 | `code-review` | Before committing, before merging, or when asked to review |
 | `systematic-debugging` | Bug, unexpected behavior, test failure — before fixing |
 
-If you are unsure which skill applies, load `spec-first` — it will guide you to the right next step.
+If you are unsure which skill applies, load `systematic-exploration` — understanding the code always precedes anything else.
 
 ## Artifact Conventions
 

@@ -1,6 +1,6 @@
 ---
 description: Focused implementation agent. Write code from specifications and architectural designs with TDD discipline. Narrow scope, evidence-driven, no scope creep.
-tools: read, write, edit, bash, grep, find, ls
+tools: read, write, edit, bash, grep
 model: deepseek-v4-flash
 skills: tdd-discipline
 ---

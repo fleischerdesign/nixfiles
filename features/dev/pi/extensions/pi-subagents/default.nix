@@ -27,13 +27,18 @@ let
       (builtins.attrNames (builtins.readDir agentsDir))
   );
 
-  # Extract frontmatter (text between first two "---" markers)
+  # Extract frontmatter (text between first two "---" markers).
+  # Uses splitString because POSIX ERE .* does not match \n.
   extractFM =
     content:
     let
-      stripped = builtins.match "---\n(.*)\n---.*" content;
+      parts = lib.splitString "---" content;
+      fmWithNL = if builtins.length parts > 2 then builtins.elemAt parts 1 else "";
+      lines = lib.splitString "\n" fmWithNL;
+      # Drop leading/trailing empty strings from the split
+      clean = builtins.filter (l: l != "") lines;
     in
-    if stripped == null then "" else builtins.elemAt stripped 0;
+    lib.concatStringsSep "\n" clean;
 
   # True when line is a YAML key-value with an unquoted colon in the value.
   # Pattern:  key: value: rest
