@@ -18,8 +18,6 @@ in
     ]
     ++ lib.optionals (role != "server") [
       # --- Desktop Only ---
-      pi-coding-agent
-      nodejs
       custom.hermes-desktop
       telegram-desktop
       google-chrome
