@@ -215,13 +215,9 @@ in
         # ── settings.json ────────────────────────────────────────
 
         baseSettings = {
-          inherit (cfg)
-            defaultProvider
-            defaultModel
-            defaultThinkingLevel
-            theme
-            enableSkillCommands
-            ;
+          defaultProvider = cfg.provider;
+          inherit (cfg) defaultModel theme enableSkillCommands;
+          defaultThinkingLevel = cfg.thinkingLevel;
           inherit packages;
         }
         // lib.optionalAttrs (cfg.enabledModels != [ ]) {
@@ -234,14 +230,10 @@ in
           in
           overlaid
           // {
+            defaultProvider = cfg.provider;
+            inherit (cfg) defaultModel theme enableSkillCommands;
+            defaultThinkingLevel = cfg.thinkingLevel;
             inherit packages;
-            inherit (cfg)
-              defaultProvider
-              defaultModel
-              defaultThinkingLevel
-              theme
-              enableSkillCommands
-              ;
           };
 
         # ── Collect _files from all enabled extensions ───────────
