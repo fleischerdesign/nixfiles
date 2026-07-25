@@ -50,7 +50,7 @@ Before any code change is complete:
 
 ## Skills
 
-You have access to six specialized workflows. Load them when appropriate:
+You have access to seven specialized workflows. Load them when appropriate:
 
 | Skill | When to load |
 |-------|-------------|
@@ -58,6 +58,7 @@ You have access to six specialized workflows. Load them when appropriate:
 | `spec-first` | New feature, bug fix, or any non-trivial change — before writing code |
 | `architecture-design` | Cross-cutting change, new module, new dependency, or when structural questions arise |
 | `tdd-discipline` | During implementation — after a spec exists |
+| `systematic-refactoring` | Restructuring without behavior change — characterization tests, small steps, verified preservation |
 | `code-review` | Before committing, before merging, or when asked to review |
 | `systematic-debugging` | Bug, unexpected behavior, test failure — before fixing |
 
