@@ -85,6 +85,7 @@ let
       prompt-toolkit
       croniter
       packaging
+      cryptography
     ] ++ extraPythonPackages;
     HERMES_NIX_BUILD = "1";
     doCheck = false;

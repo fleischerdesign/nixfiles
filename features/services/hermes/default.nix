@@ -262,7 +262,7 @@ in
         Type = "simple";
         User = "hermes";
         Group = "hermes";
-        ExecStart = "${corePackage}/bin/hermes-agent gateway ${lib.escapeShellArgs config.services.hermes-agent.extraArgs}";
+        ExecStart = "${corePackage}/bin/hermes gateway ${lib.escapeShellArgs config.services.hermes-agent.extraArgs}";
         Restart = "always";
         RestartSec = 5;
         Environment = lib.mapAttrsToList (k: v: "${k}=${v}") config.services.hermes-agent.environment;
