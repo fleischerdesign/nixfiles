@@ -61,8 +61,6 @@ let
   mkNullableEnv = lib.filterAttrs (_: v: v != null);
 
   agentEnv = mkNullableEnv ({
-    HERMES_PLUGINS_DEBUG = "1";
-    HERMES_LOG_LEVEL = "DEBUG";
     MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
     HASS_URL = cfg.integrations.hass.url;
     PAPERLESS_URL = cfg.integrations.paperless.url;
@@ -105,7 +103,6 @@ let
       };
     };
     terminal.backend = "local";
-    plugins.enabled = [ "mnemosyne" ];
   } (
     if cfg.integrations.telegram.enable && cfg.integrations.telegram.chatId != null then {
       platforms.telegram.home_channel = {

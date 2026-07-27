@@ -96,6 +96,14 @@ let
       substituteInPlace pyproject.toml \
         --replace-fail 'setuptools>=77.0,<83' 'setuptools>=77.0'
     '';
+
+    # Python 3.14 renamed ThreadPoolExecutor._initializer to .initializer.
+    # The hermes-agent daemon_pool.py accesses the old underscore-prefixed
+    # attribute, which causes AttributeError on all concurrent tool execution.
+    postPatch = ''
+      substituteInPlace tools/daemon_pool.py \
+        --replace-fail 'self._initializer,' 'self.initializer,'
+    '';
   };
 
   pythonEnv = python3Packages.python.withPackages (_: [ hermesBuild ]);
