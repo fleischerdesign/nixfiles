@@ -68,15 +68,21 @@ in
         StateDirectory = "hermes-webui";
         StateDirectoryMode = "0700";
         UMask = "0077";
-        Environment = [
+        Environment = let
+          corePkg = pkgs.callPackage ../../package.nix { inherit (pkgs) nodejs_22; };
+          agentSrc = pkgs.fetchFromGitHub {
+            owner = "NousResearch";
+            repo = "hermes-agent";
+            rev = "8f8b66d8ac6ed5172daa213b615037cae0ed92f9";
+            hash = "sha256-iEsc8oUoGGX1EzpR4tTIFiB5oiUBUG7e+GR1AfNZv8I=";
+          };
+        in [
           "HERMES_WEBUI_HOST=127.0.0.1"
           "HERMES_WEBUI_PORT=${toString ecfg.port}"
           "HERMES_WEBUI_STATE_DIR=/var/lib/hermes-webui"
           "HERMES_HOME=/var/lib/hermes/.hermes"
-          "HERMES_WEBUI_AGENT_DIR=${pkgs.callPackage ../../package.nix { inherit (pkgs) nodejs_22; }}"
-          "HERMES_WEBUI_PYTHON=${
-            pkgs.callPackage ../../package.nix { inherit (pkgs) nodejs_22; }
-          }.pythonEnv/bin/python3"
+          "HERMES_WEBUI_AGENT_DIR=${agentSrc}"
+          "HERMES_WEBUI_PYTHON=${corePkg.passthru.pythonEnv}/bin/python3"
           "HERMES_API_URL=http://127.0.0.1:8642"
           "HERMES_WEBUI_DEFAULT_WORKSPACE=/var/lib/hermes/workspace"
           "HASS_URL=${hcfg.hassUrl}"
