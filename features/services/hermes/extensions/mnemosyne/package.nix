@@ -17,7 +17,7 @@ let
     src = pythonPackages.fetchPypi {
       pname = "mnemosyne_memory";
       inherit version;
-      sha256 = "sha256-c4de8fe8761df206b09d4d9b1595e8cf28a89e925e68b4d3340181b80851ac66";
+      hash = "sha256-xN6P6HYd8gawnU2bFZXozyionpJeaLTTNAGBuAhRrGY=";
     };
     pyproject = true;
     build-system = [ pythonPackages.setuptools ];
@@ -35,7 +35,7 @@ let
     src = pythonPackages.fetchPypi {
       pname = "mnemosyne_hermes";
       inherit version;
-      sha256 = "sha256-896946bda8cc420fc613c55d27b553340cf120b44d5084b4d3f02b6060e585b3";
+      hash = "sha256-iWlGvajMQg/GE8VdJ7VTNAzxILRNUIS00/ArYGDlhbM=";
     };
     pyproject = true;
     build-system = [ pythonPackages.setuptools ];

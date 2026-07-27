@@ -56,12 +56,14 @@
       enable = true;
       prefix = "moebius";
     };
-    extensions.webui = {
-      enable = true;
-      oidc = {
+    extensions = {
+      webui.enable = true;
+      webui.oidc = {
         clientId = "WLcmhxTlLrbN9R4e7bfnlSNYi387OW1ynQWu27dG";
         issuer = "https://auth.ancoris.ovh/application/o/hermes/";
       };
+      mnemosyne.enable = true;
+      ddgs.enable = true;
     };
   };
 

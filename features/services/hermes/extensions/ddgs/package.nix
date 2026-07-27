@@ -13,7 +13,7 @@ pythonPackages.buildPythonPackage rec {
   version = "9.14.4";
   src = pythonPackages.fetchPypi {
     inherit pname version;
-    sha256 = "sha256-f7b118a2b709a9e9c04a1dca6e96b98c25d4dfaca1a4b0a244d74454fcca48ef";
+    hash = "sha256-97EYorcJqenASh3Kbpa5jCXU36yhpLCiRNdEVPzKSO8=";
   };
   pyproject = true;
   build-system = [ pythonPackages.setuptools ];

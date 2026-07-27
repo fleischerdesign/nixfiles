@@ -1,7 +1,7 @@
 {
   "name": "ddgs",
   "version": "9.14.4",
-  "srcHash": "sha256-f7b118a2b709a9e9c04a1dca6e96b98c25d4dfaca1a4b0a244d74454fcca48ef",
+  "srcHash": "sha256-97EYorcJqenASh3Kbpa5jCXU36yhpLCiRNdEVPzKSO8=",
   "upstream": {
     "type": "pypi",
     "package": "ddgs"
