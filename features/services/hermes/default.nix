@@ -104,10 +104,6 @@ let
       };
     };
     terminal.backend = "local";
-    plugins.enabled = builtins.catAttrs "pluginName" (
-      builtins.filter (ext: ext.enable && ext.pluginName != null)
-        (builtins.attrValues config.my.features.services.hermes.extensions)
-    );
   } (
     if cfg.integrations.telegram.enable && cfg.integrations.telegram.chatId != null then {
       platforms.telegram.home_channel = {
@@ -331,6 +327,12 @@ in
           return base
 
       merged = deep_merge(existing, nix_cfg)
+
+      # Remove plugins key when Nix config does not manage it — lets
+      # the agent fall back to its default plugin discovery (user
+      # directory scan, grandfathering of existing plugins).
+      if "plugins" not in nix_cfg and "plugins" in merged:
+          del merged["plugins"]
 
       with open(config_path, "w") as f:
           yaml.safe_dump(merged, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
