@@ -334,6 +334,8 @@ in
 
       chown hermes:hermes ${hermesHome}/config.yaml
       chmod 0640 ${hermesHome}/config.yaml
+
+      systemctl try-restart hermes-agent.service || true
     '';
 
     systemd.tmpfiles.rules = [
