@@ -77,8 +77,7 @@ let
     };
     memory = {
       provider = "mnemosyne";
-      memory_enabled = false;
-      user_profile_enabled = false;
+      memory_enabled = true;
     };
     auxiliary = {
       vision = {
