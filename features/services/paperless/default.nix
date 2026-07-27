@@ -26,8 +26,9 @@ in
         my.features.services.postgresql.enable = true;
         my.features.services.redis.enable = true;
 
-        # 1. SOPS Secret for OIDC
+        # 1. SOPS Secrets
         sops.secrets.paperless_oidc_secret = { };
+        sops.secrets.paperless_secret_key = { };
 
         # 2. Template for the sensitive JSON Auth variable
         sops.templates."paperless.env" = {
