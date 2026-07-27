@@ -268,6 +268,7 @@ in
 
     systemd.services.hermes-agent = {
       description = "Hermes Agent Gateway";
+      restartTriggers = [ generatedConfigFile ];
       wantedBy = [ "multi-user.target" ];
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
@@ -289,6 +290,8 @@ in
 
     environment.systemPackages = [ corePackage ];
     environment.variables.HERMES_HOME = hermesHome;
+
+    systemd.services.hermes-webui.restartTriggers = [ generatedConfigFile ];
 
     system.activationScripts."hermes-agent-config" = lib.stringAfter [ "users" ] ''
       mkdir -p ${hermesHome} ${cfg.workingDirectory}
@@ -334,8 +337,6 @@ in
 
       chown hermes:hermes ${hermesHome}/config.yaml
       chmod 0640 ${hermesHome}/config.yaml
-
-      systemctl try-restart hermes-agent.service hermes-webui.service || true
     '';
 
     systemd.tmpfiles.rules = [
