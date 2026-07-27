@@ -281,9 +281,45 @@ in
       chown hermes:hermes ${cfg.stateDir} ${hermesHome} ${cfg.workingDirectory}
       chmod 2750 ${cfg.stateDir} ${hermesHome} ${cfg.workingDirectory}
 
-      if [ ! -f ${hermesHome}/config.yaml ]; then
-        install -o hermes -g hermes -m 0640 ${generatedConfigFile} ${hermesHome}/config.yaml
-      fi
+      ${pkgs.python3.withPackages (ps: [ ps.pyyaml ])}/bin/python3 << 'PYEOF'
+      import yaml, json, sys
+
+      nix_path = "${generatedConfigFile}"
+      config_path = "${hermesHome}/config.yaml"
+      dry_run = False
+
+      try:
+          with open(nix_path) as f:
+              nix_cfg = yaml.safe_load(f)
+      except Exception as e:
+          print(f"[hermes-config] failed to read nix config: {e}", file=sys.stderr)
+          sys.exit(1)
+
+      existing = {}
+      try:
+          with open(config_path) as f:
+              existing = yaml.safe_load(f) or {}
+      except FileNotFoundError:
+          pass
+
+      def deep_merge(base, override):
+          for k, v in override.items():
+              if isinstance(v, dict) and isinstance(base.get(k), dict):
+                  base[k] = deep_merge(dict(base[k]), v)
+              else:
+                  base[k] = v
+          return base
+
+      merged = deep_merge(existing, nix_cfg)
+
+      with open(config_path, "w") as f:
+          yaml.safe_dump(merged, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+      print("[hermes-config] wrote merged config.yaml")
+      PYEOF
+
+      chown hermes:hermes ${hermesHome}/config.yaml
+      chmod 0640 ${hermesHome}/config.yaml
     '';
 
     systemd.tmpfiles.rules = [
