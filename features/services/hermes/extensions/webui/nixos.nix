@@ -40,16 +40,17 @@ let
 
   webuiEnv =
     [
-      "HERMES_WEBUI_HOST=127.0.0.1"
+      "HERMES_WEBUI_HOST=${ecfg.host}"
       "HERMES_WEBUI_PORT=${toString ecfg.port}"
-      "HERMES_WEBUI_STATE_DIR=/var/lib/hermes-webui"
-      "HERMES_HOME=/var/lib/hermes/.hermes"
+      "HERMES_WEBUI_STATE_DIR=${ecfg.stateDir}"
+      "HERMES_HOME=${hcfg.stateDir}/.hermes"
       "HERMES_WEBUI_AGENT_DIR=${agentSrc}"
       "HERMES_WEBUI_PYTHON=${corePkg.passthru.pythonEnv}/bin/python3"
       "HERMES_API_URL=http://127.0.0.1:8642"
       "HERMES_WEBUI_DEFAULT_WORKSPACE=${hcfg.workingDirectory}"
       "MNEMOSYNE_EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     ]
+    ++ lib.mapAttrsToList (k: v: "${k}=${v}") ecfg.extraEnvironment
     ++ mkIfSet "HASS_URL" hcfg.integrations.hass.url
     ++ mkIfSet "PAPERLESS_URL" hcfg.integrations.paperless.url
     ++ mkIfSet "CAMOFOX_URL" hcfg.integrations.camofox.url
@@ -98,6 +99,21 @@ in
       default = { };
       description = "OIDC authentication configuration for the WebUI.";
     };
+    host = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1";
+      description = "Listen address for the Hermes WebUI.";
+    };
+    stateDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/hermes-webui";
+      description = "State directory for the WebUI service.";
+    };
+    extraEnvironment = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      description = "Extra environment variables passed to the WebUI service.";
+    };
   };
 
   config = lib.mkIf (hcfg.enable && ecfg.enable) {
@@ -127,15 +143,18 @@ in
         Group = "hermes";
         ExecStart = "${pkgs.callPackage ./package.nix { }}/bin/hermes-webui";
         Restart = "on-failure";
-        StateDirectory = "hermes-webui";
-        StateDirectoryMode = "0700";
         UMask = "0077";
         Environment = webuiEnv;
         EnvironmentFile = lib.optionals (config.sops.secrets ? hermes_agent_env) [
           config.sops.secrets.hermes_agent_env.path
         ];
+        ReadWritePaths = [ ecfg.stateDir ];
       };
     };
+
+    systemd.tmpfiles.rules = [
+      "d ${ecfg.stateDir} 0700 hermes hermes - -"
+    ];
 
     my.endpoints.hermes-webui = {
       host = config.networking.hostName;

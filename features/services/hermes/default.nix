@@ -50,6 +50,8 @@ let
 
   generatedConfigFile = pkgs.writeText "hermes-config.yaml" configJson;
 
+  hermesHome = cfg.stateDir + "/.hermes";
+
   baseDomain = config.my.features.services.caddy.baseDomain;
   sub = cfg.subdomainDelegation;
 
@@ -177,6 +179,11 @@ in
         default = "/var/lib/hermes/workspace";
         description = "Working directory for the agent service.";
       };
+      stateDir = lib.mkOption {
+        type = lib.types.str;
+        default = "/var/lib/hermes";
+        description = "State directory for hermes-agent. HERMES_HOME is set to stateDir/.hermes.";
+      };
 
       subdomainDelegation = lib.mkOption {
         type = lib.types.submodule {
@@ -267,25 +274,25 @@ in
     };
 
     environment.systemPackages = [ corePackage ];
-    environment.variables.HERMES_HOME = "/var/lib/hermes/.hermes";
+    environment.variables.HERMES_HOME = hermesHome;
 
     system.activationScripts."hermes-agent-config" = lib.stringAfter [ "users" ] ''
-      mkdir -p /var/lib/hermes/.hermes ${cfg.workingDirectory}
-      chown hermes:hermes /var/lib/hermes /var/lib/hermes/.hermes ${cfg.workingDirectory}
-      chmod 2750 /var/lib/hermes /var/lib/hermes/.hermes ${cfg.workingDirectory}
+      mkdir -p ${hermesHome} ${cfg.workingDirectory}
+      chown hermes:hermes ${cfg.stateDir} ${hermesHome} ${cfg.workingDirectory}
+      chmod 2750 ${cfg.stateDir} ${hermesHome} ${cfg.workingDirectory}
 
-      if [ ! -f /var/lib/hermes/.hermes/config.yaml ]; then
-        install -o hermes -g hermes -m 0640 ${generatedConfigFile} /var/lib/hermes/.hermes/config.yaml
+      if [ ! -f ${hermesHome}/config.yaml ]; then
+        install -o hermes -g hermes -m 0640 ${generatedConfigFile} ${hermesHome}/config.yaml
       fi
     '';
 
     systemd.tmpfiles.rules = [
-      "d /var/lib/hermes            2770 hermes hermes - -"
-      "d /var/lib/hermes/.hermes    2770 hermes hermes - -"
+      "d ${cfg.stateDir}            2770 hermes hermes - -"
+      "d ${hermesHome}              2770 hermes hermes - -"
       "d ${cfg.workingDirectory}    2770 hermes hermes - -"
-      "d /var/lib/hermes/.gemini    0770 hermes hermes -"
-      "d /var/lib/hermes/.config    0770 hermes hermes -"
-      "d /var/lib/hermes/.config/gh 0770 hermes hermes -"
+      "d ${cfg.stateDir}/.gemini    0770 hermes hermes -"
+      "d ${cfg.stateDir}/.config    0770 hermes hermes -"
+      "d ${cfg.stateDir}/.config/gh 0770 hermes hermes -"
       "f /var/lib/systemd/linger/hermes 0644 root root - -"
     ];
 
@@ -297,7 +304,7 @@ in
         hermes = {
           isSystemUser = true;
           group = "hermes";
-          home = "/var/lib/hermes";
+          home = cfg.stateDir;
           homeMode = "2750";
           createHome = true;
         };
@@ -335,12 +342,12 @@ in
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
       serviceConfig = {
-        ExecStart = "${pkgs.caddy}/bin/caddy run --config /var/lib/hermes/.hermes/caddy/Caddyfile --adapter caddyfile";
-        ExecReload = "${pkgs.caddy}/bin/caddy reload --config /var/lib/hermes/.hermes/caddy/Caddyfile --address localhost:2020";
+        ExecStart = "${pkgs.caddy}/bin/caddy run --config ${hermesHome}/caddy/Caddyfile --adapter caddyfile";
+        ExecReload = "${pkgs.caddy}/bin/caddy reload --config ${hermesHome}/caddy/Caddyfile --address localhost:2020";
         User = "hermes";
         Group = "hermes";
         Restart = "always";
-        WorkingDirectory = "/var/lib/hermes";
+        WorkingDirectory = cfg.stateDir;
       };
     };
 
@@ -355,20 +362,20 @@ in
         Group = "hermes";
       };
       script = ''
-        mkdir -p /var/lib/hermes/.hermes/caddy/routes
+        mkdir -p ${hermesHome}/caddy/routes
 
-        cat > /var/lib/hermes/.hermes/caddy/Caddyfile << 'CADDYEOF'
+        cat > ${hermesHome}/caddy/Caddyfile << 'CADDYEOF'
         {
           admin localhost:2020
           auto_https off
         }
 
         :4480 {
-          import /var/lib/hermes/.hermes/caddy/routes/*
+          import ${hermesHome}/caddy/routes/*
         }
         CADDYEOF
 
-        cat > /var/lib/hermes/.hermes/caddy/routes/webhook << ROUTEEOF
+        cat > ${hermesHome}/caddy/routes/webhook << ROUTEEOF
         @webhook host webhook.${sub.prefix}.${baseDomain}
         handle @webhook {
           rewrite * /webhooks{path}
@@ -378,7 +385,7 @@ in
         }
         ROUTEEOF
 
-        cat > /var/lib/hermes/.hermes/caddy/routes/health << ROUTEEOF
+        cat > ${hermesHome}/caddy/routes/health << ROUTEEOF
         @health host health.${sub.prefix}.${baseDomain}
         handle @health {
           reverse_proxy 127.0.0.1:8090 {

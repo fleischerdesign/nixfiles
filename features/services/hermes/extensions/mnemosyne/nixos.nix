@@ -33,7 +33,7 @@ in
         RemainAfterExit = true;
         User = "hermes";
         Group = "hermes";
-        ExecStart = "${mnemosynePkgs.hermes}/bin/mnemosyne-hermes --hermes-home /var/lib/hermes/.hermes install --force";
+        ExecStart = "${mnemosynePkgs.hermes}/bin/mnemosyne-hermes --hermes-home ${hcfg.stateDir}/.hermes install --force";
       };
     };
   };
