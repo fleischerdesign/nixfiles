@@ -28,7 +28,7 @@ _final: prev: {
     })
   ];
 
-  authentik = prev.authentik.override (old: {
+  authentik = prev.authentik.override (_: {
     fetchFromGitHub =
       args:
       prev.runCommand "authentik-src-patched" { } ''
