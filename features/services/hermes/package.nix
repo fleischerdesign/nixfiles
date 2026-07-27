@@ -1,3 +1,37 @@
+# features/services/hermes/package.nix — Hermes Agent application package
+#
+# Two-phase derivation pattern:
+#   1. hermesBuild (buildPythonPackage)  Compiles the Python wheel from
+#      the upstream source. Dependencies go into propagatedBuildInputs
+#      so the entry-point wrappers can find them at import time.
+#   2. Outer stdenv.mkDerivation          Assembles the final package:
+#      symlinks immutable assets (skills, locales, plugins) from the
+#      source tree, symlinks the pre-built web_dist (npm → Vite output
+#      at hermes_cli/web_dist/), and wraps the three entry-point
+#      binaries (hermes, hermes-agent, hermes-acp) with HERMES_*
+#      environment variables the agent reads at startup.
+#
+# Design decisions:
+#   - HERMES_NIX_BUILD=1          Bypasses upstream's setup.py guard that
+#                                 blocks non-Nix pip/sdist installs.
+#   - ELECTRON_SKIP_BINARY_DOWNLOAD=1
+#                                 The npm monorepo includes electron for
+#                                 the desktop/TUI workspaces. We only
+#                                 need the web workspace; this prevents
+#                                 electron's postinstall from fetching
+#                                 its binary in the Nix sandbox.
+#   - pythonEnv (withPackages)    Exposed via passthru so the webui
+#                                 extension can reference a Python
+#                                 interpreter that has hermes-agent
+#                                 available (HERMES_WEBUI_PYTHON).
+#   - extraPythonPackages         Injection point for extension packages
+#                                 (mnemosyne, ddgs). These become part of
+#                                 the agent's Python environment without
+#                                 rebuilding the core wheel.
+#   - setuptools version patch    Upstream constrains setuptools <83 but
+#                                 nixpkgs ships 83.x. We relax the
+#                                 constraint in pyproject.toml via
+#                                 prePatch substituteInPlace.
 { lib, stdenv, makeBinaryWrapper, fetchFromGitHub
 , nodejs_22, buildNpmPackage, python3Packages, git, ripgrep, openssh, ffmpeg
 , extraPythonPackages ? [ ]

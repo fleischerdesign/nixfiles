@@ -1,3 +1,12 @@
+# features/services/hermes/extensions/mnemosyne/nixos.nix — Mnemosyne extension
+#
+# Provides the Mnemosyne memory provider for hermes-agent. Mnemosyne
+# stores conversation memory as vector embeddings in a SQLite database
+# (sqlite-vec extension). The bootstrap oneshot service initializes
+# the database before the agent starts.
+#
+# The extension contributes its Python packages (memory + hermes CLI)
+# through the core module's extraPythonPackages injection point.
 {
   config,
   lib,

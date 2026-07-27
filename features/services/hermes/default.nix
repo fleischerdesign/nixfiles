@@ -1,3 +1,32 @@
+# features/services/hermes/default.nix — Hermes Agent feature module
+#
+# Self-contained NixOS module for the Hermes AI agent. No upstream flake
+# dependency — the agent is built from source via buildPythonPackage
+# (package.nix) with npm-based web assets for the gateway UI.
+#
+# Architecture:
+#   Core (this file)        Options, systemd service, config generation,
+#                           subdomain delegation, secrets, users.
+#   package.nix             Two-phase derivation: buildPythonPackage for
+#                           the Python application, stdenv.mkDerivation
+#                           for asset symlinks and binary wrappers.
+#   mcp.nix                 Typed MCP server options bridged into the
+#                           free-form settings attrset.
+#   extensions/<name>/      Each extension provides its own nixos.nix
+#                           (options + config) and optionally package.nix.
+#                           Extensions are gated by explicit enable flags.
+#
+# Design decisions:
+#   - buildPythonPackage with empty propagatedBuildInputs → dependencies
+#     are provided by pythonEnv (withPackages). This separates the
+#     application build from its runtime environment, allowing
+#     extension packages to be injected without rebuilding the core.
+#   - Config is serialized as JSON (YAML superset) and written once
+#     on first boot. The agent's runtime settings are fully declarative
+#     via services.hermes-agent.settings.
+#   - Subdomain delegation uses a host-level Caddy wildcard TLS
+#     (Cloudflare DNS challenge) that reverse-proxies to an internal
+#     Caddy instance running as the hermes user.
 { config, lib, pkgs, ... }:
 let
   cfg = config.my.features.services.hermes;

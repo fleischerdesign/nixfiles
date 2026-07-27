@@ -1,3 +1,19 @@
+# features/services/hermes/extensions/webui/nixos.nix — WebUI extension
+#
+# Provides the Hermes WebUI as an optional extension to the hermes-agent
+# service. The webui runs as a separate systemd service (hermes-webui)
+# and communicates with the agent's internal API (HERMES_API_URL).
+#
+# Dependencies on the core module:
+#   - hcfg.integrations.*      Read-only: HASS, Paperless, Camofox URLs
+#   - hcfg.workingDirectory    Default workspace location
+#   - corePkg.passthru.pythonEnv  Python interpreter with agent deps
+#   - agentSrc (fetchFromGitHub)  Agent source tree for bootstrap.py
+#     validation (checks for run_agent.py).
+#
+# The webui bootstrap.py entry point is wrapped in package.nix with
+# --foreground --no-browser --skip-agent-install. OIDC authentication
+# is optional (all oidc.* options default to null).
 { config, lib, pkgs, ... }:
 let
   hcfg = config.my.features.services.hermes;

@@ -1,3 +1,8 @@
+# features/services/hermes/extensions/ddgs/nixos.nix — DDGS extension
+#
+# DuckDuckGo search provider for hermes-agent. This is a package-only
+# extension — it provides a Python package injected via extraPythonPackages
+# but requires no additional service or configuration.
 { config, lib, ... }:
 let
   hcfg = config.my.features.services.hermes;

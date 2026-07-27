@@ -1,3 +1,18 @@
+# features/services/hermes/extensions/webui/package.nix — WebUI package
+#
+# Thin wrapper around the upstream hermes-webui source (nesquena/hermes-webui).
+# Copies the Python runtime files (bootstrap.py, server.py, api/, static/)
+# and wraps bootstrap.py with a Nix-provided Python environment.
+#
+# Design decisions:
+#   - HERMES_WEBUI_DISABLE_LOCAL_VENV=1  Prevents bootstrap.py from
+#     creating its own Python venv at runtime — we use the Nix-built
+#     environment instead.
+#   - --skip-agent-install                The agent is installed separately
+#     by the core hermes-agent package.
+#   - Entry point: bootstrap.py           Not -m hermes_webui.server.
+#     The upstream bootstrap handles venv provisioning, state init,
+#     foreground/daemon mode, and the HTTP server lifecycle.
 {
   stdenv,
   lib,

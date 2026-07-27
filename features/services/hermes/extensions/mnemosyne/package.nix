@@ -1,3 +1,11 @@
+# features/services/hermes/extensions/mnemosyne/package.nix — Mnemosyne packages
+#
+# Builds two Python packages from PyPI:
+#   mnemosyne-memory   Vector memory database (sqlite-vec, fastembed, numpy)
+#   mnemosyne-hermes   CLI tool for managing Mnemosyne databases
+#
+# Fastembed is pinned to the vanilla nixpkgs version — no pillow override
+# needed since we no longer bridge a uv2nix venv with nixpkgs PYTHONPATH.
 { python3Packages }:
 
 let

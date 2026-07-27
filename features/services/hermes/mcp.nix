@@ -1,3 +1,13 @@
+# features/services/hermes/mcp.nix — MCP server configuration
+#
+# Typed NixOS options for MCP (Model Context Protocol) servers that
+# bridge into hermes-agent's free-form config.yaml settings.
+#
+# Design: options are declared under services.hermes-agent.mcpServers
+# (typed, validated) and the config block maps them into
+# services.hermes-agent.settings.mcp_servers (untyped attrs).
+# This gives users type safety at the Nix level while preserving
+# the agent's native config format.
 { config, lib, ... }:
 let
   hcfg = config.my.features.services.hermes;

@@ -1,3 +1,7 @@
+# features/services/hermes/extensions/ddgs/package.nix — DDGS package
+#
+# DuckDuckGo Search Python package built from PyPI. Provides the
+# 'ddgs' module used by hermes-agent for web search functionality.
 { python3Packages }:
 
 let
