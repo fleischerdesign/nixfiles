@@ -62,6 +62,7 @@ let
 
   agentEnv = mkNullableEnv ({
     HERMES_PLUGINS_DEBUG = "1";
+    HERMES_LOG_LEVEL = "DEBUG";
     MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
     HASS_URL = cfg.integrations.hass.url;
     PAPERLESS_URL = cfg.integrations.paperless.url;
