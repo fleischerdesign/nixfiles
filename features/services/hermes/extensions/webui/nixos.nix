@@ -66,6 +66,12 @@ in
 {
   options.my.features.services.hermes.extensions.webui = {
     enable = lib.mkEnableOption "Hermes WebUI extension";
+    pluginName = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      internal = true;
+      description = "Plugin name. null = not a plugin.";
+    };
     port = lib.mkOption {
       type = lib.types.port;
       default = 8787;

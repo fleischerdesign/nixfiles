@@ -11,6 +11,12 @@ in
 {
   options.my.features.services.hermes.extensions.ddgs = {
     enable = lib.mkEnableOption "DuckDuckGo search package extension";
+    pluginName = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "ddgs";
+      internal = true;
+      description = "Plugin name registered in config.yaml plugins.enabled.";
+    };
   };
 
   config = lib.mkIf (hcfg.enable && ecfg.enable) {

@@ -104,6 +104,10 @@ let
       };
     };
     terminal.backend = "local";
+    plugins.enabled = builtins.catAttrs "pluginName" (
+      builtins.filter (ext: ext.enable && ext.pluginName != null)
+        (builtins.attrValues config.my.features.services.hermes.extensions)
+    );
   } (
     if cfg.integrations.telegram.enable && cfg.integrations.telegram.chatId != null then {
       platforms.telegram.home_channel = {

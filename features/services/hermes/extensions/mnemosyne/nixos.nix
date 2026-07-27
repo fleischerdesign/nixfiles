@@ -21,6 +21,12 @@ in
 {
   options.my.features.services.hermes.extensions.mnemosyne = {
     enable = lib.mkEnableOption "Mnemosyne memory extension";
+    pluginName = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "mnemosyne";
+      internal = true;
+      description = "Plugin name registered in config.yaml plugins.enabled.";
+    };
   };
 
   config = lib.mkIf (hcfg.enable && ecfg.enable) {
