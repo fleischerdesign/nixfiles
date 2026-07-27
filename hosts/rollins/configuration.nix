@@ -32,20 +32,23 @@
     ];
   };
 
-  my.features.services.hermes-agent.enable = true;
-  my.features.services.hermes-agent.subdomainDelegation = true;
+  my.features.services.hermes = {
+    enable = true;
+    subdomainDelegation = true;
+  };
+
   services.hermes-agent.settings.platforms.telegram.home_channel = {
     platform = "telegram";
     chat_id = "5838211825";
   };
-  services.hermes-agent.container.enable = false;
+
   services.hermes-agent.environment = {
     API_SERVER_ENABLED = "true";
     API_SERVER_HOST = "127.0.0.1";
     API_SERVER_PORT = "8642";
   };
 
-  my.features.services.hermes-webui = {
+  my.features.services.hermes.extensions.webui = {
     enable = true;
     oidcClientId = "WLcmhxTlLrbN9R4e7bfnlSNYi387OW1ynQWu27dG";
     oidcIssuer = "https://auth.ancoris.ovh/application/o/hermes/";

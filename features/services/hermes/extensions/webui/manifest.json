@@ -1,0 +1,10 @@
+{
+  "name": "hermes-webui",
+  "version": "399cd7ab19ce43f77d3c3a68bb575e9eed9cd6af",
+  "srcHash": "sha256-Dp7ZaOdgt/Rh6n/MzvEmWiz4Q2Q4IV4FFY7PpHkDYl4=",
+  "upstream": {
+    "type": "github-rev",
+    "owner": "nesquena",
+    "repo": "hermes-webui"
+  }
+}

@@ -58,16 +58,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    hermes-agent = {
-      url = "github:NousResearch/hermes-agent";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
-    hermes-webui = {
-      url = "github:nesquena/hermes-webui";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
   };
 
   outputs =
@@ -84,7 +74,6 @@
       # Zentralisierte Overlays
       overlays = [
         (import ./packages/overlays/fix/bottles)
-        (import ./packages/overlays/fix/hermes-agent inputs)
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];

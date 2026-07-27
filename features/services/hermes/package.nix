@@ -1,0 +1,117 @@
+{ lib, stdenv, makeBinaryWrapper, fetchFromGitHub
+, nodejs_22, buildNpmPackage, python3Packages, git, ripgrep, openssh, ffmpeg
+, extraPythonPackages ? [ ]
+}:
+
+let
+  manifest = builtins.fromJSON (builtins.readFile ./manifest.json);
+
+  src = fetchFromGitHub {
+    owner = manifest.upstream.owner;
+    repo = manifest.upstream.repo;
+    rev = manifest.rev;
+    hash = manifest.srcHash;
+  };
+
+  webDist = buildNpmPackage {
+    pname = "hermes-gateway-web";
+    version = manifest.version;
+    src = src;
+    npmDepsHash = manifest.npmDepsHash;
+    npmWorkspace = "web";
+    ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
+    installPhase = ''
+      mkdir -p $out
+      cp -r hermes_cli/web_dist/* $out/
+    '';
+  };
+
+  runtimeDeps = [ git ripgrep openssh ffmpeg ];
+
+  hermesBuild = python3Packages.buildPythonPackage {
+    pname = manifest.name;
+    version = manifest.version;
+    inherit src;
+
+    pyproject = true;
+    build-system = [ python3Packages.setuptools ];
+    propagatedBuildInputs = with python3Packages; [
+      openai
+      certifi
+      python-dotenv
+      fire
+      httpx
+      rich
+      tenacity
+      pyyaml
+      ruamel-yaml
+      requests
+      jinja2
+      pydantic
+      prompt-toolkit
+      croniter
+      packaging
+    ] ++ extraPythonPackages;
+    HERMES_NIX_BUILD = "1";
+    doCheck = false;
+    dontCheckRuntimeDeps = true;
+    pythonImportsCheck = [ "hermes_cli" ];
+
+    prePatch = ''
+      substituteInPlace pyproject.toml \
+        --replace-fail 'setuptools>=77.0,<83' 'setuptools>=77.0'
+    '';
+  };
+
+  pythonEnv = python3Packages.python.withPackages (_: [ hermesBuild ]);
+
+in stdenv.mkDerivation {
+  pname = manifest.name;
+  version = manifest.version;
+  inherit src;
+  dontUnpack = true;
+  dontBuild = true;
+  nativeBuildInputs = [ makeBinaryWrapper ];
+
+  installPhase = ''
+    runHook preInstall
+
+    mkdir -p $out/share/hermes-agent $out/bin
+
+    ln -s ${src}/skills $out/share/hermes-agent/skills
+    ln -s ${src}/optional-skills $out/share/hermes-agent/optional-skills
+    ln -s ${src}/plugins $out/share/hermes-agent/plugins
+    ln -s ${src}/locales $out/share/hermes-agent/locales
+    ln -s ${src}/optional-mcps $out/share/hermes-agent/optional-mcps
+    ln -s ${webDist} $out/share/hermes-agent/web_dist
+
+    for bin in hermes hermes-agent hermes-acp; do
+      makeBinaryWrapper ${hermesBuild}/bin/$bin $out/bin/$bin \
+        --suffix PATH : "${lib.makeBinPath runtimeDeps}" \
+        --set HERMES_BUNDLED_SKILLS $out/share/hermes-agent/skills \
+        --set HERMES_OPTIONAL_SKILLS $out/share/hermes-agent/optional-skills \
+        --set HERMES_BUNDLED_PLUGINS $out/share/hermes-agent/plugins \
+        --set HERMES_BUNDLED_LOCALES $out/share/hermes-agent/locales \
+        --set HERMES_OPTIONAL_MCPS $out/share/hermes-agent/optional-mcps \
+        --set HERMES_WEB_DIST $out/share/hermes-agent/web_dist \
+        --set HERMES_PYTHON ${pythonEnv}/bin/python3 \
+        --set HERMES_NODE ${lib.getExe nodejs_22} \
+        --set HERMES_REVISION ${manifest.rev}
+    done
+
+    runHook postInstall
+  '';
+
+  passthru = {
+    inherit pythonEnv;
+    inherit (hermesBuild) overridePythonAttrs;
+  };
+
+  meta = with lib; {
+    description = "The self-improving AI agent — creates skills from experience";
+    homepage = "https://github.com/NousResearch/hermes-agent";
+    license = licenses.mit;
+    platforms = platforms.linux;
+    mainProgram = "hermes";
+  };
+}

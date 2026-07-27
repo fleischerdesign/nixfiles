@@ -21,7 +21,12 @@ fi
 
 echo "🔍 Checking custom packages for upstream updates..."
 
-for manifest_path in "$CUSTOM_PKGS_DIR"/*/manifest.json; do
+MANIFEST_PATHS=()
+while IFS= read -r -d '' mp; do
+  MANIFEST_PATHS+=("$mp")
+done < <(find "$REPO_ROOT/packages/custom" "$REPO_ROOT/features" -name manifest.json -print0 2>/dev/null)
+
+for manifest_path in "${MANIFEST_PATHS[@]}"; do
   [ -f "$manifest_path" ] || continue
 
   pkg_dir="$(dirname "$manifest_path")"

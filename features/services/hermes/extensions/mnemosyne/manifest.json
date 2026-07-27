@@ -1,0 +1,14 @@
+{
+  "name": "mnemosyne",
+  "memoryVersion": "3.8.0",
+  "memoryHash": "sha256-c4de8fe8761df206b09d4d9b1595e8cf28a89e925e68b4d3340181b80851ac66",
+  "hermesVersion": "0.2.0",
+  "hermesHash": "sha256-896946bda8cc420fc613c55d27b553340cf120b44d5084b4d3f02b6060e585b3",
+  "upstream": {
+    "type": "pypi",
+    "packages": {
+      "memory": "mnemosyne-memory",
+      "hermes": "mnemosyne-hermes"
+    }
+  }
+}
