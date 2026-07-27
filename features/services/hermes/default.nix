@@ -1,9 +1,4 @@
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ config, lib, pkgs, ... }:
 let
   cfg = config.my.features.services.hermes;
 
@@ -21,14 +16,83 @@ let
   };
 
   configJson = builtins.toJSON (
-    lib.recursiveUpdate {
-      terminal.cwd = cfg.workingDirectory;
-    } config.services.hermes-agent.settings
+    lib.recursiveUpdate { terminal.cwd = cfg.workingDirectory; } config.services.hermes-agent.settings
   );
 
   generatedConfigFile = pkgs.writeText "hermes-config.yaml" configJson;
 
-  baseDomain = config.my.features.services.caddy.baseDomain or "rls.ancoris.ovh";
+  baseDomain = config.my.features.services.caddy.baseDomain;
+  sub = cfg.subdomainDelegation;
+
+  mkNullableEnv = lib.filterAttrs (_: v: v != null);
+
+  agentEnv = mkNullableEnv ({
+    MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
+    HASS_URL = cfg.integrations.hass.url;
+    PAPERLESS_URL = cfg.integrations.paperless.url;
+    CAMOFOX_URL = cfg.integrations.camofox.url;
+  } // lib.optionalAttrs (cfg.integrations.camofox.url != null) {
+    CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
+  });
+
+  agentSettings = lib.recursiveUpdate {
+    approvals.mode = "smart";
+    model = {
+      default = cfg.model;
+      provider = "deepseek";
+    };
+    memory = {
+      provider = "mnemosyne";
+      memory_enabled = false;
+      user_profile_enabled = false;
+    };
+    auxiliary = {
+      vision = {
+        provider = "openrouter";
+        model = "google/gemini-3.5-flash";
+      };
+      title_generation = {
+        provider = "deepseek";
+        model = "deepseek-v4-flash";
+      };
+      compression = {
+        provider = "deepseek";
+        model = "deepseek-v4-flash";
+      };
+      approval = {
+        provider = "deepseek";
+        model = "deepseek-v4-flash";
+      };
+      web_extract = {
+        provider = "deepseek";
+        model = "deepseek-v4-flash";
+      };
+    };
+    terminal.backend = "local";
+  } (
+    if cfg.integrations.telegram.chatId != null then {
+      platforms.telegram.home_channel = {
+        platform = "telegram";
+        chat_id = cfg.integrations.telegram.chatId;
+      };
+    } else { }
+    // (
+      if cfg.integrations.camofox.url != null then {
+        browser.camofox.managed_persistence = true;
+      } else { }
+    )
+    // (
+      if sub.enable then {
+        platforms.webhook = {
+          enabled = true;
+          extra = {
+            port = 8644;
+            host = "127.0.0.1";
+          };
+        };
+      } else { }
+    )
+  );
 in
 {
   imports = [
@@ -79,120 +143,72 @@ in
         default = [ config.my.user.name ];
         description = "Interactive host users in the hermes group.";
       };
-      subdomainDelegation = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = "Wildcard subdomain delegation via Caddy.";
-      };
-      hassUrl = lib.mkOption {
-        type = lib.types.str;
-        default =
-          if
-            config.my.endpoints ? home-assistant && config.my.endpoints.home-assistant.proxy.subdomain != null
-          then
-            "https://${config.my.endpoints.home-assistant.proxy.subdomain}.${
-              config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh"
-            }"
-          else
-            "https://hass.fls.ancoris.ovh";
-        description = "Home Assistant URL.";
-      };
-      paperlessUrl = lib.mkOption {
-        type = lib.types.str;
-        default =
-          if config.my.endpoints ? paperless && config.my.endpoints.paperless.proxy.subdomain != null then
-            "https://${config.my.endpoints.paperless.proxy.subdomain}.${
-              config.my.features.services.caddy.baseDomain or "fls.ancoris.ovh"
-            }"
-          else
-            "https://paperless.fls.ancoris.ovh";
-        description = "Paperless URL.";
-      };
-      telegramChatId = lib.mkOption {
-        type = lib.types.str;
-        default = "5838211825";
-        description = "Telegram Chat ID for home_channel.";
-      };
       workingDirectory = lib.mkOption {
         type = lib.types.str;
         default = "/var/lib/hermes/workspace";
-        description = "Working directory for the hermes-agent service and terminal.cwd setting.";
+        description = "Working directory for the agent service.";
       };
-      camofoxUrl = lib.mkOption {
-        type = lib.types.str;
-        default = "http://127.0.0.1:9377";
-        description = "Camofox browser URL.";
+
+      subdomainDelegation = lib.mkOption {
+        type = lib.types.submodule {
+          options = {
+            enable = lib.mkEnableOption "wildcard subdomain delegation via Caddy";
+            prefix = lib.mkOption {
+              type = lib.types.str;
+              default = "hermes";
+              description = "Subdomain prefix for routing (e.g. webhook.{prefix}.{baseDomain}).";
+            };
+          };
+        };
+        default = { };
+      };
+
+      integrations = lib.mkOption {
+        type = lib.types.submodule {
+          options = {
+            hass.url = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Home Assistant URL. When null, no HASS_URL env var is set.";
+            };
+            paperless.url = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Paperless URL. When null, no PAPERLESS_URL env var is set.";
+            };
+            camofox.url = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Camofox browser URL. When null, camofox API key and env vars are absent.";
+            };
+            telegram.chatId = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Telegram Chat ID for home_channel. When null, telegram config is absent.";
+            };
+          };
+        };
+        default = { };
       };
     };
   };
 
   config = lib.mkIf cfg.enable {
     sops.secrets = {
-      camofox_api_key.restartUnits = lib.mkDefault [ "hermes-agent.service" ];
       hermes_agent_env = {
         owner = "hermes";
         restartUnits = [ "hermes-agent.service" ];
       };
+    } // lib.optionalAttrs (cfg.integrations.camofox.url != null) {
+      camofox_api_key.restartUnits = lib.mkDefault [ "hermes-agent.service" ];
+    } // lib.optionalAttrs (sub.enable) {
+      cloudflare_api_token = { };
     };
 
     services.hermes-agent = {
-      settings = {
-        approvals.mode = "smart";
-        model = {
-          default = cfg.model;
-          provider = "deepseek";
-        };
-        memory = {
-          provider = "mnemosyne";
-          memory_enabled = false;
-          user_profile_enabled = false;
-        };
-        auxiliary = {
-          vision = {
-            provider = "openrouter";
-            model = "google/gemini-3.5-flash";
-          };
-          title_generation = {
-            provider = "deepseek";
-            model = "deepseek-v4-flash";
-          };
-          compression = {
-            provider = "deepseek";
-            model = "deepseek-v4-flash";
-          };
-          approval = {
-            provider = "deepseek";
-            model = "deepseek-v4-flash";
-          };
-          web_extract = {
-            provider = "deepseek";
-            model = "deepseek-v4-flash";
-          };
-        };
-        platforms = {
-          telegram.home_channel = {
-            platform = "telegram";
-            chat_id = cfg.telegramChatId;
-          };
-          webhook = {
-            enabled = cfg.subdomainDelegation;
-            extra = {
-              port = 8644;
-              host = "127.0.0.1";
-            };
-          };
-        };
-        terminal.backend = "local";
-        browser.camofox.managed_persistence = true;
-      };
+      settings = agentSettings;
       environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
-      environment = {
-        MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
-        HASS_URL = cfg.hassUrl;
-        PAPERLESS_URL = cfg.paperlessUrl;
-        CAMOFOX_URL = cfg.camofoxUrl;
-        CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
-      };
+      environment = agentEnv;
       extraPackages = with pkgs; [
         nix
         gh
@@ -260,35 +276,32 @@ in
 
     users.groups.hermes = { };
 
-    # ---- Subdomain delegation --------------------------------
-    services.caddy.package = lib.mkIf cfg.subdomainDelegation (
+    services.caddy.package = lib.mkIf sub.enable (
       pkgs.caddy.withPlugins {
         plugins = [ "github.com/caddy-dns/cloudflare@v0.2.4" ];
         hash = "sha256-7GoH8YLCoPmPExQxoga2FHB58zQDoZVf1BBwkVi0SsQ=";
       }
     );
 
-    sops.secrets.cloudflare_api_token = lib.mkIf cfg.subdomainDelegation { };
-
-    sops.templates.caddy_env.content = lib.mkIf cfg.subdomainDelegation ''
+    sops.templates.caddy_env.content = lib.mkIf sub.enable ''
       CLOUDFLARE_API_TOKEN=${config.sops.placeholder.cloudflare_api_token}
     '';
 
-    services.caddy.environmentFile = lib.mkIf cfg.subdomainDelegation config.sops.templates.caddy_env.path;
+    services.caddy.environmentFile = lib.mkIf sub.enable config.sops.templates.caddy_env.path;
 
-    services.caddy.virtualHosts."*.moebius.${baseDomain}" = lib.mkIf cfg.subdomainDelegation {
+    services.caddy.virtualHosts."*.${sub.prefix}.${baseDomain}" = lib.mkIf sub.enable {
       extraConfig = ''
         tls {
           dns cloudflare {env.CLOUDFLARE_API_TOKEN}
         }
-        @moebius host *.moebius.${baseDomain}
-        handle @moebius {
+        @${sub.prefix} host *.${sub.prefix}.${baseDomain}
+        handle @${sub.prefix} {
           reverse_proxy 127.0.0.1:4480
         }
       '';
     };
 
-    systemd.services.hermes-agent-caddy = lib.mkIf cfg.subdomainDelegation {
+    systemd.services.hermes-agent-caddy = lib.mkIf sub.enable {
       description = "Caddy for Hermes Agent Subdomain Delegation";
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
@@ -302,8 +315,8 @@ in
       };
     };
 
-    systemd.services.hermes-agent-moebius-bootstrap = lib.mkIf cfg.subdomainDelegation {
-      description = "Bootstrap Caddy for Moebius subdomain routing";
+    systemd.services.hermes-agent-moebius-bootstrap = lib.mkIf sub.enable {
+      description = "Bootstrap Caddy for Hermes subdomain routing";
       wantedBy = [ "hermes-agent.service" ];
       before = [ "hermes-agent-caddy.service" ];
       serviceConfig = {
@@ -327,7 +340,7 @@ in
         CADDYEOF
 
         cat > /var/lib/hermes/.hermes/caddy/routes/webhook << ROUTEEOF
-        @webhook host webhook.moebius.${baseDomain}
+        @webhook host webhook.${sub.prefix}.${baseDomain}
         handle @webhook {
           rewrite * /webhooks{path}
           reverse_proxy 127.0.0.1:8644 {
@@ -337,7 +350,7 @@ in
         ROUTEEOF
 
         cat > /var/lib/hermes/.hermes/caddy/routes/health << ROUTEEOF
-        @health host health.moebius.${baseDomain}
+        @health host health.${sub.prefix}.${baseDomain}
         handle @health {
           reverse_proxy 127.0.0.1:8090 {
             transport http

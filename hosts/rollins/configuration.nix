@@ -34,24 +34,29 @@
 
   my.features.services.hermes = {
     enable = true;
-    subdomainDelegation = true;
-  };
-
-  services.hermes-agent.settings.platforms.telegram.home_channel = {
-    platform = "telegram";
-    chat_id = "5838211825";
+    integrations = {
+      hass.url = "https://hass.fls.ancoris.ovh";
+      paperless.url = "https://paperless.fls.ancoris.ovh";
+      camofox.url = "http://127.0.0.1:9377";
+      telegram.chatId = "5838211825";
+    };
+    subdomainDelegation = {
+      enable = true;
+      prefix = "moebius";
+    };
+    extensions.webui = {
+      enable = true;
+      oidc = {
+        clientId = "WLcmhxTlLrbN9R4e7bfnlSNYi387OW1ynQWu27dG";
+        issuer = "https://auth.ancoris.ovh/application/o/hermes/";
+      };
+    };
   };
 
   services.hermes-agent.environment = {
     API_SERVER_ENABLED = "true";
     API_SERVER_HOST = "127.0.0.1";
     API_SERVER_PORT = "8642";
-  };
-
-  my.features.services.hermes.extensions.webui = {
-    enable = true;
-    oidcClientId = "WLcmhxTlLrbN9R4e7bfnlSNYi387OW1ynQWu27dG";
-    oidcIssuer = "https://auth.ancoris.ovh/application/o/hermes/";
   };
 
   my.endpoints.hermes-webui = {
