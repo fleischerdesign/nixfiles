@@ -358,6 +358,7 @@ in
           home = cfg.stateDir;
           homeMode = "2750";
           createHome = true;
+          shell = pkgs.bash;
         };
       };
 
