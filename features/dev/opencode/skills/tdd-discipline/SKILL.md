@@ -41,7 +41,7 @@ Agent({
 })
 ```
 
-The `implement` agent runs with `deepseek-v4-flash` and `tdd-discipline` skill preloaded. It implements in an isolated worktree. The parent reviews the resulting branch with `code-review` + `reviewer` subagent before merging.
+The `implement` agent runs with `deepseek-v4-flash` and `tdd-discipline` skill preloaded. It implements in an isolated worktree. The parent reviews the resulting branch with `code-review` + `review` subagent before merging.
 
 Do NOT delegate when:
 - The change is a single function in a single file

@@ -13,9 +13,21 @@ in
     enable = true;
     extraPackages = [ pkgs.nodejs ];
     settings = {
+      model = "deepseek/deepseek-v4-pro";
+      small_model = "deepseek/deepseek-v4-flash";
+      autoupdate = false;
       instructions = [
         "~/.config/opencode/instructions/engineering-constitution.md"
       ];
+      provider = {
+        deepseek = {
+          options = {
+            timeout = 600000;
+            chunkTimeout = 30000;
+            setCacheKey = true;
+          };
+        };
+      };
       mcp = {
         nixos = {
           type = "local";
@@ -54,8 +66,7 @@ in
         opencodeDir + "/skills/architecture-design/SKILL.md";
       ".config/opencode/skills/code-review/SKILL.md".source =
         opencodeDir + "/skills/code-review/SKILL.md";
-      ".config/opencode/skills/spec-first/SKILL.md".source =
-        opencodeDir + "/skills/spec-first/SKILL.md";
+      ".config/opencode/skills/spec-first/SKILL.md".source = opencodeDir + "/skills/spec-first/SKILL.md";
       ".config/opencode/skills/systematic-debugging/SKILL.md".source =
         opencodeDir + "/skills/systematic-debugging/SKILL.md";
       ".config/opencode/skills/systematic-exploration/SKILL.md".source =
@@ -67,10 +78,8 @@ in
     }
     # Agents
     // {
-      ".config/opencode/agents/implement/AGENT.md".source =
-        opencodeDir + "/agents/implement/AGENT.md";
-      ".config/opencode/agents/review/AGENT.md".source =
-        opencodeDir + "/agents/review/AGENT.md";
+      ".config/opencode/agents/implement/AGENT.md".source = opencodeDir + "/agents/implement/AGENT.md";
+      ".config/opencode/agents/review/AGENT.md".source = opencodeDir + "/agents/review/AGENT.md";
     }
   );
 }

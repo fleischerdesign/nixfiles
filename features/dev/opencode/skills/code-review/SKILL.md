@@ -29,24 +29,24 @@ Do NOT load this skill:
 
 ## Subagent Delegation
 
-For any non-trivial change, dispatch a `reviewer` subagent with fresh context for an independent, unbiased review:
+For any non-trivial change, dispatch a `review` subagent with fresh context for an independent, unbiased review:
 
 ```
 Agent({
-  subagent_type: "reviewer",
+  subagent_type: "review",
   prompt: "Review [branch/commit/diff]. Specification: [spec reference]. Key architectural decisions: [ADR references]. Focus areas: [specific concerns if any].",
   description: "Review [change]",
   run_in_background: true
 })
 ```
 
-The `reviewer` agent runs with fresh context on `deepseek-v4-flash`. It has no knowledge of design discussions, implementation rationale, or the parent's thinking — it judges only what the code actually does. Its findings are evidence for the parent's review verdict.
+The `review` agent runs with fresh context on `deepseek-v4-flash`. It has no knowledge of design discussions, implementation rationale, or the parent's thinking — it judges only what the code actually does. Its findings are evidence for the parent's review verdict.
 
-The parent synthesizes: its own structural and DRY analysis (Steps 1-4) with the reviewer's independent findings, then produces the final verdict.
+The parent synthesizes: its own structural and DRY analysis (Steps 1-4) with the review agent's independent findings, then produces the final verdict.
 
 Do NOT delegate when:
 - The change is trivial (single-digit lines, obvious correctness)
-- The reviewer's findings would add no information beyond the parent's own review
+- The review agent's findings would add no information beyond the parent's own review
 
 ## Process
 
