@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
-    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "overlays/**", "lib/**", "user/**", "media/**", "src/**"]
+    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**"]
   pull_request:
-    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "overlays/**", "lib/**", "user/**", "media/**", "src/**"]
+    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**"]
   workflow_dispatch:
 
 permissions:
