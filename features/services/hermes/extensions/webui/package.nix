@@ -35,15 +35,16 @@ stdenv.mkDerivation {
     runHook preInstall
     mkdir -p $out/hermes-webui $out/bin
 
-    for d in api static; do
-      if [ -d $src/$d ]; then
-        cp -r $src/$d $out/hermes-webui/
-      fi
-    done
+    cp $src/bootstrap.py $out/hermes-webui/
+    cp $src/server.py $out/hermes-webui/
+    cp $src/mcp_server.py $out/hermes-webui/
+    cp $src/requirements.txt $out/hermes-webui/
+    cp -r $src/api $out/hermes-webui/
+    cp -r $src/static $out/hermes-webui/
 
     makeBinaryWrapper ${pythonEnv}/bin/python3 $out/bin/hermes-webui \
-      --add-flags "-m hermes_webui.server" \
-      --prefix PYTHONPATH : $out/hermes-webui
+      --set HERMES_WEBUI_DISABLE_LOCAL_VENV 1 \
+      --add-flags "$out/hermes-webui/bootstrap.py --foreground --no-browser --skip-agent-install"
 
     runHook postInstall
   '';
