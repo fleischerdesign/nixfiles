@@ -47,7 +47,7 @@ in
     ];
 
     sops.secrets.camofox_api_key = {
-      restartUnits = [ "hermes-webui.service" ];
+      restartUnits = lib.mkAfter [ "hermes-webui.service" ];
     };
 
     systemd.services.hermes-webui = {
@@ -84,7 +84,7 @@ in
           "HERMES_WEBUI_AGENT_DIR=${agentSrc}"
           "HERMES_WEBUI_PYTHON=${corePkg.passthru.pythonEnv}/bin/python3"
           "HERMES_API_URL=http://127.0.0.1:8642"
-          "HERMES_WEBUI_DEFAULT_WORKSPACE=/var/lib/hermes/workspace"
+          "HERMES_WEBUI_DEFAULT_WORKSPACE=${hcfg.workingDirectory}"
           "HASS_URL=${hcfg.hassUrl}"
           "PAPERLESS_URL=${hcfg.paperlessUrl}"
           "CAMOFOX_URL=${hcfg.camofoxUrl}"

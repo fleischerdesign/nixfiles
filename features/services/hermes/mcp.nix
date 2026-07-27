@@ -1,6 +1,6 @@
 { config, lib, ... }:
 let
-  cfg = config.my.features.services.hermes;
+  hcfg = config.my.features.services.hermes;
 in
 {
   options.services.hermes-agent.mcpServers = lib.mkOption {
@@ -46,7 +46,7 @@ in
     description = "MCP server definitions bridged into hermes-agent settings.";
   };
 
-  config = lib.mkIf (cfg.enable && config.services.hermes-agent.mcpServers != { }) {
+  config = lib.mkIf (hcfg.enable && config.services.hermes-agent.mcpServers != { }) {
     services.hermes-agent.settings.mcp_servers = lib.mapAttrs (
       _name: srv:
       (lib.optionalAttrs (srv.command != null) {

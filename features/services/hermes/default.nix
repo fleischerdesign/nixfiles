@@ -22,7 +22,7 @@ let
 
   configJson = builtins.toJSON (
     lib.recursiveUpdate {
-      terminal.cwd = "/var/lib/hermes/workspace";
+      terminal.cwd = cfg.workingDirectory;
     } config.services.hermes-agent.settings
   );
 
@@ -113,6 +113,11 @@ in
         default = "5838211825";
         description = "Telegram Chat ID for home_channel.";
       };
+      workingDirectory = lib.mkOption {
+        type = lib.types.str;
+        default = "/var/lib/hermes/workspace";
+        description = "Working directory for the hermes-agent service and terminal.cwd setting.";
+      };
       camofoxUrl = lib.mkOption {
         type = lib.types.str;
         default = "http://127.0.0.1:9377";
@@ -123,7 +128,7 @@ in
 
   config = lib.mkIf cfg.enable {
     sops.secrets = {
-      camofox_api_key.restartUnits = [ "hermes-agent.service" ];
+      camofox_api_key.restartUnits = lib.mkDefault [ "hermes-agent.service" ];
       hermes_agent_env = {
         owner = "hermes";
         restartUnits = [ "hermes-agent.service" ];
@@ -210,7 +215,7 @@ in
         RestartSec = 5;
         Environment = lib.mapAttrsToList (k: v: "${k}=${v}") config.services.hermes-agent.environment;
         EnvironmentFile = map builtins.toString config.services.hermes-agent.environmentFiles;
-        WorkingDirectory = "/var/lib/hermes/workspace";
+        WorkingDirectory = cfg.workingDirectory;
       };
 
       path = config.services.hermes-agent.extraPackages;
@@ -220,9 +225,9 @@ in
     environment.variables.HERMES_HOME = "/var/lib/hermes/.hermes";
 
     system.activationScripts."hermes-agent-config" = lib.stringAfter [ "users" ] ''
-      mkdir -p /var/lib/hermes/.hermes /var/lib/hermes/workspace
-      chown hermes:hermes /var/lib/hermes /var/lib/hermes/.hermes /var/lib/hermes/workspace
-      chmod 2750 /var/lib/hermes /var/lib/hermes/.hermes /var/lib/hermes/workspace
+      mkdir -p /var/lib/hermes/.hermes ${cfg.workingDirectory}
+      chown hermes:hermes /var/lib/hermes /var/lib/hermes/.hermes ${cfg.workingDirectory}
+      chmod 2750 /var/lib/hermes /var/lib/hermes/.hermes ${cfg.workingDirectory}
 
       if [ ! -f /var/lib/hermes/.hermes/config.yaml ]; then
         install -o hermes -g hermes -m 0640 ${generatedConfigFile} /var/lib/hermes/.hermes/config.yaml
@@ -232,7 +237,7 @@ in
     systemd.tmpfiles.rules = [
       "d /var/lib/hermes            2770 hermes hermes - -"
       "d /var/lib/hermes/.hermes    2770 hermes hermes - -"
-      "d /var/lib/hermes/workspace  2770 hermes hermes - -"
+      "d ${cfg.workingDirectory}    2770 hermes hermes - -"
       "d /var/lib/hermes/.gemini    0770 hermes hermes -"
       "d /var/lib/hermes/.config    0770 hermes hermes -"
       "d /var/lib/hermes/.config/gh 0770 hermes hermes -"
