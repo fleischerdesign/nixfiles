@@ -32,6 +32,7 @@ in
         # 2. Template for the sensitive JSON Auth variable
         sops.templates."paperless.env" = {
           content = ''
+            PAPERLESS_SECRET_KEY=${config.sops.placeholder.paperless_secret_key}
             PAPERLESS_SOCIALACCOUNT_PROVIDERS=${
               builtins.toJSON {
                 openid_connect = {
@@ -43,6 +44,7 @@ in
                       secret = config.sops.placeholder.paperless_oidc_secret;
                       settings = {
                         server_url = cfg.ssoServerUrl;
+                        token_auth_method = "client_secret_basic";
                       };
                     }
                   ];
@@ -82,7 +84,7 @@ in
           settings = {
             PAPERLESS_REDIS = "redis://localhost:6379";
             PAPERLESS_DBHOST = "/run/postgresql";
-            PAPERLESS_DBENGINE = "django.db.backends.postgresql";
+            PAPERLESS_DBENGINE = "postgresql";
             PAPERLESS_DBNAME = "paperless";
             PAPERLESS_DBUSER = "paperless";
             PAPERLESS_URL =
@@ -120,10 +122,6 @@ in
         # Systemd overrides
         systemd.services.paperless-web = {
           serviceConfig.EnvironmentFile = config.sops.templates."paperless.env".path;
-          environment = {
-            SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-            REQUESTS_CA_BUNDLE = "/etc/ssl/certs/ca-bundle.crt";
-          };
         };
         systemd.services.paperless-consumer.serviceConfig.EnvironmentFile =
           config.sops.templates."paperless.env".path;
