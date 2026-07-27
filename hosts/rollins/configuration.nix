@@ -35,10 +35,22 @@
   my.features.services.hermes = {
     enable = true;
     integrations = {
-      hass.url = "https://hass.fls.ancoris.ovh";
-      paperless.url = "https://paperless.fls.ancoris.ovh";
-      camofox.url = "http://127.0.0.1:9377";
-      telegram.chatId = "5838211825";
+      hass = {
+        enable = true;
+        url = "https://hass.fls.ancoris.ovh";
+      };
+      paperless = {
+        enable = true;
+        url = "https://paperless.fls.ancoris.ovh";
+      };
+      camofox = {
+        enable = true;
+        url = "http://127.0.0.1:9377";
+      };
+      telegram = {
+        enable = true;
+        chatId = "5838211825";
+      };
     };
     subdomainDelegation = {
       enable = true;

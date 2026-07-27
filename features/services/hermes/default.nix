@@ -39,6 +39,9 @@ let
       ])
       ++ (lib.optionals cfg.extensions.ddgs.enable [
         (pkgs.callPackage ./extensions/ddgs/package.nix { })
+      ])
+      ++ (lib.optionals cfg.integrations.telegram.enable [
+        pkgs.python3Packages.python-telegram-bot
       ]);
 
     inherit (pkgs) nodejs_22;
@@ -62,7 +65,7 @@ let
     HASS_URL = cfg.integrations.hass.url;
     PAPERLESS_URL = cfg.integrations.paperless.url;
     CAMOFOX_URL = cfg.integrations.camofox.url;
-  } // lib.optionalAttrs (cfg.integrations.camofox.url != null) {
+  } // lib.optionalAttrs (cfg.integrations.camofox.enable) {
     CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
   });
 
@@ -101,14 +104,14 @@ let
     };
     terminal.backend = "local";
   } (
-    if cfg.integrations.telegram.chatId != null then {
+    if cfg.integrations.telegram.enable && cfg.integrations.telegram.chatId != null then {
       platforms.telegram.home_channel = {
         platform = "telegram";
         chat_id = cfg.integrations.telegram.chatId;
       };
     } else { }
     // (
-      if cfg.integrations.camofox.url != null then {
+      if cfg.integrations.camofox.enable then {
         browser.camofox.managed_persistence = true;
       } else { }
     )
@@ -202,25 +205,37 @@ in
       integrations = lib.mkOption {
         type = lib.types.submodule {
           options = {
-            hass.url = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Home Assistant URL. When null, no HASS_URL env var is set.";
+            hass = {
+              enable = lib.mkEnableOption "Home Assistant integration";
+              url = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Home Assistant URL.";
+              };
             };
-            paperless.url = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Paperless URL. When null, no PAPERLESS_URL env var is set.";
+            paperless = {
+              enable = lib.mkEnableOption "Paperless integration";
+              url = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Paperless URL.";
+              };
             };
-            camofox.url = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Camofox browser URL. When null, camofox API key and env vars are absent.";
+            camofox = {
+              enable = lib.mkEnableOption "Camofox browser integration";
+              url = lib.mkOption {
+                type = lib.types.str;
+                default = "http://127.0.0.1:9377";
+                description = "Camofox browser URL.";
+              };
             };
-            telegram.chatId = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = null;
-              description = "Telegram Chat ID for home_channel. When null, telegram config is absent.";
+            telegram = {
+              enable = lib.mkEnableOption "Telegram integration";
+              chatId = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Telegram Chat ID for home_channel.";
+              };
             };
           };
         };
@@ -235,7 +250,7 @@ in
         owner = "hermes";
         restartUnits = [ "hermes-agent.service" ];
       };
-    } // lib.optionalAttrs (cfg.integrations.camofox.url != null) {
+    } // lib.optionalAttrs (cfg.integrations.camofox.enable) {
       camofox_api_key.restartUnits = lib.mkDefault [ "hermes-agent.service" ];
     } // lib.optionalAttrs (sub.enable) {
       cloudflare_api_token = { };

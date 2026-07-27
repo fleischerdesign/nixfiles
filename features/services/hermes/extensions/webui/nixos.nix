@@ -54,7 +54,7 @@ let
     ++ mkIfSet "HASS_URL" hcfg.integrations.hass.url
     ++ mkIfSet "PAPERLESS_URL" hcfg.integrations.paperless.url
     ++ mkIfSet "CAMOFOX_URL" hcfg.integrations.camofox.url
-    ++ (lib.optionals (hcfg.integrations.camofox.url != null) [
+    ++ (lib.optionals (hcfg.integrations.camofox.enable) [
       "CAMOFOX_API_KEY=${config.sops.placeholder.camofox_api_key}"
     ])
     ++ mkIfSet "HERMES_WEBUI_OIDC_ISSUER" oidc.issuer
@@ -124,7 +124,7 @@ in
       }
     ];
 
-    sops.secrets.camofox_api_key = lib.mkIf (hcfg.integrations.camofox.url != null) {
+    sops.secrets.camofox_api_key = lib.mkIf (hcfg.integrations.camofox.enable) {
       restartUnits = lib.mkAfter [ "hermes-webui.service" ];
     };
 
