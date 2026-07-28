@@ -9,7 +9,7 @@
 #      source tree, symlinks the pre-built web_dist (npm → Vite output
 #      at hermes_cli/web_dist/), and wraps the three entry-point
 #      binaries (hermes, hermes-agent, hermes-acp) with HERMES_*
-#      environment variables the agent reads at startup.
+#      environment variables the agent reads at startup via wrapProgram.
 #
 # Design decisions:
 #   - HERMES_NIX_BUILD=1          Bypasses upstream's setup.py guard that
@@ -32,9 +32,18 @@
 #                                 nixpkgs ships 83.x. We relax the
 #                                 constraint in pyproject.toml via
 #                                 prePatch substituteInPlace.
-{ lib, stdenv, makeBinaryWrapper, fetchFromGitHub
-, nodejs_22, buildNpmPackage, python3Packages, git, ripgrep, openssh, ffmpeg
-, extraPythonPackages ? [ ]
+{
+  lib,
+  stdenv,
+  fetchFromGitHub,
+  nodejs_22,
+  buildNpmPackage,
+  python3Packages,
+  git,
+  ripgrep,
+  openssh,
+  ffmpeg,
+  extraPythonPackages ? [ ],
 }:
 
 let
@@ -60,7 +69,12 @@ let
     '';
   };
 
-  runtimeDeps = [ git ripgrep openssh ffmpeg ];
+  runtimeDeps = [
+    git
+    ripgrep
+    openssh
+    ffmpeg
+  ];
 
   hermesBuild = python3Packages.buildPythonPackage {
     pname = manifest.name;
@@ -69,24 +83,27 @@ let
 
     pyproject = true;
     build-system = [ python3Packages.setuptools ];
-    propagatedBuildInputs = with python3Packages; [
-      openai
-      certifi
-      python-dotenv
-      fire
-      httpx
-      rich
-      tenacity
-      pyyaml
-      ruamel-yaml
-      requests
-      jinja2
-      pydantic
-      prompt-toolkit
-      croniter
-      packaging
-      cryptography
-    ] ++ extraPythonPackages;
+    propagatedBuildInputs =
+      with python3Packages;
+      [
+        openai
+        certifi
+        python-dotenv
+        fire
+        httpx
+        rich
+        tenacity
+        pyyaml
+        ruamel-yaml
+        requests
+        jinja2
+        pydantic
+        prompt-toolkit
+        croniter
+        packaging
+        cryptography
+      ]
+      ++ extraPythonPackages;
     HERMES_NIX_BUILD = "1";
     doCheck = false;
     dontCheckRuntimeDeps = true;
@@ -108,41 +125,76 @@ let
 
   pythonEnv = python3Packages.python.withPackages (_: [ hermesBuild ]);
 
-in stdenv.mkDerivation {
+in
+stdenv.mkDerivation {
   pname = manifest.name;
   version = manifest.version;
   inherit src;
   dontUnpack = true;
   dontBuild = true;
-  nativeBuildInputs = [ makeBinaryWrapper ];
+  nativeBuildInputs = [ ];
 
   installPhase = ''
-    runHook preInstall
+        runHook preInstall
 
-    mkdir -p $out/share/hermes-agent $out/bin
+        mkdir -p $out/share/hermes-agent $out/bin
 
-    ln -s ${src}/skills $out/share/hermes-agent/skills
-    ln -s ${src}/optional-skills $out/share/hermes-agent/optional-skills
-    ln -s ${src}/plugins $out/share/hermes-agent/plugins
-    ln -s ${src}/locales $out/share/hermes-agent/locales
-    ln -s ${src}/optional-mcps $out/share/hermes-agent/optional-mcps
-    ln -s ${webDist} $out/share/hermes-agent/web_dist
+        ln -s ${src}/skills $out/share/hermes-agent/skills
+        ln -s ${src}/optional-skills $out/share/hermes-agent/optional-skills
+        ln -s ${src}/plugins $out/share/hermes-agent/plugins
+        ln -s ${src}/locales $out/share/hermes-agent/locales
+        ln -s ${src}/optional-mcps $out/share/hermes-agent/optional-mcps
+        ln -s ${webDist} $out/share/hermes-agent/web_dist
 
-    for bin in hermes hermes-agent hermes-acp; do
-      makeBinaryWrapper ${hermesBuild}/bin/$bin $out/bin/$bin \
-        --suffix PATH : "${lib.makeBinPath runtimeDeps}" \
-        --set HERMES_BUNDLED_SKILLS $out/share/hermes-agent/skills \
-        --set HERMES_OPTIONAL_SKILLS $out/share/hermes-agent/optional-skills \
-        --set HERMES_BUNDLED_PLUGINS $out/share/hermes-agent/plugins \
-        --set HERMES_BUNDLED_LOCALES $out/share/hermes-agent/locales \
-        --set HERMES_OPTIONAL_MCPS $out/share/hermes-agent/optional-mcps \
-        --set HERMES_WEB_DIST $out/share/hermes-agent/web_dist \
-        --set HERMES_PYTHON ${pythonEnv}/bin/python3 \
-        --set HERMES_NODE ${lib.getExe nodejs_22} \
-        --set HERMES_REVISION ${manifest.rev}
-    done
+        cat > $out/bin/hermes << HERMESWRAPPER
+    #!/bin/sh
+    export PATH="${lib.makeBinPath runtimeDeps}:\$PATH"
+    export HERMES_BUNDLED_SKILLS='$out/share/hermes-agent/skills'
+    export HERMES_OPTIONAL_SKILLS='$out/share/hermes-agent/optional-skills'
+    export HERMES_BUNDLED_PLUGINS='$out/share/hermes-agent/plugins'
+    export HERMES_BUNDLED_LOCALES='$out/share/hermes-agent/locales'
+    export HERMES_OPTIONAL_MCPS='$out/share/hermes-agent/optional-mcps'
+    export HERMES_WEB_DIST='$out/share/hermes-agent/web_dist'
+    export HERMES_PYTHON='${pythonEnv}/bin/python3'
+    export HERMES_NODE='${lib.getExe nodejs_22}'
+    export HERMES_REVISION='${manifest.rev}'
+    exec ${pythonEnv}/bin/python3 -m hermes_cli.main "\$@"
+    HERMESWRAPPER
+        chmod +x $out/bin/hermes
 
-    runHook postInstall
+        cat > $out/bin/hermes-agent << HERMESWRAPPER
+    #!/bin/sh
+    export PATH="${lib.makeBinPath runtimeDeps}:\$PATH"
+    export HERMES_BUNDLED_SKILLS='$out/share/hermes-agent/skills'
+    export HERMES_OPTIONAL_SKILLS='$out/share/hermes-agent/optional-skills'
+    export HERMES_BUNDLED_PLUGINS='$out/share/hermes-agent/plugins'
+    export HERMES_BUNDLED_LOCALES='$out/share/hermes-agent/locales'
+    export HERMES_OPTIONAL_MCPS='$out/share/hermes-agent/optional-mcps'
+    export HERMES_WEB_DIST='$out/share/hermes-agent/web_dist'
+    export HERMES_PYTHON='${pythonEnv}/bin/python3'
+    export HERMES_NODE='${lib.getExe nodejs_22}'
+    export HERMES_REVISION='${manifest.rev}'
+    exec ${pythonEnv}/bin/python3 -m run_agent "\$@"
+    HERMESWRAPPER
+        chmod +x $out/bin/hermes-agent
+
+        cat > $out/bin/hermes-acp << HERMESWRAPPER
+    #!/bin/sh
+    export PATH="${lib.makeBinPath runtimeDeps}:\$PATH"
+    export HERMES_BUNDLED_SKILLS='$out/share/hermes-agent/skills'
+    export HERMES_OPTIONAL_SKILLS='$out/share/hermes-agent/optional-skills'
+    export HERMES_BUNDLED_PLUGINS='$out/share/hermes-agent/plugins'
+    export HERMES_BUNDLED_LOCALES='$out/share/hermes-agent/locales'
+    export HERMES_OPTIONAL_MCPS='$out/share/hermes-agent/optional-mcps'
+    export HERMES_WEB_DIST='$out/share/hermes-agent/web_dist'
+    export HERMES_PYTHON='${pythonEnv}/bin/python3'
+    export HERMES_NODE='${lib.getExe nodejs_22}'
+    export HERMES_REVISION='${manifest.rev}'
+    exec ${pythonEnv}/bin/python3 -m acp_adapter.entry "\$@"
+    HERMESWRAPPER
+        chmod +x $out/bin/hermes-acp
+
+        runHook postInstall
   '';
 
   passthru = {

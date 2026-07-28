@@ -14,12 +14,23 @@
 # The webui bootstrap.py entry point is wrapped in package.nix with
 # --foreground --no-browser --skip-agent-install. OIDC authentication
 # is optional (all oidc.* options default to null).
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   hcfg = config.my.features.services.hermes;
   ecfg = config.my.features.services.hermes.extensions.webui;
   oidc = ecfg.oidc;
-  corePkg = pkgs.callPackage ../../package.nix { inherit (pkgs) nodejs_22; };
+  corePkg = pkgs.callPackage ../../package.nix {
+    inherit (pkgs) nodejs_22;
+    extraPythonPackages = [
+      (pkgs.callPackage ../mnemosyne/package.nix { }).memory
+      (pkgs.callPackage ../mnemosyne/package.nix { }).hermes
+    ];
+  };
   agentSrc = pkgs.fetchFromGitHub {
     owner = "NousResearch";
     repo = "hermes-agent";
@@ -38,30 +49,29 @@ let
     else
       null;
 
-  webuiEnv =
-    [
-      "HERMES_WEBUI_HOST=${ecfg.host}"
-      "HERMES_WEBUI_PORT=${toString ecfg.port}"
-      "HERMES_WEBUI_STATE_DIR=${ecfg.stateDir}"
-      "HERMES_HOME=${hcfg.stateDir}/.hermes"
-      "HERMES_WEBUI_AGENT_DIR=${agentSrc}"
-      "HERMES_WEBUI_PYTHON=${corePkg.passthru.pythonEnv}/bin/python3"
-      "HERMES_API_URL=http://127.0.0.1:8642"
-      "HERMES_WEBUI_DEFAULT_WORKSPACE=${hcfg.workingDirectory}"
-      "MNEMOSYNE_EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    ]
-    ++ lib.mapAttrsToList (k: v: "${k}=${v}") ecfg.extraEnvironment
-    ++ mkIfSet "HASS_URL" hcfg.integrations.hass.url
-    ++ mkIfSet "PAPERLESS_URL" hcfg.integrations.paperless.url
-    ++ mkIfSet "CAMOFOX_URL" hcfg.integrations.camofox.url
-    ++ (lib.optionals (hcfg.integrations.camofox.enable) [
-      "CAMOFOX_API_KEY=${config.sops.placeholder.camofox_api_key}"
-    ])
-    ++ mkIfSet "HERMES_WEBUI_OIDC_ISSUER" oidc.issuer
-    ++ mkIfSet "HERMES_WEBUI_OIDC_CLIENT_ID" oidc.clientId
-    ++ mkIfSet "HERMES_WEBUI_OIDC_ALLOW_CLAIM" oidc.allowClaim
-    ++ mkIfSet "HERMES_WEBUI_OIDC_ALLOW_VALUES" oidc.allowValues
-    ++ mkIfSet "HERMES_WEBUI_OIDC_REDIRECT_URI" oidcRedirectUri;
+  webuiEnv = [
+    "HERMES_WEBUI_HOST=${ecfg.host}"
+    "HERMES_WEBUI_PORT=${toString ecfg.port}"
+    "HERMES_WEBUI_STATE_DIR=${ecfg.stateDir}"
+    "HERMES_HOME=${hcfg.stateDir}/.hermes"
+    "HERMES_WEBUI_AGENT_DIR=${agentSrc}"
+    "HERMES_WEBUI_PYTHON=${corePkg.passthru.pythonEnv}/bin/python3"
+    "HERMES_API_URL=http://127.0.0.1:8642"
+    "HERMES_WEBUI_DEFAULT_WORKSPACE=${hcfg.workingDirectory}"
+    "MNEMOSYNE_EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  ]
+  ++ lib.mapAttrsToList (k: v: "${k}=${v}") ecfg.extraEnvironment
+  ++ mkIfSet "HASS_URL" hcfg.integrations.hass.url
+  ++ mkIfSet "PAPERLESS_URL" hcfg.integrations.paperless.url
+  ++ mkIfSet "CAMOFOX_URL" hcfg.integrations.camofox.url
+  ++ (lib.optionals (hcfg.integrations.camofox.enable) [
+    "CAMOFOX_API_KEY=${config.sops.placeholder.camofox_api_key}"
+  ])
+  ++ mkIfSet "HERMES_WEBUI_OIDC_ISSUER" oidc.issuer
+  ++ mkIfSet "HERMES_WEBUI_OIDC_CLIENT_ID" oidc.clientId
+  ++ mkIfSet "HERMES_WEBUI_OIDC_ALLOW_CLAIM" oidc.allowClaim
+  ++ mkIfSet "HERMES_WEBUI_OIDC_ALLOW_VALUES" oidc.allowValues
+  ++ mkIfSet "HERMES_WEBUI_OIDC_REDIRECT_URI" oidcRedirectUri;
 in
 {
   options.my.features.services.hermes.extensions.webui = {
