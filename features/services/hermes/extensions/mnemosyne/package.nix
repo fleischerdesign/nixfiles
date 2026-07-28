@@ -4,20 +4,22 @@
 #   mnemosyne-memory   Vector memory database (sqlite-vec, fastembed, numpy)
 #   mnemosyne-hermes   CLI tool for managing Mnemosyne databases
 #
-# Fastembed is pinned to the vanilla nixpkgs version — no pillow override
-# needed since we no longer bridge a uv2nix venv with nixpkgs PYTHONPATH.
+# Versions and hashes are managed via manifest.json. Run
+#   nix run .#update-custom-packages
+# to check for upstream updates.
 { python3Packages }:
 
 let
   pythonPackages = python3Packages;
+  manifest = builtins.fromJSON (builtins.readFile ./manifest.json);
 
   memory = pythonPackages.buildPythonPackage rec {
     pname = "mnemosyne-memory";
-    version = "3.8.0";
+    version = manifest.memoryVersion;
     src = pythonPackages.fetchPypi {
       pname = "mnemosyne_memory";
       inherit version;
-      hash = "sha256-xN6P6HYd8gawnU2bFZXozyionpJeaLTTNAGBuAhRrGY=";
+      hash = manifest.memoryHash;
     };
     pyproject = true;
     build-system = [ pythonPackages.setuptools ];
@@ -31,11 +33,11 @@ let
 
   hermes = pythonPackages.buildPythonPackage rec {
     pname = "mnemosyne-hermes";
-    version = "0.2.0";
+    version = manifest.hermesVersion;
     src = pythonPackages.fetchPypi {
       pname = "mnemosyne_hermes";
       inherit version;
-      hash = "sha256-iWlGvajMQg/GE8VdJ7VTNAzxILRNUIS00/ArYGDlhbM=";
+      hash = manifest.hermesHash;
     };
     pyproject = true;
     build-system = [ pythonPackages.setuptools ];

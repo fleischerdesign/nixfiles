@@ -27,7 +27,7 @@ let
   src = fetchFromGitHub {
     owner = manifest.upstream.owner;
     repo = manifest.upstream.repo;
-    rev = manifest.version;
+    rev = manifest.rev;
     hash = manifest.srcHash;
   };
 

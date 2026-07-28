@@ -296,15 +296,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
         echo "    🎉 New version: $latest_version"
 
-        # Get the source URL and hash for the latest version.
-        source_url="$(echo "$PYPI_JSON" | jq -r --arg ver "$latest_version" '.releases[$ver][] | select(.packagetype == "sdist") | .url' | head -n 1)"
-        if [ -z "$source_url" ]; then
-          source_url="$(echo "$PYPI_JSON" | jq -r --arg ver "$latest_version" '.urls[] | select(.packagetype == "sdist") | .url' | head -n 1)"
-        fi
-        if [ -z "$source_url" ]; then
-          echo "    ⚠️ Could not find sdist URL for $pypi_name v$latest_version"
-          continue
-        fi
+      source_url="https://pypi.org/packages/source/${pypi_name:0:1}/${pypi_name}/${pypi_name//-/_}-${latest_version}.tar.gz"
 
         new_hash="$(nix store prefetch-file --unpack "$source_url" --json | jq -r '.hash')"
         if [ -z "$new_hash" ] || [ "$new_hash" = "null" ]; then
@@ -352,10 +344,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
       echo "  🎉 New version: $latest_version"
 
-      source_url="$(echo "$PYPI_JSON" | jq -r --arg ver "$latest_version" '.releases[$ver][] | select(.packagetype == "sdist") | .url' | head -n 1)"
-      if [ -z "$source_url" ]; then
-        source_url="$(echo "$PYPI_JSON" | jq -r --arg ver "$latest_version" '.urls[] | select(.packagetype == "sdist") | .url' | head -n 1)"
-      fi
+      source_url="https://pypi.org/packages/source/${pypi_pkg:0:1}/${pypi_pkg}/${pypi_pkg//-/_}-${latest_version}.tar.gz"
       if [ -z "$source_url" ]; then
         echo "  ⚠️ Could not find sdist URL for $pypi_pkg v$latest_version"
         continue
