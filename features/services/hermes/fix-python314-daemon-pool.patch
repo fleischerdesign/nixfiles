@@ -1,12 +1,13 @@
 --- a/tools/daemon_pool.py
 +++ b/tools/daemon_pool.py
-@@ -59,10 +59,9 @@
+@@ -59,11 +59,10 @@
                  args=(
                      weakref.ref(self, weakref_cb),
-                     self._work_queue,
+-                    self._work_queue,
 -                    self._initializer,
 -                    self._initargs,
 +                    self._create_worker_context(),
++                    self._work_queue,
                  ),
                  daemon=True,
              )
