@@ -109,17 +109,17 @@ let
     dontCheckRuntimeDeps = true;
     pythonImportsCheck = [ "hermes_cli" ];
 
+    # Python 3.14 removed ThreadPoolExecutor._initializer / ._initargs entirely
+    # and replaced them with ._create_worker_context().  The daemon_pool module
+    # mirrors CPython 3.8–3.13 internally — the patch adapts _adjust_thread_count
+    # to build the correct 3-arg _worker(executor_reference, ctx, work_queue) call.
+    # Without it every concurrent tool execution fails with:
+    #   AttributeError: 'DaemonThreadPoolExecutor' object has no attribute 'initializer'
+    patches = [ ./fix-python314-daemon-pool.patch ];
+
     prePatch = ''
       substituteInPlace pyproject.toml \
         --replace-fail 'setuptools>=77.0,<83' 'setuptools>=77.0'
-    '';
-
-    # Python 3.14 renamed ThreadPoolExecutor._initializer to .initializer.
-    # The hermes-agent daemon_pool.py accesses the old underscore-prefixed
-    # attribute, which causes AttributeError on all concurrent tool execution.
-    postPatch = ''
-      substituteInPlace tools/daemon_pool.py \
-        --replace-fail 'self._initializer,' 'self.initializer,'
     '';
   };
 
