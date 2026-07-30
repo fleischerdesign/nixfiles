@@ -1,22 +1,27 @@
 {
   config,
+  options,
   lib,
   ...
 }:
 let
   cfg = config.my.features.services.mealie;
+  caddyOpt = options.my.features.services.caddy.baseDomain or null;
+  caddyBaseDomain =
+    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
+  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
 in
 {
   options.my.features.services.mealie = {
     enable = lib.mkEnableOption "Mealie Recipe Manager";
     smtpFromEmail = lib.mkOption {
       type = lib.types.str;
-      default = "noreply@ancoris.ovh";
+      default = if caddyBaseDomain != null then "noreply@${caddyBaseDomain}" else "noreply@ancoris.ovh";
       description = "From address for SMTP outgoing mails.";
     };
     ssoConfigurationUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/mealie/.well-known/openid-configuration";
+      default = "https://${authHost}/application/o/mealie/.well-known/openid-configuration";
       description = "OIDC discovery configuration endpoint URL.";
     };
   };

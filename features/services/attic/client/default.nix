@@ -2,6 +2,7 @@
 # Attic binary cache client configuration with optional background auto-push service.
 {
   config,
+  options,
   lib,
   pkgs,
   ...
@@ -51,7 +52,7 @@ in
     enable = lib.mkEnableOption "attic binary cache client";
     user = lib.mkOption {
       type = lib.types.str;
-      default = config.my.user.name;
+      default = config.my.user.primary or config.my.user.name;
       description = "User for attic config ownership.";
     };
     group = lib.mkOption {
@@ -61,7 +62,19 @@ in
     };
     endpoint = lib.mkOption {
       type = lib.types.str;
-      default = "https://cache.rls.ancoris.ovh";
+      default =
+        let
+          caddyOpt = options.my.features.services.caddy.baseDomain or null;
+          caddyBaseDomain =
+            if caddyOpt != null && caddyOpt.isDefined then
+              config.my.features.services.caddy.baseDomain
+            else
+              null;
+        in
+        if caddyBaseDomain != null then
+          "https://cache.${caddyBaseDomain}"
+        else
+          "https://cache.rls.ancoris.ovh";
       description = "Attic cache server endpoint URL.";
     };
     autoPush = lib.mkOption {
@@ -71,60 +84,72 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    sops.secrets.attic_push_token = { };
+  config = lib.mkIf cfg.enable (
+    let
+      userObj = config.users.users.${cfg.user} or null;
+      userHome = if userObj != null then userObj.home else "/home/${cfg.user}";
+    in
+    {
+      environment.systemPackages = [ pkgs.attic-client ];
 
-    sops.templates.attic_user_config = {
-      owner = cfg.user;
-      inherit (cfg) group;
-      mode = "0440";
-      content = ''
-        default-server = "nixfiles-server"
-
-        [servers.nixfiles-server]
-        endpoint = "${cfg.endpoint}"
-        token = "${config.sops.placeholder.attic_push_token}"
-      '';
-    };
-
-    sops.templates.attic_root_config = {
-      owner = "root";
-      group = "root";
-      mode = "0400";
-      content = ''
-        default-server = "nixfiles-server"
-
-        [servers.nixfiles-server]
-        endpoint = "${cfg.endpoint}"
-        token = "${config.sops.placeholder.attic_push_token}"
-      '';
-    };
-
-    systemd.tmpfiles.rules = [
-      "d /home/${cfg.user}/.config/attic 0700 ${cfg.user} ${cfg.group} -"
-      "L+ /home/${cfg.user}/.config/attic/config.toml 0400 ${cfg.user} ${cfg.group} - /run/secrets/rendered/attic_user_config"
-      "d /root/.config/attic 0700 root root -"
-      "L+ /root/.config/attic/config.toml 0400 root root - /run/secrets/rendered/attic_root_config"
-    ];
-
-    systemd.services.attic-auto-push = lib.mkIf cfg.autoPush {
-      description = "Asynchronous Attic Binary Cache Push Service";
-      wantedBy = [ "multi-user.target" ];
-      after = [
-        "network-online.target"
-        "tailscaled.service"
-      ];
-      wants = [
-        "network-online.target"
-        "tailscaled.service"
-      ];
-      serviceConfig = {
-        Type = "simple";
-        ExecStart = "${pushScript}/bin/attic-auto-push";
-        Nice = 19;
-        IOSchedulingClass = "idle";
-        RemainAfterExit = false;
+      sops.secrets.attic_push_token = {
+        owner = cfg.user;
+        group = cfg.group;
+        mode = "0400";
       };
-    };
-  };
+
+      sops.templates.attic_user_config = {
+        owner = cfg.user;
+        group = cfg.group;
+        mode = "0400";
+        content = ''
+          default-server = "nixfiles-server"
+
+          [servers.nixfiles-server]
+          endpoint = "${cfg.endpoint}"
+          token = "${config.sops.placeholder.attic_push_token}"
+        '';
+      };
+
+      sops.templates.attic_root_config = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+        content = ''
+          default-server = "nixfiles-server"
+
+          [servers.nixfiles-server]
+          endpoint = "${cfg.endpoint}"
+          token = "${config.sops.placeholder.attic_push_token}"
+        '';
+      };
+
+      systemd.tmpfiles.rules = [
+        "d ${userHome}/.config/attic 0700 ${cfg.user} ${cfg.group} -"
+        "L+ ${userHome}/.config/attic/config.toml 0400 ${cfg.user} ${cfg.group} - /run/secrets/rendered/attic_user_config"
+        "d /root/.config/attic 0700 root root -"
+        "L+ /root/.config/attic/config.toml 0400 root root - /run/secrets/rendered/attic_root_config"
+      ];
+
+      systemd.services.attic-auto-push = lib.mkIf cfg.autoPush {
+        description = "Asynchronous Attic Binary Cache Push Service";
+        wantedBy = [ "multi-user.target" ];
+        after = [
+          "network-online.target"
+          "tailscaled.service"
+        ];
+        wants = [
+          "network-online.target"
+          "tailscaled.service"
+        ];
+        serviceConfig = {
+          Type = "simple";
+          ExecStart = "${pushScript}/bin/attic-auto-push";
+          Nice = 19;
+          IOSchedulingClass = "idle";
+          RemainAfterExit = false;
+        };
+      };
+    }
+  );
 }

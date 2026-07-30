@@ -37,12 +37,12 @@ let
       discoveredUsers =
         if builtins.pathExists userDir then
           lib.filter (
-            name: builtins.pathExists (userDir + "/${name}/home.nix")
+            name: builtins.pathExists (userDir + "/${name}/metadata.nix")
           ) (builtins.attrNames (builtins.readDir userDir))
         else
           [ ];
 
-      defaultUserName = if discoveredUsers != [ ] then lib.head discoveredUsers else "philipp";
+      defaultUserName = if discoveredUsers != [ ] then lib.head discoveredUsers else "root";
 
       normalizedUsers =
         if users == [ ] then
@@ -51,12 +51,20 @@ let
           map (u: u // { name = u.name or defaultUserName; }) users;
 
       homeManagerUsers = lib.listToAttrs (
-        map (user: {
-          inherit (user) name;
-          value = {
-            imports = [ (import (../../user + "/${user.name}/home.nix")) ] ++ (user.homeModules or [ ]);
-          };
-        }) normalizedUsers
+        lib.concatMap (
+          user:
+          let
+            homeFile = ../../user + "/${user.name}/home.nix";
+          in
+          lib.optionals (builtins.pathExists homeFile) [
+            {
+              inherit (user) name;
+              value = {
+                imports = [ (import homeFile) ] ++ (user.homeModules or [ ]);
+              };
+            }
+          ]
+        ) normalizedUsers
       );
     in
     inputs.nixpkgs-unstable.lib.nixosSystem {

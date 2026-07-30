@@ -59,7 +59,7 @@
   };
 
   config = lib.mkIf config.my.features.system.networking.topology.enable {
-    my.features.system.networking.topology.hosts = {
+    my.features.system.networking.topology.hosts = lib.mkDefault {
       mackaye = {
         tailscaleIp = "100.120.39.68";
         localIp = "173.249.22.211";

@@ -7,55 +7,17 @@
 let
   role = osConfig.my.role;
   opencodeDir = ../../features/dev/opencode;
+  ocfg = osConfig.my.features.dev.opencode or { };
 in
 {
-  programs.opencode = lib.mkIf (role != "server") {
+  programs.opencode = lib.mkIf (role != "server" && (ocfg.enable or false)) {
     enable = true;
     extraPackages = [ pkgs.nodejs ];
-    settings = {
-      model = "deepseek/deepseek-v4-pro";
-      small_model = "deepseek/deepseek-v4-flash";
-      autoupdate = false;
-      instructions = [
-        "~/.config/opencode/instructions/engineering-constitution.md"
-      ];
-      provider = {
-        deepseek = {
-          options = {
-            timeout = 600000;
-            chunkTimeout = 30000;
-            setCacheKey = true;
-          };
-        };
-      };
-      mcp = {
-        nixos = {
-          type = "local";
-          command = [ (lib.getExe pkgs.mcp-nixos) ];
-          enabled = true;
-        };
-        chrome-devtools = {
-          type = "local";
-          command = [
-            "npx"
-            "-y"
-            "chrome-devtools-mcp@latest"
-            "--executablePath"
-            (lib.getExe pkgs.google-chrome)
-          ];
-          enabled = true;
-        };
-      };
-      plugin = [
-        "context-mode"
-        "opencode-pty"
-        "opencode-direnv"
-      ];
-    };
+    settings = ocfg.settings or { };
   };
 
-  home.file = lib.mkIf (role != "server") (
-    # Engineering Constitution (instructions file)
+  home.file = lib.mkIf (role != "server" && (ocfg.enable or false)) (
+    # Engineering Constitution
     {
       ".config/opencode/instructions/engineering-constitution.md".source =
         opencodeDir + "/instructions/engineering-constitution.md";

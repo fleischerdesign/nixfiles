@@ -1,5 +1,6 @@
 {
   config,
+  options,
   lib,
   features,
   ...
@@ -7,28 +8,32 @@
 
 let
   cfg = config.my.features.services.homarr;
+  caddyOpt = options.my.features.services.caddy.baseDomain or null;
+  caddyBaseDomain =
+    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
+  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
 in
 {
   options.my.features.services.homarr = {
     enable = lib.mkEnableOption "Homarr Dashboard";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "ancoris.ovh";
+      default = if caddyBaseDomain != null then caddyBaseDomain else "ancoris.ovh";
       description = "Domain name for Homarr.";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/homarr/";
+      default = "https://${authHost}/application/o/homarr/";
       description = "Authentik SSO authority issuer.";
     };
     ssoAuthorizeUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/authorize";
+      default = "https://${authHost}/application/o/authorize";
       description = "Authentik OIDC authorize endpoint.";
     };
     ssoLogoutRedirectUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/homarr/end-session/";
+      default = "https://${authHost}/application/o/homarr/end-session/";
       description = "SSO Logout redirect URL.";
     };
   };

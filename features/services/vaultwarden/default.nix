@@ -1,5 +1,6 @@
 {
   config,
+  options,
   lib,
   features,
   ...
@@ -7,18 +8,22 @@
 
 let
   cfg = config.my.features.services.vaultwarden;
+  caddyOpt = options.my.features.services.caddy.baseDomain or null;
+  caddyBaseDomain =
+    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
+  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
 in
 {
   options.my.features.services.vaultwarden = {
     enable = lib.mkEnableOption "Vaultwarden";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "vault.ancoris.ovh";
+      default = if caddyBaseDomain != null then "vault.${caddyBaseDomain}" else "vault.ancoris.ovh";
       description = "Full domain name for Vaultwarden.";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/vaultwarden/";
+      default = "https://${authHost}/application/o/vaultwarden/";
       description = "OIDC Issuer/Authority URL for single sign-on.";
     };
   };

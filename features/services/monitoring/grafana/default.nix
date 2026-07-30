@@ -1,28 +1,34 @@
 {
   config,
+  options,
   lib,
   ...
 }:
 
 let
   cfg = config.my.features.services.monitoring.grafana;
+  caddyOpt = options.my.features.services.caddy.baseDomain or null;
+  caddyBaseDomain =
+    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
+  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
+  ntfyHost = if caddyBaseDomain != null then "ntfy.${caddyBaseDomain}" else "ntfy.mky.ancoris.ovh";
 in
 {
   options.my.features.services.monitoring.grafana = {
     enable = lib.mkEnableOption "Grafana Dashboard";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "grafana.mky.ancoris.ovh";
+      default = if caddyBaseDomain != null then "grafana.${caddyBaseDomain}" else "grafana.mky.ancoris.ovh";
       description = "FQDN of the Grafana instance.";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o";
+      default = "https://${authHost}/application/o";
       description = "Base SSO authority URL.";
     };
     ntfyAlertUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://ntfy.mky.ancoris.ovh/grafana-alerts?template=grafana";
+      default = "https://${ntfyHost}/grafana-alerts?template=grafana";
       description = "Ntfy webhook URL for Grafana alerts.";
     };
   };

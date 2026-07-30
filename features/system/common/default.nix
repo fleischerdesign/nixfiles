@@ -77,13 +77,14 @@ in
 
     my.features.dev.git = {
       enable = true;
-      users = [
-        {
-          username = config.my.user.name;
-          gitName = config.my.user.fullName;
-          gitEmail = config.my.user.email;
-        }
-      ];
+      accounts = {
+        "${config.my.user.name}" = {
+          userName = config.my.user.fullName;
+          userEmail = config.my.user.email;
+          ghUser = "fleischerdesign";
+          sopsSecret = config.my.user.name;
+        };
+      };
     };
 
     environment.systemPackages = with pkgs; [

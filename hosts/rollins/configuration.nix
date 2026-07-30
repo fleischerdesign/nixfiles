@@ -61,9 +61,22 @@
       webui.oidc = {
         clientId = "WLcmhxTlLrbN9R4e7bfnlSNYi387OW1ynQWu27dG";
         issuer = "https://auth.ancoris.ovh/application/o/hermes/";
+        allowValues = "philipp@fleischer.design";
       };
       mnemosyne.enable = true;
       ddgs.enable = true;
+    };
+    auxiliary = {
+      vision.provider = "openrouter";
+      vision.model = "xiaomi/mimo-v2.5";
+      title_generation.provider = "deepseek";
+      title_generation.model = "deepseek-v4-flash";
+      compression.provider = "deepseek";
+      compression.model = "deepseek-v4-flash";
+      approval.provider = "deepseek";
+      approval.model = "deepseek-v4-flash";
+      web_extract.provider = "deepseek";
+      web_extract.model = "deepseek-v4-flash";
     };
   };
 
@@ -82,6 +95,16 @@
   };
 
   my.features.services.camofox.enable = true;
+
+  sops.secrets.hermes_ssh_key = {
+    owner = "hermes";
+    mode = "0600";
+    path = "/var/lib/hermes/.ssh/id_ed25519";
+  };
+
+  systemd.tmpfiles.rules = [
+    "d /var/lib/hermes/.ssh 0700 hermes hermes - -"
+  ];
 
   system.stateVersion = "24.11";
 }

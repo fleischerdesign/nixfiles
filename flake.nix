@@ -147,7 +147,7 @@
               nativeBuildInputs = [ pkgs.statix ];
             }
             ''
-              statix check ${./.} || true
+              statix check ${./.}
               touch $out
             '';
 
@@ -195,6 +195,11 @@
           name: _:
           let
             hostConfig = self.nixosConfigurations.${name};
+            deployKey =
+              let
+                envKey = builtins.getEnv "DEPLOY_KEY";
+              in
+              if envKey != "" then envKey else "~/.ssh/deploy-key";
           in
           {
             hostname = hostConfig.config.my.features.system.networking.topology.hosts.${name}.tailscaleIp;
@@ -203,7 +208,7 @@
               sshUser = "root";
               sshOpts = [
                 "-i"
-                "/home/philipp/.ssh/deploy-key"
+                deployKey
               ];
               path = inputs.deploy-rs.lib.${system}.activate.nixos hostConfig;
             };

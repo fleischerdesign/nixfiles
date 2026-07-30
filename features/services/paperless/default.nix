@@ -1,18 +1,23 @@
 {
   config,
+  options,
   lib,
   features,
   ...
 }:
 let
   cfg = config.my.features.services.paperless;
+  caddyOpt = options.my.features.services.caddy.baseDomain or null;
+  caddyBaseDomain =
+    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
+  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
 in
 {
   options.my.features.services.paperless = {
     enable = lib.mkEnableOption "Paperless-ngx Document Management";
     ssoServerUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/paperless";
+      default = "https://${authHost}/application/o/paperless";
       description = "OIDC Issuer/Server URL for Authentik.";
     };
   };

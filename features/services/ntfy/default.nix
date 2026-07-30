@@ -6,10 +6,17 @@
 
 let
   cfg = config.my.features.services.ntfy;
+  caddyBaseDomain = config.my.features.services.caddy.baseDomain or null;
 in
 {
   options.my.features.services.ntfy = {
     enable = lib.mkEnableOption "ntfy-sh notification service";
+
+    adminUser = lib.mkOption {
+      type = lib.types.str;
+      default = config.my.user.primary or "admin";
+      description = "Primary admin username for ntfy auth tokens.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -26,13 +33,14 @@ in
     # Template für ntfy env, um Token deklarativ einzubauen
     sops.templates."ntfy.env".content = ''
       NTFY_AUTH_USERS="${config.sops.placeholder.ntfy_users}"
-      NTFY_AUTH_TOKENS="philipp:${config.sops.placeholder.grafana_ntfy_token}:Grafana"
+      NTFY_AUTH_TOKENS="${cfg.adminUser}:${config.sops.placeholder.grafana_ntfy_token}:Grafana"
     '';
 
     services.ntfy-sh = {
       enable = true;
       settings = {
-        base-url = "https://ntfy.${config.my.features.services.caddy.baseDomain}";
+        base-url =
+          if caddyBaseDomain != null then "https://ntfy.${caddyBaseDomain}" else "http://127.0.0.1:8083";
         listen-http = "127.0.0.1:8083";
         auth-file = "/var/lib/ntfy-sh/auth.db";
         auth-default-access = "deny-all";

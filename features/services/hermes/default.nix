@@ -27,7 +27,12 @@
 #   - Subdomain delegation uses a host-level Caddy wildcard TLS
 #     (Cloudflare DNS challenge) that reverse-proxies to an internal
 #     Caddy instance running as the hermes user.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.features.services.hermes;
 
@@ -55,77 +60,86 @@ let
 
   hermesHome = cfg.stateDir + "/.hermes";
 
-  baseDomain = config.my.features.services.caddy.baseDomain;
   sub = cfg.subdomainDelegation;
+  baseDomain = sub.baseDomain;
 
   mkNullableEnv = lib.filterAttrs (_: v: v != null);
 
-  agentEnv = mkNullableEnv ({
-    MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
-    HASS_URL = cfg.integrations.hass.url;
-    PAPERLESS_URL = cfg.integrations.paperless.url;
-    CAMOFOX_URL = cfg.integrations.camofox.url;
-  } // lib.optionalAttrs (cfg.integrations.camofox.enable) {
-    CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
-  });
-
-  agentSettings = lib.recursiveUpdate {
-    approvals.mode = "smart";
-    model = {
-      default = cfg.model;
-      provider = "deepseek";
-    };
-    memory = {
-      provider = "mnemosyne";
-      memory_enabled = true;
-    };
-    auxiliary = {
-      vision = {
-        provider = "openrouter";
-        model = "google/gemini-3.5-flash";
-      };
-      title_generation = {
-        provider = "deepseek";
-        model = "deepseek-v4-flash";
-      };
-      compression = {
-        provider = "deepseek";
-        model = "deepseek-v4-flash";
-      };
-      approval = {
-        provider = "deepseek";
-        model = "deepseek-v4-flash";
-      };
-      web_extract = {
-        provider = "deepseek";
-        model = "deepseek-v4-flash";
-      };
-    };
-    terminal.backend = "local";
-  } (
-    if cfg.integrations.telegram.enable && cfg.integrations.telegram.chatId != null then {
-      platforms.telegram.home_channel = {
-        platform = "telegram";
-        chat_id = cfg.integrations.telegram.chatId;
-      };
-    } else { }
-    // (
-      if cfg.integrations.camofox.enable then {
-        browser.camofox.managed_persistence = true;
-      } else { }
-    )
-    // (
-      if sub.enable then {
-        platforms.webhook = {
-          enabled = true;
-          extra = {
-            port = 8644;
-            host = "127.0.0.1";
-          };
-        };
-      } else { }
-    )
+  agentEnv = mkNullableEnv (
+    {
+      MNEMOSYNE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
+      HASS_URL = cfg.integrations.hass.url;
+      PAPERLESS_URL = cfg.integrations.paperless.url;
+      CAMOFOX_URL = cfg.integrations.camofox.url;
+    }
+    // lib.optionalAttrs (cfg.integrations.camofox.enable) {
+      CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
+    }
   );
+
+  agentSettings =
+    lib.recursiveUpdate
+      {
+        approvals.mode = "smart";
+        model = {
+          default = cfg.model;
+          provider = "deepseek";
+        };
+        memory = {
+          provider = "mnemosyne";
+          memory_enabled = true;
+        };
+        auxiliary = cfg.auxiliary;
+        terminal.backend = "local";
+      }
+      (
+        if cfg.integrations.telegram.enable && cfg.integrations.telegram.chatId != null then
+          {
+            platforms.telegram.home_channel = {
+              platform = "telegram";
+              chat_id = cfg.integrations.telegram.chatId;
+            };
+          }
+        else
+          { }
+          // (
+            if cfg.integrations.camofox.enable then
+              {
+                browser.camofox.managed_persistence = true;
+              }
+            else
+              { }
+          )
+          // (
+            if sub.enable then
+              {
+                platforms.webhook = {
+                  enabled = true;
+                  extra = {
+                    port = 8644;
+                    host = "127.0.0.1";
+                  };
+                };
+              }
+            else
+              { }
+          )
+      );
+
+  modelOption = lib.types.submodule {
+    options = {
+      model = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Model name.";
+      };
+      provider = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Model provider.";
+      };
+    };
+  };
 in
 {
   imports = [
@@ -171,9 +185,46 @@ in
         default = "deepseek-v4-flash";
         description = "Default model for Hermes Agent.";
       };
+
+      auxiliary = lib.mkOption {
+        type = lib.types.submodule {
+          options = {
+            vision = lib.mkOption {
+              type = modelOption;
+              default = { };
+              description = "Vision/image model configuration.";
+            };
+            title_generation = lib.mkOption {
+              type = modelOption;
+              default = { };
+              description = "Title generation model configuration.";
+            };
+            compression = lib.mkOption {
+              type = modelOption;
+              default = { };
+              description = "Compression model configuration.";
+            };
+            approval = lib.mkOption {
+              type = modelOption;
+              default = { };
+              description = "Approval model configuration.";
+            };
+            web_extract = lib.mkOption {
+              type = modelOption;
+              default = { };
+              description = "Web extraction model configuration.";
+            };
+          };
+        };
+        default = { };
+        description = "Auxiliary model configurations.";
+      };
+
       hostUsers = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = [ config.my.user.name ];
+        default = lib.optionals (config ? my && config.my ? user && config.my.user ? primary) [
+          config.my.user.primary
+        ];
         description = "Interactive host users in the hermes group.";
       };
       workingDirectory = lib.mkOption {
@@ -191,6 +242,11 @@ in
         type = lib.types.submodule {
           options = {
             enable = lib.mkEnableOption "wildcard subdomain delegation via Caddy";
+            baseDomain = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = config.my.features.services.caddy.baseDomain or null;
+              description = "Base domain for wildcard routing.";
+            };
             prefix = lib.mkOption {
               type = lib.types.str;
               default = "hermes";
@@ -249,9 +305,11 @@ in
         owner = "hermes";
         restartUnits = [ "hermes-agent.service" ];
       };
-    } // lib.optionalAttrs (cfg.integrations.camofox.enable) {
+    }
+    // lib.optionalAttrs (cfg.integrations.camofox.enable) {
       camofox_api_key.restartUnits = lib.mkDefault [ "hermes-agent.service" ];
-    } // lib.optionalAttrs (sub.enable) {
+    }
+    // lib.optionalAttrs (sub.enable) {
       cloudflare_api_token = { };
     };
 
@@ -294,9 +352,8 @@ in
     systemd.services.hermes-webui.restartTriggers = [ generatedConfigFile ];
 
     system.activationScripts."hermes-agent-config" = lib.stringAfter [ "users" ] ''
-      mkdir -p ${hermesHome} ${cfg.workingDirectory}
-      chown hermes:hermes ${cfg.stateDir} ${hermesHome} ${cfg.workingDirectory}
-      chmod 2750 ${cfg.stateDir} ${hermesHome} ${cfg.workingDirectory}
+      mkdir -p ${hermesHome}
+      chown hermes:hermes ${hermesHome}
 
       ${pkgs.python3.withPackages (ps: [ ps.pyyaml ])}/bin/python3 << 'PYEOF'
       import yaml, json, sys
@@ -347,6 +404,16 @@ in
       "d ${cfg.stateDir}/.config    0770 hermes hermes -"
       "d ${cfg.stateDir}/.config/gh 0770 hermes hermes -"
       "f /var/lib/systemd/linger/hermes 0644 root root - -"
+    ]
+    ++ lib.optionals (config.my.features.dev.opencode.enable or false) [
+      "d ${cfg.stateDir}/.config/opencode 0700 hermes hermes - -"
+      "d ${cfg.stateDir}/.local/share/opencode 0700 hermes hermes - -"
+      "L+ ${cfg.stateDir}/.config/opencode/opencode.json - hermes hermes - ${config.my.features.dev.opencode.configJsonPath}"
+    ]
+    ++ lib.optionals (config.sops.templates ? "opencode-auth.json") [
+      "L+ ${cfg.stateDir}/.local/share/opencode/auth.json - hermes hermes - ${
+        config.sops.templates."opencode-auth.json".path
+      }"
     ];
 
     users.users =
@@ -355,12 +422,8 @@ in
       }))
       // {
         hermes = {
-          isSystemUser = true;
-          group = "hermes";
-          home = cfg.stateDir;
-          homeMode = "2750";
-          createHome = true;
-          shell = pkgs.bash;
+          home = lib.mkForce cfg.stateDir;
+          homeMode = lib.mkDefault "2750";
         };
       };
 
