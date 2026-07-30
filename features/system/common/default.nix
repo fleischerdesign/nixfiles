@@ -75,17 +75,7 @@ in
     documentation.man.cache.enable = false;
     documentation.doc.enable = false;
 
-    my.features.dev.git = {
-      enable = true;
-      accounts = {
-        "${config.my.user.name}" = {
-          userName = config.my.user.fullName;
-          userEmail = config.my.user.email;
-          ghUser = "fleischerdesign";
-          sopsSecret = config.my.user.name;
-        };
-      };
-    };
+    my.features.dev.git.enable = true;
 
     environment.systemPackages = with pkgs; [
       wget

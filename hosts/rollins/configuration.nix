@@ -34,6 +34,7 @@
 
   my.features.services.hermes = {
     enable = true;
+    soulContent = builtins.readFile ../../features/services/hermes/SOUL.md;
     integrations = {
       hass = {
         enable = true;

@@ -40,6 +40,8 @@
     home-manager.enable = true;
   };
 
+  my.features.dev.git.enable = true;
+
   home.packages = [
     pkgs.nil
     pkgs.nixfmt

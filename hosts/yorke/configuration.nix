@@ -76,23 +76,5 @@
   sops.secrets."opencode/deepseek" = { };
   sops.secrets."opencode/openrouter" = { };
 
-  my.features.dev.git = {
-    enable = true;
-    accounts = {
-      philipp = {
-        userName = config.my.user.fullName;
-        userEmail = config.my.user.email;
-        ghUser = "fleischerdesign";
-        sopsSecret = "philipp";
-      };
-      hermes = {
-        userName = config.my.user.fullName;
-        userEmail = config.my.user.email;
-        ghUser = "fleischerdesign";
-        sopsSecret = "philipp";
-      };
-    };
-  };
-
   system.stateVersion = "24.05";
 }

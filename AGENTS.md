@@ -116,8 +116,12 @@ Rollen setzen **Defaults** (`lib.mkDefault`), Hosts **überschreiben** (`=` ohne
 - **Gating**: Feature-Konfiguration steht hinter `lib.mkIf cfg.enable`. Ein Feature ist geladen, aber nur aktiv wenn `enable = true`.
 - **Option-Pfad**: `my.features.<domain>.<feature>` — konsistent mit Verzeichnispfad `features/<domain>/<feature>/default.nix`.
 - **Feature-Dependencies**: `features.requires ["services.redis"] config` → setzt `lib.mkDefault true` + assertion (Build bricht ab wenn explizit disabled).
+- **Architektur-Prinzipien für Feature-Module**:
+  - **Agnostisch & Generisch**: Feature-Module dürfen KEINE hartcodierten User-Namen (`philipp`, `hermes`) oder Host-Namen enthalten. Sie müssen modular, DRY, akademisch sauber und wiederverwendbar sein, sodass auch externe Entwickler sie einbinden können.
+  - **System-Features**: Für systemweite Dienste/Hardware (Services, Networking, Drivers). Werden in Host-Configs/Rollen via `my.features.<domain>.<feature>.enable = true` aktiviert.
+  - **User-Scoped Features**: Für reine User-Tools (Entwicklungsumgebungen, Shells, Dotfiles, OpenCode). Werden in `features/<domain>/<feature>/default.nix` generisch per `home-manager.sharedModules` bereitgestellt und im jeweiligen User-Kontext (`user/<name>/home.nix` bzw. `opencode.nix`) via `my.features.<domain>.<feature>.enable = true` aktiviert.
 
-**Kanonisches Feature-Modul:**
+**Kanonisches System-Feature-Modul:**
 ```nix
 # features/<domain>/<feature>/default.nix
 { config, lib, pkgs, ... }:
@@ -130,6 +134,27 @@ in {
   config = lib.mkIf cfg.enable {
     # NixOS-Konfiguration...
   };
+}
+```
+
+**Kanonisches User-Scoped Feature-Modul (Home Manager):**
+```nix
+# features/<domain>/<feature>/default.nix
+{ config, lib, pkgs, ... }:
+let featureDir = ./.;
+in {
+  home-manager.sharedModules = [
+    ({ config, lib, pkgs, osConfig ? {}, ... }:
+    let cfg = config.my.features.<domain>.<feature>;
+    in {
+      options.my.features.<domain>.<feature> = {
+        enable = lib.mkEnableOption "description";
+      };
+      config = lib.mkIf cfg.enable {
+        # Home-Manager Konfiguration für diesen User...
+      };
+    })
+  ];
 }
 ```
 
@@ -215,11 +240,12 @@ SSH-Key: `~/.ssh/deploy-key` (User: `root`). Tailscale-IPs aus `my.features.syst
 
 ## opencode-Integration
 
-Die opencode-Konfiguration wird via Home-Manager (`programs.opencode`) in `user/philipp/opencode.nix` verwaltet:
-- **Source-Dateien**: Skills, Agents, Instructions liegen unter `features/dev/opencode/` (hat **kein** `default.nix` — ist kein Nix-Modul).
-- **Aktivierung**: `home.file` symlinkt Source-Dateien nach `~/.config/opencode/`. Änderungen werden mit `nixos-rebuild switch` aktiv.
-- **Gating**: `lib.mkIf (role != "server")` — opencode ist auf Servern deaktiviert.
-- **MCP**: `mcp-nixos` (local binary), `chrome-devtools` (npx via `google-chrome`), `context-mode`.
+Die opencode-Konfiguration wird als **generisches User-Scoped Feature** in `features/dev/opencode/default.nix` deklariert:
+- **Architecture**: `features/dev/opencode/default.nix` stellt das Feature per `home-manager.sharedModules` bereit und verlinkt native Home-Manager-Optionen (`programs.opencode.skills`, `agents`, `settings`).
+- **Aktivierung**: In den jeweiligen User-Modulen (`user/philipp/opencode.nix`, `user/hermes/home.nix`) via `my.features.dev.opencode.enable = true`.
+- **Scope**: Läuft agnostisch für jeden Home-Manager-User auf jedem Host (egal ob Desktop oder Server wie `rollins`).
+- **Source-Dateien**: Skills, Agents, Instructions liegen zentral unter `features/dev/opencode/` (Single Source of Truth).
+- **Secrets**: API-Keys (`auth.json`) werden transparent über die `osConfig.sops.templates."opencode-auth.json"` verlinkt, falls auf dem Host definiert.
 
 ## Custom Package Updater
 

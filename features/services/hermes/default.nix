@@ -238,6 +238,12 @@ in
         description = "State directory for hermes-agent. HERMES_HOME is set to stateDir/.hermes.";
       };
 
+      soulContent = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "SOUL.md identity content. Written once to HERMES_HOME via tmpfiles C-type. Null by default — set per host. To update after initial deploy, delete the target file and redeploy.";
+      };
+
       subdomainDelegation = lib.mkOption {
         type = lib.types.submodule {
           options = {
@@ -405,15 +411,8 @@ in
       "d ${cfg.stateDir}/.config/gh 0770 hermes hermes -"
       "f /var/lib/systemd/linger/hermes 0644 root root - -"
     ]
-    ++ lib.optionals (config.my.features.dev.opencode.enable or false) [
-      "d ${cfg.stateDir}/.config/opencode 0700 hermes hermes - -"
-      "d ${cfg.stateDir}/.local/share/opencode 0700 hermes hermes - -"
-      "L+ ${cfg.stateDir}/.config/opencode/opencode.json - hermes hermes - ${config.my.features.dev.opencode.configJsonPath}"
-    ]
-    ++ lib.optionals (config.sops.templates ? "opencode-auth.json") [
-      "L+ ${cfg.stateDir}/.local/share/opencode/auth.json - hermes hermes - ${
-        config.sops.templates."opencode-auth.json".path
-      }"
+    ++ lib.optionals (cfg.soulContent != null) [
+      "C ${hermesHome}/SOUL.md 0640 hermes hermes - ${pkgs.writeText "hermes-soul.md" cfg.soulContent}"
     ];
 
     users.users =
