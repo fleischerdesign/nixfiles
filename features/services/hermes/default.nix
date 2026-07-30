@@ -61,7 +61,7 @@ let
   hermesHome = cfg.stateDir + "/.hermes";
 
   sub = cfg.subdomainDelegation;
-  baseDomain = sub.baseDomain;
+  inherit (sub) baseDomain;
 
   mkNullableEnv = lib.filterAttrs (_: v: v != null);
 
@@ -72,7 +72,7 @@ let
       PAPERLESS_URL = cfg.integrations.paperless.url;
       CAMOFOX_URL = cfg.integrations.camofox.url;
     }
-    // lib.optionalAttrs (cfg.integrations.camofox.enable) {
+    // lib.optionalAttrs cfg.integrations.camofox.enable {
       CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
     }
   );
@@ -89,7 +89,7 @@ let
           provider = "mnemosyne";
           memory_enabled = true;
         };
-        auxiliary = cfg.auxiliary;
+        inherit (cfg) auxiliary;
         terminal.backend = "local";
       }
       (
@@ -306,10 +306,10 @@ in
         restartUnits = [ "hermes-agent.service" ];
       };
     }
-    // lib.optionalAttrs (cfg.integrations.camofox.enable) {
+    // lib.optionalAttrs cfg.integrations.camofox.enable {
       camofox_api_key.restartUnits = lib.mkDefault [ "hermes-agent.service" ];
     }
-    // lib.optionalAttrs (sub.enable) {
+    // lib.optionalAttrs sub.enable {
       cloudflare_api_token = { };
     };
 

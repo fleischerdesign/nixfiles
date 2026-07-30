@@ -100,7 +100,7 @@ in
 
       sops.templates.attic_user_config = {
         owner = cfg.user;
-        group = cfg.group;
+        inherit (cfg) group;
         mode = "0400";
         content = ''
           default-server = "nixfiles-server"

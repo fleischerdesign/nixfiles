@@ -1,1 +1,6 @@
-disabled = ["repeated_keys"]
+disabled = [
+  "repeated_keys",
+  "manual_inherit",
+  "manual_inherit_from",
+  "useless_parens",
+]

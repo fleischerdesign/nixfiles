@@ -147,7 +147,7 @@
               nativeBuildInputs = [ pkgs.statix ];
             }
             ''
-              statix check ${./.}
+              statix check --config ${./statix.toml} ${./.}
               touch $out
             '';
 
