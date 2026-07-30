@@ -107,6 +107,10 @@ in
           SOPS_AGE_KEY_FILE = cfg.sopsAgeKeyFile;
         };
 
+        systemd.tmpfiles.rules = map (
+          name: "d /nix/var/nix/profiles/per-user/${name} 0755 ${name} users - -"
+        ) discoveredUserNames;
+
         users.users.${cfg.primary} = {
           isNormalUser = true;
           description = cfg.fullName;
