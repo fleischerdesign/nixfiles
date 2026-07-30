@@ -107,9 +107,11 @@ in
           SOPS_AGE_KEY_FILE = cfg.sopsAgeKeyFile;
         };
 
-        systemd.tmpfiles.rules = map (
-          name: "d /nix/var/nix/profiles/per-user/${name} 0755 ${name} users - -"
-        ) discoveredUserNames;
+        systemd.tmpfiles.rules = lib.concatMap (name: [
+          "d /nix/var/nix/profiles/per-user/${name} 0755 ${name} users - -"
+          "d /home/${name} 0700 ${name} users - -"
+          "d /home/${name}/.local 0755 ${name} users - -"
+        ]) discoveredUserNames;
 
         users.users.${cfg.primary} = {
           isNormalUser = true;
