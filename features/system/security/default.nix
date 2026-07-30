@@ -42,10 +42,14 @@ in
       enable = true;
       extraRules = lib.optionals cfg.sudo.passwordlessRebuild [
         {
-          users = [ config.my.user.name ];
+          users = [ config.my.user.primary ];
           commands = [
             {
               command = "/run/current-system/sw/bin/nixos-rebuild";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/run/current-system/sw/bin/nixos-rebuild *";
               options = [ "NOPASSWD" ];
             }
             {
@@ -53,7 +57,15 @@ in
               options = [ "NOPASSWD" ];
             }
             {
+              command = "/run/current-system/sw/bin/nh *";
+              options = [ "NOPASSWD" ];
+            }
+            {
               command = "/run/current-system/sw/bin/nix-env";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/run/current-system/sw/bin/nix-env *";
               options = [ "NOPASSWD" ];
             }
             {
@@ -61,7 +73,15 @@ in
               options = [ "NOPASSWD" ];
             }
             {
+              command = "${pkgs.nix}/bin/nix-env *";
+              options = [ "NOPASSWD" ];
+            }
+            {
               command = "/run/current-system/sw/bin/nix-collect-garbage";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/run/current-system/sw/bin/nix-collect-garbage *";
               options = [ "NOPASSWD" ];
             }
             {
@@ -69,7 +89,15 @@ in
               options = [ "NOPASSWD" ];
             }
             {
+              command = "${pkgs.nix}/bin/nix-collect-garbage *";
+              options = [ "NOPASSWD" ];
+            }
+            {
               command = "/nix/store/*-nixos-system-*/bin/switch";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/nix/store/*-nixos-system-*/bin/switch *";
               options = [ "NOPASSWD" ];
             }
             {
@@ -77,7 +105,23 @@ in
               options = [ "NOPASSWD" ];
             }
             {
+              command = "/nix/store/*-nixos-system-*/bin/boot *";
+              options = [ "NOPASSWD" ];
+            }
+            {
               command = "/nix/store/*-nixos-system-*/bin/test";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/nix/store/*-nixos-system-*/bin/test *";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/nix/store/*-nixos-system-*/bin/dry-activate";
+              options = [ "NOPASSWD" ];
+            }
+            {
+              command = "/nix/store/*-nixos-system-*/bin/dry-activate *";
               options = [ "NOPASSWD" ];
             }
           ];
