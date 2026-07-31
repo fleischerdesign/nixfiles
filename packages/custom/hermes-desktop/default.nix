@@ -6,6 +6,8 @@
   fetchFromGitHub,
   pkg-config,
   wrapGAppsHook3,
+  copyDesktopItems,
+  makeDesktopItem,
   webkitgtk_4_1,
   gtk3,
   libsoup_3,
@@ -36,7 +38,9 @@ rustPlatform.buildRustPackage {
   nativeBuildInputs = [
     pkg-config
     wrapGAppsHook3
+    copyDesktopItems
   ];
+
   buildInputs = [
     webkitgtk_4_1
     gtk3
@@ -46,6 +50,20 @@ rustPlatform.buildRustPackage {
     librsvg
     glib
     glib-networking
+  ];
+
+  desktopItems = [
+    (makeDesktopItem {
+      name = "hermes-desktop";
+      desktopName = "Hermes Desktop";
+      exec = "hermes-desktop";
+      icon = "hermes-desktop";
+      comment = "Official native Tauri 2 desktop application for Hermes WebUI";
+      categories = [
+        "Utility"
+        "Network"
+      ];
+    })
   ];
 
   postInstall = ''
