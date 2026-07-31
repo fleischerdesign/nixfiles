@@ -28,6 +28,10 @@
     printing.enable = lib.mkDefault true;
   };
 
+  my.features.desktop = {
+    webapps.enable = lib.mkDefault true;
+  };
+
   my.features.dev = {
     containers.enable = lib.mkDefault true;
     codium.enable = lib.mkDefault true;

@@ -42,6 +42,23 @@
 
   my.features.dev.git.enable = true;
 
+  my.features.desktop.webapps = {
+    enable = true;
+    apps = {
+      hermes = {
+        displayName = "Hermes WebUI";
+        url = "https://hermes.rls.ancoris.ovh";
+        icon = "google-chrome";
+        comment = "Official Hermes WebUI PWA Desktop Client";
+        categories = [
+          "Network"
+          "Utility"
+        ];
+        wmClass = "hermes-webui";
+      };
+    };
+  };
+
   home.packages = [
     pkgs.nil
     pkgs.nixfmt
