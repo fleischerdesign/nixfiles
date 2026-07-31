@@ -74,7 +74,6 @@
       # Zentralisierte Overlays
       overlays = [
         (import ./packages/overlays/fix/bottles)
-        (import ./packages/overlays/fix/authentik)
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];
