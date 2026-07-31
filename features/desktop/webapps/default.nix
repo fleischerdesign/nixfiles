@@ -27,9 +27,9 @@ let
         };
 
         icon = lib.mkOption {
-          type = lib.types.either lib.types.str lib.types.path;
+          type = lib.types.either lib.types.str (lib.types.either lib.types.path lib.types.package);
           default = "internet-web-browser";
-          description = "Icon name or path to local icon image file.";
+          description = "Icon name, path to local image file, or fetched package derivation.";
         };
 
         comment = lib.mkOption {
@@ -42,7 +42,6 @@ let
           type = lib.types.listOf lib.types.str;
           default = [
             "Network"
-            "Utility"
           ];
           description = "XDG Desktop Categories for launcher filtering.";
         };
@@ -129,17 +128,38 @@ in
 
               execStr = "${browserBin} " + lib.concatStringsSep " " browserArgs;
 
-              iconVal = if builtins.isPath appCfg.icon then toString appCfg.icon else appCfg.icon;
+              isPathIcon = builtins.isPath appCfg.icon || lib.isDerivation appCfg.icon;
+
+              iconName = if isPathIcon then "webapp-${appName}" else appCfg.icon;
+
+              desktopItem = pkgs.makeDesktopItem {
+                name = "webapp-${appName}";
+                desktopName = appCfg.displayName;
+                exec = execStr;
+                icon = iconName;
+                comment = appCfg.comment;
+                categories = appCfg.categories;
+                type = "Application";
+                terminal = false;
+              };
             in
-            pkgs.makeDesktopItem {
-              name = "webapp-${appName}";
-              desktopName = appCfg.displayName;
-              exec = execStr;
-              icon = iconVal;
-              comment = appCfg.comment;
-              categories = appCfg.categories;
-              type = "Application";
-              terminal = false;
+            pkgs.stdenv.mkDerivation {
+              name = "webapp-package-${appName}";
+              desktopItems = [ desktopItem ];
+              nativeBuildInputs = [ pkgs.copyDesktopItems ];
+              dontUnpack = true;
+              dontBuild = true;
+
+              installPhase = ''
+                runHook preInstall
+                mkdir -p $out/share/applications
+                copyDesktopItems
+                ${lib.optionalString isPathIcon ''
+                  mkdir -p $out/share/icons/hicolor/512x512/apps
+                  cp -L ${appCfg.icon} $out/share/icons/hicolor/512x512/apps/webapp-${appName}.png
+                ''}
+                runHook postInstall
+              '';
             };
         in
         {
