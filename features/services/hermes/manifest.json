@@ -1,9 +1,9 @@
 {
   "name": "hermes-agent",
-  "version": "0.19.0",
-  "rev": "1dfe781edd5e96d09511cf27d800a03e63b09789",
-  "srcHash": "sha256-0+X3MY3AZHLZmj3gcTMJOViVeHIz+OVypZynvLrLKJw=",
-  "npmDepsHash": "sha256-sjCgrK0olUzU2vCepLiIJdf0N2ut8nbaF/t37FR4QcI=",
+  "version": "0.19.1",
+  "rev": "dbe14424ed192b83993e5655629b0dd5714f3355",
+  "srcHash": "sha256-MmepZYoiKo7SftGgEkLNOvqyA+6w9wUtxRL2UBLgfXk=",
+  "npmDepsHash": "sha256-ZeZcsYELAqUO9/QjHJt6BWdFJ9o4zMgsK9JB6SfnouI=",
   "upstream": {
     "type": "github-rev",
     "owner": "NousResearch",

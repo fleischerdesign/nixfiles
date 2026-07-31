@@ -1,7 +1,7 @@
 {
   "name": "mnemosyne",
-  "memoryVersion": "3.14.0",
-  "memoryHash": "sha256-EQbl7GmsIkncre0bepSNj1zux5WaMXbMbvvdD6QSdus=",
+  "memoryVersion": "3.15.1",
+  "memoryHash": "sha256-lspUMxc0pUSkhSUrNdiiO5OJ1NMC/S853EYSanXtXKM=",
   "hermesVersion": "0.5.0",
   "hermesHash": "sha256-CzEvnUw5oPFtT5bHQQ/GBdy2C/E7qShQn32irIRYKqw=",
   "upstream": {

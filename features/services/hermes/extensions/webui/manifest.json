@@ -1,11 +1,12 @@
 {
   "name": "hermes-webui",
   "version": "21bdd7c1f1afe1c1a69d46e7dd2215d9020a834a",
-  "srcHash": "sha256-AVuuXtaXwl1q8govKd5VnfBJB6Bf25q+6z2buYvVXgg=",
+  "srcHash": "sha256-ZfvUzWqKuwkQIE7FUnc8vK4igEccKnAjYVsP7LGeYyg=",
   "upstream": {
     "type": "github-rev",
     "owner": "nesquena",
     "repo": "hermes-webui"
   },
-  "rev": "21bdd7c1f1afe1c1a69d46e7dd2215d9020a834a"
+  "rev": "dd7f6ac318f7c91a06841f326216542d57dd5f2c",
+  "npmDepsHash": ""
 }
