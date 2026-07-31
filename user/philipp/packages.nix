@@ -18,7 +18,6 @@ in
     ]
     ++ lib.optionals (role != "server") [
       # --- Desktop Only ---
-      custom.hermes-desktop
       telegram-desktop
       google-chrome
       nerd-fonts.jetbrains-mono

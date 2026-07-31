@@ -45,16 +45,16 @@
   my.features.desktop.webapps = {
     enable = true;
     apps = {
-      hermes = {
-        displayName = "Hermes WebUI";
-        url = "https://hermes.rls.ancoris.ovh";
-        icon = "google-chrome";
-        comment = "Official Hermes WebUI PWA Desktop Client";
+      moebius = {
+        displayName = "Moebius";
+        url = "https://moebius.rls.ancoris.ovh";
+        icon = ../../media/moebius.png;
+        comment = "Hermes Moebius Subdomain Gateway";
         categories = [
           "Network"
           "Utility"
         ];
-        wmClass = "hermes-webui";
+        wmClass = "moebius";
       };
     };
   };
