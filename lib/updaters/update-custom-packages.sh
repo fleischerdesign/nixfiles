@@ -240,15 +240,56 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
       continue
     fi
 
-    # Build-time hashes (npmDepsHash) are reset to empty.
     tmp_manifest="$(mktemp)"
     jq --arg rev "$latest_commit" \
        --arg src_hash "$new_src_hash" \
-       '.rev = $rev | .srcHash = $src_hash | .npmDepsHash = ""' \
+       '.rev = $rev | .srcHash = $src_hash' \
        "$manifest_path" > "$tmp_manifest"
-
     mv "$tmp_manifest" "$manifest_path"
-    echo "  ✨ Updated $pkg_name to commit ${latest_commit:0:12} (npmDepsHash needs manual update)"
+
+    # Auto-inspect source tarball for version updates & npmDepsHash
+    tmp_src="$(mktemp -d)"
+    if curl -sfL "$tarball_url" | tar -xz -C "$tmp_src" --strip-components=1 2>/dev/null; then
+      # 1. Check for version in pyproject.toml or package.json
+      extracted_version=""
+      if [ -f "$tmp_src/pyproject.toml" ]; then
+        extracted_version="$(python3 -c "import tomllib; print(tomllib.load(open('$tmp_src/pyproject.toml', 'rb')).get('project', {}).get('version', ''))" 2>/dev/null || true)"
+        if [ -z "$extracted_version" ]; then
+          extracted_version="$(grep -m1 '^version' "$tmp_src/pyproject.toml" 2>/dev/null | cut -d'"' -f2 || true)"
+        fi
+      elif [ -f "$tmp_src/package.json" ]; then
+        extracted_version="$(jq -r '.version // empty' "$tmp_src/package.json" 2>/dev/null || true)"
+      fi
+
+      if [ -n "$extracted_version" ] && [ "$(jq -r '.version // empty' "$manifest_path")" != "" ]; then
+        echo "  🔍 Extracted version from source metadata: $extracted_version"
+        tmp_man="$(mktemp)"
+        jq --arg ver "$extracted_version" '.version = $ver' "$manifest_path" > "$tmp_man"
+        mv "$tmp_man" "$manifest_path"
+      fi
+
+      # 2. Auto-calculate npmDepsHash if field exists
+      if jq -e 'has("npmDepsHash")' "$manifest_path" >/dev/null 2>&1; then
+        if [ -f "$tmp_src/package-lock.json" ]; then
+          echo "  📦 Calculating npmDepsHash via prefetch-npm-deps..."
+          new_npm_hash="$( (cd "$tmp_src" && nix run nixpkgs#prefetch-npm-deps -- package-lock.json 2>/dev/null) | tail -n 1 || true)"
+          if [[ "$new_npm_hash" == sha256-* ]]; then
+            echo "  ✨ Auto-calculated npmDepsHash: $new_npm_hash"
+            tmp_man="$(mktemp)"
+            jq --arg hash "$new_npm_hash" '.npmDepsHash = $hash' "$manifest_path" > "$tmp_man"
+            mv "$tmp_man" "$manifest_path"
+          else
+            echo "  ⚠️ Could not calculate npmDepsHash automatically, setting empty"
+            tmp_man="$(mktemp)"
+            jq '.npmDepsHash = ""' "$manifest_path" > "$tmp_man"
+            mv "$tmp_man" "$manifest_path"
+          fi
+        fi
+      fi
+    fi
+    rm -rf "$tmp_src"
+
+    echo "  ✨ Updated $pkg_name to commit ${latest_commit:0:12}"
 
   # =========================================================================
   # pypi — Python package from PyPI, supports single and multi-package manifests
@@ -296,7 +337,10 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
         echo "    🎉 New version: $latest_version"
 
-      source_url="https://pypi.org/packages/source/${pypi_name:0:1}/${pypi_name}/${pypi_name//-/_}-${latest_version}.tar.gz"
+        source_url="$(echo "$PYPI_JSON" | jq -r '.urls[] | select(.packagetype=="sdist").url // empty' | head -n 1)"
+        if [ -z "$source_url" ]; then
+          source_url="https://pypi.org/packages/source/${pypi_name:0:1}/${pypi_name}/${pypi_name//-/_}-${latest_version}.tar.gz"
+        fi
 
         new_hash="$(nix store prefetch-file --unpack "$source_url" --json | jq -r '.hash')"
         if [ -z "$new_hash" ] || [ "$new_hash" = "null" ]; then
@@ -344,10 +388,9 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
       echo "  🎉 New version: $latest_version"
 
-      source_url="https://pypi.org/packages/source/${pypi_pkg:0:1}/${pypi_pkg}/${pypi_pkg//-/_}-${latest_version}.tar.gz"
+      source_url="$(echo "$PYPI_JSON" | jq -r '.urls[] | select(.packagetype=="sdist").url // empty' | head -n 1)"
       if [ -z "$source_url" ]; then
-        echo "  ⚠️ Could not find sdist URL for $pypi_pkg v$latest_version"
-        continue
+        source_url="https://pypi.org/packages/source/${pypi_pkg:0:1}/${pypi_pkg}/${pypi_pkg//-/_}-${latest_version}.tar.gz"
       fi
 
       new_hash="$(nix store prefetch-file --unpack "$source_url" --json | jq -r '.hash')"
