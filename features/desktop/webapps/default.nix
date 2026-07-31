@@ -127,7 +127,7 @@ in
                   ++ profileArg
                   ++ appCfg.extraArgs;
 
-              execStr = "${browserBin} ${lib.escapeShellArgs browserArgs}";
+              execStr = "${browserBin} " + lib.concatStringsSep " " browserArgs;
 
               iconVal = if builtins.isPath appCfg.icon then toString appCfg.icon else appCfg.icon;
             in

@@ -52,7 +52,6 @@
         comment = "Hermes Moebius Subdomain Gateway";
         categories = [
           "Network"
-          "Utility"
         ];
         wmClass = "moebius";
       };
