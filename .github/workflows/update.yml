@@ -23,7 +23,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@v22
 
-      - uses: DeterminateSystems/magic-nix-cache-action@v9
+      - uses: DeterminateSystems/magic-nix-cache-action@v14
 
       - id: detect
         env:
