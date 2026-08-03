@@ -2,9 +2,11 @@
 {
   # 1. Z170 PCIe ASPM Power-Fix (verhindert Hängenbleiben bei Sleep/Standby)
   # 2. Intel Arc A770: i915 Treiber (seit Kernel 6.2+ ohne force_probe, auto-detected)
-  # 3. CPU Performance: Mitigations abschalten für i7-9700KF (+5-15% IPC)
+  # 3. i915.enable_dc=0: Deaktiviert Display C-States zur Vermeidung von S3 (deep) Suspend-Freezes
+  # 4. CPU Performance: Mitigations abschalten für i7-9700KF (+5-15% IPC)
   boot.kernelParams = [
     "pcie_aspm.policy=performance"
+    "i915.enable_dc=0"
     "mitigations=off"
   ];
 
