@@ -52,6 +52,10 @@
         enable = true;
         chatId = "5838211825";
       };
+      vikunja = {
+        enable = true;
+        url = "https://vikunja.mky.ancoris.ovh";
+      };
     };
     subdomainDelegation = {
       enable = true;

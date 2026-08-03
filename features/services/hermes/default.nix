@@ -75,6 +75,10 @@ let
     // lib.optionalAttrs cfg.integrations.camofox.enable {
       CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
     }
+    // lib.optionalAttrs cfg.integrations.vikunja.enable {
+      VIKUNJA_URL = cfg.integrations.vikunja.url;
+      VIKUNJA_API_TOKEN = config.sops.placeholder.vikunja_api_token;
+    }
   );
 
   agentSettings =
@@ -299,6 +303,14 @@ in
                 description = "Telegram Chat ID for home_channel.";
               };
             };
+            vikunja = {
+              enable = lib.mkEnableOption "Vikunja task management integration";
+              url = lib.mkOption {
+                type = lib.types.str;
+                default = "https://vikunja.mky.ancoris.ovh";
+                description = "Vikunja URL.";
+              };
+            };
           };
         };
         default = { };
@@ -315,6 +327,9 @@ in
     }
     // lib.optionalAttrs cfg.integrations.camofox.enable {
       camofox_api_key.restartUnits = lib.mkDefault [ "hermes-agent.service" ];
+    }
+    // lib.optionalAttrs cfg.integrations.vikunja.enable {
+      vikunja_api_token.restartUnits = lib.mkDefault [ "hermes-agent.service" ];
     }
     // lib.optionalAttrs sub.enable {
       cloudflare_api_token = { };
