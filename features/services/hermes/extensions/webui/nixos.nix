@@ -64,8 +64,8 @@ let
   ++ mkIfSet "HASS_URL" hcfg.integrations.hass.url
   ++ mkIfSet "PAPERLESS_URL" hcfg.integrations.paperless.url
   ++ mkIfSet "CAMOFOX_URL" hcfg.integrations.camofox.url
-  ++ (lib.optionals (hcfg.integrations.camofox.enable) [
-    "CAMOFOX_API_KEY=${config.sops.placeholder.camofox_api_key}"
+  ++ (lib.optionals (hcfg.integrations.vikunja.enable) [
+    "VIKUNJA_URL=${hcfg.integrations.vikunja.url}"
   ])
   ++ mkIfSet "HERMES_WEBUI_OIDC_ISSUER" oidc.issuer
   ++ mkIfSet "HERMES_WEBUI_OIDC_CLIENT_ID" oidc.clientId
@@ -144,6 +144,10 @@ in
       restartUnits = lib.mkAfter [ "hermes-webui.service" ];
     };
 
+    sops.secrets.vikunja_api_token = lib.mkIf (hcfg.integrations.vikunja.enable) {
+      restartUnits = lib.mkAfter [ "hermes-webui.service" ];
+    };
+
     systemd.services.hermes-webui = {
       description = "Hermes WebUI";
       wantedBy = [ "multi-user.target" ];
@@ -161,9 +165,13 @@ in
         Restart = "on-failure";
         UMask = "0077";
         Environment = webuiEnv;
-        EnvironmentFile = lib.optionals (config.sops.secrets ? hermes_agent_env) [
-          config.sops.secrets.hermes_agent_env.path
-        ];
+        EnvironmentFile =
+          lib.optionals (config.sops.secrets ? hermes_agent_env) [
+            config.sops.secrets.hermes_agent_env.path
+          ]
+          ++ lib.optionals (config.sops.templates ? hermes_env) [
+            config.sops.templates."hermes_env".path
+          ];
         ReadWritePaths = [ ecfg.stateDir ];
       };
     };

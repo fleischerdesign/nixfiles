@@ -72,12 +72,8 @@ let
       PAPERLESS_URL = cfg.integrations.paperless.url;
       CAMOFOX_URL = cfg.integrations.camofox.url;
     }
-    // lib.optionalAttrs cfg.integrations.camofox.enable {
-      CAMOFOX_API_KEY = config.sops.placeholder.camofox_api_key;
-    }
     // lib.optionalAttrs cfg.integrations.vikunja.enable {
       VIKUNJA_URL = cfg.integrations.vikunja.url;
-      VIKUNJA_API_TOKEN = config.sops.placeholder.vikunja_api_token;
     }
   );
 
@@ -335,9 +331,24 @@ in
       cloudflare_api_token = { };
     };
 
+    sops.templates."hermes_env" = {
+      owner = "hermes";
+      restartUnits = [
+        "hermes-agent.service"
+        "hermes-webui.service"
+      ];
+      content = ''
+        ${lib.optionalString cfg.integrations.camofox.enable "CAMOFOX_API_KEY=${config.sops.placeholder.camofox_api_key}"}
+        ${lib.optionalString cfg.integrations.vikunja.enable "VIKUNJA_API_TOKEN=${config.sops.placeholder.vikunja_api_token}"}
+      '';
+    };
+
     services.hermes-agent = {
       settings = agentSettings;
-      environmentFiles = [ config.sops.secrets.hermes_agent_env.path ];
+      environmentFiles = [
+        config.sops.secrets.hermes_agent_env.path
+        config.sops.templates."hermes_env".path
+      ];
       environment = agentEnv;
       extraPackages = with pkgs; [
         nix
