@@ -62,6 +62,7 @@ let
     src = src;
     npmDepsHash = manifest.npmDepsHash;
     npmWorkspace = "web";
+    npmFlags = [ "--engine-strict=false" ];
     ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
     installPhase = ''
       mkdir -p $out
@@ -119,7 +120,7 @@ let
 
     prePatch = ''
       substituteInPlace pyproject.toml \
-        --replace-fail 'setuptools>=77.0,<83' 'setuptools>=77.0'
+        --replace-quiet 'setuptools>=77.0,<83' 'setuptools>=77.0'
     '';
   };
 
