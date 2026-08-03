@@ -66,6 +66,7 @@
       };
       mnemosyne.enable = true;
       ddgs.enable = true;
+      obsidian.enable = true;
     };
     auxiliary = {
       vision.provider = "openrouter";

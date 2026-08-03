@@ -156,7 +156,12 @@ in
                 copyDesktopItems
                 ${lib.optionalString isPathIcon ''
                   mkdir -p $out/share/icons/hicolor/512x512/apps
+                  mkdir -p $out/share/icons/hicolor/scalable/apps
+                  mkdir -p $out/share/pixmaps
                   cp -L ${appCfg.icon} $out/share/icons/hicolor/512x512/apps/webapp-${appName}.png
+                  cp -L ${appCfg.icon} $out/share/icons/hicolor/scalable/apps/webapp-${appName}.png
+                  cp -L ${appCfg.icon} $out/share/pixmaps/webapp-${appName}.png
+                  cp -L ${appCfg.icon} $out/share/pixmaps/${appName}.png
                 ''}
                 runHook postInstall
               '';

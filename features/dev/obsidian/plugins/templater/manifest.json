@@ -1,0 +1,14 @@
+{
+  "name": "templater-obsidian",
+  "pname": "templater-obsidian",
+  "version": "2.20.6",
+  "mainHash": "0wmq7h392v4wbms4fiz73jswhlam22zyl7v72cnva2skj5y88d70",
+  "manifestHash": "0ql9alp91615qmy1jv4bg5cg3m21fgayf6rgvxh9mjdir4sw5srh",
+  "stylesHash": "010c6maylykv7f9xqdhjmdkf9732r42xyns56a4qmwz9578vr1bx",
+  "upstream": {
+    "type": "obsidian-plugin",
+    "owner": "SilentVoid13",
+    "repo": "Templater",
+    "tagPrefix": ""
+  }
+}

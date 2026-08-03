@@ -35,9 +35,10 @@
   };
 
   my.features.services.portfolio.enable = true;
-  my.features.services.couchdb.enable = true;
+  my.features.services.obsidian-livesync.enable = true;
 
   my.features.services.ntfy.enable = true;
+  my.features.services.vikunja.enable = true;
   my.features.system.backups.restic = {
     enable = true;
     environmentFile = "restic_env_mackaye";

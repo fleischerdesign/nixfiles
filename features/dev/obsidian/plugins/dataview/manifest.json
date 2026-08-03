@@ -1,0 +1,14 @@
+{
+  "name": "dataview",
+  "pname": "dataview",
+  "version": "0.5.70",
+  "mainHash": "003xxdhm3x6jy8j9sg9fasf2glzv5c7clpspfc787bdg21qczcbb",
+  "manifestHash": "11b150b0dybjcjbnw1874bkyax15mswyqy8wb62ipa1d253xndcj",
+  "stylesHash": "1s8xmbvg6lp9c8bndvhc6ksd7i2v4pykffi3lydrh3z06a8ds1ik",
+  "upstream": {
+    "type": "obsidian-plugin",
+    "owner": "blacksmithgu",
+    "repo": "obsidian-dataview",
+    "tagPrefix": ""
+  }
+}

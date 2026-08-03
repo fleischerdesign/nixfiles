@@ -1,0 +1,14 @@
+{
+  "name": "obsidian-linter",
+  "pname": "obsidian-linter",
+  "version": "1.32.0",
+  "mainHash": "05ilkvvgi48ml2amdxgq97zzgzfgyxascq2yvmwcy94hjazl8kqv",
+  "manifestHash": "0ff8dvg04f93zihmzrmw435hm4rg5s9y43q22f77b2a274ixmqpb",
+  "stylesHash": "0sa2895r6xsb29jba31l2bgvacw1dwxhmw20k3y981gak7lifhg6",
+  "upstream": {
+    "type": "obsidian-plugin",
+    "owner": "platers",
+    "repo": "obsidian-linter",
+    "tagPrefix": ""
+  }
+}

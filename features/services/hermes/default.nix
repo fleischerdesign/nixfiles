@@ -147,6 +147,7 @@ in
     ./extensions/webui/nixos.nix
     ./extensions/mnemosyne/nixos.nix
     ./extensions/ddgs/nixos.nix
+    ./extensions/obsidian/nixos.nix
   ];
 
   options = {

@@ -1,0 +1,14 @@
+{
+  "name": "obsidian-meta-bind-plugin",
+  "pname": "obsidian-meta-bind-plugin",
+  "version": "1.5.1",
+  "mainHash": "1cw4jwzgqahzi8yi5qg74x1s67likyd293xjfj82aj0z9nmbya6k",
+  "manifestHash": "09a37h6l83dwc7mclq9jny41546gfnw4cx1w3y2i2y516qggy79w",
+  "stylesHash": "0qaxsld7bd1qc4c503sdq55cv8js8d13v60bzql59i9468c9w1lp",
+  "upstream": {
+    "type": "obsidian-plugin",
+    "owner": "mProjectsCode",
+    "repo": "obsidian-meta-bind-plugin",
+    "tagPrefix": ""
+  }
+}
