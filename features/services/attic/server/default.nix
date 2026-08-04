@@ -57,11 +57,8 @@ in
 
     services.caddy.virtualHosts."${cfg.domain}" = {
       extraConfig = ''
-        tls {
-          alpn http/1.1
-        }
         reverse_proxy 127.0.0.1:8080 {
-          request_buffers 10MiB
+          flush_interval -1
         }
       '';
     };
