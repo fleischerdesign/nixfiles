@@ -53,7 +53,7 @@
         chatId = "5838211825";
       };
       vikunja = {
-        enable = true;
+        enable = false;
         url = "https://vikunja.mky.ancoris.ovh";
       };
     };
