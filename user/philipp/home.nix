@@ -55,6 +55,77 @@
         ];
         wmClass = "moebius";
       };
+
+      gmail = {
+        displayName = "Mail";
+        url = "https://mail.google.com";
+        icon = ../../media/gmail.png;
+        comment = "Google Mail Web App";
+        categories = [
+          "Network"
+          "Email"
+        ];
+        wmClass = "gmail";
+      };
+
+      calendar = {
+        displayName = "Kalender";
+        url = "https://calendar.google.com";
+        icon = ../../media/google-calendar.png;
+        comment = "Google Calendar Web App";
+        categories = [
+          "Utility"
+          "Calendar"
+        ];
+        wmClass = "google-calendar";
+      };
+
+      tasks = {
+        displayName = "Tasks";
+        url = "https://tasks.google.com";
+        icon = ../../media/google-tasks.png;
+        comment = "Google Tasks Web App";
+        categories = [
+          "Utility"
+        ];
+        wmClass = "google-tasks";
+      };
+
+      photos = {
+        displayName = "Fotos";
+        url = "https://photos.google.com";
+        icon = ../../media/google-photos.png;
+        comment = "Google Photos Web App";
+        categories = [
+          "Graphics"
+          "Photos"
+        ];
+        wmClass = "google-photos";
+      };
+
+      meet = {
+        displayName = "Meet";
+        url = "https://meet.google.com";
+        icon = ../../media/google-meet.png;
+        comment = "Google Meet Web App";
+        categories = [
+          "Network"
+          "VideoConference"
+        ];
+        wmClass = "google-meet";
+      };
+
+      youtube = {
+        displayName = "YouTube";
+        url = "https://youtube.com";
+        icon = ../../media/youtube.png;
+        comment = "YouTube Web App";
+        categories = [
+          "AudioVideo"
+          "Video"
+        ];
+        wmClass = "youtube";
+      };
     };
   };
 
