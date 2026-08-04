@@ -98,7 +98,7 @@
         comment = "Google Photos Web App";
         categories = [
           "Graphics"
-          "Photos"
+          "Photography"
         ];
         wmClass = "google-photos";
       };
