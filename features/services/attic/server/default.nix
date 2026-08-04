@@ -34,7 +34,10 @@ in
         listen = "127.0.0.1:8080";
         allowed-hosts = [ cfg.domain ];
         api-endpoint = "https://${cfg.domain}/";
-        database.url = "sqlite:///var/lib/atticd/server.db?mode=rwc";
+        database = {
+          url = "sqlite:///var/lib/atticd/server.db?mode=rwc";
+          max-connections = 64;
+        };
         storage = {
           type = "local";
           path = "/var/lib/atticd/storage";
