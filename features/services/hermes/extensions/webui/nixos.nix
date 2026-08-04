@@ -38,40 +38,25 @@ let
     hash = "sha256-iEsc8oUoGGX1EzpR4tTIFiB5oiUBUG7e+GR1AfNZv8I=";
   };
 
-  mkIfSet = k: v: lib.optional (v != null) "${k}=${v}";
-
-  oidcRedirectUri =
-    let
-      ep = config.my.endpoints.hermes-webui or { };
-    in
-    if ep ? proxy && ep.proxy.subdomain != null then
-      "https://${ep.proxy.subdomain}.${ep.proxy.domain}/api/auth/oidc/callback"
-    else
-      null;
-
-  webuiEnv = [
-    "HERMES_WEBUI_HOST=${ecfg.host}"
-    "HERMES_WEBUI_PORT=${toString ecfg.port}"
-    "HERMES_WEBUI_STATE_DIR=${ecfg.stateDir}"
-    "HERMES_HOME=${hcfg.stateDir}/.hermes"
-    "HERMES_WEBUI_AGENT_DIR=${agentSrc}"
-    "HERMES_WEBUI_PYTHON=${corePkg.passthru.pythonEnv}/bin/python3"
-    "HERMES_API_URL=http://127.0.0.1:8642"
-    "HERMES_WEBUI_DEFAULT_WORKSPACE=${hcfg.workingDirectory}"
-    "MNEMOSYNE_EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-  ]
-  ++ lib.mapAttrsToList (k: v: "${k}=${v}") ecfg.extraEnvironment
-  ++ mkIfSet "HASS_URL" hcfg.integrations.hass.url
-  ++ mkIfSet "PAPERLESS_URL" hcfg.integrations.paperless.url
-  ++ mkIfSet "CAMOFOX_URL" hcfg.integrations.camofox.url
-  ++ (lib.optionals (hcfg.integrations.vikunja.enable) [
-    "VIKUNJA_URL=${hcfg.integrations.vikunja.url}"
-  ])
-  ++ mkIfSet "HERMES_WEBUI_OIDC_ISSUER" oidc.issuer
-  ++ mkIfSet "HERMES_WEBUI_OIDC_CLIENT_ID" oidc.clientId
-  ++ mkIfSet "HERMES_WEBUI_OIDC_ALLOW_CLAIM" oidc.allowClaim
-  ++ mkIfSet "HERMES_WEBUI_OIDC_ALLOW_VALUES" oidc.allowValues
-  ++ mkIfSet "HERMES_WEBUI_OIDC_REDIRECT_URI" oidcRedirectUri;
+  webuiEnv =
+    config.services.hermes-agent.environment
+    // {
+      HERMES_WEBUI_HOST = ecfg.host;
+      HERMES_WEBUI_PORT = toString ecfg.port;
+      HERMES_WEBUI_STATE_DIR = ecfg.stateDir;
+      HERMES_HOME = "${hcfg.stateDir}/.hermes";
+      HERMES_WEBUI_AGENT_DIR = agentSrc;
+      HERMES_WEBUI_PYTHON = "${corePkg.passthru.pythonEnv}/bin/python3";
+      HERMES_API_URL = "http://127.0.0.1:8642";
+      HERMES_WEBUI_DEFAULT_WORKSPACE = hcfg.workingDirectory;
+    }
+    // ecfg.extraEnvironment
+    // lib.optionalAttrs (oidc.issuer != null) { HERMES_WEBUI_OIDC_ISSUER = oidc.issuer; }
+    // lib.optionalAttrs (oidc.clientId != null) { HERMES_WEBUI_OIDC_CLIENT_ID = oidc.clientId; }
+    // lib.optionalAttrs (oidc.allowClaim != null) { HERMES_WEBUI_OIDC_ALLOW_CLAIM = oidc.allowClaim; }
+    // lib.optionalAttrs (oidc.allowValues != null) {
+      HERMES_WEBUI_OIDC_ALLOW_VALUES = oidc.allowValues;
+    };
 in
 {
   options.my.features.services.hermes.extensions.webui = {
@@ -164,7 +149,7 @@ in
         ExecStart = "${pkgs.callPackage ./package.nix { }}/bin/hermes-webui";
         Restart = "on-failure";
         UMask = "0077";
-        Environment = webuiEnv;
+        Environment = lib.mapAttrsToList (k: v: "${k}=${v}") webuiEnv;
         EnvironmentFile =
           lib.optionals (config.sops.secrets ? hermes_agent_env) [
             config.sops.secrets.hermes_agent_env.path
