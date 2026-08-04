@@ -34,6 +34,12 @@ in
         listen = "127.0.0.1:8080";
         allowed-hosts = [ cfg.domain ];
         api-endpoint = "https://${cfg.domain}/";
+        chunking = {
+          nar-size-threshold = 16 * 1024 * 1024;
+          min-size = 256 * 1024;
+          avg-size = 1024 * 1024;
+          max-size = 4 * 1024 * 1024;
+        };
         database = {
           url = "sqlite:///var/lib/atticd/server.db?mode=rwc";
           max-connections = 64;
