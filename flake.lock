@@ -47,11 +47,11 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1785874940,
-        "narHash": "sha256-uuwNrx8lOb/w2TUllumBSyW/3eH8Zx5An0ZgD8slPHY=",
+        "lastModified": 1785892481,
+        "narHash": "sha256-1JTy9/LyITSBP1a4WZ9tmOv2yDh9OTbA3YUJbQHiMYc=",
         "owner": "serokell",
         "repo": "deploy-rs",
-        "rev": "5059116c0bae73dbd9277cbc340f5b8a21ccaaa9",
+        "rev": "f6f2359a6cb7e3c51ea673bcb39933ac2622350d",
         "type": "github"
       },
       "original": {
@@ -256,11 +256,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1785812695,
-        "narHash": "sha256-YKd6efsiKdJ7UOAURH6sanFqv6JXfHIqxXVC4kuDppc=",
+        "lastModified": 1785898908,
+        "narHash": "sha256-UPMYwEyyh6QhbnXyIlpIi0H9454Ow/eOOOSkRx3Hxkk=",
         "owner": "nix-community",
         "repo": "nix-vscode-extensions",
-        "rev": "2ae89c3de613fb717a8e5e43e20b6603c4dd63cc",
+        "rev": "b510fc22aa22ad079592c5adb46d547a37def055",
         "type": "github"
       },
       "original": {
@@ -277,11 +277,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1785866135,
-        "narHash": "sha256-ugvn1/SwNQDsYx8XM7FoAsPe9WL/ZMMjWgB/acoeeCs=",
+        "lastModified": 1785898698,
+        "narHash": "sha256-q3daR5qdxtd7/FOE/TWeQq5TRN1Mz+DeNRag62hGqFI=",
         "owner": "kaylorben",
         "repo": "nixcord",
-        "rev": "6385c7caabc51e9818e2ad32bc68178b4608ecb1",
+        "rev": "13b7cd788c3a8e85b35f920f335760f7f5f6262b",
         "type": "github"
       },
       "original": {
