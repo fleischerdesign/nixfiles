@@ -166,6 +166,7 @@ in
                     agent = lib.mkDefault (
                       lib.mapAttrs (_name: tier: {
                         model = lib.mkDefault cfg.models.${tier};
+                        mode = "subagent";
                       }) availableAgents
                     );
                   }
