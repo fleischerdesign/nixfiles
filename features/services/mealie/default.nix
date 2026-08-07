@@ -8,8 +8,11 @@ let
   cfg = config.my.features.services.mealie;
   caddyOpt = options.my.features.services.caddy.baseDomain or null;
   caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
-  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
+    if caddyOpt != null && caddyOpt.isDefined then
+      config.my.features.services.caddy.baseDomain
+    else
+      null;
+  authHost = "auth.ancoris.ovh";
 in
 {
   options.my.features.services.mealie = {
