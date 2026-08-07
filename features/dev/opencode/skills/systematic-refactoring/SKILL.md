@@ -153,15 +153,14 @@ After verification:
 For refactorings spanning 3+ modules, delegate to an `implement` subagent with strict scope:
 
 ```
-Agent({
+task({
   subagent_type: "implement",
   prompt: "Perform refactoring only. No behavior change. Steps: [list of specific refactorings]. Characterization tests exist at [paths]. Safety net: [how to verify]. Out of scope: any behavior change, new features, cleanup beyond the specified refactorings.",
-  description: "Refactor [scope]",
-  isolation: "worktree"
+  description: "Refactor [scope]"
 })
 ```
 
-The subagent implements in an isolated worktree. Review with `code-review` + `reviewer` agent before merging. The parent verifies that `git diff -w` shows only structural changes.
+The subagent implements in its own session. Review with `code-review` skill and `review` subagent before merging. The parent verifies that `git diff -w` shows only structural changes.
 
 ## Evidence
 

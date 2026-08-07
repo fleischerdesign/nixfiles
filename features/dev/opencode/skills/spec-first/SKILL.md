@@ -17,6 +17,8 @@ You do not start with code. You start with a specification. The spec is the cont
 
 If you have not yet read the code affected by this change, load **`systematic-exploration`** first. A specification written without code-level evidence is fiction.
 
+If the requirements are ambiguous or underspecified, load **`requirements-elicitation`** before this skill. A specification written from assumptions is rework waiting to happen.
+
 ## Trigger
 
 Load this skill when:
@@ -108,7 +110,20 @@ Out of scope:
 
 Out-of-scope declarations prevent scope creep and set reviewer expectations.
 
-### Step 6: Validate the Spec
+### Step 6: Right-Size the Spec
+
+Verify the spec is appropriately scoped before proceeding:
+
+```
+Sizing check:
+- Can this be implemented in one focused session? (~2-4 hours of work)
+- If larger: split into multiple specs with clear dependencies.
+- If smaller (<30 minutes): is a formal spec overhead? Decide explicitly.
+- Does the spec justify its weight? A 5-line change should not have a 50-line spec.
+  But a 5-line change in a security-critical path may justify it. Weigh risk, not line count.
+```
+
+### Step 7: Validate the Spec
 
 Before implementation begins, verify:
 - Every acceptance criterion is testable (can be automated)
@@ -125,6 +140,7 @@ After completing this skill, the following artifacts exist:
 - [ ] Acceptance criteria (Gherkin scenarios, minimum 3: happy, edge, error)
 - [ ] Edge case enumeration (covered + out of scope)
 - [ ] Out-of-scope declaration
+- [ ] Sizing assessment (right-sized for one session)
 - [ ] Specification saved to `src/<module>/<feature>.spec.md` alongside the primary module
 
 ## Exit Gate

@@ -50,19 +50,46 @@ Before any code change is complete:
 
 ## Skills
 
-You have access to seven specialized workflows. Load them when appropriate:
+You have access to fifteen specialized workflows, organized as a pipeline. Load them when appropriate:
+
+### Pipeline Skills (start here — classify your task)
 
 | Skill | When to load |
 |-------|-------------|
+| `orchestration` | START of every non-trivial task — classify the task, select the correct chain |
+| `project-onboarding` | Entering a new repository for the first time — discover conventions |
+| `requirements-elicitation` | Ambiguous task, unclear intent — clarify before specifying |
 | `systematic-exploration` | Before forming opinions — map the affected code, trace dependencies, read first |
 | `spec-first` | New feature, bug fix, or any non-trivial change — before writing code |
-| `architecture-design` | Cross-cutting change, new module, new dependency, or when structural questions arise |
-| `tdd-discipline` | During implementation — after a spec exists |
-| `systematic-refactoring` | Restructuring without behavior change — characterization tests, small steps, verified preservation |
-| `code-review` | Before committing, before merging, or when asked to review |
-| `systematic-debugging` | Bug, unexpected behavior, test failure — before fixing |
 
-If you are unsure which skill applies, load `systematic-exploration` — understanding the code always precedes anything else.
+### Design & Implementation Skills
+
+| Skill | When to load |
+|-------|-------------|
+| `architecture-design` | Cross-cutting change, new module, new dependency, or when structural questions arise |
+| `tdd-discipline` | During implementation — after a spec exists. Never write production code before its test |
+| `systematic-refactoring` | Restructuring without behavior change — characterization tests, small steps, verified preservation |
+
+### Verification & Quality Skills
+
+| Skill | When to load |
+|-------|-------------|
+| `code-review` | Before committing, before merging, or when asked to review |
+| `security-review` | Auth-sensitive code, data handling, API exposure — any change touching a trust boundary |
+| `performance-verification` | Specification includes latency, throughput, or resource constraints |
+| `integration-deployment` | After code-review approval — build, stage, deploy, verify |
+
+### Incident & Meta Skills
+
+| Skill | When to load |
+|-------|-------------|
+| `systematic-debugging` | Bug, unexpected behavior, test failure — before fixing |
+| `post-mortem` | After significant bug or incident resolution — capture lessons, close the feedback loop |
+| `commit-pr-hygiene` | Splitting work into commits, preparing a pull request |
+
+If you are unsure which skill applies, load `orchestration` — classifying the task is always the first step.
+
+**Model Tiers:** Agents resolve their model centrally via the `models.*` configuration (primary/secondary) and `availableAgents` mapping. Change the model in ONE place; every agent and the main session follow. Skills reference agents by name — never hardcode model names or tiers.
 
 ## Artifact Conventions
 

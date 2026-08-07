@@ -29,18 +29,17 @@ Do NOT load this skill for:
 
 ## Subagent Delegation
 
-For investigations spanning 2+ modules or an unfamiliar area, dispatch Explore subagents for parallel reconnaissance:
+For investigations spanning 2+ modules or an unfamiliar area, dispatch explore subagents for parallel reconnaissance:
 
 ```
-Agent({
-  subagent_type: "Explore",
+task({
+  subagent_type: "explore",
   prompt: "Search for [specific target]. Look in [directories]. Search breadth: [quick/medium/very thorough]. Report back: [specific questions to answer].",
-  description: "Explore [area]",
-  run_in_background: true
+  description: "Explore [area]"
 })
 ```
 
-Dispatch one Explore per independent search area in parallel (single message, multiple tool calls with `run_in_background: true`). The parent synthesizes findings — subagents provide raw data, not judgments.
+Dispatch one explore subagent per independent search area in parallel (single message, multiple `task` tool calls). The parent synthesizes findings — subagents provide raw data, not judgments.
 
 Do NOT delegate when:
 - The search is a single known file or directory

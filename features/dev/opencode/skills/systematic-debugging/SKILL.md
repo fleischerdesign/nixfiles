@@ -174,7 +174,8 @@ Debugging is complete when:
 ## Handoff
 
 After this skill:
-- If the fix is non-trivial: **`spec-first`** → write a spec for the fix
+- If the fix is non-trivial and the incident was significant: **`post-mortem`** → capture timeline, root cause chain, and workflow retrospective
+- If the fix is non-trivial but contained: **`spec-first`** → write a spec for the fix
 - If the fix is straightforward: **`tdd-discipline`** → test-first implementation of the fix
 - In all cases: **`code-review`** before merging the fix
 

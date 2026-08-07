@@ -33,15 +33,14 @@ Do NOT load this skill for:
 For changes touching 2+ non-trivial modules or >50 lines of new logic, delegate implementation to an `implement` subagent with the specification and architectural plan:
 
 ```
-Agent({
+task({
   subagent_type: "implement",
   prompt: "Implement [spec reference]. Specification: [summary]. Architecture: [key decisions]. Files to modify: [paths]. Existing patterns to follow: [patterns]. Out of scope: [explicitly].",
-  description: "Implement [feature]",
-  isolation: "worktree"
+  description: "Implement [feature]"
 })
 ```
 
-The `implement` agent runs with `deepseek-v4-flash` and `tdd-discipline` skill preloaded. It implements in an isolated worktree. The parent reviews the resulting branch with `code-review` + `review` subagent before merging.
+The `implement` agent runs on its configured model tier (set centrally in `availableAgents`, resolved via `models.*`) with `tdd-discipline` skill preloaded. The parent reviews the resulting branch with `code-review` skill and `review` subagent before merging.
 
 Do NOT delegate when:
 - The change is a single function in a single file
@@ -118,9 +117,9 @@ When the code transforms data, has invariants, or processes input:
 
 Property-based tests complement example-based tests. Examples verify known cases; properties discover unknown failures.
 
-### Step 5: Mutation Testing Gate
+### Step 5: Mutation Testing Gate (where tooling exists and risk justifies it)
 
-Before declaring the test suite complete:
+Before declaring the test suite complete, if mutation testing tooling is available for the language and the risk level of the code justifies it:
 
 ```
 1. Run mutation testing on the changed code
@@ -129,10 +128,13 @@ Before declaring the test suite complete:
    - Missing test cases → add them
    - Dead code → remove it
    - Equivalent mutant → document why it's not killable
-4. Target: 100% mutation score on changed code
+4. Target: high mutation score on changed code; 100% is ideal,
+   but right-size the effort to the risk. A configuration file needs
+   zero mutation testing. A payment processing function needs
+   thorough mutation coverage.
 ```
 
-Mutation testing is the honesty check. Coverage says "this line was executed." Mutation says "this line's behavior is verified."
+Mutation testing is the honesty check. Coverage says "this line was executed." Mutation says "this line's behavior is verified." But the cost of tooling setup and execution time must be proportional to the defect risk. Do not let an unavailable mutation testing framework block progress — document the gap and proceed, flagged as technical debt.
 
 ### Step 6: Test Suite Hygiene
 
@@ -150,16 +152,16 @@ After completing this skill, the following exist:
 - [ ] RED phase log: which test was written, why it failed (not compilation)
 - [ ] GREEN phase log: what minimal code was added
 - [ ] REFACTOR phase log: what was improved without behavior change
-- [ ] Property-based tests for data-transform or algorithmic code (if applicable)
-- [ ] Mutation testing report showing 100% kill rate on changed code
+- [ ] Property-based tests for data-transform or algorithmic code (if applicable and tooling available)
+- [ ] Mutation testing report (where tooling exists and risk justifies it; otherwise: documented gap)
 
 ## Exit Gate
 
 TDD is complete for this change when:
 - Every behavior in the specification has at least one test
 - Every test follows F.I.R.S.T. principles
-- Property-based tests cover identified invariants
-- Mutation testing reports no surviving mutants (or documented equivalents)
+- Property-based tests cover identified invariants (where applicable)
+- Mutation testing (where available and justified) reports strong coverage; gaps are documented
 - The REFACTOR phase has been executed at least once
 
 ## Handoff

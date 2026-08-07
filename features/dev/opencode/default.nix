@@ -1,10 +1,11 @@
 # features/dev/opencode/default.nix — Generic OpenCode Home-Manager & System Feature Module
 #
 # Architecture & Guidelines:
-# - System Level: Defines host-level `providers` (SOPS auth.json template) and `settings`.
-# - User-Scoped Level (`home-manager.sharedModules`): Exposes `my.features.dev.opencode.enable` for HM users.
+# - System Level: Defines models (tiered), providers (SOPS auth.json template), and settings.
+# - User-Scoped Level (home-manager.sharedModules): Exposes my.features.dev.opencode.enable for HM users.
 # - Agnostic & Generic: Zero hardcoded usernames, hostnames, or paths. Reusable across NixOS & Home Manager.
-# - Single Source of Truth: Base skills, agents, instructions defined once under `features/dev/opencode/`.
+# - Single Source of Truth: Base skills, agents, instructions defined once under features/dev/opencode/.
+# - Model Indirection: Agents reference tiers (primary/secondary); actual model strings live in `models.*`.
 {
   config,
   lib,
@@ -13,15 +14,42 @@
 let
   cfg = config.my.features.dev.opencode;
   opencodeDir = ./.;
+  # Tier policy: Gatherer/Writer → secondary (cheap, high volume).
+  # Judge/Verifier → primary (expensive, high stakes).
+  availableAgents = {
+    implement = "secondary";
+    explore = "secondary";
+    review = "primary";
+    security-reviewer = "primary";
+  };
 in
 {
   options.my.features.dev.opencode = {
     enable = lib.mkEnableOption "system-wide OpenCode API secrets template";
 
+    models = lib.mkOption {
+      type = lib.types.submodule {
+        options = {
+          primary = lib.mkOption {
+            type = lib.types.str;
+            default = "deepseek/deepseek-v4-flash";
+            description = "Primary (high-capability) model for the main session and agents.";
+          };
+          secondary = lib.mkOption {
+            type = lib.types.str;
+            default = "deepseek/deepseek-v4-flash";
+            description = "Secondary (cost-efficient) model for subagents and lightweight tasks.";
+          };
+        };
+      };
+      default = { };
+      description = "Model tiers. Change here to update all agents and session defaults at once.";
+    };
+
     settings = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
-      description = "Host-wide default OpenCode settings (model, mcp, plugins, etc.).";
+      description = "Host-wide OpenCode settings override. Prefer models.* for model changes.";
     };
 
     providers = lib.mkOption {
@@ -41,7 +69,6 @@ in
   };
 
   config = lib.mkMerge [
-    # System-level SOPS secrets template if providers are defined
     (lib.mkIf (cfg.enable || cfg.providers != { }) {
       sops.templates."opencode-auth.json" = lib.mkIf (cfg.providers != { }) {
         owner = config.my.user.primary or "root";
@@ -56,7 +83,6 @@ in
       };
     })
 
-    # Home-Manager module registered for all users on the host
     {
       home-manager.sharedModules = [
         (
@@ -101,13 +127,20 @@ in
                 agents = userCfg.agents;
                 settings = lib.mkMerge [
                   {
-                    model = lib.mkDefault "deepseek/deepseek-v4-pro";
-                    small_model = lib.mkDefault "deepseek/deepseek-v4-flash";
+                    model = lib.mkDefault cfg.models.primary;
+                    small_model = lib.mkDefault cfg.models.secondary;
                     autoupdate = lib.mkDefault false;
                     instructions = lib.mkDefault [
                       "~/.config/opencode/instructions/engineering-constitution.md"
                     ];
-                    mcp = {
+                    provider = lib.mkDefault {
+                      deepseek.options = {
+                        timeout = 600000;
+                        chunkTimeout = 30000;
+                        setCacheKey = true;
+                      };
+                    };
+                    mcp = lib.mkDefault {
                       nixos = {
                         type = "local";
                         command = [ "${pkgs.mcp-nixos}/bin/mcp-nixos" ];
@@ -125,11 +158,16 @@ in
                         enabled = true;
                       };
                     };
-                    plugin = [
+                    plugin = lib.mkDefault [
                       "context-mode"
                       "opencode-pty"
                       "opencode-direnv"
                     ];
+                    agent = lib.mkDefault (
+                      lib.mapAttrs (_name: tier: {
+                        model = lib.mkDefault cfg.models.${tier};
+                      }) availableAgents
+                    );
                   }
                   (osConfig.my.features.dev.opencode.settings or { })
                   userCfg.settings

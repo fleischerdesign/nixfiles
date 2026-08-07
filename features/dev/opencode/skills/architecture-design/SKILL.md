@@ -31,18 +31,17 @@ Do NOT load this skill for:
 
 ## Subagent Delegation
 
-When the change affects 3+ modules or a broad area of the codebase, dispatch `Explore` subagents for read-only reconnaissance before making architectural decisions:
+When the change affects 3+ modules or a broad area of the codebase, dispatch `explore` subagents for read-only reconnaissance before making architectural decisions:
 
 ```
-Agent({
-  subagent_type: "Explore",
+task({
+  subagent_type: "explore",
   prompt: "Map all modules that handle [domain]. For each: public interface, dependencies, and what knowledge it hides. Report file paths and key symbols.",
-  description: "Map [domain] modules",
-  run_in_background: true
+  description: "Map [domain] modules"
 })
 ```
 
-Dispatch one Explore per affected domain in parallel (background). Collect results, then proceed with Steps 1-6 in the parent. The parent owns architectural decisions — subagents provide evidence, not judgments.
+Dispatch one explore subagent per affected domain in parallel (multiple `task` calls in a single message). Collect results, then proceed with Steps 1-6 in the parent. The parent owns architectural decisions — subagents provide evidence, not judgments.
 
 ## Process
 

@@ -32,15 +32,14 @@ Do NOT load this skill:
 For any non-trivial change, dispatch a `review` subagent with fresh context for an independent, unbiased review:
 
 ```
-Agent({
+task({
   subagent_type: "review",
   prompt: "Review [branch/commit/diff]. Specification: [spec reference]. Key architectural decisions: [ADR references]. Focus areas: [specific concerns if any].",
-  description: "Review [change]",
-  run_in_background: true
+  description: "Review [change]"
 })
 ```
 
-The `review` agent runs with fresh context on `deepseek-v4-flash`. It has no knowledge of design discussions, implementation rationale, or the parent's thinking — it judges only what the code actually does. Its findings are evidence for the parent's review verdict.
+The `review` agent runs with fresh context on its configured model tier (set centrally in `availableAgents`, resolved via `models.*`). It has no knowledge of design discussions, implementation rationale, or the parent's thinking — it judges only what the code actually does. Its findings are evidence for the parent's review verdict.
 
 The parent synthesizes: its own structural and DRY analysis (Steps 1-4) with the review agent's independent findings, then produces the final verdict.
 
@@ -204,8 +203,15 @@ After completing this skill:
 Review is complete when:
 - Every finding has a severity classification (BLOCKER/WARNING/SUGGESTION)
 - BLOCKERS are concrete and fixable (not "this is bad" but "this specific line has this specific issue: here's why and here's what to do")
+- Every BLOCKER has been either fixed (traceable to the finding) or explicitly rebutted with rationale; unresolved BLOCKERS are escalated to the human
 - The verdict is clear and unambiguous
 - The review is proportionate to the change size (a 10-line change doesn't get a 5-page review)
+
+## Handoff
+
+After this skill:
+- If the change touches trust boundaries: **`security-review`** — independent security gate before merge
+- Otherwise: the verdict is the final pre-merge gate. Proceed to **`commit-pr-hygiene`** if commits aren't yet structured for review, or **`integration-deployment`** if deployment follows the merge.
 
 ## Anti-Patterns
 
