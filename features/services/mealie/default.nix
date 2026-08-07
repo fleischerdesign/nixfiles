@@ -86,6 +86,8 @@ in
         OIDC_USER_CLAIM = "email";
         OIDC_NAME_CLAIM = "name";
         OIDC_REMEMBER_ME = "True";
+        # Authentik liefert kein email_verified-Claim -> Prüfung deaktivieren
+        OIDC_REQUIRES_EMAIL_VERIFICATION = "False";
 
         # OpenAI Configuration
         OPENAI_BASE_URL = "https://openrouter.ai/api/v1";
