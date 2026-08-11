@@ -35,6 +35,7 @@
   };
 
   my.features.services.portfolio.enable = true;
+  my.features.services.salus.enable = true;
   my.features.services.obsidian-livesync.enable = true;
 
   my.features.services.ntfy.enable = true;
