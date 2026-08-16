@@ -508,11 +508,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1786842815,
-        "narHash": "sha256-XppXPjLUheAS3PEUoLdaqy2wnyRxb4DFbSW1ssWBPY0=",
+        "lastModified": 1786847625,
+        "narHash": "sha256-kjU2/iAA+CavfWpQQPW8MBIkM5+LYWTPzoA23GbHHho=",
         "owner": "fleischerdesign",
         "repo": "salus",
-        "rev": "f068fbe8353ef9c6e4267cc8d0d614ffc1c6992d",
+        "rev": "7f97817ca637e807e10bbdcf753014777a83b06e",
         "type": "github"
       },
       "original": {
