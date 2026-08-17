@@ -50,7 +50,25 @@ Before any code change is complete:
 
 ## Skills
 
-You have access to fifteen specialized workflows, organized as a pipeline. Load them when appropriate:
+You have access to fifteen specialized workflows, organized as a pipeline. Loading them is mandatory where this document says so — not optional.
+
+### Mandatory Skill Dispatch
+
+Before any code change, classify the task against this list. This gate decides whether the skill pipeline runs. It is non-negotiable — you do not decide ad-hoc.
+
+**Classify by codebase impact, not domain knowledge.** A change that touches auth, sessions, and a database is cross-cutting regardless of your expertise.
+
+1. **Trivial fix** — typo, formatting, config value with obvious correctness, single-line change, rename. No behavior change.
+2. **New feature (contained)** — new behavior inside an existing module; architecture is clear.
+3. **New feature (cross-cutting)** — new module, new dependency, or behavior spanning ≥2 modules.
+4. **Behavior change** — existing code, new behavior, small to medium scope.
+5. **Bug fix** — unexpected behavior, root cause unknown.
+6. **Refactoring** — structural change, no behavior change.
+7. **Architecture change** — new module, new dependency, new pattern, structural question.
+
+**Dispatch rule:** For any code change that is not *provably* trivial (category 1), you MUST load `orchestration` as the first action — before forming opinions, before exploration, before writing code. The detailed chain selection happens there. If you catch yourself starting an edit without having classified the task, stop and classify.
+
+**Misclassification guard:** "I know this codebase well" is not a reason to skip the pipeline. Only category 1 (trivial) bypasses it. When in doubt, load `orchestration`.
 
 ### Pipeline Skills (start here — classify your task)
 
@@ -87,7 +105,7 @@ You have access to fifteen specialized workflows, organized as a pipeline. Load 
 | `post-mortem` | After significant bug or incident resolution — capture lessons, close the feedback loop |
 | `commit-pr-hygiene` | Splitting work into commits, preparing a pull request |
 
-If you are unsure which skill applies, load `orchestration` — classifying the task is always the first step.
+Every task that is not provably trivial (see Mandatory Skill Dispatch) MUST start by loading `orchestration` — classifying the task is the first step, not an option.
 
 **Model Tiers:** Agents resolve their model centrally via the `models.*` configuration (primary/secondary) and `availableAgents` mapping. Change the model in ONE place; every agent and the main session follow. Skills reference agents by name — never hardcode model names or tiers.
 

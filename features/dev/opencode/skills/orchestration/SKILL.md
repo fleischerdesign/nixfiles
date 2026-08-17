@@ -1,6 +1,6 @@
 ---
 name: orchestration
-description: Skill-chain decision engine. Classifies every non-trivial task into a workflow path and dispatches the correct skills and subagents. Load at the START of any task — before forming opinions, before writing specs, before exploration.
+description: Skill-chain decision engine. Classifies every non-trivial task into a workflow path and dispatches the correct skills and subagents. MUST be loaded at the START of any code change that is not provably trivial — before forming opinions, before writing specs, before exploration. The engineering-constitution's Mandatory Skill Dispatch mandates this.
 ---
 
 # Orchestration
@@ -15,11 +15,13 @@ You do not decide ad-hoc which skills to load. You classify the task, consult th
 
 ## Trigger
 
-Load this skill at the START of every non-trivial task.
+Load this skill at the START of every non-trivial task. The engineering-constitution's **Mandatory Skill Dispatch** makes this a binding obligation: any code change that is not provably trivial MUST load this skill before anything else. Interactive exploration or "I know this codebase" is not a reason to skip — only category 1 (trivial) bypasses the pipeline.
 
 Do NOT load this skill for:
-- Trivial fixes where the task is fully self-contained and obvious
-- Interactive exploration where the user is driving
+- Trivial fixes where the task is fully self-contained and obvious (typo, formatting, single-line with clear correctness, rename — no behavior change)
+- A task already classified as trivial by the dispatch rule
+
+If you catch yourself mid-edit without having classified the task, stop and load this skill.
 
 ## Process
 
@@ -27,12 +29,13 @@ Do NOT load this skill for:
 
 ```
 Task type:
-[ ] New feature (non-trivial, crosses module boundaries or introduces new abstractions)
+[ ] Trivial fix (typo, formatting, config, single-line with clear correctness, rename — no behavior change)
+[ ] New feature (contained — new behavior inside an existing module; architecture is clear)
+[ ] New feature (cross-cutting — new module, new dependency, or behavior spanning ≥2 modules)
 [ ] Behavior change (existing code, new behavior, small to medium scope)
 [ ] Bug fix (unexpected behavior, root cause unknown)
 [ ] Refactoring (structural change, no behavior change)
 [ ] Architecture change (new module, new dependency, new pattern)
-[ ] Trivial fix (typo, formatting, config, single-line with clear correctness)
 ```
 
 ### Step 2: Map to Workflow Chain
