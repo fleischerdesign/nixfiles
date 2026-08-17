@@ -32,7 +32,7 @@ in
         options = {
           primary = lib.mkOption {
             type = lib.types.str;
-            default = "deepseek/deepseek-v4-flash";
+            default = "deepseek/deepseek-v4-pro";
             description = "Primary (high-capability) model for the main session and agents.";
           };
           secondary = lib.mkOption {
