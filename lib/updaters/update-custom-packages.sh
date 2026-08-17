@@ -279,10 +279,11 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
             jq --arg hash "$new_npm_hash" '.npmDepsHash = $hash' "$manifest_path" > "$tmp_man"
             mv "$tmp_man" "$manifest_path"
           else
-            echo "  ⚠️ Could not calculate npmDepsHash automatically, setting empty"
-            tmp_man="$(mktemp)"
-            jq '.npmDepsHash = ""' "$manifest_path" > "$tmp_man"
-            mv "$tmp_man" "$manifest_path"
+            # Leave the previous npmDepsHash intact. Blanking it guarantees a broken
+            # build; keeping it either still works (unchanged deps) or fails loudly
+            # with a hash mismatch (recoverable). Note: some lockfiles also need the
+            # integrity fix (fix-pi-integrity.mjs) before prefetch-npm-deps succeeds.
+            echo "  ⚠️ Could not auto-calculate npmDepsHash (missing integrity or lockfile). Keeping previous hash."
           fi
         fi
       fi
@@ -469,6 +470,58 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     mv "$tmp_manifest" "$manifest_path"
     echo "  ✨ Updated $pkg_name to v$latest_tag"
+
+  # =========================================================================
+  # npm — package published to the npm registry (tarball as source)
+  # =========================================================================
+
+  elif [ "$upstream_type" = "npm" ]; then
+    package="$(jq -r '.upstream.package' "$manifest_path")"
+    current_version="$(jq -r '.version' "$manifest_path")"
+
+    echo "  Current version: $current_version"
+    echo "  Checking npm upstream: $package..."
+
+    PKG_JSON="$(curl -sf "https://registry.npmjs.org/$package")" || {
+      echo "  ⚠️ Could not fetch npm metadata for $package"
+      continue
+    }
+
+    latest_version="$(echo "$PKG_JSON" | jq -r '."dist-tags".latest // empty')"
+
+    if [ -z "$latest_version" ]; then
+      echo "  ⚠️ Could not parse latest version"
+      continue
+    fi
+
+    if [ "$latest_version" = "$current_version" ]; then
+      echo "  ✅ $pkg_name is already up to date ($latest_version)."
+      continue
+    fi
+
+    echo "  🎉 New version: $latest_version"
+
+    tarball_url="$(echo "$PKG_JSON" | jq -r --arg v "$latest_version" '.versions[$v].dist.tarball // empty')"
+    if [ -z "$tarball_url" ]; then
+      echo "  ⚠️ Could not resolve tarball for $latest_version"
+      continue
+    fi
+
+    echo "  Downloading and hashing $tarball_url..."
+    new_hash="$(nix store prefetch-file "$tarball_url" --json | jq -r '.hash')"
+
+    if [ -z "$new_hash" ] || [ "$new_hash" = "null" ]; then
+      echo "  ❌ Failed to calculate hash for $tarball_url"
+      continue
+    fi
+
+    tmp_manifest="$(mktemp)"
+    jq --arg ver "$latest_version" \
+       --arg hash "$new_hash" \
+       '.version = $ver | .srcHash = $hash' \
+       "$manifest_path" > "$tmp_manifest"
+    mv "$tmp_manifest" "$manifest_path"
+    echo "  ✨ Updated $pkg_name to $latest_version (vendored lockfile + npmDepsHash may need manual regeneration)"
 
   # =========================================================================
   # Unknown type
