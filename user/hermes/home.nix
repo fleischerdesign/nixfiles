@@ -14,6 +14,6 @@
     antigravity-cli
   ];
 
-  my.features.dev.opencode.enable = true;
+  my.features.dev.pi.enable = true;
   my.features.dev.git.enable = true;
 }

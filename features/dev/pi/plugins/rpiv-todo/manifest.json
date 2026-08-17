@@ -1,0 +1,10 @@
+{
+  "name": "@juicesharp/rpiv-todo",
+  "version": "2.6.1",
+  "srcHash": "sha256-iLdR5P+D5rDHETrUw64GfLP2cTA6lmlEOaiqMjKOSEI=",
+  "npmDepsHash": "sha256-9hTPc+5zeo/6m0VLaEUjlN+4OhW/J7zIsXkrWp+fT/4=",
+  "upstream": {
+    "type": "npm",
+    "package": "@juicesharp/rpiv-todo"
+  }
+}

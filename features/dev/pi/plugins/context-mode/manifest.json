@@ -1,0 +1,12 @@
+{
+  "name": "context-mode",
+  "version": "1.0.169",
+  "rev": "7536cebed3f2a3b52262511121aa19744d388e78",
+  "srcHash": "sha256-CmTldprv3qfQW1EJWtPdJHxs/ZFcwF3sbFenzjxDVwY=",
+  "npmDepsHash": "sha256-oGHHMWcSicoZvC/EadVOz0aE9+WrE0t0JvxmE2VyzU8=",
+  "upstream": {
+    "type": "github-rev",
+    "owner": "mksglu",
+    "repo": "context-mode"
+  }
+}

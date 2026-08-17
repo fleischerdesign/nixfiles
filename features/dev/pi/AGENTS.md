@@ -107,7 +107,7 @@ Before any code change, classify the task against this list. This gate decides w
 
 Every task that is not provably trivial (see Mandatory Skill Dispatch) MUST start by loading `orchestration` — classifying the task is the first step, not an option.
 
-**Model Tiers:** Agents resolve their model centrally via the `models.*` configuration (primary/secondary) and `availableAgents` mapping. Change the model in ONE place; every agent and the main session follow. Skills reference agents by name — never hardcode model names or tiers.
+**Model Tiers:** Agents resolve their model centrally via the pi feature's `models` configuration (primary/secondary), surfaced through `subagents.agentOverrides` in `~/.pi/agent/settings.json`. Change the model in ONE place; every agent and the main session follow. Skills reference agents by name — never hardcode model names or tiers.
 
 ## Artifact Conventions
 

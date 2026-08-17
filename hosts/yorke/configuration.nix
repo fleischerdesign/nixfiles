@@ -26,16 +26,16 @@
     autoPush = true;
   };
 
-  my.features.dev.opencode = {
+  my.features.dev.pi = {
     enable = true;
     providers = {
-      deepseek.apiKey = config.sops.placeholder."opencode/deepseek";
-      openrouter.apiKey = config.sops.placeholder."opencode/openrouter";
+      deepseek.apiKey = config.sops.placeholder."pi/deepseek";
+      openrouter.apiKey = config.sops.placeholder."pi/openrouter";
     };
   };
 
-  sops.secrets."opencode/deepseek" = { };
-  sops.secrets."opencode/openrouter" = { };
+  sops.secrets."pi/deepseek" = { };
+  sops.secrets."pi/openrouter" = { };
 
   system.stateVersion = "24.05";
 }
