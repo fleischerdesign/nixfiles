@@ -210,8 +210,10 @@ Review is complete when:
 ## Handoff
 
 After this skill:
-- If the change touches trust boundaries: **`security-review`** — independent security gate before merge
-- Otherwise: the verdict is the final pre-merge gate. Proceed to **`commit-pr-hygiene`** if commits aren't yet structured for review, or **`integration-deployment`** if deployment follows the merge.
+- If the change touches trust boundaries: **`security-review`** — independent security gate before merge; its findings feed back into this verdict
+- Otherwise, with an APPROVE verdict: **`documentation-consistency`** — the pre-merge documentation gate
+- Then: **`release-management`** (if shipping a versioned release) → **`integration-deployment`** — otherwise `integration-deployment` directly
+- If commits aren't yet structured for review: **`commit-pr-hygiene`** first, then re-review
 
 ## Anti-Patterns
 

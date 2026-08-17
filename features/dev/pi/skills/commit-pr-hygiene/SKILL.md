@@ -11,7 +11,7 @@ The git history is the permanent record of how the system evolved. A well-crafte
 
 - **Reviewability** (your Engineering Constitution): A 500-line diff is a process failure. Commits are the unit of review. If a commit cannot be reviewed in isolation, it is too large.
 - **Bisectability**: When a bug is introduced, `git bisect` narrows it to a single commit. If commits mix unrelated changes, bisect points to a commit that contains both the bug and irrelevant noise — the noise obscures the cause.
-- **Conventional Commits**: A structured message format (`type(scope): description`) that enables automated changelog generation and semantic versioning. Adopt when the project uses it; do not impose on projects that don't.
+- **Conventional Commits**: A structured message format (`type(scope): description`) that enables automated changelog generation and semantic versioning — consumed downstream by `release-management`. Adopt when the project uses it; do not impose on projects that don't.
 - **Atomicity**: A commit is a single, reversible unit of change. "Fix bug X AND refactor module Y" is two commits. If one needs to be reverted, the other shouldn't be caught in the blast radius.
 
 ## Prerequisite

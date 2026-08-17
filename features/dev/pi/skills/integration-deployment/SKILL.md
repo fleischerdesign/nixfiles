@@ -1,6 +1,6 @@
 ---
 name: integration-deployment
-description: Build, stage, deploy, and verify a change in a production-like environment. Use after code-review approval and before declaring the change "done." Produces a verified deployment with smoke tests and a documented rollback plan.
+description: Build, stage, deploy, and verify a change in a production-like environment. Use after code-review, documentation-consistency, and release-management (if versioned) — before declaring the change "done." Produces a verified deployment with smoke tests and a documented rollback plan.
 ---
 
 # Integration & Deployment
@@ -18,6 +18,8 @@ Code that passes review in a development environment has not been verified. Inte
 
 Load this skill when:
 - Code review has approved the change
+- Documentation consistency has passed
+- Release management has produced the version, changelog, and tag (if this is a versioned release)
 - The change is ready to be deployed
 - Performance verification has passed (if criteria existed)
 - `orchestration` signals the deployment phase

@@ -124,7 +124,7 @@ Performance verification is complete when:
 ## Handoff
 
 After this skill:
-- PASS: **`integration-deployment`** — proceed to deploy
+- PASS: **`release-management`** (if shipping a versioned release) → **`integration-deployment`** — proceed to deploy
 - FAIL: **`systematic-debugging`** — treat performance gap as a bug
 - Marginal PASS: **`code-review`** — flag as WARNING
 

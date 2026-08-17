@@ -50,7 +50,7 @@ Before any code change is complete:
 
 ## Skills
 
-You have access to fifteen specialized workflows, organized as a pipeline. Loading them is mandatory where this document says so — not optional.
+You have access to eighteen specialized workflows, organized as a pipeline. Loading them is mandatory where this document says so — not optional.
 
 ### Mandatory Skill Dispatch
 
@@ -86,6 +86,7 @@ Before any code change, classify the task against this list. This gate decides w
 |-------|-------------|
 | `architecture-design` | Cross-cutting change, new module, new dependency, or when structural questions arise |
 | `tdd-discipline` | During implementation — after a spec exists. Never write production code before its test |
+| `mutation-testing` | After TDD — verify test-suite quality via fault injection on logic-bearing code |
 | `systematic-refactoring` | Restructuring without behavior change — characterization tests, small steps, verified preservation |
 
 ### Verification & Quality Skills
@@ -93,8 +94,10 @@ Before any code change, classify the task against this list. This gate decides w
 | Skill | When to load |
 |-------|-------------|
 | `code-review` | Before committing, before merging, or when asked to review |
+| `documentation-consistency` | Pre-merge gate — living docs, ADRs, and specs stay in sync with code |
 | `security-review` | Auth-sensitive code, data handling, API exposure — any change touching a trust boundary |
 | `performance-verification` | Specification includes latency, throughput, or resource constraints |
+| `release-management` | After code-review + doc-consistency — version, changelog, release notes, tag |
 | `integration-deployment` | After code-review approval — build, stage, deploy, verify |
 
 ### Incident & Meta Skills

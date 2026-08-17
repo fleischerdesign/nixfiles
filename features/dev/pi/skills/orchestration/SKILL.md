@@ -44,12 +44,12 @@ Task type:
 
 | Task Type | Chain | Rationale |
 |---|---|---|
-| New feature (cross-cutting) | `project-onboarding`(if new repo) → `requirements-elicitation`(if ambiguous) → `systematic-exploration` → `spec-first` → `architecture-design` → `tdd-discipline` → `security-review`(if trust boundaries) → `commit-pr-hygiene` → `performance-verification`(if perf criteria) → `code-review` → `integration-deployment` | Full pipeline. Every gate fires. Specification and ADR produced. |
-| New feature (contained) | `project-onboarding`(if new repo) → `systematic-exploration` → `spec-first` → `tdd-discipline` → `commit-pr-hygiene` → `code-review` | Architecture is clear; skip architecture-design unless structure is affected. |
-| Behavior change (small) | `systematic-exploration` → `spec-first` → `tdd-discipline` → `commit-pr-hygiene` → `code-review` | Small scope; skip architecture and security unless relevant. |
-| Bug fix | `systematic-exploration`(if location unknown) → `systematic-debugging` → `spec-first`(if fix non-trivial) → `tdd-discipline` → `commit-pr-hygiene` → `code-review` → `post-mortem`(if significant) | Debug first, spec if needed, fix, then retrospective. |
-| Refactoring | `systematic-exploration` → `systematic-refactoring` → `commit-pr-hygiene` → `code-review` | Characterization tests, small steps, no behavior change. |
-| Architecture change | `systematic-exploration` → `architecture-design`(→ ADR) → `spec-first`(optional) → `tdd-discipline` → `code-review` | ADR required. Implementation may follow architecture. |
+| New feature (cross-cutting) | `project-onboarding`(if new repo) → `requirements-elicitation`(if ambiguous) → `systematic-exploration` → `spec-first` → `architecture-design` → `tdd-discipline` → `mutation-testing` → `security-review`(if trust boundaries) → `commit-pr-hygiene` → `performance-verification`(if perf criteria) → `code-review` → `documentation-consistency` → `release-management`(if releasing) → `integration-deployment` | Full pipeline. Every gate fires. Specification and ADR produced. |
+| New feature (contained) | `project-onboarding`(if new repo) → `systematic-exploration` → `spec-first` → `tdd-discipline` → `mutation-testing` → `commit-pr-hygiene` → `code-review` → `documentation-consistency` → `release-management`(if releasing) | Architecture is clear; skip architecture-design unless structure is affected. |
+| Behavior change (small) | `systematic-exploration` → `spec-first` → `tdd-discipline` → `mutation-testing`(if logic-bearing) → `commit-pr-hygiene` → `code-review` → `documentation-consistency` | Small scope; skip architecture and security unless relevant. |
+| Bug fix | `systematic-exploration`(if location unknown) → `systematic-debugging` → `spec-first`(if fix non-trivial) → `tdd-discipline` → `mutation-testing`(if logic-bearing) → `commit-pr-hygiene` → `code-review` → `documentation-consistency` → `post-mortem`(if significant) | Debug first, spec if needed, fix, then retrospective. |
+| Refactoring | `systematic-exploration` → `systematic-refactoring` → `commit-pr-hygiene` → `code-review` → `documentation-consistency`(if docs affected) | Characterization tests, small steps, no behavior change. |
+| Architecture change | `systematic-exploration` → `architecture-design`(→ ADR) → `spec-first`(optional) → `tdd-discipline` → `mutation-testing` → `code-review` → `documentation-consistency` | ADR required. Implementation may follow architecture. |
 
 ### Step 3: Load and Dispatch
 
@@ -73,10 +73,10 @@ If a skill reveals the task is MORE complex than classified:
 | Attribute | Light Chain | Full Chain |
 |---|---|---|
 | Intensity | Typo, config, single-line, obvious correctness | Multi-module, new abstraction, unfamiliar code |
-| Skills | Direct to `tdd-discipline` or skip (for trivial) | Full exploration → spec → architecture → TDD → review |
+| Skills | Direct to `tdd-discipline` or skip (for trivial) | Full exploration → spec → architecture → TDD → mutation testing → review → doc consistency → release |
 | Subagents | None or single `implement` | `explore` → `implement` + `review` + `security-reviewer`(if relevant) |
 | Artifacts | None or minimal | Spec (.spec.md), ADR (if architecture), review verdict |
-| Gate | Build + tests pass | All of Full Chain + mutation testing + security sign-off |
+| Gate | Build + tests pass | All of Full Chain + security sign-off |
 
 ## Evidence
 
