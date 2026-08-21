@@ -52,12 +52,9 @@ in
     };
 
     theme = lib.mkOption {
-      type = lib.types.enum [
-        "dark"
-        "light"
-      ];
-      default = "dark";
-      description = "Pi UI theme.";
+      type = lib.types.str;
+      default = "vscode-dark-modern";
+      description = "Pi UI theme name or path.";
     };
 
     models = lib.mkOption {
@@ -256,6 +253,12 @@ in
                 default = piDir + "/agents";
                 description = "Path to agents directory.";
               };
+
+              themes = lib.mkOption {
+                type = lib.types.path;
+                default = piDir + "/themes";
+                description = "Path to themes directory.";
+              };
             };
 
             config = lib.mkIf userCfg.enable {
@@ -283,6 +286,11 @@ in
 
                 ".pi/agent/agents" = {
                   source = userCfg.agents;
+                  recursive = true;
+                };
+
+                ".pi/agent/themes" = {
+                  source = userCfg.themes;
                   recursive = true;
                 };
 
