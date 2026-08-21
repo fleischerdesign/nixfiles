@@ -209,6 +209,7 @@ in
               defaultProvider = cfg.provider;
               defaultModel = cfg.models.primary;
               defaultThinkingLevel = cfg.thinkingLevel;
+              quietStartup = true;
               theme = cfg.theme;
               enableSkillCommands = true;
               packages = lib.attrValues pluginsLib.packageDirs ++ cfg.plugins;
