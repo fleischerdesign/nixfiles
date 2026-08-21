@@ -213,6 +213,11 @@ in
           default = true;
           description = "Enable durable background shell tasks & async process management plugin.";
         };
+        enableFusion = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable multi-model Fusion consensus tools (fusion_investigate, fusion_reason, etc.). Default is false to keep tool surface clean.";
+        };
         config = lib.mkOption {
           type = lib.types.attrsOf lib.types.anything;
           default = { };
@@ -315,6 +320,13 @@ in
             );
             activePluginDirs = map (name: pluginsLib.packageDirs.${name}) activePluginNames;
 
+            fusionTools = [
+              "fusion_investigate"
+              "fusion_reason"
+              "fusion_research"
+              "fusion_validate"
+            ];
+
             baseSettings = {
               defaultProvider = cfg.provider;
               defaultModel = cfg.models.primary;
@@ -323,6 +335,7 @@ in
               theme = cfg.theme;
               enableSkillCommands = true;
               packages = activePluginDirs ++ cfg.plugins.extraPlugins;
+              excludeTools = lib.optionals (!cfg.plugins.pi-background-tasks.enableFusion) fusionTools;
               subagents = lib.optionalAttrs cfg.plugins.subagents.enable {
                 defaultModel = qualifyModel cfg.models.secondary;
                 maxDepth = cfg.plugins.subagents.config.maxDepth;
@@ -379,6 +392,10 @@ in
               # materialized on the target machine. `builtins.toJSON` strips string
               # context, so referencing them in the config files alone would not pull
               # them into the closure.
+              home.sessionVariables = {
+                PI_BG_DISABLE_UPDATE_CHECK = "1";
+              };
+
               home.packages = [
                 pkgs.pi-coding-agent
                 pkgs.nodejs
