@@ -18,12 +18,27 @@ let
   cfg = config.my.features.dev.pi;
   piDir = ./.;
   pluginsLib = import ./lib/plugins.nix { inherit lib pkgs; };
-  # Tier policy: Gatherer/Writer → secondary (cheap, high volume).
-  # Judge/Verifier → primary (expensive, high stakes).
-  agentTiers = {
-    implement = "secondary";
-    review = "primary";
-    security-reviewer = "primary";
+  # Fine-grained agent configuration: Tier & Reasoning Effort per agent role.
+  # - Reviewers / Auditors (primary): high capability + high reasoning (quality gate must never compromise).
+  # - Implementer (secondary): cost-efficient + low reasoning (executes spec & TDD, saves ~80% output tokens).
+  # - Explorer (tertiary): ultra-cheap + low reasoning (fast file gathering & repo searches).
+  agentConfigs = {
+    implement = {
+      tier = "secondary";
+      thinkingLevel = "low";
+    };
+    review = {
+      tier = "primary";
+      thinkingLevel = "high";
+    };
+    security-reviewer = {
+      tier = "primary";
+      thinkingLevel = "high";
+    };
+    explore = {
+      tier = "tertiary";
+      thinkingLevel = "low";
+    };
   };
 in
 {
@@ -32,8 +47,8 @@ in
 
     provider = lib.mkOption {
       type = lib.types.str;
-      default = "deepseek";
-      description = "Default LLM provider (deepseek, anthropic, openai, etc.).";
+      default = "openrouter";
+      description = "Default LLM provider (openrouter, deepseek, anthropic, etc.).";
     };
 
     theme = lib.mkOption {
@@ -50,13 +65,18 @@ in
         options = {
           primary = lib.mkOption {
             type = lib.types.str;
-            default = "deepseek-v4-pro";
+            default = "google/gemini-3.7-flash";
             description = "Primary (high-capability) model for the main session and agents.";
           };
           secondary = lib.mkOption {
             type = lib.types.str;
-            default = "deepseek-v4-flash";
+            default = "deepseek/deepseek-v4-flash-0731";
             description = "Secondary (cost-efficient) model for subagents and lightweight tasks.";
+          };
+          tertiary = lib.mkOption {
+            type = lib.types.str;
+            default = "qwen/qwen3.7-flash";
+            description = "Tertiary (ultra-cheap) model for lightweight exploration and file-gathering tasks.";
           };
         };
       };
@@ -186,6 +206,8 @@ in
           let
             userCfg = config.my.features.dev.pi;
             mcpServers = osConfig.my.features.dev.pi.mcpServers or { };
+            qualifyModel = m: if lib.hasPrefix "${cfg.provider}/" m then m else "${cfg.provider}/${m}";
+
             baseSettings = {
               defaultProvider = cfg.provider;
               defaultModel = cfg.models.primary;
@@ -194,10 +216,12 @@ in
               enableSkillCommands = true;
               packages = lib.attrValues pluginsLib.packageDirs ++ cfg.plugins;
               subagents = {
-                defaultModel = cfg.models.secondary;
-                agentOverrides = lib.mapAttrs (_: tier: {
-                  model = cfg.models.${tier};
-                }) agentTiers;
+                defaultModel = qualifyModel cfg.models.secondary;
+                maxDepth = 1;
+                agentOverrides = lib.mapAttrs (_: spec: {
+                  model = qualifyModel cfg.models.${spec.tier};
+                  thinkingLevel = spec.thinkingLevel;
+                }) agentConfigs;
               };
             };
             mergedSettings = lib.recursiveUpdate (lib.recursiveUpdate baseSettings (
