@@ -53,7 +53,7 @@ in
 
     theme = lib.mkOption {
       type = lib.types.str;
-      default = "vscode-dark-modern";
+      default = "dark";
       description = "Pi UI theme name or path.";
     };
 
