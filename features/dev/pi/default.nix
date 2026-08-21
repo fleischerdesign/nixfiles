@@ -207,6 +207,19 @@ in
         };
       };
 
+      pi-background-tasks = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable durable background shell tasks & async process management plugin.";
+        };
+        config = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = { };
+          description = "Native configuration payload for pi-background-tasks.";
+        };
+      };
+
       extraPlugins = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];

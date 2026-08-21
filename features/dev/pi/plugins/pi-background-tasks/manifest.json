@@ -1,0 +1,12 @@
+{
+  "name": "pi-background-tasks",
+  "version": "2.4.2",
+  "rev": "37fdcf0276bcc1e89ab73fe2fb63146fb4367ccd",
+  "srcHash": "sha256-T26tohGH7FWzn159mHCMHlqfKdaRz/7rugfa8jKAWCM=",
+  "npmDepsHash": "sha256-prTf3erXPeOfLcEWVPu4lmf0FfxDzR1TjuhZBToCWn8=",
+  "upstream": {
+    "type": "github-rev",
+    "owner": "ismailsaleekh",
+    "repo": "pi-background-tasks"
+  }
+}
