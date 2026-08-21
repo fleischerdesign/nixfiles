@@ -116,10 +116,102 @@ in
       description = "Provider API keys for system-wide auth.json template generation.";
     };
 
-    plugins = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ ];
-      description = "Additional Pi package paths (npm/git/local) appended to the built-in plugin set.";
+    plugins = {
+      mcp-adapter = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable Model Context Protocol (MCP) adapter plugin.";
+        };
+        config = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              mcpFooterStatus = lib.mkOption {
+                type = lib.types.enum [
+                  "full"
+                  "compact"
+                  "off"
+                ];
+                default = "off";
+                description = "Footer status indicator mode for pi-mcp-adapter.";
+              };
+              disableProxyTool = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Hide the mcp proxy tool once direct tools are resolved.";
+              };
+            };
+          };
+          default = { };
+          description = "Native JSON configuration payload for pi-mcp-adapter.";
+        };
+      };
+
+      subagents = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable pi-subagents execution engine plugin.";
+        };
+        config = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              maxDepth = lib.mkOption {
+                type = lib.types.int;
+                default = 1;
+                description = "Maximum subagent recursion depth.";
+              };
+            };
+          };
+          default = { };
+          description = "Native JSON configuration payload for pi-subagents.";
+        };
+      };
+
+      context-mode = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable context trimming & summarization plugin.";
+        };
+        config = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = { };
+          description = "Native configuration payload for context-mode.";
+        };
+      };
+
+      web-access = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable web fetch & search capabilities plugin.";
+        };
+        config = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = { };
+          description = "Native configuration payload for web-access.";
+        };
+      };
+
+      rpiv-todo = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable persistent task-tree management plugin.";
+        };
+        config = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = { };
+          description = "Native configuration payload for rpiv-todo.";
+        };
+      };
+
+      extraPlugins = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Additional Pi package paths (npm/git/local) appended to the built-in plugin set.";
+      };
     };
 
     mcpServers = lib.mkOption {
@@ -205,6 +297,11 @@ in
             mcpServers = osConfig.my.features.dev.pi.mcpServers or { };
             qualifyModel = m: if lib.hasPrefix "${cfg.provider}/" m then m else "${cfg.provider}/${m}";
 
+            activePluginNames = lib.filter (name: cfg.plugins.${name}.enable or true) (
+              lib.attrNames pluginsLib.packageDirs
+            );
+            activePluginDirs = map (name: pluginsLib.packageDirs.${name}) activePluginNames;
+
             baseSettings = {
               defaultProvider = cfg.provider;
               defaultModel = cfg.models.primary;
@@ -212,10 +309,10 @@ in
               quietStartup = true;
               theme = cfg.theme;
               enableSkillCommands = true;
-              packages = lib.attrValues pluginsLib.packageDirs ++ cfg.plugins;
-              subagents = {
+              packages = activePluginDirs ++ cfg.plugins.extraPlugins;
+              subagents = lib.optionalAttrs cfg.plugins.subagents.enable {
                 defaultModel = qualifyModel cfg.models.secondary;
-                maxDepth = 1;
+                maxDepth = cfg.plugins.subagents.config.maxDepth;
                 agentOverrides = lib.mapAttrs (_: spec: {
                   model = qualifyModel cfg.models.${spec.tier};
                   thinkingLevel = spec.thinkingLevel;
@@ -226,6 +323,7 @@ in
               osConfig.my.features.dev.pi.settings or { }
             )) userCfg.settings;
             mcpSettings = {
+              settings = cfg.plugins.mcp-adapter.config;
               mcpServers = lib.mapAttrs (_: s: {
                 command = "${s.package}/bin/${s.binName}";
                 args = s.args;
