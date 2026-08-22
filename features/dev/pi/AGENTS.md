@@ -110,7 +110,23 @@ Before any code change, classify the task against this list. This gate decides w
 
 Every task that is not provably trivial (see Mandatory Skill Dispatch) MUST start by loading `orchestration` — classifying the task is the first step, not an option.
 
-**Model Tiers:** Agents resolve their model centrally via the pi feature's `models` configuration (primary/secondary), surfaced through `subagents.agentOverrides` in `~/.pi/agent/settings.json`. Change the model in ONE place; every agent and the main session follow. Skills reference agents by name — never hardcode model names or tiers.
+**Model Tiers:** Agents resolve their model centrally via the pi feature's `models` configuration (primary/secondary/tertiary), surfaced through `subagents.agentOverrides` in `~/.pi/agent/settings.json`. Change the model in ONE place; every agent and the main session follow. Skills reference agents by name — never hardcode model names or tiers.
+
+## Mandatory Subagent Delegation Protocol
+
+You operate as the Primary Architect and Orchestrator. Your main role is high-level reasoning, specification design, task planning, user communication, and review. You MUST delegate focused execution tasks to specialized subagents using `subagent` or `bg_delegate` rather than performing heavy execution directly in your main conversation context.
+
+### 1. Exploration Gate (`explore` Subagent)
+- **STRICT PROHIBITION:** You MUST NOT perform multi-file repository exploration, search sprees (`grep`, `find`, `ls`), or multi-file reading directly in the main conversation context. Doing so pollutes your context window and wastes high-reasoning tokens.
+- **MANDATORY DELEGATION:** For any codebase inspection, file search, or module discovery beyond a single known file, you MUST spawn the `explore` subagent (or `bg_delegate`).
+- **EXECUTION:** The `explore` subagent executes in an isolated low-cost context (`tertiary` tier, low reasoning) and returns a concise, structured summary back to you.
+
+### 2. Implementation & TDD Gate (`implement` Subagent)
+- **STRICT PROHIBITION:** Do NOT write multi-line production code or run TDD test loops directly in the main thread for non-trivial tasks.
+- **MANDATORY DELEGATION:** Delegate code creation and TDD execution to the `implement` subagent (`secondary` tier, low reasoning), supplying the specification (`<feature>.spec.md`) as input.
+
+### 3. Review & Security Gate (`review` & `security-reviewer` Subagents)
+- **MANDATORY DELEGATION:** Before declaring any non-trivial task complete or committing code, spawn the `review` subagent (and `security-reviewer` if auth/trust boundaries are touched) to perform an independent audit of the diff (`primary` tier, high reasoning).
 
 ## Artifact Conventions
 
