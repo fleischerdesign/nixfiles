@@ -62,6 +62,11 @@
       url = "github:fleischerdesign/salus/develop";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+
+    nod = {
+      url = "github:fleischerdesign/nod/develop";
+      inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
+    };
   };
 
   outputs =

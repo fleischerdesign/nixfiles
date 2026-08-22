@@ -409,6 +409,27 @@
         "type": "github"
       }
     },
+    "nod": {
+      "inputs": {
+        "nixpkgs-unstable": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787438334,
+        "narHash": "sha256-hnMHOvRkRWdq8cyOW5CvmFB+8RgWGP/giw00GYFPRow=",
+        "owner": "fleischerdesign",
+        "repo": "nod",
+        "rev": "a1eefd16fbe8dda455adbc1a67b0b533626dade9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "fleischerdesign",
+        "ref": "develop",
+        "repo": "nod",
+        "type": "github"
+      }
+    },
     "portfolio": {
       "inputs": {
         "flake-utils": "flake-utils_2",
@@ -491,6 +512,7 @@
         "nixcord": "nixcord",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixvim": "nixvim",
+        "nod": "nod",
         "portfolio": "portfolio",
         "salus": "salus",
         "sops-nix": "sops-nix",
