@@ -30,10 +30,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    nix.package = pkgs.lix;
+
     nix.settings = {
       experimental-features = [
         "nix-command"
         "flakes"
+        "eval-cache"
       ];
       auto-optimise-store = true;
       max-jobs = "auto";
