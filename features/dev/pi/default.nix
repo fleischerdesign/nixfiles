@@ -339,6 +339,15 @@ in
               subagents = lib.optionalAttrs cfg.plugins.subagents.enable {
                 defaultModel = qualifyModel cfg.models.secondary;
                 maxDepth = cfg.plugins.subagents.config.maxDepth;
+                modelScope = {
+                  enforce = true;
+                  strict = true;
+                  allow = [
+                    (qualifyModel cfg.models.primary)
+                    (qualifyModel cfg.models.secondary)
+                    (qualifyModel cfg.models.tertiary)
+                  ];
+                };
                 agentOverrides = lib.mapAttrs (_: spec: {
                   model = qualifyModel cfg.models.${spec.tier};
                   thinkingLevel = spec.thinkingLevel;
@@ -356,6 +365,44 @@ in
                 directTools = s.directTools;
               }) mcpServers;
             };
+
+            # Dynamically inject model & thinking fields into agent markdown files
+            mkAgentFileText =
+              name:
+              let
+                spec =
+                  agentConfigs.${name} or {
+                    tier = "secondary";
+                    thinkingLevel = "low";
+                  };
+                modelStr = qualifyModel cfg.models.${spec.tier};
+                thinkingStr = spec.thinkingLevel;
+                rawContent = builtins.readFile (piDir + "/agents/${name}.md");
+                # Remove existing top-level YAML frontmatter if present
+                lines = lib.splitString "\n" rawContent;
+                hasFrontmatter = lib.length lines > 1 && (lib.elemAt lines 0) == "---";
+                tailLines =
+                  if hasFrontmatter then
+                    let
+                      rest = lib.drop 1 lines;
+                      idx = lib.lists.findFirstIndex (x: x == "---") null rest;
+                    in
+                    if idx != null then lib.drop (idx + 1) rest else lines
+                  else
+                    lines;
+                bodyText = lib.concatStringsSep "\n" tailLines;
+                fallbackLine = lib.optionalString (
+                  spec.tier == "tertiary"
+                ) "fallbackModels:\n  - ${qualifyModel cfg.models.secondary}\n";
+              in
+              ''
+                ---
+                name: ${name}
+                model: ${modelStr}
+                thinking: ${thinkingStr}
+                ${fallbackLine}---
+                ${bodyText}
+              '';
           in
           {
             options.my.features.dev.pi = {
@@ -413,10 +460,10 @@ in
                   recursive = true;
                 };
 
-                ".pi/agent/agents" = {
-                  source = userCfg.agents;
-                  recursive = true;
-                };
+                ".pi/agent/agents/explore.md".text = mkAgentFileText "explore";
+                ".pi/agent/agents/implement.md".text = mkAgentFileText "implement";
+                ".pi/agent/agents/review.md".text = mkAgentFileText "review";
+                ".pi/agent/agents/security-reviewer.md".text = mkAgentFileText "security-reviewer";
 
                 ".pi/agent/themes" = {
                   source = userCfg.themes;

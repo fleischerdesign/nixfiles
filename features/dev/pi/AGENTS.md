@@ -127,6 +127,8 @@ The Main Session operates strictly as a **Zero-Side-Effect Control Plane**. It p
 
 You MUST delegate focused execution tasks to specialized Data Plane subagents using `subagent` or `bg_delegate` rather than performing execution directly in your main conversation context.
 
+- **NO MODEL OVERRIDE IN TOOL CALLS (CRITICAL):** When invoking the `subagent` tool, you MUST NOT supply the optional `model` parameter in your tool arguments. Leave `model` omitted so that the runtime automatically resolves the agent's pinned model from its generated frontmatter and settings.
+
 ### 1. Exploration Gate (`explore` Subagent)
 - **STRICT PROHIBITION:** You MUST NOT perform multi-file repository exploration, search sprees (`grep`, `find`, `ls`), or multi-file reading directly in the main conversation context.
 - **MANDATORY DELEGATION:** For any codebase inspection, file search, or module discovery beyond a single known file, you MUST spawn the `explore` subagent (or `bg_delegate`).
