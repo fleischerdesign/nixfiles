@@ -29,7 +29,7 @@ let
     };
     review = {
       tier = "primary";
-      thinkingLevel = "high";
+      thinkingLevel = "medium";
     };
     security-reviewer = {
       tier = "primary";
