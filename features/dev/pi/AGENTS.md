@@ -112,12 +112,23 @@ Every task that is not provably trivial (see Mandatory Skill Dispatch) MUST star
 
 **Model Tiers:** Agents resolve their model centrally via the pi feature's `models` configuration (primary/secondary/tertiary), surfaced through `subagents.agentOverrides` in `~/.pi/agent/settings.json`. Change the model in ONE place; every agent and the main session follow. Skills reference agents by name — never hardcode model names or tiers.
 
+## Principle of Main-Context Isolation (Control Plane vs. Data Plane)
+
+The Main Session operates strictly as a **Zero-Side-Effect Control Plane**. It plans, orchestrates, and communicates — it NEVER processes raw data or mutates code directly.
+
+1. **Universal Scope:** This principle applies unconditionally to ALL user inputs — initial prompts, follow-up feedback, design critiques, bug reports, or inline code suggestions. No input type is exempt.
+2. **Control Plane / Data Plane Separation:**
+   - **Control Plane (Main Session):** High-level reasoning, task classification (`orchestration`), spec design, subagent dispatch, and final user communication.
+   - **Data Plane (Subagents & Background Tasks):** File reading, repository search, code implementation, TDD test runs, and static analysis.
+3. **Zero-Inline-Execution Rule:** The Main Session MUST NOT execute file editing (`write`, `replace`), multi-file reading (`read`), or search sprees (`grep`, `find`) directly within its own thread.
+4. **Input Neutrality Guard:** User prompts containing concrete code snippets, UI feedback, or step-by-step instructions are task specifications to be dispatched to Data Plane subagents — NEVER permission slips for the Main Session to execute inline edits.
+
 ## Mandatory Subagent Delegation Protocol
 
-You operate as the Primary Architect and Orchestrator. Your main role is high-level reasoning, specification design, task planning, user communication, and review. You MUST delegate focused execution tasks to specialized subagents using `subagent` or `bg_delegate` rather than performing heavy execution directly in your main conversation context.
+You MUST delegate focused execution tasks to specialized Data Plane subagents using `subagent` or `bg_delegate` rather than performing execution directly in your main conversation context.
 
 ### 1. Exploration Gate (`explore` Subagent)
-- **STRICT PROHIBITION:** You MUST NOT perform multi-file repository exploration, search sprees (`grep`, `find`, `ls`), or multi-file reading directly in the main conversation context. Doing so pollutes your context window and wastes high-reasoning tokens.
+- **STRICT PROHIBITION:** You MUST NOT perform multi-file repository exploration, search sprees (`grep`, `find`, `ls`), or multi-file reading directly in the main conversation context.
 - **MANDATORY DELEGATION:** For any codebase inspection, file search, or module discovery beyond a single known file, you MUST spawn the `explore` subagent (or `bg_delegate`).
 - **EXECUTION:** The `explore` subagent executes in an isolated low-cost context (`tertiary` tier, low reasoning) and returns a concise, structured summary back to you.
 - **NO SELF-FALLBACK RULE (CRITICAL):** After a subagent completes, you MUST NOT fall back to issuing direct `read`, `find`, or `grep` commands yourself in the main session to inspect additional files. If a subagent's summary reveals open questions about other components or layers (e.g., Frontend vs. Backend vs. DB), spawn additional targeted `explore` subagents or re-prompt with refined subagent tasks. The main session MUST remain lightweight and clean.
@@ -127,7 +138,7 @@ You operate as the Primary Architect and Orchestrator. Your main role is high-le
 - **MANDATORY DELEGATION:** Delegate code creation and TDD execution to the `implement` subagent (`secondary` tier, low reasoning), supplying the specification (`<feature>.spec.md`) as input.
 
 ### 3. Review & Security Gate (`review` & `security-reviewer` Subagents)
-- **MANDATORY DELEGATION:** Before declaring any non-trivial task complete or committing code, spawn the `review` subagent (and `security-reviewer` if auth/trust boundaries are touched) to perform an independent audit of the diff (`primary` tier, high reasoning).
+- **MANDATORY DELEGATION:** Before declaring any non-trivial task complete or committing code, spawn the `review` subagent (and `security-reviewer` if auth/trust boundaries are touched) to perform an independent audit of the diff (`primary` tier, medium/high reasoning).
 
 ## Artifact Conventions
 
