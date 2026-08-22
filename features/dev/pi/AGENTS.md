@@ -142,6 +142,13 @@ You MUST delegate focused execution tasks to specialized Data Plane subagents EX
 ### 3. Review & Security Gate (`review` & `security-reviewer` Subagents)
 - **MANDATORY DELEGATION:** Before declaring any non-trivial task complete or committing code, spawn the `review` subagent (and `security-reviewer` if auth/trust boundaries are touched) to perform an independent audit of the diff (`primary` tier, medium/high reasoning).
 
+### 4. Lifecycle & Deterministic Status Protocol (NO POLLING LOOPS)
+- **SINGLE STATUS CHECK RULE:** When `subagent_wait` returns `attention required` or indicates a child status update, check the status ONCE using `subagent({ action: "status", id: "..." })`.
+- **NO REPETITIVE POLLING:** You MUST NOT call `subagent({ action: "status" })` repeatedly in a loop.
+- **DETERMINISTIC ACTION:**
+  - If the child is **completed**: Synthesize the output and proceed immediately.
+  - If the child is **stopped** or **failed**: Acknowledge the outcome immediately and report to the user or spawn a new subagent with refined dispatches. Do NOT issue redundant `status`, `steer`, `interrupt`, or `stop` chains.
+
 ## Artifact Conventions
 
 Engineering artifacts are stored co-located with the code they describe, not in a separate documentation silo.
