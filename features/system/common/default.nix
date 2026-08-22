@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  inputs ? null,
   ...
 }:
 
@@ -69,26 +70,24 @@ in
     };
     console.keyMap = "de";
 
-    programs.nh = {
-      enable = true;
-      clean.enable = true;
-      clean.extraArgs = "--keep-since 4d --keep 3";
-      flake = "/etc/nixos";
-    };
-
     documentation.man.cache.enable = false;
     documentation.doc.enable = false;
 
     my.features.dev.git.enable = true;
 
-    environment.systemPackages = with pkgs; [
-      wget
-      openssl
-      btop
-      tree
-      duf
-      ripgrep
-    ];
+    environment.systemPackages =
+      with pkgs;
+      [
+        wget
+        openssl
+        btop
+        tree
+        duf
+        ripgrep
+      ]
+      ++ lib.optionals (inputs ? nod && inputs.nod ? packages) [
+        inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default
+      ];
 
     sops = {
       defaultSopsFile = ../../../secrets/secrets.yaml;

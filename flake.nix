@@ -53,11 +53,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    deploy-rs = {
-      url = "github:serokell/deploy-rs";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
     salus = {
       url = "github:fleischerdesign/salus/develop";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
