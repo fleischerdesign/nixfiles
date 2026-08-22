@@ -36,7 +36,6 @@ in
       experimental-features = [
         "nix-command"
         "flakes"
-        "eval-cache"
       ];
       auto-optimise-store = true;
       max-jobs = "auto";
