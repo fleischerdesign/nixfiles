@@ -337,6 +337,7 @@ in
               packages = activePluginDirs ++ cfg.plugins.extraPlugins;
               excludeTools = lib.optionals (!cfg.plugins.pi-background-tasks.enableFusion) fusionTools;
               subagents = lib.optionalAttrs cfg.plugins.subagents.enable {
+                disableBuiltins = true;
                 defaultModel = qualifyModel cfg.models.secondary;
                 maxDepth = cfg.plugins.subagents.config.maxDepth;
                 modelScope = {
