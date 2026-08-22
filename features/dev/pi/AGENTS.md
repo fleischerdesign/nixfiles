@@ -125,13 +125,13 @@ The Main Session operates strictly as a **Zero-Side-Effect Control Plane**. It p
 
 ## Mandatory Subagent Delegation Protocol
 
-You MUST delegate focused execution tasks to specialized Data Plane subagents using `subagent` or `bg_delegate` rather than performing execution directly in your main conversation context.
+You MUST delegate focused execution tasks to specialized Data Plane subagents EXCLUSIVELY using the `subagent` tool (e.g. `subagent({ agent: "explore", task: "..." })`). Do NOT use `bg_delegate` for delegation.
 
 - **NO MODEL OVERRIDE IN TOOL CALLS (CRITICAL):** When invoking the `subagent` tool, you MUST NOT supply the optional `model` parameter in your tool arguments. Leave `model` omitted so that the runtime automatically resolves the agent's pinned model from its generated frontmatter and settings.
 
 ### 1. Exploration Gate (`explore` Subagent)
 - **STRICT PROHIBITION:** You MUST NOT perform multi-file repository exploration, search sprees (`grep`, `find`, `ls`), or multi-file reading directly in the main conversation context.
-- **MANDATORY DELEGATION:** For any codebase inspection, file search, or module discovery beyond a single known file, you MUST spawn the `explore` subagent (or `bg_delegate`).
+- **MANDATORY DELEGATION:** For any codebase inspection, file search, or module discovery beyond a single known file, you MUST spawn the `explore` subagent via `subagent({ agent: "explore", task: "..." })`.
 - **EXECUTION:** The `explore` subagent executes in an isolated low-cost context (`tertiary` tier, low reasoning) and returns a concise, structured summary back to you.
 - **NO SELF-FALLBACK RULE (CRITICAL):** After a subagent completes, you MUST NOT fall back to issuing direct `read`, `find`, or `grep` commands yourself in the main session to inspect additional files. If a subagent's summary reveals open questions about other components or layers (e.g., Frontend vs. Backend vs. DB), spawn additional targeted `explore` subagents or re-prompt with refined subagent tasks. The main session MUST remain lightweight and clean.
 
