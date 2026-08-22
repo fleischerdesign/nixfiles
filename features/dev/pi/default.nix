@@ -26,18 +26,22 @@ let
     implement = {
       tier = "secondary";
       thinkingLevel = "low";
+      description = "Focused implementation agent. Write code from specifications and architectural designs with TDD discipline. Narrow scope, evidence-driven, no scope creep.";
     };
     review = {
       tier = "primary";
       thinkingLevel = "medium";
+      description = "Independent code reviewer with fresh context — unbiased, evidence-based, structured findings";
     };
     security-reviewer = {
       tier = "primary";
       thinkingLevel = "high";
+      description = "Independent security reviewer with fresh context — adversary-perspective analysis, STRIDE threat modeling, zero trust in developer assumptions";
     };
     explore = {
       tier = "tertiary";
       thinkingLevel = "low";
+      description = "Ultra-fast repository exploration and information gathering agent. Reads files, lists directories, and gathers code context.";
     };
   };
 in
@@ -399,6 +403,7 @@ in
               ''
                 ---
                 name: ${name}
+                description: ${spec.description}
                 model: ${modelStr}
                 thinking: ${thinkingStr}
                 ${fallbackLine}---
