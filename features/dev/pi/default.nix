@@ -49,6 +49,49 @@ let
       description = "Specialized visual and multimodal analysis agent. Inspects images, screenshots, diagrams, UI mockups, and visual artifacts to extract precise structured observations, text (OCR), layout details, and anomalies.";
     };
   };
+
+  modelSubmodule = lib.types.submodule {
+    options = {
+      id = lib.mkOption {
+        type = lib.types.str;
+        description = "Model identifier (e.g. 'deepseek/deepseek-v4-flash-0731' or 'deepseek-chat').";
+      };
+
+      provider = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Provider override for this tier (defaults to cfg.provider if null).";
+      };
+
+      routing = lib.mkOption {
+        type = lib.types.nullOr (
+          lib.types.submodule {
+            options = {
+              order = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = "Ordered provider preference for OpenRouter.";
+              };
+              quantizations = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ "fp8" ];
+                description = "Allowed quantizations (e.g. ['fp8'], ['fp8' 'bf16']).";
+              };
+              allowFallbacks = lib.mkOption {
+                type = lib.types.bool;
+                default = true;
+                description = "Allow fallback providers satisfying quantization criteria.";
+              };
+            };
+          }
+        );
+        default = null;
+        description = "OpenRouter-specific routing rules for this model.";
+      };
+    };
+  };
+
+  modelType = lib.types.coercedTo lib.types.str (id: { inherit id; }) modelSubmodule;
 in
 {
   options.my.features.dev.pi = {
@@ -57,7 +100,7 @@ in
     provider = lib.mkOption {
       type = lib.types.str;
       default = "openrouter";
-      description = "Default LLM provider (openrouter, deepseek, anthropic, etc.).";
+      description = "Default LLM provider (openrouter, deepseek, anthropic, openai, etc.).";
     };
 
     theme = lib.mkOption {
@@ -70,29 +113,59 @@ in
       type = lib.types.submodule {
         options = {
           primary = lib.mkOption {
-            type = lib.types.str;
-            default = "deepseek/deepseek-v4-flash-0731";
-            description = "Primary (high-capability) model for the main session and agents.";
+            type = modelType;
+            default = {
+              id = "deepseek/deepseek-v4-flash-0731";
+              routing = {
+                order = [
+                  "Baidu"
+                  "DeepInfra"
+                  "StreamLake"
+                  "Novita"
+                ];
+                quantizations = [ "fp8" ];
+                allowFallbacks = true;
+              };
+            };
+            description = "Primary model for the main session and review agents.";
           };
           secondary = lib.mkOption {
-            type = lib.types.str;
-            default = "deepseek/deepseek-v4-flash-0731";
-            description = "Secondary (cost-efficient) model for subagents and lightweight tasks.";
+            type = modelType;
+            default = {
+              id = "deepseek/deepseek-v4-flash-0731";
+              routing = {
+                order = [
+                  "Baidu"
+                  "DeepInfra"
+                  "StreamLake"
+                  "Novita"
+                ];
+                quantizations = [ "fp8" ];
+                allowFallbacks = true;
+              };
+            };
+            description = "Secondary model for implementation subagents.";
           };
           tertiary = lib.mkOption {
-            type = lib.types.str;
+            type = modelType;
             default = "qwen/qwen3.7-flash";
-            description = "Tertiary (ultra-cheap) model for lightweight exploration and file-gathering tasks.";
+            description = "Tertiary model for lightweight exploration tasks.";
           };
           vision = lib.mkOption {
-            type = lib.types.str;
+            type = modelType;
             default = "xiaomi/mimo-v2.5";
-            description = "Multimodal vision model for visual asset analysis, OCR, screenshots, and UI inspections.";
+            description = "Multimodal vision model for visual asset analysis.";
           };
         };
       };
       default = { };
-      description = "Model tiers. Change here to update all agents and session defaults at once.";
+      description = "Model tiers. Easily switchable globally or per model tier.";
+    };
+
+    customProviders = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = { };
+      description = "Custom provider definitions injected into models.json (e.g. self-hosted Ollama, vLLM).";
     };
 
     thinkingLevel = lib.mkOption {
@@ -327,7 +400,16 @@ in
           let
             userCfg = config.my.features.dev.pi;
             mcpServers = osConfig.my.features.dev.pi.mcpServers or { };
-            qualifyModel = m: if lib.hasPrefix "${cfg.provider}/" m then m else "${cfg.provider}/${m}";
+            getModelId = m: if builtins.isAttrs m then m.id else m;
+            getModelProvider =
+              m: if builtins.isAttrs m && (m.provider or null != null) then m.provider else cfg.provider;
+            qualifyModel =
+              m:
+              let
+                id = getModelId m;
+                prov = getModelProvider m;
+              in
+              if lib.hasPrefix "${prov}/" id then id else "${prov}/${id}";
 
             activePluginNames = lib.filter (name: cfg.plugins.${name}.enable or true) (
               lib.attrNames pluginsLib.packageDirs
@@ -341,9 +423,50 @@ in
               "fusion_validate"
             ];
 
+            openRouterOverrides = lib.listToAttrs (
+              lib.concatMap
+                (
+                  tier:
+                  let
+                    id = getModelId tier;
+                    prov = getModelProvider tier;
+                    cleanId = lib.removePrefix "${prov}/" id;
+                    routing = if builtins.isAttrs tier then (tier.routing or null) else null;
+                  in
+                  lib.optional (prov == "openrouter" && routing != null) {
+                    name = cleanId;
+                    value = {
+                      compat = {
+                        openRouterRouting = {
+                          allow_fallbacks = routing.allowFallbacks;
+                        }
+                        // lib.optionalAttrs (routing.order != [ ]) { inherit (routing) order; }
+                        // lib.optionalAttrs (routing.quantizations != [ ]) {
+                          inherit (routing) quantizations;
+                        };
+                      };
+                    };
+                  }
+                )
+                [
+                  cfg.models.primary
+                  cfg.models.secondary
+                  cfg.models.tertiary
+                  cfg.models.vision
+                ]
+            );
+
+            modelsJsonContent = {
+              providers = lib.recursiveUpdate (lib.optionalAttrs (openRouterOverrides != { }) {
+                openrouter = {
+                  modelOverrides = openRouterOverrides;
+                };
+              }) cfg.customProviders;
+            };
+
             baseSettings = {
               defaultProvider = cfg.provider;
-              defaultModel = cfg.models.primary;
+              defaultModel = qualifyModel cfg.models.primary;
               defaultThinkingLevel = cfg.thinkingLevel;
               quietStartup = true;
               theme = cfg.theme;
@@ -492,6 +615,9 @@ in
                     source = config.lib.file.mkOutOfStoreSymlink osConfig.sops.templates."pi-auth.json".path;
                   };
                 }
+                (lib.optionalAttrs (modelsJsonContent.providers != { }) {
+                  ".pi/agent/models.json".text = builtins.toJSON modelsJsonContent;
+                })
                 (lib.mapAttrs' (
                   name: _:
                   lib.nameValuePair ".pi/agent/agents/${name}.md" {
