@@ -95,7 +95,7 @@ in
         "xhigh"
         "max"
       ];
-      default = "high";
+      default = "medium";
       description = "Default thinking/reasoning level.";
     };
 
