@@ -75,14 +75,14 @@
     auxiliary = {
       vision.provider = "openrouter";
       vision.model = "xiaomi/mimo-v2.5";
-      title_generation.provider = "deepseek";
-      title_generation.model = "deepseek-v4-flash";
-      compression.provider = "deepseek";
-      compression.model = "deepseek-v4-flash";
-      approval.provider = "deepseek";
-      approval.model = "deepseek-v4-flash";
-      web_extract.provider = "deepseek";
-      web_extract.model = "deepseek-v4-flash";
+      title_generation.provider = "openrouter";
+      title_generation.model = "deepseek/deepseek-chat";
+      compression.provider = "openrouter";
+      compression.model = "deepseek/deepseek-chat";
+      approval.provider = "openrouter";
+      approval.model = "deepseek/deepseek-chat";
+      web_extract.provider = "openrouter";
+      web_extract.model = "deepseek/deepseek-chat";
     };
   };
 
@@ -101,6 +101,8 @@
   };
 
   my.features.services.camofox.enable = true;
+
+  sops.secrets."pi/openrouter" = { };
 
   sops.secrets.hermes_ssh_key = {
     owner = "hermes";

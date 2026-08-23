@@ -83,7 +83,7 @@ let
         approvals.mode = "smart";
         model = {
           default = cfg.model;
-          provider = "deepseek";
+          provider = cfg.provider;
         };
         memory = {
           provider = "mnemosyne";
@@ -181,9 +181,14 @@ in
 
     my.features.services.hermes = {
       enable = lib.mkEnableOption "Hermes Agent";
+      provider = lib.mkOption {
+        type = lib.types.str;
+        default = "openrouter";
+        description = "Default model provider for Hermes Agent.";
+      };
       model = lib.mkOption {
         type = lib.types.str;
-        default = "deepseek-v4-flash";
+        default = "deepseek/deepseek-chat";
         description = "Default model for Hermes Agent.";
       };
 
@@ -338,6 +343,9 @@ in
         "hermes-webui.service"
       ];
       content = ''
+        ${lib.optionalString (config.sops.secrets ? "pi/openrouter")
+          "OPENROUTER_API_KEY=${config.sops.placeholder."pi/openrouter"}"
+        }
         ${lib.optionalString cfg.integrations.camofox.enable "CAMOFOX_API_KEY=${config.sops.placeholder.camofox_api_key}"}
         ${lib.optionalString cfg.integrations.vikunja.enable "VIKUNJA_API_TOKEN=${config.sops.placeholder.vikunja_api_token}"}
       '';
