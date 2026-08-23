@@ -158,11 +158,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787176219,
-        "narHash": "sha256-djoRr6jBpe35q/0JwAvXpFXg1Ktf+X54NU2RLR7wnHw=",
+        "lastModified": 1787379775,
+        "narHash": "sha256-XL2qfqmocfsvuEGyomZg4nOZfkuSe8vZtrOX99I+b6I=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "c53d643b3737e2fcd04e6cb3b3580ef50b2087a0",
+        "rev": "ec1a8fdf74ed3f276148ee106299a2ba0e65d51f",
         "type": "github"
       },
       "original": {
@@ -257,11 +257,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1787286728,
-        "narHash": "sha256-xKZ1j+5Bn9mzP306QMTgG5MF/coZO1aCRC5Zb9uNUs8=",
+        "lastModified": 1787372784,
+        "narHash": "sha256-2+15Ox9SbqgOTuBYYmzLQb2HRMrxDyzualvwf85w18E=",
         "owner": "kaylorben",
         "repo": "nixcord",
-        "rev": "005c68566d85120c7eaada6a03cf8bf5442fd8b8",
+        "rev": "064908c1d591cf3cd3b9a5517220cd1de2abc196",
         "type": "github"
       },
       "original": {
@@ -491,11 +491,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1787158800,
-        "narHash": "sha256-qLt4CDzGb3jZg8f6urAmT4oNUkzWLNxZ3hR7rSjgJKE=",
+        "lastModified": 1787437558,
+        "narHash": "sha256-Ugb/wyBdDrgSSXe3dJe6Lr13JaVUep68udKUut1g4dI=",
         "owner": "fleischerdesign",
         "repo": "salus",
-        "rev": "a572bdd8509c5e70cb95af87139d55d20343d680",
+        "rev": "458bd020ca3879e315c4adce29f79a7b213619d7",
         "type": "github"
       },
       "original": {
