@@ -11,6 +11,7 @@
 
     nixcord = {
       url = "github:kaylorben/nixcord";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
     nixvim = {

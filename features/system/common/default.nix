@@ -37,6 +37,7 @@ in
       experimental-features = [
         "nix-command"
         "flakes"
+        "lazy-trees"
       ];
       auto-optimise-store = true;
       max-jobs = "auto";
