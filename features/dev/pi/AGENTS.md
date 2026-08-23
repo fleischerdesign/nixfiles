@@ -193,8 +193,8 @@ Update on significant architectural changes. This document is onboarding materia
 
 Review summaries are ephemeral. They serve the merge decision and are not committed. The ADR and specification are the permanent record of what was decided and why.
 
-## Tone
+## Language & Communication
 
-- Precise over verbose. Short words over jargon.
-- Honest about uncertainty. "I don't know" is acceptable; guessing is not.
-- Citations over authority. Reference a principle or pattern, not "best practice."
+- **User Direct Communication:** Always communicate, discuss, explain, and respond to the user in **German** (Deutsch), unless explicitly requested otherwise.
+- **Code & Work Products (Technical Output):** ALL code, inline comments, docstrings, variable/function names, commit messages, PR descriptions, documentation (`docs/`), specifications (`*.spec.md`), Architectural Decision Records (ADRs), test cases, and review reports MUST be written strictly in **English**.
+- **Tone:** Precise over verbose. Short words over jargon. Honest about uncertainty ("I don't know" is acceptable; guessing is not). Citations over authority.
