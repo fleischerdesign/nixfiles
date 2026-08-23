@@ -102,6 +102,7 @@
 
       globalModules = [
         inputs.sops-nix.nixosModules.sops
+        inputs.nod.nixosModules.default
       ];
       hostNames = nixpkgs-unstable.lib.attrNames (
         nixpkgs-unstable.lib.filterAttrs (
