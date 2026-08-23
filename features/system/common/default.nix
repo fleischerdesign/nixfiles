@@ -53,6 +53,12 @@ in
       trusted-public-keys = [ "nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE=" ];
     };
 
+    nix.gc = {
+      automatic = true;
+      dates = "weekly";
+      options = "--delete-older-than 14d";
+    };
+
     networking.networkmanager.enable = true;
 
     time.timeZone = "Europe/Berlin";
