@@ -76,13 +76,13 @@
       vision.provider = "openrouter";
       vision.model = "xiaomi/mimo-v2.5";
       title_generation.provider = "openrouter";
-      title_generation.model = "deepseek/deepseek-v4-flash";
+      title_generation.model = "deepseek/deepseek-v4-flash-0731";
       compression.provider = "openrouter";
-      compression.model = "deepseek/deepseek-v4-flash";
+      compression.model = "deepseek/deepseek-v4-flash-0731";
       approval.provider = "openrouter";
-      approval.model = "deepseek/deepseek-v4-flash";
+      approval.model = "deepseek/deepseek-v4-flash-0731";
       web_extract.provider = "openrouter";
-      web_extract.model = "deepseek/deepseek-v4-flash";
+      web_extract.model = "deepseek/deepseek-v4-flash-0731";
     };
   };
 
