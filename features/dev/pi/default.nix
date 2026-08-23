@@ -43,6 +43,11 @@ let
       thinkingLevel = "low";
       description = "Ultra-fast repository exploration and information gathering agent. Reads files, lists directories, and gathers code context.";
     };
+    vision = {
+      tier = "vision";
+      thinkingLevel = "low";
+      description = "Specialized visual and multimodal analysis agent. Inspects images, screenshots, diagrams, UI mockups, and visual artifacts to extract precise structured observations, text (OCR), layout details, and anomalies.";
+    };
   };
 in
 {
@@ -66,7 +71,7 @@ in
         options = {
           primary = lib.mkOption {
             type = lib.types.str;
-            default = "google/gemini-3.7-flash";
+            default = "deepseek/deepseek-v4-flash-0731";
             description = "Primary (high-capability) model for the main session and agents.";
           };
           secondary = lib.mkOption {
@@ -78,6 +83,11 @@ in
             type = lib.types.str;
             default = "qwen/qwen3.7-flash";
             description = "Tertiary (ultra-cheap) model for lightweight exploration and file-gathering tasks.";
+          };
+          vision = lib.mkOption {
+            type = lib.types.str;
+            default = "xiaomi/mimo-v2.5";
+            description = "Multimodal vision model for visual asset analysis, OCR, screenshots, and UI inspections.";
           };
         };
       };
@@ -351,6 +361,8 @@ in
                     (qualifyModel cfg.models.primary)
                     (qualifyModel cfg.models.secondary)
                     (qualifyModel cfg.models.tertiary)
+                    (qualifyModel cfg.models.vision)
+                    (qualifyModel "google/gemini-3.7-flash")
                   ];
                 };
                 agentOverrides = lib.mapAttrs (_: spec: {
@@ -396,9 +408,13 @@ in
                   else
                     lines;
                 bodyText = lib.concatStringsSep "\n" tailLines;
-                fallbackLine = lib.optionalString (
-                  spec.tier == "tertiary"
-                ) "fallbackModels:\n  - ${qualifyModel cfg.models.secondary}\n";
+                fallbackLine =
+                  if spec.tier == "tertiary" then
+                    "fallbackModels:\n  - ${qualifyModel cfg.models.secondary}\n"
+                  else if spec.tier == "vision" then
+                    "fallbackModels:\n  - ${qualifyModel "google/gemini-3.7-flash"}\n"
+                  else
+                    "";
               in
               ''
                 ---
@@ -456,30 +472,33 @@ in
               ++ lib.attrValues pluginsLib.derivations
               ++ lib.catAttrs "package" (lib.attrValues mcpServers);
 
-              home.file = {
-                ".pi/agent/settings.json".text = builtins.toJSON mergedSettings;
-                ".pi/agent/mcp.json".text = builtins.toJSON mcpSettings;
-                ".pi/agent/AGENTS.md".source = piDir + "/AGENTS.md";
+              home.file = lib.mkMerge [
+                {
+                  ".pi/agent/settings.json".text = builtins.toJSON mergedSettings;
+                  ".pi/agent/mcp.json".text = builtins.toJSON mcpSettings;
+                  ".pi/agent/AGENTS.md".source = piDir + "/AGENTS.md";
 
-                ".pi/agent/skills" = {
-                  source = userCfg.skills;
-                  recursive = true;
-                };
+                  ".pi/agent/skills" = {
+                    source = userCfg.skills;
+                    recursive = true;
+                  };
 
-                ".pi/agent/agents/explore.md".text = mkAgentFileText "explore";
-                ".pi/agent/agents/implement.md".text = mkAgentFileText "implement";
-                ".pi/agent/agents/review.md".text = mkAgentFileText "review";
-                ".pi/agent/agents/security-reviewer.md".text = mkAgentFileText "security-reviewer";
+                  ".pi/agent/themes" = {
+                    source = userCfg.themes;
+                    recursive = true;
+                  };
 
-                ".pi/agent/themes" = {
-                  source = userCfg.themes;
-                  recursive = true;
-                };
-
-                ".pi/agent/auth.json" = lib.mkIf (osConfig ? sops && osConfig.sops.templates ? "pi-auth.json") {
-                  source = config.lib.file.mkOutOfStoreSymlink osConfig.sops.templates."pi-auth.json".path;
-                };
-              };
+                  ".pi/agent/auth.json" = lib.mkIf (osConfig ? sops && osConfig.sops.templates ? "pi-auth.json") {
+                    source = config.lib.file.mkOutOfStoreSymlink osConfig.sops.templates."pi-auth.json".path;
+                  };
+                }
+                (lib.mapAttrs' (
+                  name: _:
+                  lib.nameValuePair ".pi/agent/agents/${name}.md" {
+                    text = mkAgentFileText name;
+                  }
+                ) agentConfigs)
+              ];
             };
           }
         )

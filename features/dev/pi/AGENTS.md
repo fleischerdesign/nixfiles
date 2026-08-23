@@ -142,7 +142,13 @@ You MUST delegate focused execution tasks to specialized Data Plane subagents EX
 ### 3. Review & Security Gate (`review` & `security-reviewer` Subagents)
 - **MANDATORY DELEGATION:** Before declaring any non-trivial task complete or committing code, spawn the `review` subagent (and `security-reviewer` if auth/trust boundaries are touched) to perform an independent audit of the diff (`primary` tier, medium/high reasoning).
 
-### 4. Lifecycle & Deterministic Status Protocol (NO POLLING LOOPS)
+### 4. Visual & Multimodal Analysis Gate (`vision` Subagent)
+- **STRICT PROHIBITION:** Do NOT attempt to reason directly over raw multimodal payloads or embed heavy visual assets in the main session control plane.
+- **MANDATORY DELEGATION:** For any image, screenshot, UI design mockup, architectural diagram, or visual asset inspection, you MUST spawn the `vision` subagent via `subagent({ agent: "vision", task: "..." })`.
+- **EXECUTION:** The `vision` subagent executes in an isolated multimodal context (`vision` tier, e.g. `xiaomi/mimo-v2.5`), extracts structured textual observations, UI hierarchy, OCR text, and visual defects, and returns this analysis back to the control plane.
+- **BENEFIT:** The main session (Control Plane) remains purely text-driven, ultra-fast, and cost-efficient while retaining comprehensive multimodal perception on demand.
+
+### 5. Lifecycle & Deterministic Status Protocol (NO POLLING LOOPS)
 - **SINGLE STATUS CHECK RULE:** When `subagent_wait` returns `attention required` or indicates a child status update, check the status ONCE using `subagent({ action: "status", id: "..." })`.
 - **NO REPETITIVE POLLING:** You MUST NOT call `subagent({ action: "status" })` repeatedly in a loop.
 - **DETERMINISTIC ACTION:**
