@@ -188,7 +188,7 @@ in
       };
       model = lib.mkOption {
         type = lib.types.str;
-        default = "deepseek/deepseek-chat";
+        default = "deepseek/deepseek-v4-flash";
         description = "Default model for Hermes Agent.";
       };
 
