@@ -142,11 +142,11 @@ in
               id = "deepseek/deepseek-v4-flash-0731";
               routing = {
                 order = [
+                  "Baidu"
                   "DeepInfra"
                   "StreamLake"
                   "Novita"
                 ];
-                ignore = [ "Baidu" ];
                 quantizations = [ "fp8" ];
                 allowFallbacks = true;
               };
@@ -386,10 +386,18 @@ in
         group = "users";
         mode = "0440";
         content = builtins.toJSON (
+          let
+            openRouterAliases = lib.genAttrs [
+              "openrouter-secondary"
+              "openrouter-tertiary"
+              "openrouter-vision"
+            ] (_: cfg.providers.openrouter);
+            allProviders = cfg.providers // lib.optionalAttrs (cfg.providers ? openrouter) openRouterAliases;
+          in
           lib.mapAttrs (_: p: {
             type = "api_key";
             key = p.apiKey;
-          }) cfg.providers
+          }) allProviders
         );
       };
     })
@@ -408,15 +416,41 @@ in
             userCfg = config.my.features.dev.pi;
             mcpServers = osConfig.my.features.dev.pi.mcpServers or { };
             getModelId = m: if builtins.isAttrs m then m.id else m;
-            getModelProvider =
+            getRawProvider =
               m: if builtins.isAttrs m && (m.provider or null != null) then m.provider else cfg.provider;
+
+            primaryRouting =
+              if builtins.isAttrs cfg.models.primary then cfg.models.primary.routing or null else null;
+
+            # Check if a non-primary tier requires a dedicated virtual openrouter provider
+            tierNeedsVirtualOpenRouter =
+              tierName:
+              if !(cfg.models ? ${tierName}) then
+                false
+              else
+                let
+                  tierSpec = cfg.models.${tierName};
+                  tierProv = getRawProvider tierSpec;
+                  tierRouting = if builtins.isAttrs tierSpec then tierSpec.routing or null else null;
+                in
+                tierName != "primary"
+                && tierProv == "openrouter"
+                && tierRouting != null
+                && tierRouting != primaryRouting;
+
+            getTierProvider =
+              tierName: m:
+              if tierNeedsVirtualOpenRouter tierName then "openrouter-${tierName}" else getRawProvider m;
+
             qualifyModel =
-              m:
+              tierName: m:
               let
                 id = getModelId m;
-                prov = getModelProvider m;
+                prov = getTierProvider tierName m;
+                rawProv = getRawProvider m;
+                cleanId = lib.removePrefix "${rawProv}/" id;
               in
-              if lib.hasPrefix "${prov}/" id then id else "${prov}/${id}";
+              "${prov}/${cleanId}";
 
             activePluginNames = lib.filter (name: cfg.plugins.${name}.enable or true) (
               lib.attrNames pluginsLib.packageDirs
@@ -430,19 +464,40 @@ in
               "fusion_validate"
             ];
 
-            openRouterOverrides = lib.listToAttrs (
+            openRouterOverrides =
+              let
+                primaryId = lib.removePrefix "openrouter/" (getModelId cfg.models.primary);
+              in
+              lib.optionalAttrs (getRawProvider cfg.models.primary == "openrouter" && primaryRouting != null) {
+                ${primaryId} = {
+                  compat = {
+                    openRouterRouting = {
+                      allow_fallbacks = primaryRouting.allowFallbacks;
+                    }
+                    // lib.optionalAttrs (primaryRouting.order != [ ]) { inherit (primaryRouting) order; }
+                    // lib.optionalAttrs (primaryRouting.ignore != [ ]) { inherit (primaryRouting) ignore; }
+                    // lib.optionalAttrs (primaryRouting.quantizations != [ ]) {
+                      inherit (primaryRouting) quantizations;
+                    };
+                  };
+                };
+              };
+
+            virtualTierProviders = lib.listToAttrs (
               lib.concatMap
                 (
-                  tier:
+                  tierName:
                   let
-                    id = getModelId tier;
-                    prov = getModelProvider tier;
-                    cleanId = lib.removePrefix "${prov}/" id;
-                    routing = if builtins.isAttrs tier then (tier.routing or null) else null;
+                    tierSpec = cfg.models.${tierName};
+                    routing = tierSpec.routing or null;
+                    cleanId = lib.removePrefix "openrouter/" (getModelId tierSpec);
                   in
-                  lib.optional (prov == "openrouter" && routing != null) {
-                    name = cleanId;
+                  lib.optional (tierNeedsVirtualOpenRouter tierName) {
+                    name = "openrouter-${tierName}";
                     value = {
+                      name = "OpenRouter (${tierName})";
+                      baseUrl = "https://openrouter.ai/api/v1";
+                      api = "openai-completions";
                       compat = {
                         openRouterRouting = {
                           allow_fallbacks = routing.allowFallbacks;
@@ -453,23 +508,31 @@ in
                           inherit (routing) quantizations;
                         };
                       };
+                      models = [
+                        {
+                          id = cleanId;
+                          name = "${cleanId} (${tierName})";
+                          api = "openai-completions";
+                        }
+                      ];
                     };
                   }
                 )
                 [
-                  cfg.models.primary
-                  cfg.models.secondary
-                  cfg.models.tertiary
-                  cfg.models.vision
+                  "secondary"
+                  "tertiary"
+                  "vision"
                 ]
             );
 
             modelsJsonContent = {
-              providers = lib.recursiveUpdate (lib.optionalAttrs (openRouterOverrides != { }) {
-                openrouter = {
-                  modelOverrides = openRouterOverrides;
-                };
-              }) cfg.customProviders;
+              providers = lib.recursiveUpdate (lib.recursiveUpdate (lib.optionalAttrs (openRouterOverrides != { })
+                {
+                  openrouter = {
+                    modelOverrides = openRouterOverrides;
+                  };
+                }
+              ) virtualTierProviders) cfg.customProviders;
             };
 
             baseSettings = {
@@ -483,21 +546,21 @@ in
               excludeTools = lib.optionals (!cfg.plugins.pi-background-tasks.enableFusion) fusionTools;
               subagents = lib.optionalAttrs cfg.plugins.subagents.enable {
                 disableBuiltins = true;
-                defaultModel = qualifyModel cfg.models.secondary;
+                defaultModel = qualifyModel "secondary" cfg.models.secondary;
                 maxDepth = cfg.plugins.subagents.config.maxDepth;
                 modelScope = {
                   enforce = true;
                   strict = true;
                   allow = lib.unique [
-                    (qualifyModel cfg.models.primary)
-                    (qualifyModel cfg.models.secondary)
-                    (qualifyModel cfg.models.tertiary)
-                    (qualifyModel cfg.models.vision)
-                    (qualifyModel "google/gemini-3.7-flash")
+                    (qualifyModel "primary" cfg.models.primary)
+                    (qualifyModel "secondary" cfg.models.secondary)
+                    (qualifyModel "tertiary" cfg.models.tertiary)
+                    (qualifyModel "vision" cfg.models.vision)
+                    (qualifyModel "fallback" "google/gemini-3.7-flash")
                   ];
                 };
                 agentOverrides = lib.mapAttrs (_: spec: {
-                  model = qualifyModel cfg.models.${spec.tier};
+                  model = qualifyModel spec.tier cfg.models.${spec.tier};
                   thinkingLevel = spec.thinkingLevel;
                 }) agentConfigs;
               };
@@ -523,7 +586,7 @@ in
                     tier = "secondary";
                     thinkingLevel = "low";
                   };
-                modelStr = qualifyModel cfg.models.${spec.tier};
+                modelStr = qualifyModel spec.tier cfg.models.${spec.tier};
                 thinkingStr = spec.thinkingLevel;
                 rawContent = builtins.readFile (piDir + "/agents/${name}.md");
                 # Remove existing top-level YAML frontmatter if present
@@ -541,9 +604,9 @@ in
                 bodyText = lib.concatStringsSep "\n" tailLines;
                 fallbackLine =
                   if spec ? fallbackTier then
-                    "fallbackModels:\n  - ${qualifyModel cfg.models.${spec.fallbackTier}}\n"
+                    "fallbackModels:\n  - ${qualifyModel spec.fallbackTier cfg.models.${spec.fallbackTier}}\n"
                   else if spec ? fallbackModel then
-                    "fallbackModels:\n  - ${qualifyModel spec.fallbackModel}\n"
+                    "fallbackModels:\n  - ${qualifyModel "fallback" spec.fallbackModel}\n"
                   else
                     "";
               in
