@@ -41,11 +41,13 @@ let
     explore = {
       tier = "tertiary";
       thinkingLevel = "low";
+      fallbackTier = "secondary";
       description = "Ultra-fast repository exploration and information gathering agent. Reads files, lists directories, and gathers code context.";
     };
     vision = {
       tier = "vision";
       thinkingLevel = "low";
+      fallbackModel = "google/gemini-3.7-flash";
       description = "Specialized visual and multimodal analysis agent. Inspects images, screenshots, diagrams, UI mockups, and visual artifacts to extract precise structured observations, text (OCR), layout details, and anomalies.";
     };
   };
@@ -466,7 +468,7 @@ in
 
             baseSettings = {
               defaultProvider = cfg.provider;
-              defaultModel = qualifyModel cfg.models.primary;
+              defaultModel = getModelId cfg.models.primary;
               defaultThinkingLevel = cfg.thinkingLevel;
               quietStartup = true;
               theme = cfg.theme;
@@ -480,7 +482,7 @@ in
                 modelScope = {
                   enforce = true;
                   strict = true;
-                  allow = [
+                  allow = lib.unique [
                     (qualifyModel cfg.models.primary)
                     (qualifyModel cfg.models.secondary)
                     (qualifyModel cfg.models.tertiary)
@@ -532,10 +534,10 @@ in
                     lines;
                 bodyText = lib.concatStringsSep "\n" tailLines;
                 fallbackLine =
-                  if spec.tier == "tertiary" then
-                    "fallbackModels:\n  - ${qualifyModel cfg.models.secondary}\n"
-                  else if spec.tier == "vision" then
-                    "fallbackModels:\n  - ${qualifyModel "google/gemini-3.7-flash"}\n"
+                  if spec ? fallbackTier then
+                    "fallbackModels:\n  - ${qualifyModel cfg.models.${spec.fallbackTier}}\n"
+                  else if spec ? fallbackModel then
+                    "fallbackModels:\n  - ${qualifyModel spec.fallbackModel}\n"
                   else
                     "";
               in
