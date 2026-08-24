@@ -74,6 +74,11 @@ let
                 default = [ ];
                 description = "Ordered provider preference for OpenRouter.";
               };
+              ignore = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = "Explicit list of providers to exclude from routing (e.g. ['Baidu']).";
+              };
               quantizations = lib.mkOption {
                 type = lib.types.listOf lib.types.str;
                 default = [ "fp8" ];
@@ -120,11 +125,11 @@ in
               id = "deepseek/deepseek-v4-flash-0731";
               routing = {
                 order = [
-                  "Baidu"
                   "DeepInfra"
                   "StreamLake"
                   "Novita"
                 ];
+                ignore = [ "Baidu" ];
                 quantizations = [ "fp8" ];
                 allowFallbacks = true;
               };
@@ -137,11 +142,11 @@ in
               id = "deepseek/deepseek-v4-flash-0731";
               routing = {
                 order = [
-                  "Baidu"
                   "DeepInfra"
                   "StreamLake"
                   "Novita"
                 ];
+                ignore = [ "Baidu" ];
                 quantizations = [ "fp8" ];
                 allowFallbacks = true;
               };
@@ -443,6 +448,7 @@ in
                           allow_fallbacks = routing.allowFallbacks;
                         }
                         // lib.optionalAttrs (routing.order != [ ]) { inherit (routing) order; }
+                        // lib.optionalAttrs (routing.ignore != [ ]) { inherit (routing) ignore; }
                         // lib.optionalAttrs (routing.quantizations != [ ]) {
                           inherit (routing) quantizations;
                         };
