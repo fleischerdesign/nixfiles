@@ -183,12 +183,12 @@ in
       enable = lib.mkEnableOption "Hermes Agent";
       provider = lib.mkOption {
         type = lib.types.str;
-        default = "openrouter";
+        default = "deepseek";
         description = "Default model provider for Hermes Agent.";
       };
       model = lib.mkOption {
         type = lib.types.str;
-        default = "deepseek/deepseek-v4-flash-0731";
+        default = "deepseek-v4-flash";
         description = "Default model for Hermes Agent.";
       };
 
@@ -343,6 +343,9 @@ in
         "hermes-webui.service"
       ];
       content = ''
+        ${lib.optionalString (config.sops.secrets ? "pi/deepseek")
+          "DEEPSEEK_API_KEY=${config.sops.placeholder."pi/deepseek"}"
+        }
         ${lib.optionalString (config.sops.secrets ? "pi/openrouter")
           "OPENROUTER_API_KEY=${config.sops.placeholder."pi/openrouter"}"
         }

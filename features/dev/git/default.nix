@@ -105,6 +105,7 @@ in
             config = lib.mkIf userCfg.enable {
               programs.git = {
                 enable = true;
+                ignores = [ ".pi/" ];
                 settings = {
                   user.name = userCfg.userName;
                   user.email = userCfg.userEmail;

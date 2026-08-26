@@ -14,23 +14,18 @@ Debugging is not patching. It is the application of the scientific method to a m
 - **Five Whys** (Toyota Production System): For each symptom, ask "why did this happen?" until you reach the root cause — typically 3-5 levels deep. Stop when the answer is a process failure, not a code failure (e.g., "no test covered this edge case" is a root cause; "the variable was null" is not).
 - **Reproduction is Everything**: A bug you cannot reproduce is a bug you cannot fix. Without reproduction, you are not debugging — you are speculating with a keyboard.
 
-## Prerequisite
-
-If the bug's location is unknown — you have an error message but don't know where it originates — load **`systematic-exploration`** first. Guessing the location wastes time; mapping the affected modules makes every subsequent step faster.
-
 ## Trigger
 
 Load this skill when:
 - A bug, crash, or unexpected behavior is reported
 - A test fails and the cause is not immediately obvious
-- Observed behavior diverges from specified behavior
+- Observed behavior diverges from expected behavior
 - The user says "it's broken," "this doesn't work," "bug," "error," "crash"
 - During any investigation where the system's behavior is surprising
 
-Do NOT load this skill when:
+Do NOT load this skill for:
 - The bug's cause is immediately visible from the error message and stack trace
 - The fix is trivial and obvious (typo, missing import, off-by-one with clear context)
-- You are in the implementation phase of a feature (use `tdd-discipline`)
 
 ## Process
 
@@ -150,7 +145,7 @@ Before declaring victory:
 
 4. Scan for SIMILAR patterns:
    - Does the same root cause exist elsewhere in the codebase?
-   - If yes: file an issue or fix the class of bugs, not just this instance
+   - If yes: fix the class of bugs, not just this instance
 ```
 
 ## Evidence
@@ -161,23 +156,15 @@ After completing this skill:
 - [ ] Hypothesis log (which hypotheses were tested, which was confirmed)
 - [ ] Root cause analysis (at least 3 Whys deep)
 - [ ] Regression test that proves the bug is fixed
-- [ ] Scan result for similar patterns (even if negative: "no similar patterns found in modules X, Y, Z")
+- [ ] Scan result for similar patterns
 
 ## Exit Gate
 
 Debugging is complete when:
 - The root cause is identified at the process/design level, not just the symptom level
 - A regression test exists that would have caught this bug
-- The fix address the root cause, not the symptom
+- The fix addresses the root cause, not the symptom
 - The full test suite passes
-
-## Handoff
-
-After this skill:
-- If the fix is non-trivial and the incident was significant: **`post-mortem`** → capture timeline, root cause chain, and workflow retrospective
-- If the fix is non-trivial but contained: **`spec-first`** → write a spec for the fix
-- If the fix is straightforward: **`tdd-discipline`** → test-first implementation of the fix
-- In all cases: **`code-review`** before merging the fix
 
 ## Anti-Patterns
 

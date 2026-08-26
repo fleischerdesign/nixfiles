@@ -73,16 +73,16 @@
       obsidian.enable = true;
     };
     auxiliary = {
-      vision.provider = "openrouter";
-      vision.model = "xiaomi/mimo-v2.5";
-      title_generation.provider = "openrouter";
-      title_generation.model = "deepseek/deepseek-v4-flash-0731";
-      compression.provider = "openrouter";
-      compression.model = "deepseek/deepseek-v4-flash-0731";
-      approval.provider = "openrouter";
-      approval.model = "deepseek/deepseek-v4-flash-0731";
-      web_extract.provider = "openrouter";
-      web_extract.model = "deepseek/deepseek-v4-flash-0731";
+      vision.provider = "deepseek";
+      vision.model = "deepseek-v4-flash-vision-exp";
+      title_generation.provider = "deepseek";
+      title_generation.model = "deepseek-v4-flash";
+      compression.provider = "deepseek";
+      compression.model = "deepseek-v4-flash";
+      approval.provider = "deepseek";
+      approval.model = "deepseek-v4-flash";
+      web_extract.provider = "deepseek";
+      web_extract.model = "deepseek-v4-flash";
     };
   };
 
@@ -102,6 +102,7 @@
 
   my.features.services.camofox.enable = true;
 
+  sops.secrets."pi/deepseek" = { };
   sops.secrets."pi/openrouter" = { };
 
   sops.secrets.hermes_ssh_key = {

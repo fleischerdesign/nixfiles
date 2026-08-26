@@ -23,16 +23,10 @@ Load this skill when:
 - A module's interface needs to change without breaking consumers
 - The user says "refactor," "clean up," "restructure," "extract," "simplify"
 - Technical debt is blocking development and needs reduction
-- After `systematic-exploration` reveals structural problems
 
 Do NOT load this skill for:
-- Greenfield code with a spec and full test coverage — use `tdd-discipline`
-- Changes that alter behavior — refactoring preserves behavior; if behavior must change, use `spec-first` first
+- Changes that alter behavior — refactoring preserves behavior; if behavior must change, plan the behavior change first
 - Trivial renames or formatting changes where the tool handles it automatically
-
-## Prerequisite
-
-Load **`systematic-exploration`** first if you have not yet mapped the code you intend to refactor. You must know the full dependency graph — callers, callees, tests, consumers — before touching structure.
 
 ## Process
 
@@ -143,24 +137,9 @@ After verification:
 ```
 1. Remove any test that was purely a characterization test and is now
    redundant with existing specification tests.
-2. Update any documentation or ADRs that reference changed module names.
-3. File a follow-up issue if deprecation warnings were introduced.
-4. Note in the commit: "Pure refactoring — no behavior change."
+2. Update any documentation that references changed module names.
+3. Note in the commit: "Pure refactoring — no behavior change."
 ```
-
-## Subagent Delegation
-
-For refactorings spanning 3+ modules, delegate to an `implement` subagent with strict scope:
-
-```
-task({
-  subagent_type: "implement",
-  prompt: "Perform refactoring only. No behavior change. Steps: [list of specific refactorings]. Characterization tests exist at [paths]. Safety net: [how to verify]. Out of scope: any behavior change, new features, cleanup beyond the specified refactorings.",
-  description: "Refactor [scope]"
-})
-```
-
-The subagent implements in its own session. Review with `code-review` skill and `review` subagent before merging. The parent verifies that `git diff -w` shows only structural changes.
 
 ## Evidence
 
@@ -179,13 +158,6 @@ Refactoring is complete when:
 - Every commit is a single named refactoring
 - The code is simpler — a new team member can explain the module in under 2 minutes
 - No "while I was here" changes crept in
-
-## Handoff
-
-After this skill:
-- **`spec-first`** — now that the code is clean, specification for new behavior
-- **`architecture-design`** — if the refactoring revealed structural issues the next step should address
-- **`code-review`** — always, before merging
 
 ## Anti-Patterns
 
