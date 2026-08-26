@@ -1,7 +1,7 @@
 {
   "name": "chrome-devtools-mcp",
-  "version": "1.7.0",
-  "srcHash": "sha256-iVczWGoOzhOEk3kMB+iwg7hXGx0gN6cxJDNNlo0QRtA=",
+  "version": "1.8.0",
+  "srcHash": "sha256-rAM0QQzqddEaXrtVX7sBOaSjlN412YzCo7wKlZ8ATN0=",
   "upstream": {
     "type": "npm",
     "package": "chrome-devtools-mcp"
