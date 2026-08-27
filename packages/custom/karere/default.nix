@@ -169,13 +169,16 @@ stdenv.mkDerivation (finalAttrs: {
 
   postInstall = ''
     mkdir -p "$out/lib/karere"
-    cp -rL "$CEF_PATH"/* "$out/lib/karere/"
-    mkdir -p "$out/bin"
-    ln -sfn "$out/lib/karere"/* "$out/bin/" 2>/dev/null || true
+    cp -a "$CEF_PATH"/Release/. "$out/lib/karere/"
+    cp -a "$CEF_PATH"/Resources/. "$out/lib/karere/"
   '';
 
   preFixup = ''
     patchelf --set-rpath "$out/lib/karere:${lib.makeLibraryPath finalAttrs.buildInputs}" "$out/bin/karere"
+    gappsWrapperArgs+=(
+      --set CEF_PATH "$out/lib/karere"
+      --prefix LD_LIBRARY_PATH : "$out/lib/karere"
+    )
   '';
 
   meta = with lib; {
