@@ -238,14 +238,14 @@ deploy .#<hostname>     # Remote via deploy-rs über Tailscale SSH
 
 SSH-Key: `~/.ssh/deploy-key` (User: `root`). Tailscale-IPs aus `my.features.system.networking.topology.hosts.<name>.tailscaleIp`.
 
-## opencode-Integration
+## pi-Integration
 
-Die opencode-Konfiguration wird als **generisches User-Scoped Feature** in `features/dev/opencode/default.nix` deklariert:
-- **Architecture**: `features/dev/opencode/default.nix` stellt das Feature per `home-manager.sharedModules` bereit und verlinkt native Home-Manager-Optionen (`programs.opencode.skills`, `agents`, `settings`).
-- **Aktivierung**: In den jeweiligen User-Modulen (`user/philipp/opencode.nix`, `user/hermes/home.nix`) via `my.features.dev.opencode.enable = true`.
-- **Scope**: Läuft agnostisch für jeden Home-Manager-User auf jedem Host (egal ob Desktop oder Server wie `rollins`).
-- **Source-Dateien**: Skills, Agents, Instructions liegen zentral unter `features/dev/opencode/` (Single Source of Truth).
-- **Secrets**: API-Keys (`auth.json`) werden transparent über die `osConfig.sops.templates."opencode-auth.json"` verlinkt, falls auf dem Host definiert.
+Die Pi coding-agent Konfiguration wird als **generisches Feature** in `features/dev/pi/default.nix` deklariert:
+- **Architecture**: `features/dev/pi/default.nix` stellt das Feature per `home-manager.sharedModules` bereit und bindet Plugin-Module dynamisch via `lib/plugins.nix` ein.
+- **Plugin-System**: Jedes Plugin in `features/dev/pi/plugins/<name>/` folgt dem 3-Dateien-Muster (`manifest.json` für Version/Hashes, `package.nix` für Derivation-Build, `module.nix` für NixOS/Home-Manager Optionen).
+- **Auto-Discovery**: `features/dev/pi/lib/plugins.nix` scannt dynamisch nach `package.nix` und `module.nix`, wodurch Plugins ohne manuelle Importlisten geladen werden.
+- **Aktivierung**: In den jeweiligen User-Modulen (`user/philipp/pi.nix`) via `my.features.dev.pi.enable = true`.
+- **Secrets**: Provider API-Keys werden transparent über `osConfig.sops.templates."pi-auth.json"` als Out-of-Store Symlink verlinkt.
 
 ## Custom Package Updater
 
@@ -254,3 +254,4 @@ nix run .#update-custom-packages [package-name|"all"]
 ```
 
 Liest `packages/custom/*/manifest.json`, prüft GitHub Releases auf neue Versionen, lädt AppImage herunter, berechnet SRI-Hash, updated manifest. Erfordert `GITHUB_TOKEN` für authentifizierte API-Calls.
+
