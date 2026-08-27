@@ -7,7 +7,7 @@
 # - Pure ReAct Engine: Direct execution, no subagent overhead, instant feedback loop.
 # - Official DeepSeek Default: Native DeepSeek API with prefix caching and deepseek-v4-flash.
 # - OpenRouter Optimization: Configurable provider ordering (Baidu, Wafer, Fireworks, DeepInfra) and FP8 quantization.
-# - Plugins: Auto-discovered + built via lib/plugins.nix.
+# - Plugins: Auto-discovered modules and packages via lib/plugins.nix.
 {
   config,
   lib,
@@ -20,6 +20,8 @@ let
   pluginsLib = import ./lib/plugins.nix { inherit lib pkgs; };
 in
 {
+  imports = (import ./lib/plugins.nix { inherit lib; }).modules;
+
   options.my.features.dev.pi = {
     enable = lib.mkEnableOption "system-wide Pi API secrets template";
 
@@ -116,93 +118,6 @@ in
     };
 
     plugins = {
-      mcp-adapter = {
-        enable = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Enable Model Context Protocol (MCP) adapter plugin.";
-        };
-        config = lib.mkOption {
-          type = lib.types.submodule {
-            options = {
-              mcpFooterStatus = lib.mkOption {
-                type = lib.types.enum [
-                  "full"
-                  "compact"
-                  "off"
-                ];
-                default = "off";
-                description = "Footer status indicator mode for pi-mcp-adapter.";
-              };
-              disableProxyTool = lib.mkOption {
-                type = lib.types.bool;
-                default = false;
-                description = "Hide the mcp proxy tool once direct tools are resolved.";
-              };
-            };
-          };
-          default = { };
-          description = "Native JSON configuration payload for pi-mcp-adapter.";
-        };
-      };
-
-      context-mode = {
-        enable = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Enable context trimming & summarization plugin.";
-        };
-        config = lib.mkOption {
-          type = lib.types.attrsOf lib.types.anything;
-          default = { };
-          description = "Native configuration payload for context-mode.";
-        };
-      };
-
-      web-access = {
-        enable = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Enable web fetch & search capabilities plugin.";
-        };
-        config = lib.mkOption {
-          type = lib.types.attrsOf lib.types.anything;
-          default = { };
-          description = "Native configuration payload for web-access.";
-        };
-      };
-
-      rpiv-todo = {
-        enable = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Enable persistent task-tree management plugin.";
-        };
-        config = lib.mkOption {
-          type = lib.types.attrsOf lib.types.anything;
-          default = { };
-          description = "Native configuration payload for rpiv-todo.";
-        };
-      };
-
-      pi-background-tasks = {
-        enable = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Enable durable background shell tasks & async process management plugin.";
-        };
-        enableFusion = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Enable multi-model Fusion consensus tools (fusion_investigate, fusion_reason, etc.). Default is false to keep tool surface clean.";
-        };
-        config = lib.mkOption {
-          type = lib.types.attrsOf lib.types.anything;
-          default = { };
-          description = "Native configuration payload for pi-background-tasks.";
-        };
-      };
-
       extraPlugins = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
@@ -321,8 +236,14 @@ in
               osConfig.my.features.dev.pi.settings or { }
             )) userCfg.settings;
 
+            mcpAdapterCfg = cfg.plugins.mcp-adapter;
+            mcpAdapterSettings = {
+              inherit (mcpAdapterCfg) mcpFooterStatus disableProxyTool;
+            }
+            // mcpAdapterCfg.extraConfig;
+
             mcpSettings = {
-              settings = cfg.plugins.mcp-adapter.config;
+              settings = mcpAdapterSettings;
               mcpServers = lib.mapAttrs (_: s: {
                 command = "${s.package}/bin/${s.binName}";
                 args = s.args;
