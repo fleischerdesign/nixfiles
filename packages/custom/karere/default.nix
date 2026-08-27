@@ -170,6 +170,8 @@ stdenv.mkDerivation (finalAttrs: {
   postInstall = ''
     mkdir -p "$out/lib/karere"
     cp -rL "$CEF_PATH"/* "$out/lib/karere/"
+    mkdir -p "$out/bin"
+    ln -sfn "$out/lib/karere"/* "$out/bin/" 2>/dev/null || true
   '';
 
   preFixup = ''
