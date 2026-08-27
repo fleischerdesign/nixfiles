@@ -1,0 +1,11 @@
+{
+  "name": "karere",
+  "version": "4.2.5",
+  "srcHash": "sha256-OK5KQH1BaEbbNEOrWZ69oqW2XqWKK/NDg586xcYgQdk=",
+  "cargoHash": "sha256-E4/cNIXy/7EZUHkYdDOVqnL3G1XYz0z9UG9/NbW11kc=",
+  "upstream": {
+    "type": "github-source",
+    "owner": "tobagin",
+    "repo": "karere"
+  }
+}

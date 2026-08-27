@@ -36,7 +36,7 @@ in
       nautilus
       gnome-disk-utility
       bluetuith
-      karere
+      custom.karere
       cameractrls-gtk4
       dbeaver-bin
     ];

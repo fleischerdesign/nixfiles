@@ -150,15 +150,27 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
     echo "  Current version: $current_version"
     echo "  Checking GitHub upstream: $owner/$repo..."
 
-    RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || {
-      echo "  ⚠️ Could not fetch latest release for $owner/$repo"
-      continue
-    }
+    RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || true
+    latest_tag=""
+    tarball_url=""
 
-    latest_tag="$(echo "$RELEASE_JSON" | jq -r '.tag_name // empty' | strip_v)"
+    if [ -n "$RELEASE_JSON" ]; then
+      tag_candidate="$(echo "$RELEASE_JSON" | jq -r '.tag_name // empty')"
+      if [[ "$tag_candidate" =~ ^v?[0-9]+\.[0-9]+ ]]; then
+        latest_tag="$(echo "$tag_candidate" | strip_v)"
+        tarball_url="$(echo "$RELEASE_JSON" | jq -r '.tarball_url // empty')"
+      fi
+    fi
 
     if [ -z "$latest_tag" ]; then
-      echo "  ⚠️ Could not parse latest release tag"
+      TAGS_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/tags")" || true
+      if [ -n "$TAGS_JSON" ]; then
+        latest_tag="$(echo "$TAGS_JSON" | jq -r '[.[].name | select(test("^v?[0-9]+\\.[0-9]+"))][0] // empty' | strip_v)"
+      fi
+    fi
+
+    if [ -z "$latest_tag" ]; then
+      echo "  ⚠️ Could not parse latest release or version tag"
       continue
     fi
 
