@@ -7,6 +7,14 @@
   ...
 }:
 
+let
+  # Decodes to the literal fish-source text "\${system}" (backslash dollar brace system closing
+  # brace). Built via concatenation so this module string never contains an active "${" that Nix
+  # would interpolate at config-build time. Inside tpl's double-quoted echo, fish then turns "\$"
+  # into "$", so the generated flake.nix ends up with the valid per-system interpolation "${system}".
+  sysRef = "\\" + "$" + "{system}";
+in
+
 {
   programs.fish = {
     enable = true;
@@ -98,11 +106,11 @@
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = nixpkgs.legacyPackages.{\$system};
+        pkgs = nixpkgs.legacyPackages.${sysRef};
       in
       {
         devShells = {
-          default = nix-$tpl_name.devShells.{\$system}.default;
+          default = nix-$tpl_name.devShells.${sysRef}.default;
         };
 
         formatter = pkgs.nixfmt-rfc-style;
