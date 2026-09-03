@@ -17,7 +17,7 @@ in
   config = lib.mkIf cfg.enable {
     home-manager.sharedModules = [
       {
-        programs.vscodium = {
+        programs.vscode = {
           enable = true;
           mutableExtensionsDir = false;
 
@@ -39,10 +39,11 @@ in
               svelte.svelte-vscode
               rust-lang.rust-analyzer
               ms-python.python
+              github.copilot-chat
             ];
             userSettings = {
               "workbench.experimental.modernUI" = true;
-              "extensions.autoUpdate" = false;
+              "extensions.autoUpdate" = "off";
               "git.confirmSync" = false;
               "git.autofetch" = true;
               "terminal.integrated.fontWeight" = "normal";
@@ -73,14 +74,16 @@ in
               "nix.enableLanguageServer" = true;
               "nix.serverPath" = "nil";
               "nix.formatterPath" = "nixfmt";
-              "dart.renameFilesWithClasses" = "prompt";
-              "dart.previewFlutterUiGuides" = true;
 
               "chat.agent.enabled" = true;
+              "chat.agentHost.byokModels.enabled" = true;
 
               "redhat.telemetry.enabled" = false;
 
               "editor.formatOnSave" = true;
+
+              "editor.inlineSuggest.enabled" = true;
+              "chat.commandCenter.enabled" = true;
             };
           };
         };

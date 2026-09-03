@@ -28,6 +28,8 @@
 
   my.features.dev.pi = {
     enable = true;
+    provider = "openrouter";
+    defaultModel = "meta/muse-spark-1.3-contributor";
     providers = {
       deepseek.apiKey = config.sops.placeholder."pi/deepseek";
       openrouter.apiKey = config.sops.placeholder."pi/openrouter";
