@@ -34,6 +34,18 @@ const integrity = {
     "sha512-180/xGJtsq7IoR3p9EKWjRd0e9M4DkxInhlo9xyD7prDC7Qrhqq+nhvwrW0lFjPfXcEI2FSHmGCSyvSJE9GsaQ==",
   "@earendil-works/pi-tui@0.84.1":
     "sha512-udeXFbgEhJ6JiB0uguwNVNkDy2FENfmtQwPcY+/iJ8GWeq18wkal1tKqa5YyeH0IqtX1vG0cGh8zfSYzyzVuLA==",
+  "@earendil-works/pi-agent-core@0.84.4":
+    "sha512-HyUnjaOXj6oN/6SNcr8A1J/ElRQA50FtIE0XUTSKAQVqmdlb9qdojOyUQwF/jULE5+yOEtGuVgi/N1RnBiNG+g==",
+  "@earendil-works/pi-ai@0.84.4":
+    "sha512-AClAZxf5+c4RRu44NJPS6wyQy+Nmq+Mzyyrdvm4ZVMNuixelO02RZX4G4Aq1F145Yzp43wnM5S+hLlSI7ypfVw==",
+  "@earendil-works/pi-client@0.84.4":
+    "sha512-q398WY/3ZQHTizk7IKxApzqFV0xt4yM9LkSkwyqeLK5Bj5RwRjOWxESt26z4LgNp4O+8hqhqFPf/8fj4H5rE4A==",
+  "@earendil-works/pi-protocol@0.84.4":
+    "sha512-acyE9ozxkMiWiz/xyWpU0O9vwnYv0hyG889Vniv6Sg9c9zfsX+8MePnDNphBacY2Fvm1rxdsGmiVDSZl9yuDFA==",
+  "@earendil-works/pi-telemetry@0.84.4":
+    "sha512-8e2CuxM+ht+hedQXTZmi5JVl6/xDK9RpSDL2+MbITevKYQhMZ/z6lJOTFgox3HQyGxO8mOZEtYGVeQNaD4OzqA==",
+  "@earendil-works/pi-tui@0.84.4":
+    "sha512-nPUnwDkLtupPXnZQYrCwPFcuTydCDqTY6ZbFqhsL4S4kVq0AT418kPa/6uXwtaCD+MjBNBltb7ScTYX65yeE1w==",
 };
 
 const file = process.argv[2];
@@ -45,6 +57,8 @@ if (!file) {
 const lock = JSON.parse(readFileSync(file, "utf8"));
 let fixed = 0;
 for (const [key, entry] of Object.entries(lock.packages ?? {})) {
+  // Nested paths included: npm may hoist copies under another package's
+  // node_modules (e.g. node_modules/.../pi-coding-agent/node_modules/@earendil-works/pi-ai).
   const name = key.match(/node_modules\/(@earendil-works\/[^/]+)$/)?.[1];
   if (!name || entry.integrity || !entry.resolved) continue;
 

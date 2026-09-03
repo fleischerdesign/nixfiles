@@ -9,8 +9,37 @@
 #   github-source    — GitHub Release, rebuild from source tarball
 #   github-rev       — Pinned to a git commit, tracks default branch HEAD
 #   pypi             — PyPI package, single or multi-package manifests
+#   obsidian-plugin  — GitHub Release assets (main.js, manifest.json, styles.css)
+#   npm              — Package published to the npm registry (tarball as source)
+#
+# npm-based packages (npm type, or github-rev with npmDepsHash) get their
+# vendored package-lock.json regenerated and npmDepsHash recalculated
+# automatically via refresh_npm_lockfile.
 
 set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Temp-dir registry with trap cleanup (robust against aborts/interrupts).
+# ---------------------------------------------------------------------------
+
+TMP_DIRS=()
+
+# Assigns a new tracked temp dir to the named variable (nameref, no subshell:
+# command substitution would lose the TMP_DIRS append in the child shell).
+mk_tmp_dir() {
+  local -n _mk_ref="$1"
+  _mk_ref="$(mktemp -d)"
+  TMP_DIRS+=("$_mk_ref")
+}
+
+cleanup_tmp_dirs() {
+  local _dir
+  for _dir in ${TMP_DIRS[@]+"${TMP_DIRS[@]}"}; do
+    [ -n "$_dir" ] && [ -d "$_dir" ] && rm -rf "$_dir"
+  done
+}
+
+trap cleanup_tmp_dirs EXIT
 
 if [ -d "$PWD/packages/custom" ]; then
   REPO_ROOT="$PWD"
@@ -49,6 +78,79 @@ pypi_api() {
 
 strip_v() {
   sed 's/^v//'
+}
+
+# ---------------------------------------------------------------------------
+# refresh_npm_lockfile <pkg_dir> <tarball_url>
+#
+# Regenerates the vendored package-lock.json in <pkg_dir> from <tarball_url>
+# and recalculates npmDepsHash in the adjacent manifest.json.
+#
+# Strategy: strict peer resolution first (complete tree, incl. peer deps
+# the runtime may import). Falls back to --legacy-peer-deps only when strict
+# resolution fails (then warns, since the tree may be incomplete). Respects
+# per-package extra flags from manifest.json .upstream.npmFlags (JSON array).
+# Requires: npm, nix (prefetch-npm-deps via nix run).
+# Returns 0 on success, 1 when the lockfile could not be regenerated
+# (manifest keeps its previous npmDepsHash in that case).
+# ---------------------------------------------------------------------------
+refresh_npm_lockfile() {
+  local _pkg_dir="$1"
+  local _tarball_url="$2"
+  local _manifest_path="$_pkg_dir/manifest.json"
+  local _lockfile="$_pkg_dir/package-lock.json"
+  local _work_dir
+  mk_tmp_dir _work_dir
+
+  echo "  📦 Regenerating lockfile from $_tarball_url..."
+  if ! curl -sfL "$_tarball_url" | tar -xz -C "$_work_dir" --strip-components=1 2>/dev/null; then
+    echo "  ⚠️ Could not download/extract tarball for lockfile regeneration. Keeping previous lockfile."
+    return 1
+  fi
+
+  local _extra_flags=""
+  _extra_flags="$(jq -r '(.upstream.npmFlags // []) | join(" ")' "$_manifest_path" 2>/dev/null || true)"
+
+  local _resolution_ok=0
+  if (cd "$_work_dir" && npm install --package-lock-only --ignore-scripts $_extra_flags 2>/dev/null); then
+    _resolution_ok=1
+  elif (cd "$_work_dir" && npm install --package-lock-only --ignore-scripts --legacy-peer-deps $_extra_flags 2>/dev/null); then
+    echo "  ⚠️ Strict peer resolution failed, fell back to --legacy-peer-deps (tree may be incomplete)."
+    _resolution_ok=1
+  fi
+
+  if [ "$_resolution_ok" -ne 1 ] || [ ! -f "$_work_dir/package-lock.json" ]; then
+    echo "  ⚠️ Could not regenerate lockfile. Keeping previous lockfile and npmDepsHash."
+    return 1
+  fi
+
+  # Same integrity fix the Nix build applies (features/dev/pi/lib/plugins.nix
+  # mkSrc fixIntegrity): upstream trees omit `integrity` for nested
+  # @earendil-works/pi-* entries, which makes prefetch-npm-deps reject the
+  # lockfile. The fix script lives next to the package when vendored.
+  local _fix_script="$_pkg_dir/fix-integrity.mjs"
+  if [ ! -f "$_fix_script" ]; then
+    _fix_script="$REPO_ROOT/features/dev/pi/lib/fix-pi-integrity.mjs"
+  fi
+  if [ -f "$_fix_script" ]; then
+    (cd "$_work_dir" && node "$_fix_script" package-lock.json 2>/dev/null) || true
+  fi
+
+  echo "  📦 Calculating npmDepsHash via prefetch-npm-deps..."
+  local _new_npm_hash
+  _new_npm_hash="$( (cd "$_work_dir" && nix run nixpkgs#prefetch-npm-deps -- package-lock.json 2>/dev/null) | tail -n 1 || true)"
+  if [[ "$_new_npm_hash" != sha256-* ]]; then
+    echo "  ⚠️ Could not auto-calculate npmDepsHash (missing integrity in lockfile). Keeping previous hash."
+    return 1
+  fi
+
+  cp "$_work_dir/package-lock.json" "$_lockfile"
+  local _tmp_man
+  _tmp_man="$(mktemp)"
+  jq --arg hash "$_new_npm_hash" '.npmDepsHash = $hash' "$_manifest_path" > "$_tmp_man"
+  mv "$_tmp_man" "$_manifest_path"
+  echo "  ✨ Regenerated lockfile and npmDepsHash: $_new_npm_hash"
+  return 0
 }
 
 echo "🔍 Checking custom packages for upstream updates..."
@@ -260,17 +362,18 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
     mv "$tmp_manifest" "$manifest_path"
 
     # Auto-inspect source tarball for version updates & npmDepsHash
-    tmp_src="$(mktemp -d)"
-    if curl -sfL "$tarball_url" | tar -xz -C "$tmp_src" --strip-components=1 2>/dev/null; then
+    local tmp_rev_src
+    mk_tmp_dir tmp_rev_src
+    if curl -sfL "$tarball_url" | tar -xz -C "$tmp_rev_src" --strip-components=1 2>/dev/null; then
       # 1. Check for version in pyproject.toml or package.json
       extracted_version=""
-      if [ -f "$tmp_src/pyproject.toml" ]; then
-        extracted_version="$(python3 -c "import tomllib; print(tomllib.load(open('$tmp_src/pyproject.toml', 'rb')).get('project', {}).get('version', ''))" 2>/dev/null || true)"
+      if [ -f "$tmp_rev_src/pyproject.toml" ]; then
+        extracted_version="$(python3 -c "import tomllib; print(tomllib.load(open('$tmp_rev_src/pyproject.toml', 'rb')).get('project', {}).get('version', ''))" 2>/dev/null || true)"
         if [ -z "$extracted_version" ]; then
-          extracted_version="$(grep -m1 '^version' "$tmp_src/pyproject.toml" 2>/dev/null | cut -d'"' -f2 || true)"
+          extracted_version="$(grep -m1 '^version' "$tmp_rev_src/pyproject.toml" 2>/dev/null | cut -d'"' -f2 || true)"
         fi
-      elif [ -f "$tmp_src/package.json" ]; then
-        extracted_version="$(jq -r '.version // empty' "$tmp_src/package.json" 2>/dev/null || true)"
+      elif [ -f "$tmp_rev_src/package.json" ]; then
+        extracted_version="$(jq -r '.version // empty' "$tmp_rev_src/package.json" 2>/dev/null || true)"
       fi
 
       if [ -n "$extracted_version" ] && [ "$(jq -r '.version // empty' "$manifest_path")" != "" ]; then
@@ -282,9 +385,9 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
       # 2. Auto-calculate npmDepsHash if field exists
       if jq -e 'has("npmDepsHash")' "$manifest_path" >/dev/null 2>&1; then
-        if [ -f "$tmp_src/package-lock.json" ]; then
+        if [ -f "$tmp_rev_src/package-lock.json" ]; then
           echo "  📦 Calculating npmDepsHash via prefetch-npm-deps..."
-          new_npm_hash="$( (cd "$tmp_src" && nix run nixpkgs#prefetch-npm-deps -- package-lock.json 2>/dev/null) | tail -n 1 || true)"
+          new_npm_hash="$( (cd "$tmp_rev_src" && nix run nixpkgs#prefetch-npm-deps -- package-lock.json 2>/dev/null) | tail -n 1 || true)"
           if [[ "$new_npm_hash" == sha256-* ]]; then
             echo "  ✨ Auto-calculated npmDepsHash: $new_npm_hash"
             tmp_man="$(mktemp)"
@@ -297,10 +400,12 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
             # integrity fix (fix-pi-integrity.mjs) before prefetch-npm-deps succeeds.
             echo "  ⚠️ Could not auto-calculate npmDepsHash (missing integrity or lockfile). Keeping previous hash."
           fi
+        else
+          # Tarball ships no lockfile: regenerate one from the new tarball.
+          refresh_npm_lockfile "$pkg_dir" "$tarball_url" || true
         fi
       fi
     fi
-    rm -rf "$tmp_src"
 
     echo "  ✨ Updated $pkg_name to commit ${latest_commit:0:12}"
 
@@ -533,7 +638,12 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
        '.version = $ver | .srcHash = $hash' \
        "$manifest_path" > "$tmp_manifest"
     mv "$tmp_manifest" "$manifest_path"
-    echo "  ✨ Updated $pkg_name to $latest_version (vendored lockfile + npmDepsHash may need manual regeneration)"
+    echo "  ✨ Updated $pkg_name to $latest_version"
+
+    # Regenerate vendored lockfile + npmDepsHash when the manifest tracks them.
+    if jq -e 'has("npmDepsHash")' "$manifest_path" >/dev/null 2>&1; then
+      refresh_npm_lockfile "$pkg_dir" "$tarball_url" || true
+    fi
 
   # =========================================================================
   # Unknown type

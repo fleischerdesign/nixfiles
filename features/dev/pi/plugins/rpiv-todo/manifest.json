@@ -1,8 +1,8 @@
 {
   "name": "@juicesharp/rpiv-todo",
-  "version": "2.6.1",
-  "srcHash": "sha256-iLdR5P+D5rDHETrUw64GfLP2cTA6lmlEOaiqMjKOSEI=",
-  "npmDepsHash": "sha256-9hTPc+5zeo/6m0VLaEUjlN+4OhW/J7zIsXkrWp+fT/4=",
+  "version": "2.9.0",
+  "srcHash": "sha256-OTEF+deOO+q9yKJGIXUeu7ZzbO9H5tMukZ6un6hlJVU=",
+  "npmDepsHash": "sha256-Iu8AN2bFETGBsudVoo5dA4TG0qaLwFsdWVAWl9hrb4Y=",
   "upstream": {
     "type": "npm",
     "package": "@juicesharp/rpiv-todo"

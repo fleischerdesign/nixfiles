@@ -125,6 +125,7 @@
               curl
               jq
               nix
+              nodejs
               coreutils
               gnused
               findutils
