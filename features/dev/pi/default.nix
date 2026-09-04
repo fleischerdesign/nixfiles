@@ -56,7 +56,7 @@ in
           };
           quantizations = lib.mkOption {
             type = lib.types.listOf lib.types.str;
-            default = [ "fp8" ];
+            default = [ ];
             description = "Allowed quantizations (e.g. ['fp8'], ['fp8' 'bf16']).";
           };
           allowFallbacks = lib.mkOption {
