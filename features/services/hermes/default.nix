@@ -382,6 +382,11 @@ in
         ExecStart = "${corePackage}/bin/hermes gateway ${lib.escapeShellArgs config.services.hermes-agent.extraArgs}";
         Restart = "always";
         RestartSec = 5;
+        UMask = "0007";
+        ExecStartPre = [
+          "${pkgs.coreutils}/bin/chmod 2770 ${hermesHome}"
+          "${pkgs.coreutils}/bin/chmod -R g+rwX ${hermesHome}"
+        ];
         Environment = lib.mapAttrsToList (k: v: "${k}=${v}") config.services.hermes-agent.environment;
         EnvironmentFile = map builtins.toString config.services.hermes-agent.environmentFiles;
         WorkingDirectory = cfg.workingDirectory;
