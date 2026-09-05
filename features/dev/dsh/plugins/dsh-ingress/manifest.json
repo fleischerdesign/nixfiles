@@ -1,0 +1,6 @@
+{
+  "name": "dsh-ingress",
+  "version": "0.1.0",
+  "bundle": "dsh-ingress",
+  "description": "CloudEvents v1.0 reactive event ingress gateway with HMAC verification and sliding-window debouncing"
+}
