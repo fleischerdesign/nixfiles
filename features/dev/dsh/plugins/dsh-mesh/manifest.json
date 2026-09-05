@@ -1,0 +1,6 @@
+{
+  "name": "dsh-mesh",
+  "version": "0.1.0",
+  "bundle": "dsh-mesh",
+  "description": "Distributed peer-to-peer mesh synchronization with CvRDT state-based gossip and fail-closed leases"
+}

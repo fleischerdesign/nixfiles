@@ -501,9 +501,26 @@ in
               ]) topologyHosts
             );
 
+            currentHost = osConfig.networking.hostName or "unknown";
+            meshPeers = lib.flatten (
+              lib.mapAttrsToList (
+                hostname: host:
+                lib.optional (hostname != currentHost && host.tailscaleIp != null) {
+                  id = hostname;
+                  endpoint = "${host.tailscaleIp}:3891";
+                  tags = [ (host.hostType or "client") ];
+                }
+              ) topologyHosts
+            );
+
             pluginConfigs = {
               "dsh-memory" = {
                 facts = topologyFacts;
+              };
+              "dsh-mesh" = {
+                nodeId = currentHost;
+                listenPort = 3891;
+                peers = meshPeers;
               };
             };
 

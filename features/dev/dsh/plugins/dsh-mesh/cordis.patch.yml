@@ -1,0 +1,5 @@
+patch:
+  - id: dsh-mesh
+    insert:
+      after: dsh-base
+    plugin: dsh-mesh
