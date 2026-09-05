@@ -22,12 +22,19 @@ declare module '@deepseek-ai/cordis' {
     webServer: any;
     connection?: any;
     tools?: any;
+    llm?: any;
   }
+}
+
+interface TokenBucketState {
+  balanceEur: number;
+  lastRefillTimestamp: number;
 }
 
 export class IdentityAuthGatewayService extends Service {
   private strategies: AuthStrategy[] = [];
   private signingSecret: Buffer;
+  private tokenBuckets = new Map<string, TokenBucketState>();
 
   constructor(ctx: Context, private config: AuthPluginConfig) {
     super(ctx, 'auth');
@@ -48,6 +55,9 @@ export class IdentityAuthGatewayService extends Service {
 
     // Enforce Lattice-Based Access Control (LBAC) on tool execution
     this.enforceLbacToolPolicy();
+
+    // Enforce Quota & Budget Enforcement (Token-Bucket Theory)
+    this.enforceTokenBucketQuota();
   }
 
   private resolveSigningSecret(): Buffer {
@@ -82,20 +92,68 @@ export class IdentityAuthGatewayService extends Service {
   }
 
   async authenticateRequest(req: IncomingMessage): Promise<UserIdentity | null> {
+    // 1. Try strategy authentication first (Header, JWT, PeerMesh, Loopback)
     const remoteIp = req.socket.remoteAddress?.replace(/^.*:/, '') || '127.0.0.1';
-
     for (const strategy of this.strategies) {
       if (strategy.canHandle(req, remoteIp)) {
         const identity = await strategy.authenticate(req, remoteIp);
         if (identity) return identity;
       }
     }
+
+    // 2. Try restoring identity from validated session cookie
+    const cookieIdentity = this.extractIdentityFromCookie(req);
+    if (cookieIdentity) {
+      return cookieIdentity;
+    }
+
+    return null;
+  }
+
+  private extractIdentityFromCookie(req: IncomingMessage): UserIdentity | null {
+    const hostHeader = req.headers['host'] || '127.0.0.1:3080';
+    let authority: string;
+    try {
+      authority = new URL(`http://${hostHeader}`).host;
+    } catch {
+      authority = hostHeader;
+    }
+
+    const cookieName = 'dsh-auth-' + this.encodeBase64Url(crypto.createHash('sha256').update(authority).digest());
+    const cookieHeader = req.headers['cookie'] || '';
+    if (!cookieHeader) return null;
+
+    const cookies = cookieHeader.split(';').map(c => c.trim());
+    for (const cookie of cookies) {
+      if (cookie.startsWith(`${cookieName}=`)) {
+        const rawValue = cookie.slice(cookieName.length + 1);
+        const parts = rawValue.split('.');
+        if (parts.length === 3 && parts[0] === 'v1') {
+          const body = parts[1];
+          const sig = parts[2];
+          const expectedSig = this.encodeBase64Url(
+            crypto.createHmac('sha256', this.signingSecret).update(body).digest()
+          );
+
+          if (sig === expectedSig) {
+            try {
+              const decodedJson = Buffer.from(body, 'base64url').toString('utf8');
+              const payload = JSON.parse(decodedJson);
+              const now = Date.now();
+              if (payload.expiresAt && payload.expiresAt > now && payload.identity) {
+                return payload.identity;
+              }
+            } catch {
+              // Corrupted cookie body
+            }
+          }
+        }
+      }
+    }
     return null;
   }
 
   private interceptWebServer(): void {
-    // Wrap webServer route dispatch to automatically mint the dsh-auth session cookie
-    // when a trusted identity is present, completely removing the 401 loopback / proxy barrier.
     const originalRegister = this.ctx.webServer.register.bind(this.ctx.webServer);
     const self = this;
 
@@ -107,8 +165,8 @@ export class IdentityAuthGatewayService extends Service {
           // Attach tenant identity to cordis context
           self.ctx.tenant = identity;
 
-          // Auto-mint session cookie if absent so upstream frontend-static & connection are satisfied
-          self.ensureSessionCookie(req, res);
+          // Auto-mint session cookie if absent or renew with full tenant identity
+          self.ensureSessionCookie(req, res, identity);
         }
         return originalHandler(req, res);
       };
@@ -116,7 +174,7 @@ export class IdentityAuthGatewayService extends Service {
     };
   }
 
-  private ensureSessionCookie(req: IncomingMessage, res: ServerResponse): void {
+  private ensureSessionCookie(req: IncomingMessage, res: ServerResponse, identity?: UserIdentity): void {
     const hostHeader = req.headers['host'] || '127.0.0.1:3080';
     let authority: string;
     try {
@@ -127,14 +185,24 @@ export class IdentityAuthGatewayService extends Service {
     const cookieName = 'dsh-auth-' + this.encodeBase64Url(crypto.createHash('sha256').update(authority).digest());
 
     const existingCookies = req.headers['cookie'] || '';
+    // If cookie is absent or if we need to embed identity
     if (!existingCookies.includes(cookieName)) {
       const issuedAt = Date.now();
-      const expiresAt = issuedAt + 30 * 24 * 60 * 60 * 1000;
+      const expiresAt = issuedAt + (this.config.sessionTtlDays || 30) * 24 * 60 * 60 * 1000;
+      const resolvedIdentity: UserIdentity = identity || {
+        id: `usr_local`,
+        username: 'local',
+        groups: ['wheel'],
+        clearance: 'Admin',
+        provider: 'loopback'
+      };
+
       const payload = {
         version: 1,
         authority,
         issuedAt,
-        expiresAt
+        expiresAt,
+        identity: resolvedIdentity
       };
       const body = this.encodeBase64Url(Buffer.from(JSON.stringify(payload), 'utf8'));
       const sig = crypto.createHmac('sha256', this.signingSecret).update(body).digest();
@@ -144,7 +212,8 @@ export class IdentityAuthGatewayService extends Service {
       req.headers['cookie'] = existingCookies ? `${existingCookies}; ${cookieName}=${cookieValue}` : `${cookieName}=${cookieValue}`;
 
       // Set cookie on response for browser persistence
-      const cookieHeader = `${cookieName}=${cookieValue}; Max-Age=2592000; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Strict`;
+      const maxAge = (this.config.sessionTtlDays || 30) * 86400;
+      const cookieHeader = `${cookieName}=${cookieValue}; Max-Age=${maxAge}; Path=/; Expires=${new Date(expiresAt).toUTCString()}; HttpOnly; SameSite=Strict`;
       const prevSetCookie = res.getHeader('set-cookie');
       if (prevSetCookie) {
         const list = Array.isArray(prevSetCookie) ? prevSetCookie : [String(prevSetCookie)];
@@ -173,6 +242,9 @@ export class IdentityAuthGatewayService extends Service {
               return true;
             }
           }
+          if (self.extractIdentityFromCookie(req)) {
+            return true;
+          }
           return originalAuthorizeIndex(req, res);
         };
       }
@@ -186,6 +258,9 @@ export class IdentityAuthGatewayService extends Service {
               return undefined; // Authorized!
             }
           }
+          if (self.extractIdentityFromCookie(req)) {
+            return undefined; // Valid session cookie!
+          }
           return originalRequestRejection(req);
         };
       }
@@ -193,8 +268,6 @@ export class IdentityAuthGatewayService extends Service {
       const originalAuthenticatedUrl = conn.authenticatedUrl?.bind(conn);
       if (originalAuthenticatedUrl) {
         conn.authenticatedUrl = (baseUrl: string) => {
-          // When dsh-auth provides transparent strategy authentication (loopback / forward-proxy),
-          // return clean baseUrl without leaking or requiring the ?token= query parameter!
           const url = new URL(baseUrl);
           url.pathname = '/';
           url.search = '';
@@ -240,7 +313,7 @@ export class IdentityAuthGatewayService extends Service {
     this.ctx.inject(['tools'], (toolsCtx: any) => {
       toolsCtx.tools.on('tools/pre-execute', async function(exec: any, next: () => Promise<any>) {
         const tenant = self.ctx.tenant;
-        const clearance: ClearanceLevel = tenant?.clearance || 'Admin'; // Default to Admin for local loopback / unauthenticated local dev
+        const clearance: ClearanceLevel = tenant?.clearance || 'Admin'; // Default to Admin for local loopback
 
         const toolName = exec.name;
 
@@ -270,6 +343,86 @@ export class IdentityAuthGatewayService extends Service {
         }
 
         return next();
+      });
+    });
+  }
+
+  /**
+   * Enforce Deterministic Leaky Token-Bucket Budget Algorithm (Section 4):
+   *
+   *   B_u(t) = min(C_max, B_u(t_0) + rho * (t - t_0)) - Cost(turn)
+   *
+   * Fail-Closed Invariant:
+   *   Before dispatching a prompt to any upstream LLM adapter:
+   *   if B_u(t) <= 0 => Deny request with BudgetExceededException before opening network connection.
+   */
+  private enforceTokenBucketQuota(): void {
+    const self = this;
+
+    // Default quota policy per clearance:
+    // Admin: Unbounded (null)
+    // Member: C_max = 15.0 EUR, rho = 15.0 / 30 days = ~5.78e-6 EUR/s
+    // Restricted: C_max = 5.0 EUR, rho = 5.0 / 30 days = ~1.93e-6 EUR/s
+    const DEFAULT_CAPS: Record<ClearanceLevel, { max: number; refill: number } | null> = {
+      Admin: null,
+      Member: { max: 15.0, refill: 15.0 / (30 * 86400) },
+      Restricted: { max: 5.0, refill: 5.0 / (30 * 86400) }
+    };
+
+    this.ctx.inject(['llm'], (llmCtx: any) => {
+      llmCtx.llm.on('llm/pre-request', async function(request: any, next: () => Promise<any>) {
+        const tenant = self.ctx.tenant;
+        const clearance: ClearanceLevel = tenant?.clearance || 'Admin';
+        const tenantId = tenant?.id || 'usr_local';
+
+        const configuredQuota = self.config.quotas?.[clearance];
+        const defaultCap = DEFAULT_CAPS[clearance];
+
+        // If unbounded (Admin), permit immediately
+        if (!configuredQuota && defaultCap === null) {
+          return next();
+        }
+
+        const maxBudget = configuredQuota?.maxBudgetEur ?? defaultCap?.max ?? 15.0;
+        const refillRate = configuredQuota?.refillRatePerSec ?? defaultCap?.refill ?? (maxBudget / (30 * 86400));
+
+        const now = Date.now();
+        let bucket = self.tokenBuckets.get(tenantId);
+        if (!bucket) {
+          bucket = {
+            balanceEur: maxBudget,
+            lastRefillTimestamp: now
+          };
+          self.tokenBuckets.set(tenantId, bucket);
+        } else {
+          // Refill tokens: delta_t * rho
+          const elapsedSec = (now - bucket.lastRefillTimestamp) / 1000;
+          if (elapsedSec > 0) {
+            bucket.balanceEur = Math.min(maxBudget, bucket.balanceEur + (refillRate * elapsedSec));
+            bucket.lastRefillTimestamp = now;
+          }
+        }
+
+        // Fail-Closed Invariant: check worst-case cost margin before model call
+        const ESTIMATED_MIN_COST_EUR = 0.0005; // 0.05 cent safety margin
+        if (bucket.balanceEur < ESTIMATED_MIN_COST_EUR) {
+          const err = new Error(
+            `BudgetExceededException: Tenant "${tenantId}" (${clearance}) token-bucket balance (${bucket.balanceEur.toFixed(4)} €) is depleted. Spending ceiling C_max = ${maxBudget} €.`
+          );
+          (err as any).code = 'BUDGET_EXCEEDED';
+          throw err;
+        }
+
+        const response = await next();
+
+        // Deduct actual cost post-request if meter data is available
+        const promptTokens = response?.usage?.promptTokens || request?.messages?.length * 100 || 100;
+        const completionTokens = response?.usage?.completionTokens || 100;
+        // Approximation: ~0.14 € per 1M prompt tokens, ~0.28 € per 1M completion tokens (DeepSeek v3)
+        const costEur = (promptTokens * 0.00000014) + (completionTokens * 0.00000028);
+        bucket.balanceEur = Math.max(0, bucket.balanceEur - costEur);
+
+        return response;
       });
     });
   }

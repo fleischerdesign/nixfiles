@@ -58,13 +58,31 @@ export interface PeerMeshAuthConfig {
   allowedTimeDriftMs?: number; // Default: 10000 (10s)
 }
 
+export interface TenantQuotaConfig {
+  maxBudgetEur?: number;      // Monthly cap C_max in EUR (e.g. 15.0 for Member, 5.0 for Restricted)
+  refillRatePerSec?: number;  // Refill rate rho in EUR/sec
+}
+
 export interface AuthPluginConfig {
   mode?: 'forward-proxy' | 'oidc' | 'ldap' | 'loopback-only' | 'auto';
   sessionCookieName?: string;
   sessionTtlDays?: number;
+  quotas?: {
+    Admin?: TenantQuotaConfig;
+    Member?: TenantQuotaConfig;
+    Restricted?: TenantQuotaConfig;
+  };
   forwardProxy?: ForwardProxyConfig;
   oidc?: OidcConfig;
   ldap?: LdapConfig;
   loopback?: LoopbackConfig;
   peerMesh?: PeerMeshAuthConfig;
+}
+
+export interface SessionTokenPayload {
+  version: number;
+  authority: string;
+  issuedAt: number;
+  expiresAt: number;
+  identity: UserIdentity;
 }
