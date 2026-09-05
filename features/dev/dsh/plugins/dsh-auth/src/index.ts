@@ -18,6 +18,7 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     auth: IdentityAuthGatewayService;
     tenant?: UserIdentity;
+    webServer: any;
   }
 }
 
