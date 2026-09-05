@@ -161,17 +161,18 @@ let
 
   # One bundle row for an injected plugin: bare-name resolution from the
   # installation's node_modules; the row id equals the package name.
-  mkPluginEntry = name: mkEntry name name { };
+  mkPluginEntry = name: config: mkEntry name name config;
 
   mkHomePatchEntries =
     {
       mcpServers,
       persona,
+      pluginConfigs ? { },
       pluginBundleNames,
     }:
     lib.optionals (mcpServers != { }) (lib.mapAttrsToList mkMcpEntry mcpServers)
     ++ lib.optional (persona != null) (mkPersonaEntry persona)
-    ++ map mkPluginEntry pluginBundleNames;
+    ++ map (name: mkPluginEntry name (pluginConfigs.${name} or { })) pluginBundleNames;
 
   # A profile manifest (`package.json` beside the profile patch layer). Called
   # only for profiles with bundles or patchReload configured (the upstream

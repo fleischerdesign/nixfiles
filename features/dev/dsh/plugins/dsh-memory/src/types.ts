@@ -62,3 +62,18 @@ export interface QueryMemoryArgs {
   as_of_time?: number;
   recursive_closure?: boolean;
 }
+
+export interface StaticFactDeclaration {
+  subject: string;
+  predicate: string;
+  object: string;
+  type_constraint?: string;
+  confidence?: number;
+  security_label?: SecurityLabel;
+}
+
+export interface MemoryPluginConfig {
+  dbPath?: string;
+  facts?: StaticFactDeclaration[];
+  factsFile?: string;
+}

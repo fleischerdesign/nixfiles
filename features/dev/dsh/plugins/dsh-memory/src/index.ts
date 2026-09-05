@@ -1,9 +1,15 @@
 import { Service, type Context } from '@deepseek-ai/cordis';
 import { defineTool } from '@deepseek-ai/dsh-tools';
-import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { initializeDatabase } from './schema.js';
 import { BitemporalMemoryEngine } from './engine.js';
-import type { StoreFactArgs, QueryMemoryArgs, SecurityLabel } from './types.js';
+import type {
+  StoreFactArgs,
+  QueryMemoryArgs,
+  SecurityLabel,
+  MemoryPluginConfig,
+  StaticFactDeclaration
+} from './types.js';
 
 export const name = 'memory';
 export const inject = ['tools', 'systemPrompt'];
@@ -14,9 +20,8 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-export function apply(ctx: Context): void {
-  // Use persistent path in /var/lib/dsh or in-memory fallback
-  const dbPath = process.env.DSH_MEMORY_DB || '/var/lib/dsh/shared/knowledge.db';
+export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
+  const dbPath = config.dbPath || process.env.DSH_MEMORY_DB || '/var/lib/dsh/shared/knowledge.db';
   let db;
 
   try {
@@ -29,6 +34,36 @@ export function apply(ctx: Context): void {
   const engine = new BitemporalMemoryEngine(db);
   ctx.provide('memory');
   ctx.memory = engine;
+
+  // Ingest declarative static facts from configuration (Agnostic Ingestion)
+  const factsToIngest: StaticFactDeclaration[] = [...(config.facts || [])];
+
+  if (config.factsFile && fs.existsSync(config.factsFile)) {
+    try {
+      const content = fs.readFileSync(config.factsFile, 'utf8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        factsToIngest.push(...parsed);
+      }
+    } catch {
+      // Non-fatal: continue if external facts file cannot be parsed
+    }
+  }
+
+  for (const item of factsToIngest) {
+    if (item.subject && item.predicate && item.object) {
+      engine.storeFact({
+        subject: item.subject,
+        predicate: item.predicate,
+        object: item.object,
+        validFrom: 0, // Invariant fact: valid from epoch start
+        validTo: Infinity,
+        typeConstraint: item.type_constraint ?? 'String',
+        confidence: item.confidence ?? 1.0,
+        securityLabel: item.security_label ?? 'system'
+      });
+    }
+  }
 
   ctx.systemPrompt.section({
     name: 'tool:memory',

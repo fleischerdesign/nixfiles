@@ -478,8 +478,37 @@ in
               systemCfg.settings or { }
             )) userCfg.settings;
 
+            topologyHosts = osConfig.my.features.system.networking.topology.hosts or { };
+            topologyFacts = lib.flatten (
+              lib.mapAttrsToList (hostname: host: [
+                {
+                  subject = "urn:nix:host:${hostname}";
+                  predicate = "sys:hasType";
+                  object = host.hostType or "client";
+                }
+                (lib.optional (host.tailscaleIp != null) {
+                  subject = "urn:nix:host:${hostname}";
+                  predicate = "net:tailscaleIp";
+                  object = host.tailscaleIp;
+                  type_constraint = "IPv4";
+                })
+                (lib.optional (host.domain != null) {
+                  subject = "urn:nix:host:${hostname}";
+                  predicate = "net:domain";
+                  object = host.domain;
+                  type_constraint = "FQDN";
+                })
+              ]) topologyHosts
+            );
+
+            pluginConfigs = {
+              "dsh-memory" = {
+                facts = topologyFacts;
+              };
+            };
+
             patchEntries = render.mkHomePatchEntries {
-              inherit mcpServers;
+              inherit mcpServers pluginConfigs;
               persona = systemCfg.persona or null;
               pluginBundleNames = activePluginBundleNames;
             };
