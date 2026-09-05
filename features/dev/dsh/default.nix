@@ -405,6 +405,122 @@ in
       default = { };
       description = "Host-wide settings.yaml override (merged above rendered namespaces).";
     };
+
+    auth = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable the unified @dsh/auth gateway plugin.";
+      };
+
+      mode = lib.mkOption {
+        type = lib.types.enum [
+          "auto"
+          "forward-proxy"
+          "oidc"
+          "ldap"
+          "loopback-only"
+        ];
+        default = "auto";
+        description = "Primary authentication mode.";
+      };
+
+      forwardProxy = {
+        enabled = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Trust identity headers from upstream reverse proxy (e.g. Authentik/Caddy).";
+        };
+        trustedProxies = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [
+            "127.0.0.1"
+            "::1"
+          ];
+          description = "IP addresses of trusted reverse proxies.";
+        };
+        adminGroups = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [
+            "authentik Admins"
+            "wheel"
+            "admin"
+          ];
+          description = "Proxy group names mapped to Admin clearance.";
+        };
+        memberGroups = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [
+            "family"
+            "users"
+            "member"
+          ];
+          description = "Proxy group names mapped to Member clearance.";
+        };
+      };
+
+      oidc = {
+        enabled = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Direct OIDC identity provider integration.";
+        };
+        issuer = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "OIDC issuer discovery URL (e.g. https://auth.ancoris.ovh/application/o/dsh/).";
+        };
+        clientId = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "OIDC client ID.";
+        };
+        clientSecret = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "OIDC client secret.";
+        };
+      };
+
+      ldap = {
+        enabled = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Direct LDAP directory integration.";
+        };
+        url = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "LDAP server URL (e.g. ldaps://ldap.ancoris.ovh:636).";
+        };
+        baseDn = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Base DN for user search.";
+        };
+      };
+
+      loopback = {
+        enabled = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Allow seamless local loopback access (127.0.0.1).";
+        };
+      };
+
+      peerMesh = {
+        enabled = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "HMAC cluster authentication for peer-to-peer node mesh.";
+        };
+        clusterSecret = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Shared secret for HMAC-SHA256 inter-node authentication.";
+        };
+      };
+    };
   };
 
   config = lib.mkMerge [
@@ -513,7 +629,20 @@ in
               ) topologyHosts
             );
 
+            authCfg = systemCfg.auth or { };
             pluginConfigs = {
+              "dsh-auth" = {
+                mode = authCfg.mode or "auto";
+                forwardProxy = authCfg.forwardProxy or { enabled = true; };
+                oidc = authCfg.oidc or { enabled = false; };
+                ldap = authCfg.ldap or { enabled = false; };
+                loopback = {
+                  enabled = authCfg.loopback.enabled or true;
+                  defaultUser = osConfig.my.user.name or (builtins.getEnv "USER");
+                  defaultClearance = "Admin";
+                };
+                peerMesh = authCfg.peerMesh or { enabled = true; };
+              };
               "dsh-memory" = {
                 facts = topologyFacts;
               };

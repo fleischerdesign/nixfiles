@@ -1,0 +1,59 @@
+# features/dev/dsh/plugins/dsh-auth/package.nix
+# dsh-auth: Unified identity and authentication gateway (OIDC, LDAP, Forward-Proxy, Loopback, Peer-HMAC).
+{
+  lib,
+  stdenv,
+  nodejs_24,
+  typescript,
+  dsh,
+  ...
+}:
+
+let
+  manifest = builtins.fromJSON (builtins.readFile ./manifest.json);
+  pname = manifest.name;
+in
+stdenv.mkDerivation {
+  inherit pname;
+  inherit (manifest) version;
+
+  src = ./.;
+
+  nativeBuildInputs = [
+    nodejs_24
+    typescript
+  ];
+
+  buildPhase = ''
+    runHook preBuild
+    mkdir -p node_modules/@deepseek-ai
+    if [ -d "${dsh}/lib/dsh/node_modules/@deepseek-ai" ]; then
+      ln -s ${dsh}/lib/dsh/node_modules/@deepseek-ai/* node_modules/@deepseek-ai/
+    fi
+    if [ -d "${dsh}/lib/dsh/node_modules/@types" ]; then
+      ln -s ${dsh}/lib/dsh/node_modules/@types node_modules/@types
+    fi
+
+    tsc --project tsconfig.json
+    runHook postBuild
+  '';
+
+  installPhase = ''
+    runHook preInstall
+    mkdir -p $out/lib/node_modules/${pname}
+    cp -r lib package.json cordis.patch.yml $out/lib/node_modules/${pname}/
+    if [ -d "${dsh}/lib/dsh/node_modules/@deepseek-ai" ]; then
+      mkdir -p $out/lib/node_modules/${pname}/node_modules
+      ln -s ${dsh}/lib/dsh/node_modules/@deepseek-ai $out/lib/node_modules/${pname}/node_modules/@deepseek-ai
+    fi
+    runHook postInstall
+  '';
+
+  passthru.dshPluginName = manifest.bundle or pname;
+
+  meta = {
+    description = manifest.description;
+    license = lib.licenses.mit;
+    platforms = lib.platforms.linux;
+  };
+}

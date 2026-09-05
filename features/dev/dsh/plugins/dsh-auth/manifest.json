@@ -1,0 +1,6 @@
+{
+  "name": "dsh-auth",
+  "version": "0.1.0",
+  "bundle": "dsh-auth",
+  "description": "Unified identity authentication gateway supporting OIDC, LDAP, Authentik forward-proxy, local loopback, and peer mesh HMAC"
+}
