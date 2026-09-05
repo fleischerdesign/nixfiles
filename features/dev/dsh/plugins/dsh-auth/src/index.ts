@@ -1,7 +1,6 @@
 import { Service, type Context } from '@deepseek-ai/cordis';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import * as yaml from 'js-yaml';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AuthPluginConfig, UserIdentity } from './types.js';
 import {
@@ -52,9 +51,22 @@ export class IdentityAuthGatewayService extends Service {
     const credPath = `${process.env.DSH_HOME || process.env.HOME + '/.dsh'}/.credentials.yaml`;
     try {
       if (fs.existsSync(credPath)) {
-        const doc: any = yaml.load(fs.readFileSync(credPath, 'utf8'));
-        const secStr = doc?.records?.['client-connection/browser-session']?.payload?.secret;
-        if (secStr) {
+        const content = fs.readFileSync(credPath, 'utf8');
+        // Check JSON first
+        try {
+          const doc = JSON.parse(content);
+          const secStr = doc?.records?.['client-connection/browser-session']?.payload?.secret;
+          if (secStr) {
+            const padding = '='.repeat((4 - secStr.length % 4) % 4);
+            return Buffer.from(secStr.replaceAll('-', '+').replaceAll('_', '/') + padding, 'base64');
+          }
+        } catch {
+          // Fall through to regex
+        }
+        // Match "secret: <base64url>" or '"secret": "<base64url>"'
+        const match = content.match(/secret:\s*["']?([A-Za-z0-9_-]+)["']?/);
+        if (match && match[1]) {
+          const secStr = match[1];
           const padding = '='.repeat((4 - secStr.length % 4) % 4);
           return Buffer.from(secStr.replaceAll('-', '+').replaceAll('_', '/') + padding, 'base64');
         }
