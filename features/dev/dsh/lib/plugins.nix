@@ -24,7 +24,10 @@ let
   ) (lib.attrNames entries);
 
   derivations = lib.genAttrs pluginNames (
-    name: pkgs.callPackage (pluginsDir + "/${name}/package.nix") { }
+    name:
+    pkgs.callPackage (pluginsDir + "/${name}/package.nix") {
+      dsh = pkgs.custom.dsh or pkgs.dsh or null;
+    }
   );
 
   # The npm package name each bundle row must reference. Plugins declare it

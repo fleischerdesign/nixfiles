@@ -1,0 +1,6 @@
+{
+  "name": "dsh-workspace-tx",
+  "version": "0.1.0",
+  "bundle": "dsh-workspace-tx",
+  "description": "Optimistic Concurrency Control (OCC) and hermetic CoW transaction manager for dsh"
+}

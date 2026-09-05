@@ -13,6 +13,7 @@
   fetchFromGitHub,
   fetchPnpmDeps,
   pnpmConfigHook,
+  ...
 }:
 
 let

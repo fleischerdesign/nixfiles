@@ -1,0 +1,5 @@
+patch:
+  - id: dsh-workspace-tx
+    insert:
+      after: dsh-base
+    plugin: dsh-workspace-tx
