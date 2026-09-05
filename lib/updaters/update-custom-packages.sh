@@ -12,6 +12,11 @@
 #   obsidian-plugin  — GitHub Release assets (main.js, manifest.json, styles.css)
 #   npm              — Package published to the npm registry (tarball as source)
 #
+# github-source manifests support .upstream.tagPrefix (default "v") for repos
+# tagging releases under a non-default prefix (e.g. "dsh-v"); with a custom
+# prefix the release list is scanned because /releases/latest ignores
+# prereleases.
+#
 # npm-based packages (npm type, or github-rev with npmDepsHash) get their
 # vendored package-lock.json regenerated and npmDepsHash recalculated
 # automatically via refresh_npm_lockfile.
@@ -247,27 +252,44 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
   elif [ "$upstream_type" = "github-source" ]; then
     owner="$(jq -r '.upstream.owner' "$manifest_path")"
     repo="$(jq -r '.upstream.repo' "$manifest_path")"
+    tag_prefix="$(jq -r '.upstream.tagPrefix // "v"' "$manifest_path")"
     current_version="$(jq -r '.version' "$manifest_path")"
 
     echo "  Current version: $current_version"
     echo "  Checking GitHub upstream: $owner/$repo..."
 
-    RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || true
     latest_tag=""
     tarball_url=""
+    RELEASE_JSON=""
 
-    if [ -n "$RELEASE_JSON" ]; then
-      tag_candidate="$(echo "$RELEASE_JSON" | jq -r '.tag_name // empty')"
-      if [[ "$tag_candidate" =~ ^v?[0-9]+\.[0-9]+ ]]; then
-        latest_tag="$(echo "$tag_candidate" | strip_v)"
-        tarball_url="$(echo "$RELEASE_JSON" | jq -r '.tarball_url // empty')"
+    if [ "$tag_prefix" = "v" ]; then
+      RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || true
+
+      if [ -n "$RELEASE_JSON" ]; then
+        tag_candidate="$(echo "$RELEASE_JSON" | jq -r '.tag_name // empty')"
+        if [[ "$tag_candidate" =~ ^v?[0-9]+\.[0-9]+ ]]; then
+          latest_tag="$(echo "$tag_candidate" | strip_v)"
+          tarball_url="$(echo "$RELEASE_JSON" | jq -r '.tarball_url // empty')"
+        fi
       fi
-    fi
 
-    if [ -z "$latest_tag" ]; then
-      TAGS_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/tags")" || true
-      if [ -n "$TAGS_JSON" ]; then
-        latest_tag="$(echo "$TAGS_JSON" | jq -r '[.[].name | select(test("^v?[0-9]+\\.[0-9]+"))][0] // empty' | strip_v)"
+      if [ -z "$latest_tag" ]; then
+        TAGS_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/tags")" || true
+        if [ -n "$TAGS_JSON" ]; then
+          latest_tag="$(echo "$TAGS_JSON" | jq -r '[.[].name | select(test("^v?[0-9]+\\.[0-9]+"))][0] // empty' | strip_v)"
+        fi
+      fi
+    else
+      # Custom tag prefix: /releases/latest ignores prereleases, so scan the
+      # release list for the newest tag under this prefix instead.
+      RELEASES_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases?per_page=10")" || true
+      if [ -n "$RELEASES_JSON" ]; then
+        tag_candidate="$(echo "$RELEASES_JSON" | jq -r --arg prefix "$tag_prefix" '[.[].tag_name | select(test("^" + $prefix + "[0-9]+\\."))][0] // empty')"
+        if [ -n "$tag_candidate" ]; then
+          latest_tag="${tag_candidate#"$tag_prefix"}"
+          RELEASE_JSON="$(echo "$RELEASES_JSON" | jq -c --arg tag "$tag_candidate" '[.[] | select(.tag_name == $tag)][0] // empty')"
+          tarball_url="$(echo "$RELEASE_JSON" | jq -r '.tarball_url // empty')"
+        fi
       fi
     fi
 
@@ -287,7 +309,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
     tarball_url="$(echo "$RELEASE_JSON" | jq -r '.tarball_url // empty')"
     if [ -z "$tarball_url" ]; then
       echo "  ⚠️ No tarball_url in release, falling back to archive URL"
-      tarball_url="https://github.com/$owner/$repo/archive/refs/tags/v$latest_tag.tar.gz"
+      tarball_url="https://github.com/$owner/$repo/archive/refs/tags/$tag_prefix$latest_tag.tar.gz"
     fi
 
     echo "  Downloading and hashing source tarball..."
@@ -298,12 +320,14 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
       continue
     fi
 
-    # Build-time hashes (cargoHash, etc.) are reset to empty so the next
-    # nix-build will reveal the correct value via hash mismatch.
+    # Build-time hashes are reset to empty so the next nix-build reveals the
+    # correct value via hash mismatch. Only reset keys the manifest declares.
     tmp_manifest="$(mktemp)"
     jq --arg ver "$latest_tag" \
        --arg src_hash "$new_src_hash" \
-       '.version = $ver | .srcHash = $src_hash | .cargoHash = ""' \
+       '.version = $ver | .srcHash = $src_hash
+        | (if has("cargoHash") then .cargoHash = "" else . end)
+        | (if has("npmDepsHash") then .npmDepsHash = "" else . end)' \
        "$manifest_path" > "$tmp_manifest"
 
     mv "$tmp_manifest" "$manifest_path"

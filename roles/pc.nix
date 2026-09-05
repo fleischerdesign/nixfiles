@@ -1,6 +1,7 @@
 # roles/pc.nix
 # This is the base role for any "Personal Computer", whether desktop or notebook.
 {
+  config,
   lib,
   ...
 }:
@@ -35,6 +36,42 @@
     codium.enable = lib.mkDefault true;
     nixvim.enable = lib.mkDefault true;
     obsidian.enable = lib.mkDefault true;
+
+    dsh = {
+      credentials = {
+        "DEEPSEEK_API_KEY".key = lib.mkDefault config.sops.placeholder."pi/deepseek";
+        "OPENROUTER_API_KEY".key = lib.mkDefault config.sops.placeholder."pi/openrouter";
+      };
+
+      piAi.providers = {
+        openrouter.apiKeyEnv = lib.mkDefault "OPENROUTER_API_KEY";
+        openrouter-contributor = {
+          displayName = lib.mkDefault "OpenRouter (Contributor)";
+          apiKeyEnv = lib.mkDefault "OPENROUTER_API_KEY";
+          api = lib.mkDefault "openai-completions";
+          baseURL = lib.mkDefault "https://openrouter.ai/api/v1";
+          models = lib.mkDefault [
+            {
+              id = "meta/muse-spark-1.3-contributor";
+              name = "Muse Spark 1.3 (Contributor)";
+              contextWindow = 1048576;
+              maxTokens = 943718;
+              input = [
+                "text"
+                "image"
+              ];
+            }
+          ];
+        };
+      };
+
+      defaultModel = lib.mkDefault {
+        provider = "openrouter-contributor";
+        model = "meta/muse-spark-1.3-contributor";
+      };
+
+      web.enable = lib.mkDefault true;
+    };
   };
 
   my.features.media = {

@@ -8,6 +8,7 @@
   imports = [
     ./packages.nix
     ./pi.nix
+    ./dsh.nix
     ./fish.nix
     inputs.nixcord.homeModules.nixcord
   ];
