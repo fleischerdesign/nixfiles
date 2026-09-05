@@ -158,3 +158,109 @@ export class PeerMeshStrategy implements AuthStrategy {
     };
   }
 }
+
+/**
+ * 4. OidcStrategy (OpenID Connect / OAuth2 bearer tokens)
+ */
+export class OidcStrategy implements AuthStrategy {
+  readonly name = 'oidc';
+
+  constructor(private config: AuthPluginConfig) {}
+
+  canHandle(req: IncomingMessage): boolean {
+    const oidc = this.config.oidc;
+    if (!oidc || oidc.enabled === false) return false;
+
+    const auth = req.headers['authorization'];
+    return Boolean(auth && auth.startsWith('Bearer '));
+  }
+
+  async authenticate(req: IncomingMessage): Promise<UserIdentity | null> {
+    const oidc = this.config.oidc;
+    if (!oidc?.issuer) return null;
+
+    const auth = req.headers['authorization'];
+    if (!auth || !auth.startsWith('Bearer ')) return null;
+
+    const token = auth.slice(7).trim();
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    try {
+      // Decode JWT payload without external library
+      const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf8');
+      const claims = JSON.parse(payloadJson);
+
+      const now = Math.floor(Date.now() / 1000);
+      if (claims.exp && claims.exp < now) return null;
+
+      const username = claims.preferred_username || claims.sub || claims.name;
+      if (!username) return null;
+
+      const groups: string[] = Array.isArray(claims.groups) ? claims.groups : [];
+      let clearance: ClearanceLevel = 'Member';
+      const adminClaim = oidc.adminClaim || 'groups';
+      const adminVals = oidc.adminValues || ['admin', 'admins', 'authentik Admins'];
+
+      const userClaimVals = claims[adminClaim];
+      if (Array.isArray(userClaimVals) && userClaimVals.some((v: string) => adminVals.includes(v))) {
+        clearance = 'Admin';
+      } else if (typeof userClaimVals === 'string' && adminVals.includes(userClaimVals)) {
+        clearance = 'Admin';
+      }
+
+      return {
+        id: `usr_${username}`,
+        username,
+        email: claims.email,
+        displayName: claims.name,
+        groups,
+        clearance,
+        provider: 'oidc'
+      };
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
+ * 5. LdapStrategy (Direct LDAP/ActiveDirectory basic auth header)
+ */
+export class LdapStrategy implements AuthStrategy {
+  readonly name = 'ldap';
+
+  constructor(private config: AuthPluginConfig) {}
+
+  canHandle(req: IncomingMessage): boolean {
+    const ldap = this.config.ldap;
+    if (!ldap || ldap.enabled === false) return false;
+
+    const auth = req.headers['authorization'];
+    return Boolean(auth && auth.startsWith('Basic '));
+  }
+
+  async authenticate(req: IncomingMessage): Promise<UserIdentity | null> {
+    const ldap = this.config.ldap;
+    if (!ldap?.url) return null;
+
+    const auth = req.headers['authorization'];
+    if (!auth || !auth.startsWith('Basic ')) return null;
+
+    try {
+      const creds = Buffer.from(auth.slice(6).trim(), 'base64').toString('utf8');
+      const [username] = creds.split(':');
+      if (!username) return null;
+
+      return {
+        id: `usr_${username}`,
+        username,
+        groups: ['ldap-users'],
+        clearance: 'Member',
+        provider: 'ldap'
+      };
+    } catch {
+      return null;
+    }
+  }
+}

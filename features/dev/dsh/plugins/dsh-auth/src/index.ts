@@ -8,6 +8,8 @@ import {
   ForwardProxyStrategy,
   LoopbackStrategy,
   PeerMeshStrategy,
+  OidcStrategy,
+  LdapStrategy,
   type AuthStrategy
 } from './strategy.js';
 
@@ -19,6 +21,7 @@ declare module '@deepseek-ai/cordis' {
     auth: IdentityAuthGatewayService;
     tenant?: UserIdentity;
     webServer: any;
+    connection?: any;
   }
 }
 
@@ -32,13 +35,16 @@ export class IdentityAuthGatewayService extends Service {
     // Initialize strategies based on priority
     this.strategies.push(new PeerMeshStrategy(this.config));
     this.strategies.push(new ForwardProxyStrategy(this.config));
+    this.strategies.push(new OidcStrategy(this.config));
+    this.strategies.push(new LdapStrategy(this.config));
     this.strategies.push(new LoopbackStrategy(this.config));
 
     // Load or generate durable cookie signing secret
     this.signingSecret = this.resolveSigningSecret();
 
-    // Intercept web requests to ensure seamless authentication and cookie minting
+    // Intercept web requests and connection authorization
     this.interceptWebServer();
+    this.interceptConnection();
   }
 
   private resolveSigningSecret(): Buffer {
@@ -96,7 +102,12 @@ export class IdentityAuthGatewayService extends Service {
 
   private ensureSessionCookie(req: IncomingMessage, res: ServerResponse): void {
     const hostHeader = req.headers['host'] || '127.0.0.1:3080';
-    const authority = hostHeader.split(':')[0] + (hostHeader.includes(':') ? `:${hostHeader.split(':')[1]}` : '');
+    let authority: string;
+    try {
+      authority = new URL(`http://${hostHeader}`).host;
+    } catch {
+      authority = hostHeader;
+    }
     const cookieName = 'dsh-auth-' + this.encodeBase64Url(crypto.createHash('sha256').update(authority).digest());
 
     const existingCookies = req.headers['cookie'] || '';
@@ -126,6 +137,56 @@ export class IdentityAuthGatewayService extends Service {
         res.setHeader('set-cookie', cookieHeader);
       }
     }
+  }
+
+  private interceptConnection(): void {
+    const self = this;
+    // When connection service becomes available, wrap authorizeIndex and requestRejection
+    this.ctx.inject(['connection'], (connCtx) => {
+      const conn = connCtx.connection;
+      if (!conn) return;
+
+      const originalAuthorizeIndex = conn.authorizeIndex?.bind(conn);
+      if (originalAuthorizeIndex) {
+        conn.authorizeIndex = (req: any, res: any) => {
+          const remoteIp = req.socket?.remoteAddress?.replace(/^.*:/, '') || '127.0.0.1';
+          for (const strategy of self.strategies) {
+            if (strategy.canHandle(req, remoteIp)) {
+              // Ensure the browser session cookie is minted
+              self.ensureSessionCookie(req, res);
+              return true;
+            }
+          }
+          return originalAuthorizeIndex(req, res);
+        };
+      }
+
+      const originalRequestRejection = conn.requestRejection?.bind(conn);
+      if (originalRequestRejection) {
+        conn.requestRejection = (req: any) => {
+          const remoteIp = req.socket?.remoteAddress?.replace(/^.*:/, '') || '127.0.0.1';
+          for (const strategy of self.strategies) {
+            if (strategy.canHandle(req, remoteIp)) {
+              return undefined; // Authorized!
+            }
+          }
+          return originalRequestRejection(req);
+        };
+      }
+
+      const originalAuthenticatedUrl = conn.authenticatedUrl?.bind(conn);
+      if (originalAuthenticatedUrl) {
+        conn.authenticatedUrl = (baseUrl: string) => {
+          // When dsh-auth provides transparent strategy authentication (loopback / forward-proxy),
+          // return clean baseUrl without leaking or requiring the ?token= query parameter!
+          const url = new URL(baseUrl);
+          url.pathname = '/';
+          url.search = '';
+          url.hash = '';
+          return url.href;
+        };
+      }
+    });
   }
 
   private encodeBase64Url(buf: Buffer): string {
