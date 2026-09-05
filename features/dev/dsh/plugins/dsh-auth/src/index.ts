@@ -2,7 +2,7 @@ import { Service, type Context } from '@deepseek-ai/cordis';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { AuthPluginConfig, UserIdentity } from './types.js';
+import type { AuthPluginConfig, UserIdentity, ClearanceLevel } from './types.js';
 import {
   ForwardProxyStrategy,
   LoopbackStrategy,
@@ -21,6 +21,7 @@ declare module '@deepseek-ai/cordis' {
     tenant?: UserIdentity;
     webServer: any;
     connection?: any;
+    tools?: any;
   }
 }
 
@@ -44,6 +45,9 @@ export class IdentityAuthGatewayService extends Service {
     // Intercept web requests and connection authorization
     this.interceptWebServer();
     this.interceptConnection();
+
+    // Enforce Lattice-Based Access Control (LBAC) on tool execution
+    this.enforceLbacToolPolicy();
   }
 
   private resolveSigningSecret(): Buffer {
@@ -198,6 +202,75 @@ export class IdentityAuthGatewayService extends Service {
           return url.href;
         };
       }
+    });
+  }
+
+  /**
+   * Enforce Lattice-Based Access Control (LBAC):
+   * R = { Restricted, Member, Admin } with Restricted < Member < Admin
+   *
+   * Capability Classification:
+   * - T_Restricted (lambda <= Restricted): search_web, calculator, read_own_workspace, summarize
+   * - T_Member (lambda <= Member): T_Restricted + hass_control, paperless_query, browser_sandbox, vikunja_tasks
+   * - T_Admin (lambda <= Admin): T_Member + exec_shell, git_mutate, nix_rebuild, cluster_orchestrate, secret_access, workspace_commit
+   */
+  private enforceLbacToolPolicy(): void {
+    const self = this;
+
+    const ADMIN_ONLY_TOOLS = new Set([
+      'exec_shell',
+      'tool-bash',
+      'bash',
+      'pwsh',
+      'git_mutate',
+      'nix_rebuild',
+      'cluster_orchestrate',
+      'secret_access',
+      'workspace_commit'
+    ]);
+
+    const MEMBER_OR_ABOVE_TOOLS = new Set([
+      'hass_control',
+      'paperless_query',
+      'browser_sandbox',
+      'vikunja_tasks',
+      'workspace_propose_mutation'
+    ]);
+
+    this.ctx.inject(['tools'], (toolsCtx: any) => {
+      toolsCtx.tools.on('tools/pre-execute', async function(exec: any, next: () => Promise<any>) {
+        const tenant = self.ctx.tenant;
+        const clearance: ClearanceLevel = tenant?.clearance || 'Admin'; // Default to Admin for local loopback / unauthenticated local dev
+
+        const toolName = exec.name;
+
+        // Admin has universal clearance
+        if (clearance === 'Admin') {
+          return next();
+        }
+
+        // Check Restricted clearance
+        if (clearance === 'Restricted') {
+          if (ADMIN_ONLY_TOOLS.has(toolName) || MEMBER_OR_ABOVE_TOOLS.has(toolName)) {
+            return {
+              kind: 'deny',
+              reason: `MTAA Lattice Violation: Tool "${toolName}" requires clearance >= Member (current tenant clearance: ${clearance}).`
+            };
+          }
+        }
+
+        // Check Member clearance
+        if (clearance === 'Member') {
+          if (ADMIN_ONLY_TOOLS.has(toolName)) {
+            return {
+              kind: 'deny',
+              reason: `MTAA Lattice Violation: Tool "${toolName}" requires clearance == Admin (current tenant clearance: ${clearance}).`
+            };
+          }
+        }
+
+        return next();
+      });
     });
   }
 

@@ -51,6 +51,22 @@ export class MeshCoordinatorService extends Service {
     return Array.from(this.peers.values());
   }
 
+  async dispatchTask(peerId: string, toolName: string, args: Record<string, any>): Promise<any> {
+    const peer = this.peers.get(peerId);
+    if (!peer) {
+      throw new Error(`Target peer node "${peerId}" not found in mesh registry.`);
+    }
+
+    const taskId = `tx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    return this.client.executeRemoteTask(peer.endpoint, {
+      fromNodeId: this.config.nodeId,
+      taskId,
+      toolName,
+      arguments: args,
+      timestamp: Date.now()
+    });
+  }
+
   private startServer(port: number, host: string): void {
     this.server = http.createServer((req, res) => {
       if (req.method !== 'POST') {
@@ -82,6 +98,41 @@ export class MeshCoordinatorService extends Service {
             };
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(resp));
+          } else if (req.url === '/mesh/task') {
+            // Remote tool execution request under MTAA Task Contract
+            void (async () => {
+              try {
+                const taskReq = parsed;
+                const toolName = taskReq.toolName;
+                const toolArgs = taskReq.arguments || {};
+
+                // Execute tool via Cordis tools service
+                if (this.ctx.tools) {
+                  const out = await this.ctx.tools.execute({
+                    callId: `remote-${taskReq.taskId}` as any,
+                    name: toolName,
+                    arguments: toolArgs,
+                    signal: new AbortController().signal
+                  });
+
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({
+                    fromNodeId: this.config.nodeId,
+                    taskId: taskReq.taskId,
+                    success: !out.isError,
+                    result: out.value || out.content,
+                    error: out.error?.message,
+                    executedAt: Date.now()
+                  }));
+                } else {
+                  res.writeHead(503, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ error: 'Tools service unavailable on target node' }));
+                }
+              } catch (e: any) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: e.message || String(e) }));
+              }
+            })();
           } else {
             res.writeHead(404);
             res.end();
@@ -170,6 +221,39 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
           nodeId: config.nodeId || 'unknown',
           peers: service.getPeers()
         };
+      }
+    })
+  );
+
+  // Tool: Remote Task Dispatching under MTAA Contract
+  ctx.tools.register(
+    defineTool({
+      name: 'mesh_dispatch',
+      description: 'Dispatch an atomic tool call to be executed on a remote peer node in the cluster mesh.',
+      parameters: {
+        peer_id: { type: 'string', required: true, description: 'Hostname / ID of target peer node (e.g. mackaye, rollins, strummer).' },
+        tool_name: { type: 'string', required: true, description: 'Target tool to invoke remotely.' },
+        arguments: { type: 'object', additionalProperties: true, description: 'Arguments payload for the remote tool.' }
+      },
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            fromNodeId: { type: 'string' },
+            taskId: { type: 'string' },
+            success: { type: 'boolean' }
+          }
+        },
+        render: (_args, value: any) => [
+          {
+            type: 'text',
+            text: `<mesh_dispatch peer="${value.fromNodeId}" task="${value.taskId}" success="${value.success}">\n${JSON.stringify(value.result || value.error, null, 2)}\n</mesh_dispatch>`
+          }
+        ]
+      },
+      async execute(args: any): Promise<any> {
+        return service.dispatchTask(args.peer_id, args.tool_name, args.arguments || {});
       }
     })
   );

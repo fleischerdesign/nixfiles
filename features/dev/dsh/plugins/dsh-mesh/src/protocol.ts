@@ -24,6 +24,11 @@ export class MeshTransportClient {
     return this.postJson<SyncDeltaRequest, SyncDeltaResponse>(`${url}/mesh/sync`, req);
   }
 
+  async executeRemoteTask(endpoint: string, req: any, hmacSecret?: string): Promise<any> {
+    const url = endpoint.startsWith('http') ? endpoint : `http://${endpoint}`;
+    return this.postJson(`${url}/mesh/task`, req);
+  }
+
   private postJson<TReq, TRes>(urlStr: string, body: TReq): Promise<TRes> {
     return new Promise((resolve, reject) => {
       const url = new URL(urlStr);

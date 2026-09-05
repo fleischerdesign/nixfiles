@@ -43,3 +43,20 @@ export interface SyncDeltaResponse {
   facts: any[];
   maxTx: number;
 }
+
+export interface RemoteTaskRequest {
+  fromNodeId: string;
+  taskId: string;
+  toolName: string;
+  arguments: Record<string, any>;
+  timestamp: number;
+}
+
+export interface RemoteTaskResponse {
+  fromNodeId: string;
+  taskId: string;
+  success: boolean;
+  result?: any;
+  error?: string;
+  executedAt: number;
+}
