@@ -42,6 +42,10 @@ stdenv.mkDerivation {
     runHook preInstall
     mkdir -p $out/lib/node_modules/${pname}
     cp -r lib package.json cordis.patch.yml $out/lib/node_modules/${pname}/
+    if [ -d "${dsh}/lib/dsh/node_modules/@deepseek-ai" ]; then
+      mkdir -p $out/lib/node_modules/${pname}/node_modules
+      ln -s ${dsh}/lib/dsh/node_modules/@deepseek-ai $out/lib/node_modules/${pname}/node_modules/@deepseek-ai
+    fi
     runHook postInstall
   '';
 
