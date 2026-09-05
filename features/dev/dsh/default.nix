@@ -585,7 +585,10 @@ in
 
               home.file = lib.mkMerge [
                 {
-                  ".dsh/settings.yaml".text = builtins.toJSON settingsDoc;
+                  ".dsh/settings.yaml" = {
+                    text = builtins.toJSON settingsDoc;
+                    force = true;
+                  };
                 }
                 (lib.optionalAttrs (homePatch != null) {
                   ".dsh/cordis.patch.yml".text = homePatch;
@@ -596,6 +599,7 @@ in
                 (lib.optionalAttrs (osConfig ? sops && osConfig.sops.templates ? "dsh-credentials.yaml") {
                   ".dsh/.credentials.yaml" = {
                     source = config.lib.file.mkOutOfStoreSymlink osConfig.sops.templates."dsh-credentials.yaml".path;
+                    force = true;
                   };
                 })
                 (lib.mapAttrs'
