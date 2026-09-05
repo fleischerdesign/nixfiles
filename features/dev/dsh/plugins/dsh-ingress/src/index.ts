@@ -157,7 +157,6 @@ export class IngressGatewayService extends Service {
 
 export function apply(ctx: Context, config: IngressPluginConfig = {}): void {
   const service = new IngressGatewayService(ctx, config);
-  ctx.provide('ingress');
   ctx.ingress = service;
 
   ctx.effect(() => {
@@ -166,5 +165,3 @@ export function apply(ctx: Context, config: IngressPluginConfig = {}): void {
     };
   });
 }
-
-export default apply;

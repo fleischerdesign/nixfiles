@@ -170,5 +170,3 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     })
   );
 }
-
-export default apply;

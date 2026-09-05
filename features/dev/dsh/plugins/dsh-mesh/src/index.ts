@@ -130,7 +130,6 @@ export class MeshCoordinatorService extends Service {
 
 export function apply(ctx: Context, config: MeshPluginConfig): void {
   const service = new MeshCoordinatorService(ctx, config || { nodeId: 'standalone' });
-  ctx.provide('mesh');
   ctx.mesh = service;
 
   ctx.effect(() => {
@@ -175,5 +174,3 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
     })
   );
 }
-
-export default apply;
