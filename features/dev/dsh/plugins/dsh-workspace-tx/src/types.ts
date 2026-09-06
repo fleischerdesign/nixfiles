@@ -1,12 +1,14 @@
 /**
  * @module @dsh/workspace-tx/types
  * Formal types for Optimistic Concurrency Control (OCC), hermetic CoW isolation,
- * risk lattices, and bounded execution envelopes.
+ * risk lattices, group scopes, and bounded execution envelopes.
  */
 
 export type RiskLevel = 'R0' | 'R1' | 'R2';
 
 export type IsolationMode = 'cow-overlay' | 'git-worktree';
+
+export type WorkspaceScopeType = 'user' | 'group';
 
 export interface VerificationEnvelope {
   timeoutMs: number;
@@ -38,9 +40,13 @@ export interface TransactionContext {
   workDir: string;
   targetBranch: string;
   createdAt: number;
+  expiresAt: number; // TTL lease for automatic garbage collection
   riskLevel: RiskLevel;
   isolationMode: IsolationMode;
   status: 'prepared' | 'mutated' | 'verified' | 'committed' | 'aborted';
+  scopeType: WorkspaceScopeType;
+  scopeId: string; // "user:<username>" or "group:<groupname>"
+  owner: string;
 }
 
 export interface ProposeMutationArgs {
@@ -48,6 +54,8 @@ export interface ProposeMutationArgs {
   content: string;
   justification?: string;
   requires_network?: boolean;
+  scope_type?: WorkspaceScopeType;
+  group?: string;
 }
 
 export interface ProposeMutationResult {
@@ -55,6 +63,9 @@ export interface ProposeMutationResult {
   path: string;
   operation: 'create' | 'update';
   riskLevel: RiskLevel;
+  scopeType: WorkspaceScopeType;
+  scopeId: string;
+  expiresAt: number;
   before: string | null;
   after: string;
 }

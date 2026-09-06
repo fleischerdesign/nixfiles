@@ -20,6 +20,7 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     workspaceTx: WorkspaceTransactionEngine;
     approval: ApprovalService;
+    auth?: any;
   }
 }
 
@@ -33,7 +34,7 @@ export function apply(ctx: Context): void {
     order: 250,
     text: [
       'Use workspace_propose_mutation to stage changes inside an isolated transaction workspace.',
-      'All staged mutations are verified in a bounded execution envelope.',
+      'All staged mutations are verified in a bounded execution envelope with group/user scoping.',
       'Use workspace_commit to atomically commit and fast-forward merge the verified transaction to HEAD with user approval.'
     ].join(' ')
   });
@@ -47,7 +48,9 @@ export function apply(ctx: Context): void {
         file_path: { type: 'string', required: true, description: 'Target file path relative to workspace or absolute.' },
         content: { type: 'string', required: true, description: 'Full UTF-8 content to apply.' },
         justification: { type: 'string', description: 'Technical rationale for the modification.' },
-        requires_network: { type: 'boolean', description: 'Declare whether test verification requires network access.' }
+        requires_network: { type: 'boolean', description: 'Declare whether test verification requires network access.' },
+        scope_type: { type: 'string', enum: ['user', 'group'], description: 'Workspace transaction scope (default: user).' },
+        group: { type: 'string', description: 'Target group name if scope_type is group.' }
       },
       output: {
         schema: {
@@ -58,32 +61,43 @@ export function apply(ctx: Context): void {
             path: { type: 'string', required: true },
             operation: { type: 'string', required: true, enum: ['create', 'update'] },
             riskLevel: { type: 'string', required: true, enum: ['R0', 'R1', 'R2'] },
-            before: {
-              required: true,
-              oneOf: [{ type: 'string' }, { type: 'null' }]
-            },
+            scopeType: { type: 'string', required: true },
+            scopeId: { type: 'string', required: true },
+            expiresAt: { type: 'number', required: true },
+            before: { oneOf: [{ type: 'string' }, { type: 'null' }] },
             after: { type: 'string', required: true }
           }
         },
         render: (_args, value: ProposeMutationResult) => [
           {
             type: 'text',
-            text: `<mutation tx="${value.txId}" risk="${value.riskLevel}">\n<path>${value.path}</path>\n<operation>${value.operation}</operation>\n</mutation>`
+            text: `Staged ${value.operation} for ${value.path} [Risk: ${value.riskLevel}, Scope: ${value.scopeId}, Tx: ${value.txId}].`
           }
-        ],
-        presentationMeta: (args: ProposeMutationArgs, value: ProposeMutationResult) => ({
-          diffs: [{
-            path: args.file_path,
-            oldText: value.before,
-            newText: value.after
-          }]
-        })
+        ]
       },
       async execute(args: ProposeMutationArgs, exec): Promise<ProposeMutationResult> {
         const repoRoot = process.cwd();
         const riskLevel: RiskLevel = args.requires_network ? 'R2' : 'R1';
+        const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: ['wheel'] };
 
-        const tx = await engine.begin(repoRoot, riskLevel);
+        const scopeType = args.scope_type || 'user';
+        let scopeId = `user:${tenant.username}`;
+
+        if (scopeType === 'group') {
+          if (!args.group) {
+            throw new Error('Group scope requires a group name');
+          }
+          if (tenant.clearance !== 'Admin' && (!tenant.groups || !tenant.groups.includes(args.group))) {
+            throw new Error(`Unauthorized: You are not a member of group "${args.group}".`);
+          }
+          scopeId = `group:${args.group}`;
+        }
+
+        const tx = await engine.begin(repoRoot, riskLevel, {
+          scopeType,
+          scopeId,
+          owner: tenant.username
+        });
         const targetPath = path.resolve(tx.workDir, args.file_path);
 
         let before: string | null = null;
@@ -109,6 +123,9 @@ export function apply(ctx: Context): void {
           path: args.file_path,
           operation,
           riskLevel,
+          scopeType: tx.scopeType,
+          scopeId: tx.scopeId,
+          expiresAt: tx.expiresAt,
           before,
           after: args.content
         };
@@ -164,12 +181,27 @@ export function apply(ctx: Context): void {
           throw new Error(`Transaction ${args.tx_id} not found or already settled.`);
         }
 
+        const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: ['wheel'] };
+
+        // Group & User authorization for commit
+        if (tenant.clearance !== 'Admin') {
+          if (tx.scopeType === 'user' && tx.owner !== tenant.username) {
+            throw new Error(`Unauthorized: Transaction belongs to user "${tx.owner}".`);
+          }
+          if (tx.scopeType === 'group') {
+            const groupName = tx.scopeId.replace(/^group:/, '');
+            if (!tenant.groups || !tenant.groups.includes(groupName)) {
+              throw new Error(`Unauthorized: Not a member of group "${groupName}" for this transaction.`);
+            }
+          }
+        }
+
         // Approval Gate via ctx.approval
         if (ctx.approval) {
           const outcome = await ctx.approval.request({
             agent: exec.agent,
             toolName: 'workspace_commit',
-            reason: `Commit proposed changes: "${args.commit_message}" (Risk: ${tx.riskLevel})`,
+            reason: `Commit proposed changes: "${args.commit_message}" (Risk: ${tx.riskLevel}, Scope: ${tx.scopeId})`,
             signal: exec.signal
           });
 

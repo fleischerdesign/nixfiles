@@ -1,5 +1,5 @@
-# features/dev/dsh/plugins/dsh-memory/package.nix
-# dsh-memory: Bitemporal knowledge graph memory engine.
+# features/dev/dsh/plugins/dsh-share/package.nix
+# dsh-share: Capability-based session sharing, targeted ACLs, zero-leakage redaction, and instant revocation.
 {
   callPackage,
   dsh,

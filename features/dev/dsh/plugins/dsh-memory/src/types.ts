@@ -4,6 +4,7 @@
  */
 
 export type SecurityLabel = 'system' | 'operator' | 'user';
+export type MemoryScopeType = 'public' | 'group' | 'user' | 'repo';
 
 export interface BitemporalFact {
   id?: string;
@@ -18,6 +19,9 @@ export interface BitemporalFact {
   confidence: number;
   securityLabel: SecurityLabel;
   status: 'active' | 'disputed' | 'retracted';
+  scopeType: MemoryScopeType;
+  scopeId: string; // 'public', 'group:dev', 'user:philipp', 'repo:nixfiles'
+  author: string;
   embedding?: number[];
 }
 
@@ -29,10 +33,9 @@ export interface FactQueryFilter {
   asOfTx?: number;
   maxSecurityLabel?: SecurityLabel;
   minConfidence?: number;
-  semanticSearch?: {
-    queryEmbedding: number[];
-    limit?: number;
-  };
+  scopeType?: MemoryScopeType;
+  scopeId?: string;
+  search?: string; // FTS5 fulltext search query
 }
 
 export interface DatalogInferenceResult {
@@ -54,6 +57,10 @@ export interface StoreFactArgs {
   security_label?: SecurityLabel;
   valid_from?: number;
   valid_to?: number;
+  ttl_seconds?: number;
+  scope_type?: MemoryScopeType;
+  scope_id?: string;
+  author?: string;
 }
 
 export interface QueryMemoryArgs {
@@ -70,10 +77,15 @@ export interface StaticFactDeclaration {
   type_constraint?: string;
   confidence?: number;
   security_label?: SecurityLabel;
+  scope_type?: MemoryScopeType;
+  scope_id?: string;
+  valid_to?: number;
 }
 
 export interface MemoryPluginConfig {
   dbPath?: string;
   facts?: StaticFactDeclaration[];
   factsFile?: string;
+  autoConsolidate?: boolean; // Automatic turn-stopping memory consolidation
+  maxRecallTokens?: number;
 }

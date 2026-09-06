@@ -15,5 +15,5 @@ buildDshPlugin {
   inherit (manifest) version;
   src = ./.;
   description = manifest.description;
-  hasClient = false;
+  hasClient = true;
 }

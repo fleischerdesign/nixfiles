@@ -41,13 +41,20 @@ stdenv.mkDerivation {
       ln -s ${dsh}/lib/dsh/node_modules/@types/* node_modules/@types/
     fi
 
-    # Link react & @types/react from client packages
+    # Link react & @types/react and react-dom & @types/react-dom from client packages
     CLIENT_DIR="${dsh}/lib/dsh/packages/client/ui-sidebar/node_modules"
+    CLIENT_DOM_DIR="${dsh}/lib/dsh/packages/client/ui-schedule/node_modules"
     if [ -d "$CLIENT_DIR/react" ]; then
       ln -s "$CLIENT_DIR/react" node_modules/react
     fi
     if [ -d "$CLIENT_DIR/@types/react" ]; then
       ln -s "$CLIENT_DIR/@types/react" node_modules/@types/react
+    fi
+    if [ -d "$CLIENT_DOM_DIR/react-dom" ]; then
+      ln -s "$CLIENT_DOM_DIR/react-dom" node_modules/react-dom
+    fi
+    if [ -d "$CLIENT_DOM_DIR/@types/react-dom" ]; then
+      ln -s "$CLIENT_DOM_DIR/@types/react-dom" node_modules/@types/react-dom
     fi
 
     # 2. Compile TypeScript for Node.js host fiber (lib/index.js, lib/index.d.ts)

@@ -521,6 +521,126 @@ in
         };
       };
     };
+
+    mesh = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable distributed cluster mesh fabric.";
+      };
+      listenPort = lib.mkOption {
+        type = lib.types.port;
+        default = 3891;
+        description = "TCP port for distributed cluster mesh heartbeat and gossip.";
+      };
+      peers = lib.mkOption {
+        type = lib.types.listOf (
+          lib.types.submodule {
+            options = {
+              id = lib.mkOption {
+                type = lib.types.str;
+                description = "Cluster peer node identifier.";
+              };
+              endpoint = lib.mkOption {
+                type = lib.types.str;
+                description = "Peer endpoint (host:port or URL).";
+              };
+              tags = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = "Node tags/capabilities (e.g. server, gpu).";
+              };
+            };
+          }
+        );
+        default = [ ];
+        description = "System-wide cluster peer nodes declaratively provisioned via Nix.";
+      };
+      groupPeers = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.listOf (
+            lib.types.submodule {
+              options = {
+                id = lib.mkOption {
+                  type = lib.types.str;
+                  description = "Cluster peer node identifier.";
+                };
+                endpoint = lib.mkOption {
+                  type = lib.types.str;
+                  description = "Peer endpoint (host:port or URL).";
+                };
+                tags = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ ];
+                  description = "Node tags/capabilities (e.g. server, gpu, team).";
+                };
+              };
+            }
+          )
+        );
+        default = { };
+        description = "Group-restricted cluster peer nodes provisioned per group (e.g. dev, family).";
+      };
+    };
+
+    memory = {
+      facts = lib.mkOption {
+        type = lib.types.listOf (
+          lib.types.submodule {
+            options = {
+              subject = lib.mkOption {
+                type = lib.types.str;
+                description = "Subject entity URI.";
+              };
+              predicate = lib.mkOption {
+                type = lib.types.str;
+                description = "Predicate relation.";
+              };
+              object = lib.mkOption {
+                type = lib.types.str;
+                description = "Target entity URI or literal value.";
+              };
+              type_constraint = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = "String";
+                description = "Type constraint (e.g. String, Port, IPv4, FQDN).";
+              };
+              confidence = lib.mkOption {
+                type = lib.types.float;
+                default = 1.0;
+                description = "Confidence value between 0.0 and 1.0.";
+              };
+              security_label = lib.mkOption {
+                type = lib.types.enum [
+                  "system"
+                  "operator"
+                  "user"
+                ];
+                default = "system";
+                description = "Lattice security clearance required.";
+              };
+              scope_type = lib.mkOption {
+                type = lib.types.enum [
+                  "public"
+                  "group"
+                  "user"
+                  "repo"
+                ];
+                default = "public";
+                description = "Memory scope type.";
+              };
+              scope_id = lib.mkOption {
+                type = lib.types.str;
+                default = "public";
+                description = "Memory scope target ID (e.g. public, group:dev, repo:nixfiles).";
+              };
+            };
+          }
+        );
+        default = [ ];
+        description = "System-wide declarative invariant facts provisioned via Nix.";
+      };
+    };
   };
 
   config = lib.mkMerge [
@@ -618,18 +738,65 @@ in
             );
 
             currentHost = osConfig.networking.hostName or "unknown";
-            meshPeers = lib.flatten (
+            currentUser = osConfig.my.user.name or (builtins.getEnv "USER");
+
+            # Auto-discovered Tailscale topology peers
+            topologyPeers = lib.flatten (
               lib.mapAttrsToList (
                 hostname: host:
                 lib.optional (hostname != currentHost && host.tailscaleIp != null) {
                   id = hostname;
-                  endpoint = "${host.tailscaleIp}:3891";
+                  endpoint = "${host.tailscaleIp}:${toString (systemCfg.mesh.listenPort or 3891)}";
                   tags = [ (host.hostType or "client") ];
+                  scope = "system";
                 }
               ) topologyHosts
             );
 
+            # System-wide explicitly configured peers
+            systemExplicitPeers = map (p: p // { scope = "system"; }) (systemCfg.mesh.peers or [ ]);
+
+            # System-wide group-restricted peers
+            systemGroupPeers = lib.flatten (
+              lib.mapAttrsToList (
+                groupName: peersList:
+                map (
+                  p:
+                  p
+                  // {
+                    scope = "group";
+                    group = groupName;
+                  }
+                ) peersList
+              ) (systemCfg.mesh.groupPeers or { })
+            );
+
+            # User-specific personal peers
+            userPersonalPeers = map (
+              p:
+              p
+              // {
+                scope = "user";
+                owner = currentUser;
+              }
+            ) (userCfg.mesh.userPeers or [ ]);
+
+            allConfiguredPeers = topologyPeers ++ systemExplicitPeers ++ systemGroupPeers ++ userPersonalPeers;
+
             authCfg = systemCfg.auth or { };
+
+            # Invariant memory facts: topology facts + system facts + user personal facts
+            allConfiguredFacts =
+              topologyFacts
+              ++ (systemCfg.memory.facts or [ ])
+              ++ (map (
+                f:
+                f
+                // {
+                  scope_id = if f.scope_id != null then f.scope_id else "user:${currentUser}";
+                }
+              ) (userCfg.memory.userFacts or [ ]));
+
             pluginConfigs = {
               "dsh-auth" = {
                 mode = authCfg.mode or "auto";
@@ -638,18 +805,18 @@ in
                 ldap = authCfg.ldap or { enabled = false; };
                 loopback = {
                   enabled = authCfg.loopback.enabled or true;
-                  defaultUser = osConfig.my.user.name or (builtins.getEnv "USER");
+                  defaultUser = currentUser;
                   defaultClearance = "Admin";
                 };
                 peerMesh = authCfg.peerMesh or { enabled = true; };
               };
               "dsh-memory" = {
-                facts = topologyFacts;
+                facts = allConfiguredFacts;
               };
               "dsh-mesh" = {
                 nodeId = currentHost;
-                listenPort = 3891;
-                peers = meshPeers;
+                listenPort = systemCfg.mesh.listenPort or 3891;
+                peers = allConfiguredPeers;
               };
             };
 
@@ -698,6 +865,91 @@ in
                   type = lib.types.bool;
                   default = (osConfig.my.role or "server") != "server";
                   description = "Generate a native desktop launcher via my.features.desktop.webapps.";
+                };
+              };
+
+              mesh = {
+                userPeers = lib.mkOption {
+                  type = lib.types.listOf (
+                    lib.types.submodule {
+                      options = {
+                        id = lib.mkOption {
+                          type = lib.types.str;
+                          description = "Personal peer node identifier.";
+                        };
+                        endpoint = lib.mkOption {
+                          type = lib.types.str;
+                          description = "Peer endpoint (host:port or URL).";
+                        };
+                        tags = lib.mkOption {
+                          type = lib.types.listOf lib.types.str;
+                          default = [ ];
+                          description = "Node tags/capabilities (e.g. personal, laptop).";
+                        };
+                      };
+                    }
+                  );
+                  default = [ ];
+                  description = "Personal cluster peer nodes dedicated to this specific user.";
+                };
+              };
+
+              memory = {
+                userFacts = lib.mkOption {
+                  type = lib.types.listOf (
+                    lib.types.submodule {
+                      options = {
+                        subject = lib.mkOption {
+                          type = lib.types.str;
+                          description = "Subject entity URI.";
+                        };
+                        predicate = lib.mkOption {
+                          type = lib.types.str;
+                          description = "Predicate relation.";
+                        };
+                        object = lib.mkOption {
+                          type = lib.types.str;
+                          description = "Target entity URI or literal value.";
+                        };
+                        type_constraint = lib.mkOption {
+                          type = lib.types.nullOr lib.types.str;
+                          default = "String";
+                          description = "Type constraint (e.g. String, Port, IPv4, FQDN).";
+                        };
+                        confidence = lib.mkOption {
+                          type = lib.types.float;
+                          default = 1.0;
+                          description = "Confidence value between 0.0 and 1.0.";
+                        };
+                        security_label = lib.mkOption {
+                          type = lib.types.enum [
+                            "system"
+                            "operator"
+                            "user"
+                          ];
+                          default = "user";
+                          description = "Lattice security clearance required.";
+                        };
+                        scope_type = lib.mkOption {
+                          type = lib.types.enum [
+                            "public"
+                            "group"
+                            "user"
+                            "repo"
+                          ];
+                          default = "user";
+                          description = "Memory scope type (defaults to personal user memory).";
+                        };
+                        scope_id = lib.mkOption {
+                          type = lib.types.nullOr lib.types.str;
+                          default = null;
+                          description = "Memory scope target ID (e.g. group:dev, repo:nixfiles; defaults to user:username).";
+                        };
+                      };
+                    }
+                  );
+                  default = [ ];
+                  description = "Personal declarative facts and preferences provisioned for this user.";
                 };
               };
             };

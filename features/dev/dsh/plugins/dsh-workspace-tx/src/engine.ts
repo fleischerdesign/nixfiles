@@ -20,9 +20,21 @@ export class WorkspaceTransactionEngine {
 
   /**
    * Initialize an isolated, copy-on-write transaction context.
-   * Employs CoW overlay / worktree isolation off current HEAD.
+   * Employs CoW overlay / worktree isolation off current HEAD with Scoping and TTL.
    */
-  async begin(repoPath: string, riskLevel: RiskLevel = 'R1'): Promise<TransactionContext> {
+  async begin(
+    repoPath: string,
+    riskLevel: RiskLevel = 'R1',
+    options?: {
+      scopeType?: 'user' | 'group';
+      scopeId?: string;
+      owner?: string;
+      ttlMs?: number;
+    }
+  ): Promise<TransactionContext> {
+    // Proactively garbage collect expired orphaned transactions
+    await this.gc();
+
     const txId = crypto.randomUUID();
     const resolvedRepo = path.resolve(repoPath);
 
@@ -45,6 +57,12 @@ export class WorkspaceTransactionEngine {
       baseCommit
     ]);
 
+    const now = Date.now();
+    const ttl = options?.ttlMs ?? (48 * 3600 * 1000); // 48h default lease
+    const scopeType = options?.scopeType || 'user';
+    const owner = options?.owner || 'local';
+    const scopeId = options?.scopeId || (scopeType === 'user' ? `user:${owner}` : `group:dev`);
+
     const ctx: TransactionContext = {
       txId,
       repoPath: resolvedRepo,
@@ -53,14 +71,33 @@ export class WorkspaceTransactionEngine {
       upperDir,
       workDir: upperDir,
       targetBranch: branchName,
-      createdAt: Date.now(),
+      createdAt: now,
+      expiresAt: now + ttl,
       riskLevel,
       isolationMode: 'git-worktree',
-      status: 'prepared'
+      status: 'prepared',
+      scopeType,
+      scopeId,
+      owner
     };
 
     this.activeTx.set(txId, ctx);
     return ctx;
+  }
+
+  /**
+   * Garbage collect expired or orphaned transactions (Ephemeral Lease GC).
+   */
+  async gc(): Promise<number> {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [txId, tx] of Array.from(this.activeTx.entries())) {
+      if (tx.expiresAt && tx.expiresAt < now) {
+        await this.abort(txId);
+        cleaned++;
+      }
+    }
+    return cleaned;
   }
 
   getTransaction(txId: string): TransactionContext | undefined {

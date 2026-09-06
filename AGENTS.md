@@ -255,3 +255,15 @@ nix run .#update-custom-packages [package-name|"all"]
 
 Liest `packages/custom/*/manifest.json`, prüft GitHub Releases auf neue Versionen, lädt AppImage herunter, berechnet SRI-Hash, updated manifest. Erfordert `GITHUB_TOKEN` für authentifizierte API-Calls.
 
+## dsh-Integration
+
+DeepSeek Harness (dsh) wird als **generisches Multi-Tenant & Agent-Harness-Feature** in `features/dev/dsh/default.nix` deklariert:
+- **Architecture**: Stellt das System per `home-manager.sharedModules` bereit. Konfiguriert deklarativ `settings.yaml`, `.credentials.yaml` und den Cordis-Patch-Layer unter `$DSH_HOME` (`~/.dsh`).
+- **Plugin-System & Auto-Discovery**: `features/dev/dsh/lib/plugins.nix` scannt `features/dev/dsh/plugins/<name>/package.nix` und erzeugt deklarative Optionen unter `my.features.dev.dsh.plugins.<name>.enable`.
+- **Multi-Tenant Lattice & Security**:
+  - `dsh-auth`: Unified Identity Gateway, Forward-Proxy, Peer-Mesh & Cookie-Signierung mit HMAC-SHA256, sowie Organization- & Group-Switcher UI (`sidebar.brand.name`).
+  - `dsh-memory`: Multi-Tenant Knowledge-Graph mit Scopes (`public`, `group:*`, `user:*`, `repo:*`), FTS5 BM25 und bitemporaler TTL-Gültigkeit.
+  - `dsh-mesh`: PeerScope (`system` / `user` / `group`), Delegation Tokens und cluster-weite Agent-Delegation.
+  - `dsh-workspace-tx`: Transaktionale Copy-on-Write Workspace-Mutationen mit human-in-the-loop Approval und Gruppen-Gating.
+  - `dsh-share`: Capability-basiertes Session-Sharing (`/share/dsh_sh_...`), Zero-Leakage Redaction (Secrets/API-Keys/Pfade) und Instant Revocation, integriert in das Drei-Punkte-Menü (`...`) der Sidebar-Sessions.
+

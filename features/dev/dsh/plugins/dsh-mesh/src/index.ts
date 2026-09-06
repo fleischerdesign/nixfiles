@@ -1,10 +1,14 @@
 import { Service, type Context } from '@deepseek-ai/cordis';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import * as http from 'node:http';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { MeshTransportClient } from './protocol.js';
 import type {
   MeshPluginConfig,
+  PeerScope,
   PeerStatus,
+  PeerEndpoint,
   HeartbeatPayload,
   SyncDeltaRequest,
   SyncDeltaResponse
@@ -16,6 +20,8 @@ export const inject = ['tools', 'systemPrompt'];
 declare module '@deepseek-ai/cordis' {
   interface Context {
     mesh: MeshCoordinatorService;
+    webServer?: any;
+    auth?: any;
   }
 }
 
@@ -24,11 +30,13 @@ export class MeshCoordinatorService extends Service {
   private client: MeshTransportClient;
   private server?: http.Server;
   private heartbeatTimer?: NodeJS.Timeout;
+  private peersFilePath?: string;
 
   constructor(ctx: Context, private config: MeshPluginConfig) {
     super(ctx, 'mesh');
     this.client = new MeshTransportClient(5000);
 
+    // 1. Ingest declarative Nix peers (immutable, system, group or user scoped)
     for (const peer of config.peers || []) {
       this.peers.set(peer.id, {
         id: peer.id,
@@ -36,9 +44,17 @@ export class MeshCoordinatorService extends Service {
         lastHeartbeatMs: 0,
         rttMs: -1,
         healthy: false,
-        maxTxSeen: 0
+        maxTxSeen: 0,
+        scope: peer.scope || 'system',
+        owner: peer.owner,
+        group: peer.group,
+        dynamic: peer.dynamic || false
       });
     }
+
+    // 2. Ingest persistent dynamic user peers from ~/.dsh/mesh/peers.json
+    this.peersFilePath = config.userPeersFile || `${process.env.DSH_HOME || process.env.HOME + '/.dsh'}/mesh/user-peers.json`;
+    this.loadDynamicPeers();
 
     if (config.listenPort) {
       this.startServer(config.listenPort, config.listenHost || '0.0.0.0');
@@ -47,14 +63,186 @@ export class MeshCoordinatorService extends Service {
     this.startHeartbeatLoop(config.heartbeatIntervalMs || 10000);
   }
 
-  getPeers(): PeerStatus[] {
-    return Array.from(this.peers.values());
+  private loadDynamicPeers(): void {
+    if (!this.peersFilePath || !fs.existsSync(this.peersFilePath)) return;
+    try {
+      const data = JSON.parse(fs.readFileSync(this.peersFilePath, 'utf8'));
+      if (Array.isArray(data)) {
+        for (const p of data) {
+          if (p.id && p.endpoint) {
+            this.peers.set(p.id, {
+              id: p.id,
+              endpoint: p.endpoint,
+              lastHeartbeatMs: 0,
+              rttMs: -1,
+              healthy: false,
+              maxTxSeen: 0,
+              scope: p.scope || 'user',
+              owner: p.owner,
+              group: p.group,
+              dynamic: true
+            });
+          }
+        }
+      }
+    } catch {
+      // Failed to parse dynamic peers file; ignore
+    }
   }
 
-  async dispatchTask(peerId: string, toolName: string, args: Record<string, any>): Promise<any> {
+  private saveDynamicPeers(): void {
+    if (!this.peersFilePath) return;
+    try {
+      const dir = path.dirname(this.peersFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const dynamicList = Array.from(this.peers.values())
+        .filter(p => p.dynamic)
+        .map(p => ({
+          id: p.id,
+          endpoint: p.endpoint,
+          scope: p.scope,
+          owner: p.owner,
+          group: p.group,
+        }));
+      fs.writeFileSync(this.peersFilePath, JSON.stringify(dynamicList, null, 2), 'utf8');
+    } catch {
+      // Failed to save dynamic peers
+    }
+  }
+
+  /**
+   * Return peers visible to the requesting tenant.
+   * - Admin: sees all system peers, all group peers, and all user peers.
+   * - User/Member: sees all system peers + their own personal peers + nodes matching any of their groups.
+   */
+  getPeers(tenantUsername?: string, clearance?: string, tenantGroups?: string[]): PeerStatus[] {
+    const all = Array.from(this.peers.values());
+    if (!tenantUsername || clearance === 'Admin') {
+      return all;
+    }
+    return all.filter(p => {
+      if (p.scope === 'system') return true;
+      if (p.scope === 'user') return p.owner === tenantUsername;
+      if (p.scope === 'group' && p.group) {
+        return tenantGroups?.includes(p.group) ?? false;
+      }
+      return false;
+    });
+  }
+
+  /**
+   * Probe endpoint health and latency.
+   */
+  async probeEndpoint(endpoint: string): Promise<{ healthy: boolean; rttMs: number; error?: string }> {
+    try {
+      const { rttMs } = await this.client.sendHeartbeat(endpoint, {
+        nodeId: this.config.nodeId,
+        timestamp: Date.now(),
+        maxTx: Date.now()
+      });
+      return { healthy: true, rttMs };
+    } catch (e: any) {
+      return { healthy: false, rttMs: -1, error: e.message || String(e) };
+    }
+  }
+
+  /**
+   * Register a new dynamic peer (user or group scoped).
+   */
+  async addPeer(endpoint: PeerEndpoint, tenant?: { username: string; clearance?: string; groups?: string[] }): Promise<PeerStatus> {
+    if (this.peers.has(endpoint.id)) {
+      const existing = this.peers.get(endpoint.id)!;
+      if (!existing.dynamic) {
+        throw new Error(`Cannot overwrite node "${endpoint.id}" (declaratively managed by Nix).`);
+      }
+    }
+
+    const scope: PeerScope = endpoint.scope || 'user';
+
+    if (scope === 'group') {
+      if (!endpoint.group) {
+        throw new Error('Group-scoped node requires a group name');
+      }
+      if (tenant?.clearance !== 'Admin' && (!tenant?.groups || !tenant.groups.includes(endpoint.group))) {
+        throw new Error(`Unauthorized: You are not a member of group "${endpoint.group}".`);
+      }
+    }
+
+    // SSRF & loopback protection: prevent targeting sensitive system ports
+    const url = endpoint.endpoint.startsWith('http') ? endpoint.endpoint : `http://${endpoint.endpoint}`;
+    try {
+      const parsedUrl = new URL(url);
+      const port = Number(parsedUrl.port) || 80;
+      if (['127.0.0.1', 'localhost', '::1'].includes(parsedUrl.hostname) && [22, 5432, 6379, 9090].includes(port)) {
+        throw new Error(`Prohibited target port ${port} on loopback.`);
+      }
+    } catch (e: any) {
+      if (e.message.includes('Prohibited target port')) throw e;
+    }
+
+    const probe = await this.probeEndpoint(endpoint.endpoint);
+
+    const peerStatus: PeerStatus = {
+      id: endpoint.id,
+      endpoint: endpoint.endpoint,
+      lastHeartbeatMs: probe.healthy ? Date.now() : 0,
+      rttMs: probe.rttMs,
+      healthy: probe.healthy,
+      maxTxSeen: 0,
+      scope,
+      owner: scope === 'user' ? tenant?.username : undefined,
+      group: scope === 'group' ? endpoint.group : undefined,
+      dynamic: true
+    };
+
+    this.peers.set(endpoint.id, peerStatus);
+    this.saveDynamicPeers();
+    return peerStatus;
+  }
+
+  /**
+   * Remove a dynamic peer. Declarative Nix peers cannot be deleted.
+   */
+  removePeer(peerId: string, tenant?: { username: string; clearance?: string; groups?: string[] }): boolean {
+    const peer = this.peers.get(peerId);
+    if (!peer) return false;
+
+    if (!peer.dynamic) {
+      throw new Error(`Node "${peerId}" is declaratively configured by Nix and cannot be removed at runtime.`);
+    }
+
+    if (tenant?.clearance !== 'Admin') {
+      if (peer.scope === 'user' && peer.owner && peer.owner !== tenant?.username) {
+        throw new Error(`Unauthorized: You do not own personal node "${peerId}".`);
+      }
+      if (peer.scope === 'group' && peer.group && (!tenant?.groups || !tenant.groups.includes(peer.group))) {
+        throw new Error(`Unauthorized: You are not a member of group "${peer.group}" for node "${peerId}".`);
+      }
+    }
+
+    this.peers.delete(peerId);
+    this.saveDynamicPeers();
+    return true;
+  }
+
+  async dispatchTask(peerId: string, toolName: string, args: Record<string, any>, tenant?: any): Promise<any> {
     const peer = this.peers.get(peerId);
     if (!peer) {
       throw new Error(`Target peer node "${peerId}" not found in mesh registry.`);
+    }
+
+    // Security check: If target peer is personal to another user, deny dispatch
+    if (peer.scope === 'user' && peer.owner && tenant?.username && peer.owner !== tenant.username && tenant?.clearance !== 'Admin') {
+      throw new Error(`PermissionDenied: Personal node "${peerId}" belongs to user "${peer.owner}".`);
+    }
+
+    // Security check: If target peer is group-scoped, caller must be member of that group
+    if (peer.scope === 'group' && peer.group && tenant?.clearance !== 'Admin') {
+      if (!tenant?.groups || !tenant.groups.includes(peer.group)) {
+        throw new Error(`PermissionDenied: Node "${peerId}" is restricted to group "${peer.group}".`);
+      }
     }
 
     const taskId = `tx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -63,7 +251,13 @@ export class MeshCoordinatorService extends Service {
       taskId,
       toolName,
       arguments: args,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      capability: {
+        taskId,
+        issuedFor: `user:${tenant?.username || 'anonymous'}`,
+        authorizedGroup: peer.group ? `group:${peer.group}` : undefined,
+        expiresAt: Date.now() + 120000
+      }
     });
   }
 
@@ -187,6 +381,94 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
     return () => {
       service.close();
     };
+  });
+
+  // Register HTTP routes for cluster web UI when webServer is available
+  ctx.inject(['webServer'], (wsCtx: any) => {
+    wsCtx.webServer.register({
+      kind: 'exact',
+      path: '/api/mesh/peers',
+      handler: async (req: any, res: any) => {
+        const tenant = (req as any).tenant || { username: 'local', clearance: 'Admin', groups: ['wheel'] };
+
+        if (req.method === 'GET') {
+          try {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              nodeId: config?.nodeId || 'standalone',
+              peers: service.getPeers(tenant.username, tenant.clearance, tenant.groups)
+            }));
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: err.message }));
+          }
+          return;
+        }
+
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: any) => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const payload = JSON.parse(body);
+              if (!payload.id || !payload.endpoint) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'Missing required id or endpoint field' }));
+                return;
+              }
+
+              const scope: PeerScope = payload.scope === 'group' ? 'group' : 'user';
+
+              const peer = await service.addPeer({
+                id: String(payload.id).trim(),
+                endpoint: String(payload.endpoint).trim(),
+                tags: payload.tags || [scope === 'group' ? 'group' : 'personal'],
+                scope,
+                group: scope === 'group' ? String(payload.group || '').trim() : undefined,
+                owner: scope === 'user' ? tenant.username : undefined,
+                dynamic: true
+              }, tenant);
+
+              res.statusCode = 201;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ peer }));
+            } catch (err: any) {
+              res.statusCode = err.message.includes('managed by Nix') ? 409 : (err.message.includes('Unauthorized') ? 403 : 400);
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          const parsedUrl = new URL(`http://${req.headers.host || 'localhost'}${req.url}`);
+          const peerId = parsedUrl.searchParams.get('id');
+          if (!peerId) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Missing id query parameter' }));
+            return;
+          }
+
+          try {
+            service.removePeer(peerId, tenant);
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true, removed: peerId }));
+          } catch (err: any) {
+            res.statusCode = err.message.includes('Unauthorized') ? 403 : 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: err.message }));
+          }
+          return;
+        }
+
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+      }
+    });
   });
 
   ctx.systemPrompt.section({
