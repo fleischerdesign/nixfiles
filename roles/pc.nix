@@ -66,8 +66,8 @@
       };
 
       defaultModel = lib.mkDefault {
-        provider = "deepseek";
-        model = "DeepSeek-V4-Flash-Vision-Exp";
+        provider = "deepseek-official";
+        model = "deepseek-v4-flash-vision-exp";
       };
 
       deepseek = {
