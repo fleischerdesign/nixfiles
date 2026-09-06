@@ -14,7 +14,7 @@ import type {
 } from './types.js';
 
 export const name = 'memory';
-export const inject = ['tools', 'systemPrompt'];
+export const inject = ['tools', 'systemPrompt', 'auth'];
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -217,7 +217,8 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     ctx.inject(['llm'], (llmCtx: any) => {
       llmCtx.llm.on('llm/pre-request', async (request: any, next: () => Promise<any>) => {
         try {
-          const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
+          const authService = ctx.get('auth');
+          const tenant = authService?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
           const messages = request?.messages || [];
           const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
 
@@ -287,7 +288,8 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
           return { facts: [], transitive };
         }
 
-        const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
+        const authService = ctx.get('auth');
+        const tenant = authService?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
 
         const result = engine.query({
           subject: args.subject,
@@ -341,7 +343,8 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         ]
       },
       async execute(args: StoreFactArgs): Promise<any> {
-        const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
+        const authService = ctx.get('auth');
+        const tenant = authService?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
 
         const requestedScopeType: MemoryScopeType = args.scope_type || 'user';
         let resolvedScopeId = args.scope_id;

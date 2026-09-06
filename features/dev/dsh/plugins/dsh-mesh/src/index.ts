@@ -15,7 +15,7 @@ import type {
 } from './types.js';
 
 export const name = 'mesh';
-export const inject = ['tools', 'systemPrompt'];
+export const inject = ['tools', 'systemPrompt', 'auth'];
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -499,9 +499,15 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
         ]
       },
       async execute(): Promise<any> {
+        const authService = ctx.get('auth');
+        const tenant = authService?.activeTenant;
+        const peers = service.getPeers(tenant?.username, tenant?.clearance, tenant?.groups);
+        // Ensure lossless JSON by eliminating any undefined properties (which fail snapshotJsonValue)
+        const sanitizedPeers = JSON.parse(JSON.stringify(peers));
+
         return {
           nodeId: config.nodeId || 'unknown',
-          peers: service.getPeers()
+          peers: sanitizedPeers
         };
       }
     })
@@ -535,7 +541,10 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
         ]
       },
       async execute(args: any): Promise<any> {
-        return service.dispatchTask(args.peer_id, args.tool_name, args.arguments || {});
+        const authService = ctx.get('auth');
+        const tenant = authService?.activeTenant;
+        const res = await service.dispatchTask(args.peer_id, args.tool_name, args.arguments || {}, tenant);
+        return JSON.parse(JSON.stringify(res));
       }
     })
   );

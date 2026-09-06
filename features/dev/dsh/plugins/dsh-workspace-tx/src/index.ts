@@ -14,7 +14,7 @@ import type {
 } from './types.js';
 
 export const name = 'workspace-tx';
-export const inject = ['tools', 'systemPrompt', 'approval'];
+export const inject = ['tools', 'systemPrompt', 'approval', 'auth'];
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -78,7 +78,8 @@ export function apply(ctx: Context): void {
       async execute(args: ProposeMutationArgs, exec): Promise<ProposeMutationResult> {
         const repoRoot = process.cwd();
         const riskLevel: RiskLevel = args.requires_network ? 'R2' : 'R1';
-        const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: ['wheel'] };
+        const authService = ctx.get('auth');
+        const tenant = authService?.activeTenant || { username: 'local', clearance: 'Admin', groups: ['wheel'] };
 
         const scopeType = args.scope_type || 'user';
         let scopeId = `user:${tenant.username}`;
@@ -181,7 +182,8 @@ export function apply(ctx: Context): void {
           throw new Error(`Transaction ${args.tx_id} not found or already settled.`);
         }
 
-        const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: ['wheel'] };
+        const authService = ctx.get('auth');
+        const tenant = authService?.activeTenant || { username: 'local', clearance: 'Admin', groups: ['wheel'] };
 
         // Group & User authorization for commit
         if (tenant.clearance !== 'Admin') {
