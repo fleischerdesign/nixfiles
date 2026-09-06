@@ -29,7 +29,7 @@
   my.features.dev.pi = {
     enable = true;
     provider = "deepseek";
-    defaultModel = "deepseek-v4-flash-vision-exp";
+    defaultModel = "DeepSeek-V4-Flash-Vision-Exp";
     providers = {
       deepseek.apiKey = config.sops.placeholder."pi/deepseek";
       openrouter.apiKey = config.sops.placeholder."pi/openrouter";

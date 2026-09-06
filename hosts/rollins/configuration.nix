@@ -74,7 +74,7 @@
     };
     auxiliary = {
       vision.provider = "deepseek";
-      vision.model = "deepseek-v4-flash-vision-exp";
+      vision.model = "DeepSeek-V4-Flash-Vision-Exp";
       title_generation.provider = "deepseek";
       title_generation.model = "deepseek-v4-flash";
       compression.provider = "deepseek";
