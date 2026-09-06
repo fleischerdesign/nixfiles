@@ -219,7 +219,7 @@ Stellt `yorke` beim Öffnen der Session fest, dass der lokale Git-Zustand abweic
 │ 📍 Projekt existiert primär auf "jello" (commpact-ui)                            │
 │    Status auf diesem Gerät ("yorke"): Auf diesem Gerät noch nicht synchron       │
 │                                                                                  │
-│   [ 🚀 Remote auf jello (Alt+R) ]            [ 💬 Nur Chatten (Kein Dateizugriff) ] │
+│   [ 🚀 Remote auf jello (Alt+R) ]  [ 📥 Hierher synchronisieren ]  [ 💬 Nur Chatten ] │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -229,10 +229,13 @@ Stellt `yorke` beim Öffnen der Session fest, dass der lokale Git-Zustand abweic
    - **Edge Case: Ursprungs-Host offline / schläft ein:**
      Bricht während eines Remote-Calls die Verbindung ab, wechselt DSH in den Zustand `Remote Node Unreachable`. Der laufende Turn wird sauber mit `RemoteNetworkError` angehalten; es gibt keine hängenden Prozesse.
 
-2. **Option B: Reiner Planungs- & Diskussions-Modus (Chat Only)**:
+2. **Option B: Manuell hierher synchronisieren (`📥 Hierher synchronisieren`)**:
+   - Vom Benutzer explizit angestoßener Sync: Klont das Repository via kanonischem Git-Origin auf das lokale Gerät (oder führt ein sauberes `git pull` aus), falls der Benutzer autark und lokal ohne Netz auf diesem Gerät weiterarbeiten möchte.
+
+3. **Option C: Reiner Planungs- & Diskussions-Modus (Chat Only)**:
    - Alle dateisystem-mutierenden Tools werden stummgeschaltet. Der Agent agiert rein beratend auf Basis des synchronisierten Chat-Kontexts.
 
-*(Hinweis: Automatischer Hintergrund-Git-Sync und Over-the-Wire Patch-Transfers wurden bewusst verworfen, um Datenverluste, kaputte Worktrees und Merge-Konflikte im Hintergrund deterministisch auszuschließen).*
+*(Hinweis: Automatischer, heimlicher Hintergrund-Git-Sync und spekulative Patch-Transfers wurden verworfen; Aktionen erfolgen strikt auf explizite Benutzerinteraktion).*
 
 ---
 

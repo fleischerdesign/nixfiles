@@ -111,6 +111,25 @@ export function WorkspaceActionBanner({
 
         <button
           type="button"
+          onClick={onSyncWorkspace}
+          style={{
+            padding: '4px 10px',
+            borderRadius: '5px',
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            color: '#e2e8f0',
+            fontSize: '11px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px'
+          }}
+        >
+          <span>📥</span> Hierher synchronisieren
+        </button>
+
+        <button
+          type="button"
           onClick={onChatOnly}
           style={{
             padding: '4px 10px',
