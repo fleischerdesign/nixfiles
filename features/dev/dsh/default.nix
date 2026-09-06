@@ -767,6 +767,10 @@ in
                   Description = "DeepSeek Harness (dsh) Web UI Service";
                   Documentation = [ "https://github.com/deepseek-ai/deepseek-harness" ];
                   After = [ "network.target" ];
+                  X-Restart-Triggers = activePluginDrvs ++ [
+                    (builtins.toJSON settingsDoc)
+                    (if homePatch != null then homePatch else "")
+                  ];
                 };
 
                 Service = {

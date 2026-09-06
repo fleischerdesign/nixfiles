@@ -1,60 +1,19 @@
 # features/dev/dsh/plugins/dsh-memory/package.nix
-# dsh-memory: Bitemporal knowledge representation, Lattice-Datalog inference, and vector memory.
+# dsh-memory: Bitemporal knowledge graph memory engine.
 {
-  lib,
-  stdenv,
-  nodejs_24,
-  typescript,
+  callPackage,
   dsh,
   ...
 }:
 
 let
+  buildDshPlugin = callPackage ../../lib/build-plugin.nix { inherit dsh; };
   manifest = builtins.fromJSON (builtins.readFile ./manifest.json);
-  pname = manifest.name;
 in
-stdenv.mkDerivation {
-  inherit pname;
+buildDshPlugin {
+  pname = manifest.name;
   inherit (manifest) version;
-
   src = ./.;
-
-  nativeBuildInputs = [
-    nodejs_24
-    typescript
-  ];
-
-  buildPhase = ''
-    runHook preBuild
-    # Link dsh node_modules for type resolution
-    mkdir -p node_modules/@deepseek-ai
-    if [ -d "${dsh}/lib/dsh/node_modules/@deepseek-ai" ]; then
-      ln -s ${dsh}/lib/dsh/node_modules/@deepseek-ai/* node_modules/@deepseek-ai/
-    fi
-    if [ -d "${dsh}/lib/dsh/node_modules/@types" ]; then
-      ln -s ${dsh}/lib/dsh/node_modules/@types node_modules/@types
-    fi
-
-    tsc --project tsconfig.json
-    runHook postBuild
-  '';
-
-  installPhase = ''
-    runHook preInstall
-    mkdir -p $out/lib/node_modules/${pname}
-    cp -r lib package.json cordis.patch.yml $out/lib/node_modules/${pname}/
-    if [ -d "${dsh}/lib/dsh/node_modules/@deepseek-ai" ]; then
-      mkdir -p $out/lib/node_modules/${pname}/node_modules
-      ln -s ${dsh}/lib/dsh/node_modules/@deepseek-ai $out/lib/node_modules/${pname}/node_modules/@deepseek-ai
-    fi
-    runHook postInstall
-  '';
-
-  passthru.dshPluginName = manifest.bundle or pname;
-
-  meta = {
-    description = manifest.description;
-    license = lib.licenses.mit;
-    platforms = lib.platforms.linux;
-  };
+  description = manifest.description;
+  hasClient = false;
 }

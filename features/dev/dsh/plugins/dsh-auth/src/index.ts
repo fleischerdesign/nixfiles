@@ -18,11 +18,10 @@ export const inject = ['webServer'];
 declare module '@deepseek-ai/cordis' {
   interface Context {
     auth: IdentityAuthGatewayService;
-    tenant?: UserIdentity;
     webServer: any;
     connection?: any;
     tools?: any;
-    llm?: any;
+    llm: any;
   }
 }
 
@@ -32,6 +31,7 @@ interface TokenBucketState {
 }
 
 export class IdentityAuthGatewayService extends Service {
+  public activeTenant?: UserIdentity;
   private strategies: AuthStrategy[] = [];
   private signingSecret: Buffer;
   private tokenBuckets = new Map<string, TokenBucketState>();
@@ -162,8 +162,9 @@ export class IdentityAuthGatewayService extends Service {
       route.handler = async (req: IncomingMessage, res: ServerResponse) => {
         const identity = await self.authenticateRequest(req);
         if (identity) {
-          // Attach tenant identity to cordis context
-          self.ctx.tenant = identity;
+          // Attach tenant identity to request and service
+          (req as any).tenant = identity;
+          self.activeTenant = identity;
 
           // Auto-mint session cookie if absent or renew with full tenant identity
           self.ensureSessionCookie(req, res, identity);
@@ -312,7 +313,7 @@ export class IdentityAuthGatewayService extends Service {
 
     this.ctx.inject(['tools'], (toolsCtx: any) => {
       toolsCtx.tools.on('tools/pre-execute', async function(exec: any, next: () => Promise<any>) {
-        const tenant = self.ctx.tenant;
+        const tenant = self.activeTenant;
         const clearance: ClearanceLevel = tenant?.clearance || 'Admin'; // Default to Admin for local loopback
 
         const toolName = exec.name;
@@ -371,7 +372,7 @@ export class IdentityAuthGatewayService extends Service {
 
     this.ctx.inject(['llm'], (llmCtx: any) => {
       llmCtx.llm.on('llm/pre-request', async function(request: any, next: () => Promise<any>) {
-        const tenant = self.ctx.tenant;
+        const tenant = self.activeTenant;
         const clearance: ClearanceLevel = tenant?.clearance || 'Admin';
         const tenantId = tenant?.id || 'usr_local';
 
