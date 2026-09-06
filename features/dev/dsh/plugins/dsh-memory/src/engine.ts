@@ -30,6 +30,48 @@ export class BitemporalMemoryEngine {
       if (!hasEpistemic) {
         this.db.exec(`ALTER TABLE facts ADD COLUMN epistemic_class TEXT NOT NULL DEFAULT 'evidence';`);
       }
+
+      const hasFtsTokens = info.some((col: any) => col.name === 'fts_tokens');
+      if (!hasFtsTokens) {
+        this.db.exec(`ALTER TABLE facts ADD COLUMN fts_tokens TEXT NOT NULL DEFAULT '';`);
+        // Recreate FTS5 table and triggers with fts_tokens
+        this.db.exec(`DROP TABLE IF EXISTS facts_fts;`);
+        this.db.exec(`
+          CREATE VIRTUAL TABLE facts_fts USING fts5(
+            id UNINDEXED,
+            subject,
+            predicate,
+            object,
+            fts_tokens,
+            tokenize = 'porter unicode61'
+          );
+          DROP TRIGGER IF EXISTS trg_facts_ai;
+          DROP TRIGGER IF EXISTS trg_facts_ad;
+          DROP TRIGGER IF EXISTS trg_facts_au;
+          CREATE TRIGGER trg_facts_ai AFTER INSERT ON facts BEGIN
+            INSERT INTO facts_fts(id, subject, predicate, object, fts_tokens)
+            VALUES (new.id, new.subject, new.predicate, new.object, new.fts_tokens);
+          END;
+          CREATE TRIGGER trg_facts_ad AFTER DELETE ON facts BEGIN
+            DELETE FROM facts_fts WHERE id = old.id;
+          END;
+          CREATE TRIGGER trg_facts_au AFTER UPDATE ON facts BEGIN
+            DELETE FROM facts_fts WHERE id = old.id;
+            INSERT INTO facts_fts(id, subject, predicate, object, fts_tokens)
+            VALUES (new.id, new.subject, new.predicate, new.object, new.fts_tokens);
+          END;
+        `);
+
+        // Backfill fts_tokens for existing facts
+        const existingRows = this.db.prepare(`SELECT id, subject, predicate, object FROM facts`).all() as any[];
+        for (const row of existingRows) {
+          const tokens = decomposeToStems(`${row.subject} ${row.predicate} ${row.object}`).join(' ');
+          this.db.prepare(`UPDATE facts SET fts_tokens = ? WHERE id = ?`).run(tokens, row.id);
+          this.db.prepare(`INSERT INTO facts_fts(id, subject, predicate, object, fts_tokens) VALUES (?, ?, ?, ?, ?)`).run(
+            row.id, row.subject, row.predicate, row.object, tokens
+          );
+        }
+      }
     } catch {
       // Ignore migration errors on fresh tables
     }
@@ -98,13 +140,15 @@ export class BitemporalMemoryEngine {
       }
     }
 
+    const ftsTokens = decomposeToStems(`${fact.subject} ${fact.predicate} ${fact.object}`).join(' ');
+
     const insertStmt = this.db.prepare(`
       INSERT INTO facts (
-        id, subject, predicate, object,
+        id, subject, predicate, object, fts_tokens,
         valid_from, valid_to, tx_from, tx_to,
         type_constraint, confidence, security_label, status,
         scope_type, scope_id, author, epistemic_class
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertStmt.run(
@@ -112,6 +156,7 @@ export class BitemporalMemoryEngine {
       fact.subject,
       fact.predicate,
       fact.object,
+      ftsTokens,
       validFrom,
       validTo,
       txFrom,
@@ -289,18 +334,16 @@ export class BitemporalMemoryEngine {
     } = options;
 
     // 1. Entropy Gate: Ignore short greetings, affirmative replies, or trivial smalltalk
-    const tokens = queryText
-      .replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, ' ')
-      .split(/\s+/)
+    const queryStems = decomposeToStems(queryText)
       .filter((w) => w.length > 2 && !STOPWORDS.has(w.toLowerCase()))
-      .slice(0, 8);
+      .slice(0, 16);
 
     // If query lacks substantive content, zero tokens injected!
-    if (tokens.length < 2) {
+    if (queryStems.length < 2) {
       return [];
     }
 
-    const matchQuery = tokens.map(t => `"${t}"*`).join(' OR ');
+    const matchQuery = queryStems.map(t => `"${t}"*`).join(' OR ');
     const now = Date.now();
 
     const sql = `
@@ -410,3 +453,37 @@ const STOPWORDS = new Set([
   'der', 'die', 'das', 'und', 'ist', 'in', 'den', 'von', 'zu', 'mit', 'auf', 'für', 'eine', 'einen', 'ein',
   'hallo', 'moin', 'hi', 'danke', 'bitte', 'ok', 'okay', 'yes', 'no', 'ja', 'nein', 'wie', 'was'
 ]);
+
+/**
+ * Pure morphological decomposition and sub-word indexing.
+ * Decomposes CamelCase, namespace delimiters (: _ . - /), and common grammatical affixes
+ * without relying on external heavy language runtimes.
+ */
+function decomposeToStems(str: string): string[] {
+  if (!str) return [];
+  const words = str
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]/g, ' ')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
+
+  const tokens = new Set<string>();
+  const prefixes = ['vor', 'nach', 'spitz', 'voll', 'host', 'netz', 'user', 'sub'];
+
+  for (const w of words) {
+    tokens.add(w);
+    const stem = w.replace(/(?:e|en|er|es|em|n|s|ed|ing)$/, '');
+    if (stem.length > 2) tokens.add(stem);
+
+    for (const p of prefixes) {
+      if (w.startsWith(p) && w.length > p.length + 2) {
+        const sub = w.slice(p.length);
+        tokens.add(sub);
+        const subStem = sub.replace(/(?:e|en|er|es|em|n|s|ed|ing)$/, '');
+        if (subStem.length > 2) tokens.add(subStem);
+      }
+    }
+  }
+  return Array.from(tokens);
+}

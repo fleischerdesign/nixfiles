@@ -37,6 +37,7 @@ export function initializeDatabase(dbPath: string): DatabaseSync {
       scope_id TEXT NOT NULL DEFAULT 'public',
       author TEXT NOT NULL DEFAULT 'system',
       epistemic_class TEXT NOT NULL DEFAULT 'evidence',
+      fts_tokens TEXT NOT NULL DEFAULT '',
       embedding_blob BLOB
     );
 
@@ -54,13 +55,14 @@ export function initializeDatabase(dbPath: string): DatabaseSync {
       subject,
       predicate,
       object,
+      fts_tokens,
       tokenize = 'porter unicode61'
     );
 
     -- Sync triggers to keep FTS5 index consistent
     CREATE TRIGGER IF NOT EXISTS trg_facts_ai AFTER INSERT ON facts BEGIN
-      INSERT INTO facts_fts(id, subject, predicate, object)
-      VALUES (new.id, new.subject, new.predicate, new.object);
+      INSERT INTO facts_fts(id, subject, predicate, object, fts_tokens)
+      VALUES (new.id, new.subject, new.predicate, new.object, new.fts_tokens);
     END;
 
     CREATE TRIGGER IF NOT EXISTS trg_facts_ad AFTER DELETE ON facts BEGIN
@@ -69,8 +71,8 @@ export function initializeDatabase(dbPath: string): DatabaseSync {
 
     CREATE TRIGGER IF NOT EXISTS trg_facts_au AFTER UPDATE ON facts BEGIN
       DELETE FROM facts_fts WHERE id = old.id;
-      INSERT INTO facts_fts(id, subject, predicate, object)
-      VALUES (new.id, new.subject, new.predicate, new.object);
+      INSERT INTO facts_fts(id, subject, predicate, object, fts_tokens)
+      VALUES (new.id, new.subject, new.predicate, new.object, new.fts_tokens);
     END;
   `);
 
