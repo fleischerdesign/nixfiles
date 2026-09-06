@@ -306,10 +306,10 @@ export class BitemporalMemoryEngine {
     const sql = `
       SELECT f.*, bm25(facts_fts) as score
       FROM facts f
-      JOIN facts_fts fts ON f.id = fts.id
+      JOIN facts_fts ON f.id = facts_fts.id
       WHERE f.status = 'active'
         AND f.valid_from <= ? AND f.valid_to > ?
-        AND fts MATCH ?
+        AND facts_fts MATCH ?
       ORDER BY score ASC
       LIMIT 15
     `;
