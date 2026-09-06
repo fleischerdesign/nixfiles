@@ -13,6 +13,7 @@ export interface WorkspaceActionBannerProps {
 
 export function WorkspaceActionBanner({
   sessionNodeId,
+  workspaceUrn: propUrn,
   isDrifted = false,
   driftFilesCount = 0,
   onExecuteRemote,
@@ -22,6 +23,9 @@ export function WorkspaceActionBanner({
   const [dismissed, setDismissed] = useState(false);
   const [activeDrift, setActiveDrift] = useState(isDrifted);
   const [originNode, setOriginNode] = useState(sessionNodeId || '');
+  const [resolvedUrn, setResolvedUrn] = useState(propUrn || '');
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
 
   // Query actual session drift state dynamically
   useEffect(() => {
@@ -38,11 +42,51 @@ export function WorkspaceActionBanner({
         const currentSession = data.sessions.find((s: any) => s.nodeId !== localNode && s.isLeaseActive);
         if (currentSession) {
           setOriginNode(currentSession.nodeId);
+          if (currentSession.workspaceUrn) {
+            setResolvedUrn(currentSession.workspaceUrn);
+          }
           setActiveDrift(true);
         }
       })
       .catch(() => {});
   }, [isDrifted]);
+
+  const handleSync = async () => {
+    if (onSyncWorkspace) {
+      onSyncWorkspace();
+      return;
+    }
+
+    if (!resolvedUrn) {
+      setSyncStatus({ success: false, message: 'Keine Workspace-Identität gefunden.' });
+      return;
+    }
+
+    setSyncing(true);
+    setSyncStatus(null);
+
+    try {
+      const res = await fetch('/api/mesh/workspace/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceUrn: resolvedUrn })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSyncStatus({ success: true, message: data.message || 'Workspace erfolgreich synchronisiert!' });
+        setTimeout(() => {
+          setDismissed(true);
+        }, 2000);
+      } else {
+        setSyncStatus({ success: false, message: data.message || data.error || 'Synchronisation fehlgeschlagen.' });
+      }
+    } catch (err: any) {
+      setSyncStatus({ success: false, message: `Netzwerkfehler: ${err.message}` });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   if (dismissed || !activeDrift || !originNode) return null;
 
@@ -88,6 +132,21 @@ export function WorkspaceActionBanner({
         </button>
       </div>
 
+      {syncStatus && (
+        <div
+          style={{
+            padding: '6px 10px',
+            borderRadius: '5px',
+            fontSize: '11px',
+            backgroundColor: syncStatus.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            color: syncStatus.success ? '#34d399' : '#f87171',
+            border: `1px solid ${syncStatus.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+          }}
+        >
+          {syncStatus.message}
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
         <button
           type="button"
@@ -111,21 +170,22 @@ export function WorkspaceActionBanner({
 
         <button
           type="button"
-          onClick={onSyncWorkspace}
+          onClick={handleSync}
+          disabled={syncing}
           style={{
             padding: '4px 10px',
             borderRadius: '5px',
-            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            backgroundColor: syncing ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.08)',
             border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: '#e2e8f0',
+            color: syncing ? '#94a3b8' : '#e2e8f0',
             fontSize: '11px',
-            cursor: 'pointer',
+            cursor: syncing ? 'wait' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '5px'
           }}
         >
-          <span>📥</span> Hierher synchronisieren
+          <span>{syncing ? '⏳' : '📥'}</span> {syncing ? 'Synchronisiere...' : 'Hierher synchronisieren'}
         </button>
 
         <button
@@ -150,3 +210,4 @@ export function WorkspaceActionBanner({
     </div>
   );
 }
+

@@ -232,3 +232,94 @@ export function getWorkspaceGitFingerprint(cwd: string): {
   }
 }
 
+/**
+ * Synchronizes a workspace locally onto the current host.
+ * If the workspace is a Git repository, it either clones it into ~/dev/<repo>
+ * or fast-forwards an existing local checkout.
+ */
+export function syncWorkspaceLocally(
+  workspaceUrn: string,
+  preferredParentDir?: string
+): { success: boolean; localPath: string; message: string } {
+  const home = process.env.HOME || '/root';
+  const defaultBaseDir = preferredParentDir || path.join(home, 'dev');
+
+  if (!fs.existsSync(defaultBaseDir)) {
+    try {
+      fs.mkdirSync(defaultBaseDir, { recursive: true });
+    } catch (e: any) {
+      return { success: false, localPath: '', message: `Failed to create directory ${defaultBaseDir}: ${e.message}` };
+    }
+  }
+
+  // Parse URN
+  if (workspaceUrn.startsWith('urn:dsh:workspace:git:')) {
+    const rawRepo = workspaceUrn.replace('urn:dsh:workspace:git:', '');
+    // e.g. "github.com/fleischerdesign/commpact-ui" or "github.com/fleischerdesign/commpact-ui:packages/core"
+    const [repoPath] = rawRepo.split(':');
+    const repoName = path.basename(repoPath);
+    const targetDir = path.join(defaultBaseDir, repoName);
+    const cloneUrl = `https://${repoPath}`;
+
+    if (fs.existsSync(targetDir)) {
+      // Local directory exists: attempt fast-forward pull
+      try {
+        const isGit = fs.existsSync(path.join(targetDir, '.git'));
+        if (!isGit) {
+          return {
+            success: false,
+            localPath: targetDir,
+            message: `Target path "${targetDir}" already exists but is not a git repository.`
+          };
+        }
+
+        const out = execSync('git pull --ff-only', {
+          cwd: targetDir,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          encoding: 'utf8',
+          timeout: 15000
+        });
+
+        return {
+          success: true,
+          localPath: targetDir,
+          message: `Workspace "${repoName}" updated: ${out.trim() || 'Already up to date.'}`
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          localPath: targetDir,
+          message: `Git pull failed in "${targetDir}": ${err.stderr || err.message}`
+        };
+      }
+    } else {
+      // Clone repository
+      try {
+        execSync(`git clone "${cloneUrl}" "${targetDir}"`, {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          encoding: 'utf8',
+          timeout: 60000
+        });
+
+        return {
+          success: true,
+          localPath: targetDir,
+          message: `Repository "${repoName}" successfully cloned to "${targetDir}".`
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          localPath: targetDir,
+          message: `Git clone failed from "${cloneUrl}": ${err.stderr || err.message}`
+        };
+      }
+    }
+  }
+
+  return {
+    success: false,
+    localPath: '',
+    message: `Workspace URN "${workspaceUrn}" is not a valid Git repository URN.`
+  };
+}
+

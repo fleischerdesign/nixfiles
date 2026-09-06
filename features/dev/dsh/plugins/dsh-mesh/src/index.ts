@@ -8,7 +8,8 @@ import {
   computeCanonicalWorkspaceUrn,
   getWorkspaceGitFingerprint,
   resolveWorkspacePath,
-  extractCwdFromSessionDir
+  extractCwdFromSessionDir,
+  syncWorkspaceLocally
 } from './workspace.js';
 import type {
   MeshPluginConfig,
@@ -675,6 +676,42 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ error: err.message }));
           }
+          return;
+        }
+
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+      }
+    });
+
+    wsCtx.webServer.register({
+      kind: 'exact',
+      path: '/api/mesh/workspace/sync',
+      handler: async (req: any, res: any) => {
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: any) => { body += chunk; });
+          req.on('end', () => {
+            try {
+              const payload = JSON.parse(body || '{}');
+              const { workspaceUrn, preferredDir } = payload;
+              if (!workspaceUrn) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Missing workspaceUrn in request body' }));
+                return;
+              }
+
+              const result = syncWorkspaceLocally(workspaceUrn, preferredDir);
+              res.statusCode = result.success ? 200 : 422;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(result));
+            } catch (err: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
           return;
         }
 
