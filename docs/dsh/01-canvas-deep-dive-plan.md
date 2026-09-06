@@ -1,226 +1,254 @@
-# Master-Entwurf: Dual-Pane Interactive Canvas and Artifacts (`dsh-canvas`)
+# Formale Spezifikation: Dual-Pane Interactive Canvas & Artifacts (`dsh-canvas`)
 
-## 1. Vision, Leitprinzipien & UX-Mental Model
+## 1. Ergonomie-Philosophie, Mental Model & Human-Agent Interaction (HAI)
 
-### 1.1 Das Paradoxon des monolithischen Chat-Streams
-In standardmäßigen KI-Code-Assistenten (DeepSeek Harness, Terminal-Agenten) teilt sich der sequenzielle Prompt-Verlauf denselben Bildschirmbereich mit seitenlangen Datei-Outputs. 
-- Ein generiertes Modul von 400 Zeilen drängt den Konversationsfaden aus dem Blickfeld.
-- Das Überprüfen einzelner Funktionsdeklarationen erfordert ständiges Hin- und Herscrollen.
-- Möchte der Benutzer eine Änderung an einer bestimmten Funktion vornehmen, muss er dem LLM sprachlich mühsam erklären: *"Gehe zu Funktion XYZ in Zeile 180 und ändere dort..."*
+### 1.1 Kognitive Entkopplung: Ephemere Konversation vs. Persistente Artefakte
+Klassische Chat-Interfaces zwingen Benutzer und Sprachmodell in ein **lineares Append-Only-Paradigma**. Für die Softwareentwicklung ist dies kognitiv destruktiv:
+1. **Verlust des visuellen Ankers:** Ein 300-Zeilen-Modul verdrängt den Problemkontext und vorherige Instruktionen aus dem Sichtfeld.
+2. **Indirekte Adressierung:** Modifikationen erfordern sprachliche Hilfskonstruktionen (*"Gehe zu Funktion `resolveToken` in Zeile 45 und..."*), was zu Mehrdeutigkeiten, Latenz und Token-Verschwendung führt.
+3. **Schreib-Lese-Asymmetrie:** Code wird sequenziell gelesen, aber punktuell editiert.
 
-### 1.2 Die Canvas-Philosophie: Lebende Dokumente im Neben-Workspace
-Mit `dsh-canvas` wird die Konversation entkoppelt:
-- **Linke Pane (Chat & Orchestrierung):** Der lineare Zeitstrahl von Gedanken, Tools, Erklärungen und Planungen.
-- **Rechte Pane (Canvas Workspace):** Ein dynamischer, interaktiver Editor für *Artefakte* (Code-Dateien, Markdown-Spezifikationen, SVG/HTML Live-Previews).
-- **Direkte Manipulation (Targeted In-Place Edits):** Der Benutzer markiert im Canvas einen Code-Block, drückt `Strg+K` (oder klickt auf die schwebende Toolbar), gibt einen Mikro-Prompt ein (*"Typisiere diese Funktion strikt mit Zod und fange Error-Cases ab"*), und der Agent wendet das Diff **in situ** direkt auf das Artefakt an.
-
----
-
-## 2. Detailliertes UI- und UX-Design
-
-### 2.1 Visuelles Layout und Responsive Split-Grid
-
-```
-+---------------------------------------------------------------------------------------------------------+
-| [DSH Logo] Session: NixOS Flake Refactor   (Tailscale: jello -> rollins)              [Share] [Settings]|
-+-------------------------------------------------------+-------------------------------------------------+
-| CHAT CONVERSATION PANE (50%)                          | CANVAS WORKSPACE PANE (50%)                     |
-|                                                       |                                                 |
-| > User: Erstelle ein Redis Sentinel Cluster Modul     | [Tabs:  📄 redis-sentinel.nix  * |  📊 topology.svg ] |
-|                                                       | [Toolbar:  v3 (Latest) ▾ | [Diff] | [Sync 💾] | [✕] ]|
-| > DeepSeek Agent:                                     +-------------------------------------------------+
-|   Ich habe das Modul strukturiert.                    | 1  { config, lib, pkgs, ... }:                  |
-|   Siehe Artefakt im Canvas rechts.                    | 2  let                                          |
-|                                                       | 3    cfg = config.services.redisSentinel;       |
-|   ┌──────────────────────────────────────────────┐    | 4  in {                                         |
-|   | 📄 [Artefakt: redis-sentinel.nix (v1)]       |    | 5    options.services.redisSentinel = {         |
-|   | 84 Zeilen · Nix · Im Canvas geöffnet         |    | 6+     enable = lib.mkEnableOption "Sentinel";  |
-|   └──────────────────────────────────────────────┘    | 7+     masterName = lib.mkOption {              |
-|                                                       | 8+       type = lib.types.str;                  |
-|   [✓ Tool: validate_syntax passed]                   | 9+       default = "mymaster";                  |
-|                                                       | 10     };                                       |
-|                                                       |    +---------------------------------------+    |
-|                                                       | 11 | [Strg+K] Füge Quorum-Option hinzu... |    |
-|                                                       |    +---------------------------------------+    |
-|                                                       |                                                 |
-+-------------------------------------------------------+-------------------------------------------------+
-| [ + @file @diff ] Prompt eingeben...      [Send ↵]    | Workspace Path: features/services/redis-sentinel|
-+-------------------------------------------------------+-------------------------------------------------+
-```
-
-### 2.2 Zustände und Übergänge des Split-Panes
-
-1. **Collapsed Mode (Standardzustand / Chat First):**
-   - Wenn kein Artefakt aktiv ist, nimmt der Chat 100% der horizontalen Breite ein (zentriert mit Lesebreite 840px).
-   - Sobald der Agent ein Artefakt erzeugt oder der Benutzer eine Datei mit `@file` im Canvas inspizieren möchte, gleitet das Canvas-Pane flüssig von rechts herein (`transition: width 240ms cubic-bezier(0.16, 1, 0.3, 1)`).
-2. **Dual-Pane Mode (50/50 Split):**
-   - Ein robuster Drag-Handle (Divider mit Hover-Highlight) erlaubt stufenloses Verschieben der Pane-Breite zwischen `30% / 70%` und `70% / 30%`.
-   - Ein Doppelklick auf den Divider zentriert exakt auf `50% / 50%`.
-3. **Maximized Canvas Mode (Focus Work):**
-   - Über einen Maximize-Button im Canvas-Header kann das Canvas auf 100% expandiert werden (z. B. für komplexe Reviews großer Dateien).
-4. **Mobile / Viewport < 960px:**
-   - Automatischer Wechsel von Side-by-Side auf Tab-Navigation im Header:
-     `[ 💬 Chat ]  [ 📄 Canvas (1) ]`.
+`dsh-canvas` löst dieses Paradoxon durch die **strikte Trennung von Diskurs- und Artefaktebene**:
+- **Diskursebene (Left Pane, $P_{\text{chat}}$):** Sequenzieller Stream für Absichtsbekundungen, Planungen, Tool-Ausführungen und Erklärungen.
+- **Artefaktebene (Right Pane, $P_{\text{canvas}}$):** Reaktive Arbeitsfläche für lebendige Dokumente, Code, Schemata und Previews.
+- **Punktuelle Manipulation:** Direkte Selektion von Entitäten im Canvas mit gezieltem In-Place Refactoring ($V_{\text{target}} \to V_{\text{target}}'$).
 
 ---
 
-## 3. Kern-Features im Detail
+## 2. Formale System- und Modul-Architektur
 
-### 3.1 Targeted Selection In-Place Prompting (Strg+K)
-- **Ablauf:**
-  1. Entwickler markiert Zeilen 40–55 im Code.
-  2. Es erscheint eine schwebende Toolbar direkt über der Selektion: `[✨ Ask Agent (Strg+K)]  [📋 Copy]  [📌 Pin as Context]`.
-  3. Beim Klick auf `Ask Agent` öffnet sich ein Inline-Prompt-Input mit Autocomplete.
-  4. Der Prompt wird mit exaktem Range (`startLine, endLine`) und dem Dateikontext als Sub-Turn an das Modell gesendet.
-  5. Das Modell streamt das Diff **direkt in die Zeilen des Editors** hinein.
-  6. Nach dem Streaming sieht der Benutzer die Änderungen als visuelles Inline-Diff (Grün/Rot) mit zwei Buttons: `[✓ Accept (Strg+Enter)]` und `[✗ Revert (Esc)]`.
-
-### 3.2 Live Preview & Interactive Artifact Renderers
-Das Canvas unterstützt verschiedene Content-Typen:
-- **Code (Monaco Editor / Prism):** Syntax-Highlighting für Nix, TypeScript, Python, Rust, Go, Bash, YAML, Markdown.
-- **Sandboxed Web & HTML (`sandbox="allow-scripts"`):**
-  - Isolierte Darstellung von HTML5/CSS/JS-Apps, Mockups oder UI-Prototypen.
-  - Kommuniziert mit dem Host ausschließlich über sichere `postMessage`-Kanäle.
-- **Mermaid & Graphviz Architecture Engine:**
-  - Live-Kompilierung von Flowcharts, State-Diagrammen und Entity-Relationship-Diagrammen.
-  - Zoom & Pan Unterstützung mit SVG-Export.
-- **Rich Markdown & LaTeX:**
-  - Rendern von Formeln, GFM-Tabellen, Callouts und interaktiven Tasklisten.
-
-### 3.3 Time-Travel Version Ledger
-Jedes Artefakt besitzt eine lückenlose Revisionskette:
-- Jeder Agenten-Turn und jede manuelle Benutzerbearbeitung erzeugt eine Version `v1`, `v2`, `...`, `vn`.
-- Über ein Dropdown im Header (`v3 (Latest) ▾`) kann blitzschnell auf historische Versionen zurückgesprungen werden.
-- Ein `[Side-by-Side Diff]` Modus vergleicht zwei beliebige Versionen (`v1` vs. `v3`) direkt im Editor.
-
-### 3.4 Bidirektionale Dateisystem-Synchronisation (CoW Integration)
-- Artefakte können rein virtuell sein (z.B. flüchtige Architektur-Skizzen) oder **file-backed** (an einen Dateipfad im Workspace gebunden).
-- Bei file-backed Artefakten:
-  - Ein Klick auf `[Save / Sync 💾]` übernimmt den Inhalt über `dsh-workspace-tx` transaktional in das Workspace-Dateisystem.
-  - Ändert sich die Datei extern auf der Festplatte, detektiert der Inotify-Watcher die Änderung und markiert das Artefakt als *Desynchronized* mit einer visuellen Auflösungsleiste.
-
----
-
-## 4. Vollständiges Datenmodell und State-Machine
-
-### 4.1 TypeScript Datenverträge
-
-```typescript
-export type ArtifactFormat = 'code' | 'markdown' | 'html' | 'svg' | 'mermaid' | 'diff';
-
-export interface ArtifactSelectionRange {
-  startLine: number;
-  startColumn: number;
-  endLine: number;
-  endColumn: number;
-}
-
-export interface ArtifactVersionRecord {
-  versionId: number;
-  author: 'user' | 'agent' | 'external';
-  timestamp: number;
-  content: string;
-  summary?: string;
-  deltaSummary?: { added: number; removed: number };
-}
-
-export interface CanvasArtifactState {
-  artifactId: string;
-  sessionId: string;
-  title: string;
-  format: ArtifactFormat;
-  language: string;
-  workspacePath?: string;
-  activeVersionId: number;
-  versions: ArtifactVersionRecord[];
-  isDirty: boolean;
-  isStreaming: boolean;
-  selection?: ArtifactSelectionRange;
-}
-
-export interface CanvasStoreState {
-  openArtifactIds: string[];
-  activeArtifactId: string | null;
-  paneWidthPercent: number; // 20 bis 80, Default: 50
-  isMaximized: boolean;
-  isDiffModeActive: boolean;
-  diffCompareVersionId?: number;
-}
-```
-
-### 4.2 State Machine der interaktiven In-Place Bearbeitung
+### 2.1 Schichtenmodell und Datenfluss
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle: Editor geöffnet
-    Idle --> TextSelected: Benutzer markiert Zeilen
-    TextSelected --> Prompting: Klick auf Strg+K / Action Bar
-    TextSelected --> Idle: Klick außerhalb
-    Prompting --> StreamingDiff: User sendet Instruktion ab
-    StreamingDiff --> ReviewingDiff: Stream vollständig beendet
-    ReviewingDiff --> Idle: User klickt [Accept] -> Neue Version v_{n+1}
-    ReviewingDiff --> Idle: User klickt [Revert] -> Rollback auf v_n
+graph TD
+    subgraph Client Layer [DSH Web Client / React 19]
+        A[Split-Layout Manager] --> B[Left: ui-conversation Shell]
+        A --> C[Right: Canvas Dock]
+        C --> D[Artifact Tab Registry]
+        D --> E[Monaco Code Editor Engine]
+        D --> F[Sandboxed Webview CSP Isolated]
+        E --> G[Floating Action Toolbar Strg+K]
+        G --> H[Inline Diff Shimmer Renderer]
+    end
+
+    subgraph Reactive Store Layer [DSH Store Architecture]
+        I[CanvasStore: Snapshot & Actions]
+        J[Version History DAG Store]
+        K[Selection & Focus State Machine]
+        I <--> J
+        I <--> K
+    end
+
+    subgraph RPC & Bridge Layer [Cordis Client Services]
+        L[canvas.rpc Client Channel]
+        M[Sub-Turn Streaming Multiplexer]
+    end
+
+    subgraph Host Engine [dsh-canvas Backend Plugin]
+        N[Canvas Artifact Service]
+        O[3-Way Merge & Delta Engine]
+        P[CoW Transaction Adapter dsh-workspace-tx]
+        Q[(SQLite Artifact Revisions DB)]
+    end
+
+    C <-->|Store Subscriptions| I
+    I <-->|Typed RPC| L
+    G <-->|Sub-Turn Stream| M
+    L <--> N
+    M <--> N
+    N <--> O
+    N <--> P
+    N <--> Q
+```
+
+### 2.2 Formale Concurrency & Revisions-Algebra
+
+Ein Artefakt $A$ ist ein gerichteter azyklischer Revisionsgraph:
+$$\mathcal{G}_A = (\mathcal{V}, \mathcal{E}), \quad \mathcal{V} = \{v_0, v_1, \dots, v_n\}$$
+
+Jede Version $v_k \in \mathcal{V}$ ist definiert als Tupel:
+$$v_k = \langle \text{id}, \text{author}, t, \text{content}, \sigma, \pi \rangle$$
+wobei:
+- $\text{author} \in \{\text{User}, \text{Agent}, \text{ExternalWatcher}\}$,
+- $t \in \mathbb{R}^+$ der logische Timestamp ist,
+- $\text{content} \in \Sigma^*$ die Zeichenkette des Dokuments darstellt,
+- $\sigma = \text{SHA-256}(\text{content})$ der kryptografische Integritäts-Hash ist,
+- $\pi \subseteq \mathcal{V}$ die Menge der Elternknoten ist (bei linearen Edits $|\pi| = 1$, bei Merges $|\pi| = 2$).
+
+#### Three-Way Merge bei nebenläufigen Mutationen
+Tritt eine Mutation durch den Agenten $\Delta_A$ auf Basis von $v_{\text{base}}$ ein, während gleichzeitig eine Benutzer- oder Dateisystem-Mutation $\Delta_U$ vorliegt, berechnet die Engine:
+$$v_{\text{merged}} = \text{merge3}(v_{\text{base}}, v_{\text{base}} \oplus \Delta_U, v_{\text{base}} \oplus \Delta_A)$$
+
+- **Konfliktfreie Hunks:** Werden automatisch und verlustfrei angewendet.
+- **Konfliktbehaftete Hunks:** Werden im Monaco-Diff-Editor als interaktive Konfliktzonen dargestellt:
+  ```
+  <<<<<<< USER DRAFT
+  export const port = 8080;
+  =======
+  export const port = lib.mkDefault 8080;
+  >>>>>>> AGENT REFACTOR
+  ```
+
+---
+
+## 3. Typisierte Slot-Integration in DSH
+
+Um vollständige Modularität zu garantieren, wird kein bestehender Upstream-Code verändert. Die Einbindung erfolgt über die `@deepseek-ai/dsh-client-ui-slots` Typen- und Komponenten-Erweiterung:
+
+```typescript
+// features/dev/dsh/plugins/dsh-canvas/src/client/contract/slots.ts
+import type { PropsRuntime, PropsStore, InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
+import type { CanvasStore } from './store.js';
+
+export interface CanvasSlotOwnerProps {
+  sessionId: string;
+  activeArtifactId: string | null;
+  onCloseCanvas: () => void;
+  onSyncWorkspace: (artifactId: string) => Promise<void>;
+}
+
+export interface CanvasEditorInjected {
+  executeSelectionPrompt: (artifactId: string, range: SelectionRange, prompt: string) => Promise<void>;
+  acceptHunk: (hunkId: string) => void;
+  rejectHunk: (hunkId: string) => void;
+}
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    'canvas': 'title' | 'sync' | 'diff' | 'accept' | 'reject' | 'preview';
+  }
+
+  interface SlotMap {
+    /** Root-Slot für das Canvas-Split-Dock */
+    'conversation.canvas.dock': {
+      kind: 'single';
+      scope: 'session';
+      owner: CanvasSlotOwnerProps;
+      store: CanvasStore;
+      inject: CanvasEditorInjected;
+    };
+
+    /** Renderer für interaktive Artefakt-Karten in der Chat-Timeline */
+    'conversation.chat.artifact-badge': {
+      kind: 'keyed';
+      scope: 'session';
+      owner: {
+        artifactId: string;
+        versionId: number;
+        title: string;
+        language: string;
+        summary?: string;
+      };
+    };
+  }
+}
 ```
 
 ---
 
-## 5. Systemintegration in DeepSeek Harness (`dsh`)
+## 4. Detailliertes UI/UX- und Interaktions-Design
 
-### 5.1 Cordis Service Registration (`backend`)
-Das Backend-Plugin `features/dev/dsh/plugins/dsh-canvas/` registriert:
-1. **RPC Endpunkte:**
-   - `canvas.listArtifacts(sessionId)`
-   - `canvas.createArtifact(sessionId, params)`
-   - `canvas.updateArtifact(sessionId, artifactId, content, summary)`
-   - `canvas.executeSelectionPrompt(sessionId, artifactId, range, prompt)`
-   - `canvas.syncToDisk(sessionId, artifactId)`
-2. **DSH Agent Tools (`dsh-tool-canvas`):**
-   - `canvas_create_artifact(title, format, language, content, workspacePath)`
-   - `canvas_update_artifact(artifactId, deltaOrContent, summary)`
-   - `canvas_open_file_in_canvas(workspacePath)`
+### 4.1 Split-Pane Layout & Fluid Mechanics
 
-### 5.2 Slot-Komposition (`client`)
-Der Web-Client klinkt sich nahtlos über die `@deepseek-ai/dsh-client-ui-slots` Architektur ein:
-- **Slot `layout.main` oder `conversation.view`**:
-  - `dsh-canvas` injiziert einen HOC/Layout-Wrapper um den residenten Chat-Scrollport.
-  - Wenn `activeArtifactId !== null`, splitte den Container via Flexbox / CSS Grid.
-- **Slot `conversation.chat.turnTail`**:
-  - Rendert bei jedem Turn, in dem ein Artefakt verändert wurde, eine haptische *Artifact-Card* mit Button `[Im Canvas öffnen]`.
-- **Slot `conversation.session.header.utilities`**:
-  - Rendert ein Toggle-Icon `[ ◫ Canvas ]`, um das Pane manuell zu öffnen/schließen.
+```
++--------------------------------------------------------------------------------------------------------------------+
+| [DSH] Session: Flake Architecture Refactor               (Tailscale: jello -> rollins)          [Share] [Settings] |
++-------------------------------------------------------------+------------------------------------------------------+
+| CHAT CONVERSATION PANE (50%)                                | CANVAS ARTIFACT PANE (50%)                           |
+|                                                             |                                                      |
+| > User: Baue ein Modul für den Prometheus Node-Exporter     | [Tabs:  📄 node-exporter.nix * |  📊 topology.mermaid] |
+|                                                             | [Bar:   v2 (Agent) ▾ | [⇄ Diff] | [💾 Sync] | [⛶ Max] ]|
+| > DeepSeek Agent:                                           +------------------------------------------------------+
+|   Ich habe das Modul strukturiert und auf Port-             | 1   { config, lib, pkgs, ... }:                      |
+|   Kollisionen geprüft.                                      | 2   let                                              |
+|                                                             | 3     cfg = config.my.features.monitoring.exporter;  |
+|   ┌─────────────────────────────────────────────────────┐   | 4   in {                                             |
+|   | 📄 [Artefakt: node-exporter.nix]                    |   | 5     options.my.features.monitoring.exporter = {    |
+|   | 62 Zeilen · NixOS Modul · [Im Canvas fokussieren ↗] |   | 6+      enable = lib.mkEnableOption "node-exporter"; |
+|   └─────────────────────────────────────────────────────┘   | 7+      port = lib.mkOption {                        |
+|                                                             | 8+        type = lib.types.port;                     |
+|                                                             | 9+        default = 9100;                            |
+|                                                             | 10      };                                           |
+|                                                             |     +------------------------------------------+     |
+|                                                             | 11  | ✨ [Strg+K] Füge TLS-Optionen hinzu...   |     |
+|                                                             |     +------------------------------------------+     |
+|                                                             |                                                      |
++-------------------------------------------------------------+------------------------------------------------------+
+| [ + @file @diff ] Schreibe eine Nachricht...       [Send ↵] | Workspace: features/services/monitoring/exporter.nix |
++-------------------------------------------------------------+------------------------------------------------------+
+```
+
+### 4.2 Keyboard-First Ergonomie & Focus-Management
+Für professionelle Entwickler ist das unterbrechungsfreie Bedienen ohne Maus zwingend:
+
+| Shortcut | Kontext | Aktion |
+|---|---|---|
+| `Alt + C` | Global | Setzt Tastaturfokus sofort in die Chat-Composer-Zeile. |
+| `Alt + E` | Global | Setzt Tastaturfokus in den Monaco-Editor des Canvas. |
+| `Strg + K` | Canvas (Text selektiert) | Öffnet die schwebende In-Place Prompt-Bar über der Selektion. |
+| `Strg + Enter` | In-Place Prompt-Bar | Führt den Sub-Turn aus / wendet generierte Hunks an (`Accept All`). |
+| `Escape` | In-Place Prompt-Bar / Diff | Bricht den aktuellen Vorgang ab / verwirft das generierte Diff (`Reject All`). |
+| `Alt + M` | Canvas | Maximiert das Canvas auf 100% Breite bzw. kehrt zum 50/50 Split zurück. |
+| `Alt + W` | Canvas | Schließt das aktive Canvas-Artefakt. |
 
 ---
 
-## 6. Edge Cases, Race Conditions & Resilience-Architektur
+## 5. Security Sandbox Architecture (Zero-Exfiltration Invariant)
 
-1. **Tipp-Kollision während des Agenten-Streams:**
-   - *Problem:* Während das LLM Zeilen im Editor streamt, tippt der Benutzer gleichzeitig in die Datei.
-   - *Lösung:* Der Editor aktiviert während `isStreaming: true` einen strikten Cursor-Lock mit subtilem Lade-Pulsieren. Bricht der Benutzer via `[Stop Generating]` ab, wird der Stream sofort gekappt und der Editor wieder editierbar.
-2. **Verlust ungespeicherter Daten bei Browser-Crash:**
-   - *Problem:* Der Tab stürzt ab oder der Benutzer schließt das Fenster versehentlich.
-   - *Lösung:* Der gesamte Canvas-Zustand (inklusive noch ungespeicherter Puffer) wird mit 300ms Debounce in `IndexedDB` gespiegelt und beim Re-Mount nahtlos rehydriert.
-3. **Extreme Artefakt-Größen (> 50.000 Zeilen):**
-   - *Problem:* Das Parsen von Riesen-Dateien blockiert den React-Render-Loop.
-   - *Lösung:* Monaco Editor Virtualized Windowing. Dateien über 2 MB deaktivieren automatische Bracket-Colorization und schalten auf Chunk-basiertes Diffing um.
-4. **Sandboxed Iframe Security:**
-   - *Problem:* Der Agent erzeugt böswilliges JavaScript im HTML-Preview-Modus.
-   - *Lösung:* Der Preview-Iframe wird mit `sandbox="allow-scripts"` ohne `allow-same-origin` ausgeliefert. Cookies, LocalStorage und IndexedDB des DSH-Origins sind für den Iframe unzugänglich.
+Für Live-Previews von HTML5, JavaScript und SVG-Diagrammen gilt die strikte **Zero-Exfiltration-Invariante**:
+
+### 5.1 CSP & Iframe Sandboxing
+```html
+<iframe
+  srcdoc="..."
+  sandbox="allow-scripts"
+  referrerpolicy="no-referrer"
+  csp="
+    default-src 'none';
+    script-src 'unsafe-inline';
+    style-src 'unsafe-inline';
+    img-src data: blob:;
+    font-src data:;
+    connect-src 'none';
+    frame-src 'none';
+    object-src 'none';
+  "
+></iframe>
+```
+
+### 5.2 Formale Sicherheitsgarantien
+1. **Keine Netzwerkkonnektivität (`connect-src 'none'`):** Das gerenderte Skript kann unter keinen Umständen Daten per `fetch()`, `XMLHttpRequest` oder `WebSocket` an externe Server senden.
+2. **Keine Cookie-/Storage-Vererbung (fehlendes `allow-same-origin`):** Der Iframe läuft in einem eindeutigen, opaken Ursprung (`null`). Zugriff auf `window.localStorage`, `IndexedDB` oder Session-Cookies des Hosts ist physisch unmöglich.
+3. **Kryptografisch versiegelter MessageChannel:** Ereignisse zwischen Canvas-Shell und Iframe fließen ausschließlich über einen bidirektionalen `MessagePort`, der mit einer sitzungsspezifischen Nonce validiert wird.
+
+---
+
+## 6. Vollständige Edge-Case & Resilienz-Matrix
+
+| Edge Case | Fehlerklasse | Erkennungsmechanismus | Formale Behebungsstrategie |
+|---|---|---|---|
+| **Externe Dateisystem-Mutation** | State Drift | Inotify / `chokidar` Event auf `workspacePath`. | Prüfe $\text{SHA-256}(\text{disk})$. Wenn ungleich $v_{\text{active}}$, erzeuge $v_{\text{external}}$ im DAG und zeige nicht-blockierendes Banner: `[Disk geändert: Diff anzeigen | Überschreiben]`. |
+| **Streaming-Abbruch / Timeout** | Partial State | Abrupter Websocket-Close oder User `[Stop]`. | Der unfertige Puffer wird als flüchtiger Entwurf isoliert. Der Editor rollt deterministisch auf den exakten Zustand vor Stream-Beginn ($v_k$) zurück. |
+| **Riesige Artefakte (> 20 MB / 200k Zeilen)** | Memory / OOM | Dateigrößen-Check vor Instanziierung. | Automatischer Wechsel in den **Virtual Chunked Reader**. Monaco minimiert Syntax-Trees; AST-Features werden auf sichtbare Viewport-Fenster beschränkt. |
+| **DOM-Reflow bei Split-Resize** | Layout Thrashing | ResizeObserver mit 60fps Throttle. | Canvas-Divider nutzt CSS `transform: translate3d` anstelle kontinuierlicher Reflows über `width`-Prozentsätze. Erst beim Loslassen des Drag-Handles erfolgt der finale Layout-Commit. |
+| **Offline- / Refresh-Resilienz** | Data Loss | `beforeunload`-Event & State-Flush. | Jeder Tastenanschlag im Editor wird mit 250ms Debounce in eine sitzungsgebundene `IndexedDB` gestreamt. Nach Browser-Crash steht der exakte Editor-Zustand sofort wieder zur Verfügung. |
 
 ---
 
 ## 7. Phasen- und Implementierungsplan
 
-- **Phase 1: Foundation & Data Architecture**
-  - Erstellung von `features/dev/dsh/plugins/dsh-canvas/` (Node-Service + SQLite Persistence).
-  - Deklaration der DSH Agent Tools (`canvas_create_artifact`, `canvas_update_artifact`).
-- **Phase 2: Client Split-Pane Shell & Monaco Engine**
-  - Implementierung des Split-Pane Layout Managers mit Slider-Divider und Animationen.
-  - Integration des Monaco Editors mit Tab-Navigation und Versions-Wechsler.
-- **Phase 3: Interactive Strg+K Selection Flow**
-  - Implementierung der schwebenden Selection-Action-Bar.
-  - Sub-Turn RPC Stream für In-Place Diffs mit Accept/Revert UI.
-- **Phase 4: Live Previews (HTML / SVG / Mermaid)**
-  - Sandboxed Iframe Provider für Web-Previews und Mermaid-Visualisierer.
-- **Phase 5: NixOS Modul-Integration & CI Validation**
-  - Option `my.features.dev.dsh.plugins.dsh-canvas.enable` in `default.nix`.
-  - Flake-Check und Evaluierungstests auf allen 5 Hosts.
+- **Phase 1: Backend Plugin & Datenmodell (`features/dev/dsh/plugins/dsh-canvas/`)**
+  - Deklaration des Cordis Service `canvas` mit SQLite-DAG-Persistenz.
+  - Bereitstellung der DSH Agent Tools (`canvas_create_artifact`, `canvas_update_artifact`, `canvas_get_artifact`).
+- **Phase 2: Client Split-Dock & Monaco Engine**
+  - Implementierung des Split-Pane Layout Managers mit CSS Transform Drag-Handle.
+  - Einbindung des Monaco Editors mit Theme-Synchronisation (Dark/Light).
+- **Phase 3: Interactive Strg+K In-Place Streaming Flow**
+  - Schwebende Action-Bar für markierte Zeilen.
+  - Streaming Sub-Turn Protokoll mit visuellen Inline-Hunks und Shimmering.
+- **Phase 4: Sandboxed Previews & Visualizers**
+  - CSP-abgesicherter Iframe-Runner für HTML5/JS.
+  - Mermaid- und SVG-Renderer mit Zoom-, Pan- und Export-Funktionalität.
+- **Phase 5: NixOS Integration & Systemweite Validierung**
+  - Deklaratives Modul `my.features.dev.dsh.plugins.dsh-canvas.enable = true;`.
+  - Verifikation aller 5 Hosts via `nix flake check`.
