@@ -142,6 +142,10 @@ export class MeshCoordinatorService extends Service {
     }
   }
 
+  getPeer(peerId: string): PeerStatus | undefined {
+    return this.peers.get(peerId);
+  }
+
   /**
    * Return peers visible to the requesting tenant.
    * - Admin: sees all system peers, all group peers, and all user peers.
@@ -746,7 +750,7 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
               // Resolve peer endpoint if peerNode was provided
               let peerEndpoint = payload.peerEndpoint;
               if (!peerEndpoint && peerNode) {
-                const p = service.peers.get(peerNode);
+                const p = service.getPeer(peerNode);
                 if (p) peerEndpoint = p.endpoint;
               }
 

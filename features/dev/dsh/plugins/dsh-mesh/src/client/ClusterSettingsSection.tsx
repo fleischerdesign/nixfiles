@@ -17,6 +17,8 @@ interface PeerItem {
 interface RemoteSessionItem {
   sessionId: string;
   workspaceUrn: string;
+  workspaceLabel?: string;
+  workspaceType?: 'git' | 'relhome' | 'raw';
   nodeId: string;
   lastTurnSeq: number;
   updatedAt: number;
