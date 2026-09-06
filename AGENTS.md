@@ -269,5 +269,14 @@ DeepSeek Harness (dsh) wird als **generisches Multi-Tenant & Agent-Harness-Featu
 - **Client-Slot-Architektur (`@deepseek-ai/dsh-client-ui-slots`)**:
   - Alle UI-Erweiterungen (Modals, Panels, Menüs, Split-Views) klinken sich deklarativ über typisierte `SlotMap`-Einträge ein (z. B. `conversation.view`, `conversation.composer.dock`, `conversation.input.left`, `sidebar.footer.action`, `settings.section`).
   - Das vollständige Slot-Inventar mit Typen, Scopes und Quellpaketen ist dokumentiert unter `docs/dsh/dsh-slot-inventory.md`.
+- **Plugin-Entwicklung & Cordis-Architektur-Regeln**:
+  - **Service-Injektion (`inject`)**: Plugins müssen alle aufgerufenen Services (z. B. `'tools'`, `'systemPrompt'`, `'auth'`) explizit in `export const inject = [...]` deklarieren. Bei optionalen Abhängigkeiten immer `ctx.get('serviceName')` mit Null-Check verwenden, da Cordis-Proxies (`ReflectService`) bei undeclariertem `ctx.<service>` mit `cannot get property "<service>" without inject` abbrechen.
+  - **Lossless JSON Constraint**: Alle Tool-Ergebnisse (`execute()` in `defineTool`) werden strikt von `@deepseek-ai/dsh-util-values` (`snapshotJsonValue`) validiert. Rückgabewerte dürfen **keine** `undefined`-Werte in Keys/Objekten oder Arrays enthalten (`value is not lossless JSON`). Optionale Felder vor Rückgabe bereinigen (z. B. via `JSON.parse(JSON.stringify(result))`).
+  - **Side-Effects & Disposal**: Alle Event-Listener und Subscriptions müssen über `ctx.on()` oder `ctx.effect()` registriert werden und einen Disposer zurückgeben, damit HMR / Hot-Reloading leckagefrei funktioniert.
+- **Lokale DSH-Dokumentations-Bibliothek**:
+  - Upstream-Dokumentation: `features/dev/dsh/docs/upstream/` (u. a. `cordis-primer.md`, `cordis-tutorial/`, `tool-execution-pipeline.md`, `cookbook/adding-a-tool.md`, `capability-seams.md`).
+  - Plugin-Entwicklungs-Skill: `features/dev/dsh/docs/skills/cordis-plugin-development/SKILL.md`.
+  - Feature-Architektur & Guides: `features/dev/dsh/docs/` (`plugins.md`, `multi-tenancy.md`, `memory-architecture.md`, `distributed-agent-mesh.md`).
+  - Spezifikationen & Roadmaps: `docs/dsh/` (`01-dual-pane-canvas.md`, `02-context-pinning-git-diff.md`, `03-declarative-lsp-intelligence.md`, `04-feature-ideation-and-roadmap.md`, `05-memory-reliability-and-edge-cases.md`, `dsh-slot-inventory.md`).
 
 
