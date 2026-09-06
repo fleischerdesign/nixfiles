@@ -70,6 +70,11 @@
         model = "deepseek-v4-flash-vision-exp";
       };
 
+      deepseek = {
+        thinking = lib.mkDefault "enabled";
+        reasoningEffort = lib.mkDefault "high";
+      };
+
       web.enable = lib.mkDefault true;
     };
   };
