@@ -13,6 +13,18 @@
   # Features
   my.features.services.caddy.baseDomain = "mky.ancoris.ovh";
 
+  # Public family-facing dsh web surface: dsh.mky.ancoris.ovh behind Authentik
+  # OIDC (Caddy auto-generates the vhost + forward-auth from this endpoint).
+  my.endpoints.dsh = {
+    host = "mackaye";
+    port = 3080;
+    proxy = {
+      enable = true;
+      subdomain = "dsh";
+      auth = true;
+    };
+  };
+
   my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.common.geoip.enable = true;
 
