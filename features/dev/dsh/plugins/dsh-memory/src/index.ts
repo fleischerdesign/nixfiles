@@ -215,42 +215,63 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     ].join(' ')
   });
 
-  // Token-Guarded Context Recall Gate
+  // Token-Guarded Context Recall Gate via system-prompt/assemble
   if (config.autoConsolidate !== false) {
-    ctx.inject(['llm'], (llmCtx: any) => {
-      llmCtx.llm.on('llm/pre-request', async (request: any, next: () => Promise<any>) => {
-        try {
-          const authService = ctx.get('auth');
-          const tenant = authService?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
-          const messages = request?.messages || [];
-          const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
+    ctx.on('system-prompt/assemble', async (assembly: any, context: any, next: () => Promise<any>) => {
+      try {
+        const authService = ctx.get('auth');
+        const tenant = authService?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
 
-          if (lastUserMessage && typeof lastUserMessage.content === 'string') {
-            // Extract recent turn texts for deduplication
-            const recentTurnTexts = messages.slice(-4).map((m: any) => typeof m.content === 'string' ? m.content : '');
+        // Resolve active session messages from context.agent or context.session
+        const agent = context?.agent || (context?.scope && typeof context.scope === 'object' && 'session' in context.scope ? context.scope : null);
+        const session = agent?.session || context?.session;
 
-            const recalled = engine.recallContextGuarded({
-              queryText: lastUserMessage.content,
-              identity: tenant,
-              recentTurnTexts,
-              maxTokens: config.maxRecallTokens ?? 150,
-              minThreshold: config.minRecallThreshold ?? -1.5
-            });
+        let lastUserText = '';
+        const recentTurnTexts: string[] = [];
 
-            if (recalled.length > 0) {
-              const memoryLines = recalled.map(f => `- ${f.subject} ${f.predicate} ${f.object} [${f.epistemicClass || 'evidence'}] (${f.scopeId})`).join('\n');
-              const memoryContextBlock = `\n[Recalled Knowledge Memories]:\n${memoryLines}\n`;
-
-              if (request.messages && request.messages.length > 0 && request.messages[0].role === 'system') {
-                request.messages[0].content += memoryContextBlock;
+        if (session && typeof session.seq === 'number') {
+          for (let s = session.seq - 1; s >= 0; s--) {
+            const ev = session.eventAt?.(s);
+            if (ev?.type === 'user/message') {
+              const text = ev.data?.content?.[0]?.text || (typeof ev.data?.content === 'string' ? ev.data.content : '');
+              if (text) {
+                if (!lastUserText) lastUserText = text;
+                recentTurnTexts.push(text);
+                if (recentTurnTexts.length >= 4) break;
               }
             }
           }
-        } catch {
-          // Non-fatal: continue model invocation if recall context fails
         }
-        return next();
-      });
+
+        if (lastUserText) {
+          const recalled = engine.recallContextGuarded({
+            queryText: lastUserText,
+            identity: tenant,
+            recentTurnTexts,
+            maxTokens: config.maxRecallTokens ?? 150,
+            minThreshold: config.minRecallThreshold ?? -1.5
+          });
+
+          if (recalled.length > 0) {
+            const memoryLines = recalled
+              .map((f) => `- ${f.subject} ${f.predicate} ${f.object} [${f.epistemicClass || 'evidence'}] (${f.scopeId})`)
+              .join('\n');
+            const memoryContextText = `[Recalled Knowledge Memories]:\n${memoryLines}`;
+
+            assembly.contexts = [
+              ...(assembly.contexts || []),
+              {
+                name: 'memory:recalled',
+                order: 150,
+                text: memoryContextText
+              }
+            ];
+          }
+        }
+      } catch {
+        // Non-fatal: continue assembly if memory recall fails
+      }
+      return next();
     });
   }
 
