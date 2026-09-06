@@ -1,9 +1,12 @@
 import { Service, type Context } from '@deepseek-ai/cordis';
 import { defineTool } from '@deepseek-ai/dsh-tools';
+import { credentialRef } from '@deepseek-ai/dsh-credentials';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { initializeDatabase } from './schema.js';
 import { BitemporalMemoryEngine } from './engine.js';
+import { createEmbeddingProvider } from './embedding.js';
 import type {
   StoreFactArgs,
   QueryMemoryArgs,
@@ -15,7 +18,19 @@ import type {
 } from './types.js';
 
 export const name = 'memory';
-export const inject = ['tools', 'systemPrompt', 'auth'];
+export const inject = ['tools', 'systemPrompt', 'auth', 'credentials'];
+
+/** Extract plain text from a user message (ContentBlock[] or string content). */
+function messageText(msg: any): string {
+  if (!msg) return '';
+  const c = msg.content;
+  if (typeof c === 'string') return c;
+  if (Array.isArray(c)) {
+    const block = c.find((b: any) => b && b.type === 'text') || c[0];
+    return block?.text || '';
+  }
+  return '';
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -38,7 +53,45 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     db = initializeDatabase(':memory:');
   }
 
-  const engine = new BitemporalMemoryEngine(db);
+  // Plugin-relative directory that hosts the bundled ONNX model + tokenizer.
+  const onnxModelDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'onnx');
+
+  // Resolve the embedding API key through dsh's `credentials` service (encrypted
+  // credential store), falling back to the process environment. This is how the
+  // LLM providers obtain apiKeyEnv refs, so no secret enters configuration.
+  const resolveKey = async (envName: string): Promise<string | undefined> => {
+    try {
+      const credentials = ctx.get('credentials') as any;
+      if (credentials?.resolve) {
+        const resolved = await credentials.resolve(credentialRef(envName));
+        if (resolved?.value && resolved.value.length > 0) return resolved.value;
+      }
+    } catch {
+      // fall through to environment
+    }
+    return process.env[envName];
+  };
+
+  const embeddingProvider = createEmbeddingProvider(
+    config.embedding?.provider === 'onnx'
+      ? {
+          ...config.embedding,
+          modelDir: config.embedding.modelDir || onnxModelDir,
+          modelId: config.embedding.modelId || config.embedding.modelDir || onnxModelDir,
+        }
+      : config.embedding?.provider === 'api'
+        ? { ...config.embedding, resolveKey }
+        : config.embedding,
+  );
+  const engine = new BitemporalMemoryEngine(db, embeddingProvider, {
+    topK: config.embedding?.topK ?? 8,
+    // Provider-aware relevance floor: neural semantic embeddings (api/onnx) get
+    // a meaningful floor so unrelated facts are not injected as noise; the
+    // lexical feature-hash baseline keeps a looser floor.
+    minSimilarity: config.embedding?.minSimilarity ?? (embeddingProvider?.id === 'api' || embeddingProvider?.id === 'onnx' ? 0.5 : 0),
+    similarityMargin: config.embedding?.similarityMargin ?? 0.2,
+    weight: config.embedding?.weight ?? 0.7,
+  });
   ctx.provide('memory');
   ctx.memory = engine;
 
@@ -112,7 +165,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
                 resolvedScopeId = `group:${groupName}`;
               }
 
-              const fact = engine.storeFact({
+              const fact = await engine.storeFact({
                 subject: payload.subject,
                 predicate: payload.predicate,
                 object: payload.object,
@@ -186,24 +239,31 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     }
   }
 
-  for (const item of factsToIngest) {
-    if (item.subject && item.predicate && item.object) {
-      engine.storeFact({
-        subject: item.subject,
-        predicate: item.predicate,
-        object: item.object,
-        validFrom: 0, // Axiom: valid from epoch start
-        validTo: Infinity, // Axiom: immutable, never expires
-        typeConstraint: item.type_constraint ?? 'String',
-        confidence: item.confidence ?? 1.0,
-        securityLabel: item.security_label ?? 'system',
-        scopeType: item.scope_type ?? 'public',
-        scopeId: item.scope_id ?? 'public',
-        author: 'system',
-        epistemicClass: 'axiom' // Tagged as Class 1 Axiom
-      });
+  // Axiom ingestion + embedding backfill are asynchronous (embedding may need
+  // a lazy ONNX model load). Run them out-of-band so `apply` stays synchronous
+  // for the Cordis framework; facts are idempotent, so a partial run converges
+  // on the next activation.
+  void (async () => {
+    for (const item of factsToIngest) {
+      if (item.subject && item.predicate && item.object) {
+        await engine.storeFact({
+          subject: item.subject,
+          predicate: item.predicate,
+          object: item.object,
+          validFrom: 0, // Axiom: valid from epoch start
+          validTo: Infinity, // Axiom: immutable, never expires
+          typeConstraint: item.type_constraint ?? 'String',
+          confidence: item.confidence ?? 1.0,
+          securityLabel: item.security_label ?? 'system',
+          scopeType: item.scope_type ?? 'public',
+          scopeId: item.scope_id ?? 'public',
+          author: 'system',
+          epistemicClass: 'axiom' // Tagged as Class 1 Axiom
+        });
+      }
     }
-  }
+    await engine.backfillEmbeddings();
+  })();
 
   // System Prompt Section: Knowledge instructions
   ctx.systemPrompt.section({
@@ -213,6 +273,21 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
       'Use memory_query to retrieve verified infrastructure facts, host parameters, and dependency graphs.',
       'Use memory_store to persist verified empirical architectural decisions and constraints (Class 2 Evidence).'
     ].join(' ')
+  });
+
+  // Track the CURRENT user message being claimed by each agent. dsh claims
+  // inbox input (agent/inbox/claimed) BEFORE the system prompt is assembled and
+  // BEFORE the user/message lands in the session log, so this is how the recall
+  // gate can use the live question on the very first request of a turn (instead
+  // of lagging one turn behind on session events).
+  const claimedTextByAgent = new Map<unknown, string>();
+  ctx.on('agent/inbox/claimed', (payload: any) => {
+    try {
+      const text = messageText(payload?.message);
+      if (text) claimedTextByAgent.set(payload?.agent, text);
+    } catch {
+      // non-fatal
+    }
   });
 
   // Token-Guarded Context Recall Gate via system-prompt/assemble
@@ -229,6 +304,10 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         let lastUserText = '';
         const recentTurnTexts: string[] = [];
 
+        // Prefer the live claimed message (current turn) so the recall uses the
+        // very question being answered; fall back to the session log.
+        lastUserText = claimedTextByAgent.get(agent) || '';
+
         if (session && typeof session.seq === 'number') {
           for (let s = session.seq - 1; s >= 0; s--) {
             const ev = session.eventAt?.(s);
@@ -244,12 +323,13 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         }
 
         if (lastUserText) {
-          const recalled = engine.recallContextGuarded({
+          const recalled = await engine.recallContextGuarded({
             queryText: lastUserText,
             identity: tenant,
             recentTurnTexts,
             maxTokens: config.maxRecallTokens ?? 150,
-            minThreshold: config.minRecallThreshold ?? -1.5
+            minThreshold: config.minRecallThreshold ?? -1.5,
+            entropyMinStems: config.embedding?.entropyMinStems ?? 1,
           });
 
           if (recalled.length > 0) {
@@ -394,7 +474,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         // Tools cannot store Class 1 Axioms (only declarative NixOS can do that)
         const targetClass: EpistemicClass = args.epistemic_class === 'hypothesis' ? 'hypothesis' : 'evidence';
 
-        const fact = engine.storeFact({
+        const fact = await engine.storeFact({
           subject: args.subject,
           predicate: args.predicate,
           object: args.object,

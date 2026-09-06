@@ -16,6 +16,10 @@
   description ? "dsh plugin",
   hasClient ? false,
   extraNativeBuildInputs ? [ ],
+  /**
+    Optional extra shell snippet appended to installPhase (e.g. copy ONNX assets).
+  */
+  extraInstall ? "",
   ...
 }:
 
@@ -90,6 +94,9 @@ stdenv.mkDerivation {
       mkdir -p $out/lib/node_modules/${pname}/node_modules
       ln -s ${dsh}/lib/dsh/node_modules/@deepseek-ai $out/lib/node_modules/${pname}/node_modules/@deepseek-ai
     fi
+
+    ${extraInstall}
+
     runHook postInstall
   '';
 

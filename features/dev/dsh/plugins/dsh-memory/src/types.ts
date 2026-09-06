@@ -93,4 +93,39 @@ export interface MemoryPluginConfig {
   autoConsolidate?: boolean; // Automatic turn-stopping memory consolidation
   maxRecallTokens?: number;
   minRecallThreshold?: number;
+  /**
+   * Optional vector-embedding configuration. When present, the plugin embeds
+   * facts into `embedding_blob` and augments the recall cascade with cosine
+   * similarity. Absent -> keyword (BM25) recall only.
+   */
+  embedding?: {
+    /** Backend: 'feature-hash' (local, deterministic), 'api' (OpenAI-compatible endpoint), or 'onnx' (local neural). */
+    provider?: 'feature-hash' | 'api' | 'onnx';
+    /** Dimensionality (feature-hash baseline; api dims; onnx uses model dims unless overridden). */
+    dim?: number;
+    /** Local directory containing the ONNX model + tokenizer (onnx). */
+    modelDir?: string;
+    /** HF model id resolved by transformers.js (onnx). */
+    modelId?: string;
+    /** OpenAI-compatible base URL for /v1/embeddings (api). */
+    apiBase?: string;
+    /** Embedding model identifier (api). */
+    apiModel?: string;
+    /** Environment variable holding the API key (api). */
+    apiKeyEnv?: string;
+    /** Max inputs per batched request (api). */
+    batchSize?: number;
+    /** Cosine floor; candidates below this are discarded. */
+    minSimilarity?: number;
+    /** Relative margin to the best cosine; weaker facts further than this are discarded (default 0.2). */
+    similarityMargin?: number;
+    /** Number of vector candidates per recall (default 8). */
+    topK?: number;
+    /** Token budget for the injected memory section (default 150). */
+    maxTokens?: number;
+    /** Blend weight for cosine vs BM25 in the fused score (0..1). */
+    weight?: number;
+    /** Minimum substantive stems for a query to trigger recall (default 1). */
+    entropyMinStems?: number;
+  };
 }

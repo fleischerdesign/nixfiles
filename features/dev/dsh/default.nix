@@ -650,6 +650,81 @@ in
         default = -1.5;
         description = "Minimum BM25 score threshold (FTS5 rank cutoff; more negative = stronger match).";
       };
+      embedding = {
+        enable = lib.mkEnableOption "local vector embeddings (cosine recall) in dsh-memory" // {
+          default = false;
+          description = "When enabled, facts get embedded and the recall cascade adds a cosine stage.";
+        };
+        provider = lib.mkOption {
+          type = lib.types.enum [
+            "feature-hash"
+            "api"
+            "onnx"
+          ];
+          default = "feature-hash";
+          description = "Embedding backend. 'feature-hash' local/deterministic baseline; 'api' OpenAI-compatible endpoint (agnostic/scalable); 'onnx' bundled neural model.";
+        };
+        dim = lib.mkOption {
+          type = lib.types.int;
+          default = 512;
+          description = "Dimensionality (feature-hash baseline; api dims; onnx uses the model dims unless overridden).";
+        };
+        minSimilarity = lib.mkOption {
+          type = lib.types.float;
+          default = 0.0;
+          description = "Cosine floor; candidates below this are discarded by the vector stage. For api/onnx the plugin defaults to 0.5 unless set.";
+        };
+        similarityMargin = lib.mkOption {
+          type = lib.types.float;
+          default = 0.2;
+          description = "Relative margin to the best cosine; facts further from the top result than this are trimmed (adaptive relevance cut).";
+        };
+        topK = lib.mkOption {
+          type = lib.types.int;
+          default = 8;
+          description = "Number of vector candidates considered per recall.";
+        };
+        weight = lib.mkOption {
+          type = lib.types.float;
+          default = 0.7;
+          description = "Blend weight (0..1) of cosine vs BM25 in the fused recall score; embedding is primary.";
+        };
+        entropyMinStems = lib.mkOption {
+          type = lib.types.int;
+          default = 1;
+          description = "Minimum substantive stems for a query to trigger recall (1 allows single-entity queries).";
+        };
+        batchSize = lib.mkOption {
+          type = lib.types.int;
+          default = 16;
+          description = "Max inputs per batched embedding request (api).";
+        };
+        apiBase = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "OpenAI-compatible base URL for /v1/embeddings (api; defaults to OpenRouter).";
+        };
+        apiModel = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Embedding model identifier (api; defaults to openai/text-embedding-3-small).";
+        };
+        apiKeyEnv = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Environment variable holding the embedding API key (api; defaults to OPENROUTER_API_KEY).";
+        };
+        modelDir = lib.mkOption {
+          type = lib.types.nullOr lib.types.path;
+          default = null;
+          description = "Override the ONNX model+tokenizer directory (defaults to the plugin-bundled onnx/).";
+        };
+        modelId = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Override the transformers.js model identifier (defaults to the bundled local model dir).";
+        };
+      };
     };
 
     lsp = {
@@ -951,7 +1026,31 @@ in
                 facts = allConfiguredFacts;
                 maxRecallTokens = systemCfg.memory.maxRecallTokens or 150;
                 minRecallThreshold = systemCfg.memory.minRecallThreshold or (-1.5);
-              };
+              }
+              // (
+                if systemCfg.memory.embedding.enable or false then
+                  {
+                    embedding = {
+                      inherit (systemCfg.memory.embedding)
+                        provider
+                        dim
+                        minSimilarity
+                        topK
+                        similarityMargin
+                        weight
+                        entropyMinStems
+                        batchSize
+                        ;
+                      modelDir = systemCfg.memory.embedding.modelDir or null;
+                      modelId = systemCfg.memory.embedding.modelId or null;
+                      apiBase = systemCfg.memory.embedding.apiBase or null;
+                      apiModel = systemCfg.memory.embedding.apiModel or null;
+                      apiKeyEnv = systemCfg.memory.embedding.apiKeyEnv or null;
+                    };
+                  }
+                else
+                  { }
+              );
               "dsh-mesh" = {
                 nodeId = currentHost;
                 listenPort = systemCfg.mesh.listenPort or 3891;
