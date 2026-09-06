@@ -92,9 +92,16 @@ presence(n).groups   = union over present tenants of their OIDC groups-claims
 
 
 
-### 2.2 Transport
+### 2.2 Transport (Heartbeat)
 
-Die Presence wandert **im bestehenden Mesh-Heartbeat** (`dsh-mesh` `/mesh/heartbeat` / `pollPeers`). Der Heartbeat-Payload wird um `presence` erweitert. Jede Instanz aggregiert die Presence **aller erreichbaren Instanzen** in einer lokalen Registry `P = { presence(n) : ∀ n healthy }`.
+Die Presence wandert **im bestehenden Mesh-Heartbeat** (`dsh-mesh` `/mesh/heartbeat` / `pollPeers`).
+Der Heartbeat-Payload (`HeartbeatPayload`) wird um `presence: { tenants, groups }` erweitert; der
+Antwort-Payload des Gegenübers trägt dessen Presence. `dsh-mesh` liest die **lokale** Presence aus
+der `dsh-auth`-PresenceRegistry (`ctx.auth.presence`) und speichert pro Peer die zuletzt
+adwertisierte Presence in `PeerStatus.presence` (aggregierte Registry `P`). Zusätzlich bietet
+`dsh-memory` einen **on-demand**-Presence-Endpoint (`/mesh/memory/presence`) für die eigene
+Scope→Peer-Ableitung — die Heartbeat-Variante dient der **globalen, UI-übergreifenden**
+Sichtbarkeit (Mesh-Node-Übersicht), die Memory-Kanal-Variante dem **self-contained** Memory-Sync.
 
 ### 2.3 Register-Aktualisierung
 

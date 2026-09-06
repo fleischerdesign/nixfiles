@@ -475,7 +475,8 @@ export class MeshCoordinatorService extends Service {
             const resp: HeartbeatPayload = {
               nodeId: this.config.nodeId,
               timestamp: Date.now(),
-              maxTx: Date.now()
+              maxTx: Date.now(),
+              presence: this.localPresence()
             };
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(resp));
@@ -564,18 +565,43 @@ export class MeshCoordinatorService extends Service {
         const { rttMs, response } = await this.client.sendHeartbeat(peer.endpoint, {
           nodeId: this.config.nodeId,
           timestamp: Date.now(),
-          maxTx: Date.now()
+          maxTx: Date.now(),
+          presence: this.localPresence()
         });
 
         peer.lastHeartbeatMs = Date.now();
         peer.rttMs = rttMs;
         peer.healthy = true;
         peer.maxTxSeen = response.maxTx;
+        // Store the peer's advertised presence (tenant/group-level), if any.
+        if (response && Array.isArray(response.presence?.tenants)) {
+          peer.presence = {
+            tenants: response.presence.tenants,
+            groups: Array.isArray(response.presence.groups) ? response.presence.groups : [],
+            updatedAt: Date.now(),
+          };
+        }
       } catch {
         peer.healthy = false;
         peer.rttMs = -1;
       }
     }
+  }
+
+  /** Local presence (hosted tenants/groups) from the dsh-auth PresenceRegistry. */
+  private localPresence(): { tenants: string[]; groups: string[] } {
+    try {
+      const auth = this.ctx.get('auth') as any;
+      const reg = auth?.presence;
+      if (reg && typeof reg.tenants === 'function' && typeof reg.groups === 'function') {
+        const tenants = (reg.tenants() as any[]).map((t) => t.username || t.tenantId);
+        const groups = (reg.groups() as string[]) || [];
+        return { tenants: tenants.map(String), groups: groups.map(String) };
+      }
+    } catch {
+      // presence provider unavailable -> advertise empty
+    }
+    return { tenants: [], groups: [] };
   }
 
   close(): void {

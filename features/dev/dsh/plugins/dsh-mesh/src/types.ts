@@ -25,6 +25,12 @@ export interface MeshPluginConfig {
   userPeersFile?: string; // Path to persistent user-created peers (~/.dsh/mesh/peers.json)
 }
 
+export interface PeerPresence {
+  tenants: string[]; // usernames with an authenticated presence on that node
+  groups: string[];  // e.g. ['group:dev', 'group:family']
+  updatedAt: number;
+}
+
 export interface PeerStatus {
   id: string;
   endpoint: string;
@@ -36,12 +42,16 @@ export interface PeerStatus {
   owner?: string;
   group?: string;
   dynamic: boolean;
+  /** Presence advertised by this peer (tenant/group-level), from its heartbeat. */
+  presence?: PeerPresence;
 }
 
 export interface HeartbeatPayload {
   nodeId: string;
   timestamp: number;
   maxTx: number;
+  /** Advertisement of locally-hosted tenants/groups (agnostic presence). */
+  presence?: { tenants: string[]; groups: string[] };
 }
 
 export interface SyncDeltaRequest {

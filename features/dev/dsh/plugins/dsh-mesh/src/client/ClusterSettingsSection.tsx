@@ -12,6 +12,7 @@ interface PeerItem {
   owner?: string;
   group?: string;
   dynamic: boolean;
+  presence?: { tenants: string[]; groups: string[]; updatedAt?: number };
 }
 
 interface RemoteSessionItem {
@@ -470,6 +471,14 @@ export function ClusterSettingsSection({ t = (k: string) => k }: ClusterSectionP
                   </div>
                   <div style={{ opacity: 0.85 }}>
                     {peer.rttMs >= 0 ? `${peer.rttMs} ms` : '—'}
+                  </div>
+                  <div style={{ opacity: 0.75, fontSize: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {(peer.presence && (peer.presence.groups?.length || peer.presence.tenants?.length))
+                      ? [
+                          ...(peer.presence.groups || []),
+                          `${(peer.presence.tenants || []).length} tenant${(peer.presence.tenants || []).length === 1 ? '' : 's'}`,
+                        ].join(' · ')
+                      : '—'}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
                     <span
