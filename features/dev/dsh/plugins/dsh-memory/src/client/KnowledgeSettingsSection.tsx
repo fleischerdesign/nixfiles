@@ -12,6 +12,7 @@ interface FactItem {
   scopeType: 'public' | 'group' | 'user' | 'repo';
   scopeId: string;
   author: string;
+  epistemicClass?: 'axiom' | 'evidence' | 'hypothesis';
 }
 
 export interface KnowledgeSectionProps {
@@ -23,6 +24,7 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
   const [facts, setFacts] = useState<FactItem[]>([]);
   const [filter, setFilter] = useState('');
   const [scopeFilter, setScopeFilter] = useState<'all' | 'user' | 'group' | 'repo' | 'public'>('all');
+  const [classFilter, setClassFilter] = useState<'all' | 'axiom' | 'evidence' | 'hypothesis'>('all');
   const [loading, setLoading] = useState(true);
 
   // Add memory modal/form state
@@ -33,6 +35,7 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
   const [newScopeType, setNewScopeType] = useState<'user' | 'group' | 'repo' | 'public'>('user');
   const [newScopeTarget, setNewScopeTarget] = useState('');
   const [newTtlSeconds, setNewTtlSeconds] = useState('');
+  const [newClass, setNewClass] = useState<'evidence' | 'hypothesis'>('evidence');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -42,6 +45,9 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
       const url = new URL('/api/memory/facts', window.location.origin);
       if (scopeFilter !== 'all') {
         url.searchParams.set('scopeType', scopeFilter);
+      }
+      if (classFilter !== 'all') {
+        url.searchParams.set('epistemicClass', classFilter);
       }
       if (filter.trim()) {
         url.searchParams.set('search', filter.trim());
@@ -60,7 +66,7 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
 
   useEffect(() => {
     fetchFacts();
-  }, [scopeFilter]);
+  }, [scopeFilter, classFilter]);
 
   const handleAddFact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +82,7 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
         object: newObject.trim(),
         scopeType: newScopeType,
         ttlSeconds: newTtlSeconds ? parseInt(newTtlSeconds, 10) : undefined,
+        epistemicClass: newClass,
       };
 
       if (newScopeType === 'group' || newScopeType === 'repo') {
@@ -107,11 +114,16 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
     }
   };
 
-  const handleDeleteFact = async (id: string) => {
+  const handleDeleteFact = async (fact: FactItem) => {
+    if (fact.epistemicClass === 'axiom') {
+      alert('Axioms are immutable and cannot be deleted.');
+      return;
+    }
+
     if (!window.confirm(t('settings.knowledge.confirmDelete'))) return;
 
     try {
-      const res = await fetch(`/api/memory/facts?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/memory/facts?id=${encodeURIComponent(fact.id)}`, {
         method: 'DELETE',
       });
       if (res.ok) {
@@ -128,132 +140,150 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
   const filteredFacts = facts.filter(f =>
     f.subject.toLowerCase().includes(filter.toLowerCase()) ||
     f.predicate.toLowerCase().includes(filter.toLowerCase()) ||
-    f.object.toLowerCase().includes(filter.toLowerCase()) ||
-    (f.scopeId && f.scopeId.toLowerCase().includes(filter.toLowerCase()))
+    f.object.toLowerCase().includes(filter.toLowerCase())
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '820px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 600, color: 'var(--dsw-alias-label-primary, #fff)' }}>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--dsw-alias-label-primary, #fff)' }}>
             {t('settings.knowledge.title')}
           </h3>
-          <p style={{ margin: 0, fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, #9ca3af)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--dsw-alias-label-secondary, #9ca3af)' }}>
             {t('settings.knowledge.description')}
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            type="button"
-            onClick={() => { setShowAddForm(!showAddForm); setAddError(null); }}
-            style={{
-              padding: '5px 12px',
-              borderRadius: '6px',
-              backgroundColor: showAddForm ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: 'var(--dsw-alias-label-primary, #fff)',
-              fontSize: '12px',
-              cursor: 'pointer',
-            }}
-          >
-            {t('settings.knowledge.addFact')}
-          </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
             type="button"
             onClick={fetchFacts}
+            disabled={loading}
             style={{
-              padding: '5px 12px',
+              padding: '6px 12px',
               borderRadius: '6px',
-              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: 'var(--dsw-alias-label-primary, #fff)',
               fontSize: '12px',
               cursor: 'pointer',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: 'var(--dsw-alias-label-primary, #fff)',
             }}
           >
             {t('settings.knowledge.refresh')}
           </button>
+          <button
+            type="button"
+            onClick={() => setShowAddForm(!showAddForm)}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              backgroundColor: '#3b82f6',
+              border: 'none',
+              color: '#fff',
+            }}
+          >
+            {showAddForm ? t('settings.knowledge.cancel') : t('settings.knowledge.addFact')}
+          </button>
         </div>
       </div>
 
-      {/* Add Memory Form Modal */}
       {showAddForm && (
         <form
           onSubmit={handleAddFact}
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
             padding: '16px',
             borderRadius: '8px',
             backgroundColor: 'rgba(255, 255, 255, 0.03)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+          {addError && (
+            <div style={{ padding: '8px 12px', borderRadius: '4px', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontSize: '12px' }}>
+              {addError}
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '8px' }}>
             <input
               type="text"
-              required
+              placeholder={t('settings.knowledge.subjectPlaceholder')}
               value={newSubject}
               onChange={e => setNewSubject(e.target.value)}
-              placeholder={t('settings.knowledge.subjectPlaceholder')}
+              required
               style={{
-                padding: '8px 12px',
+                padding: '6px 10px',
                 borderRadius: '6px',
-                backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 color: 'var(--dsw-alias-label-primary, #fff)',
                 fontSize: '12px',
-                outline: 'none',
               }}
             />
             <input
               type="text"
-              required
+              placeholder={t('settings.knowledge.predicatePlaceholder')}
               value={newPredicate}
               onChange={e => setNewPredicate(e.target.value)}
-              placeholder={t('settings.knowledge.predicatePlaceholder')}
+              required
               style={{
-                padding: '8px 12px',
+                padding: '6px 10px',
                 borderRadius: '6px',
-                backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 color: 'var(--dsw-alias-label-primary, #fff)',
                 fontSize: '12px',
-                outline: 'none',
               }}
             />
             <input
               type="text"
-              required
+              placeholder={t('settings.knowledge.objectPlaceholder')}
               value={newObject}
               onChange={e => setNewObject(e.target.value)}
-              placeholder={t('settings.knowledge.objectPlaceholder')}
+              required
               style={{
-                padding: '8px 12px',
+                padding: '6px 10px',
                 borderRadius: '6px',
-                backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 color: 'var(--dsw-alias-label-primary, #fff)',
                 fontSize: '12px',
-                outline: 'none',
               }}
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <select
+              value={newClass}
+              onChange={e => setNewClass(e.target.value as any)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '6px',
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: 'var(--dsw-alias-label-primary, #fff)',
+                fontSize: '12px',
+              }}
+            >
+              <option value="evidence">Evidence (Verified)</option>
+              <option value="hypothesis">Hypothesis (Tentative)</option>
+            </select>
+
             <select
               value={newScopeType}
               onChange={e => setNewScopeType(e.target.value as any)}
               style={{
-                padding: '8px 12px',
+                padding: '6px 10px',
                 borderRadius: '6px',
-                backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
                 color: 'var(--dsw-alias-label-primary, #fff)',
                 fontSize: '12px',
-                outline: 'none',
               }}
             >
               <option value="user">{t('settings.knowledge.scopePersonal')}</option>
@@ -265,114 +295,87 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
             {(newScopeType === 'group' || newScopeType === 'repo') && (
               <input
                 type="text"
-                required
+                placeholder={newScopeType === 'group' ? t('settings.knowledge.groupIdPlaceholder') : t('settings.knowledge.repoIdPlaceholder')}
                 value={newScopeTarget}
                 onChange={e => setNewScopeTarget(e.target.value)}
-                placeholder={newScopeType === 'group' ? t('settings.knowledge.groupIdPlaceholder') : t('settings.knowledge.repoIdPlaceholder')}
+                required
                 style={{
-                  padding: '8px 12px',
+                  padding: '6px 10px',
                   borderRadius: '6px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
                   color: 'var(--dsw-alias-label-primary, #fff)',
                   fontSize: '12px',
-                  outline: 'none',
+                  width: '180px',
                 }}
               />
             )}
 
-            <input
-              type="number"
-              value={newTtlSeconds}
-              onChange={e => setNewTtlSeconds(e.target.value)}
-              placeholder={t('settings.knowledge.ttlPlaceholder')}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'var(--dsw-alias-label-primary, #fff)',
-                fontSize: '12px',
-                outline: 'none',
-              }}
-            />
-          </div>
-
-          {addError && (
-            <div style={{ fontSize: '11px', color: '#f87171' }}>
-              {addError}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-            <button
-              type="button"
-              onClick={() => setShowAddForm(false)}
-              style={{
-                padding: '5px 12px',
-                borderRadius: '6px',
-                backgroundColor: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'var(--dsw-alias-label-secondary, #d1d5db)',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              {t('settings.knowledge.cancel')}
-            </button>
             <button
               type="submit"
               disabled={adding}
               style={{
-                padding: '5px 14px',
+                marginLeft: 'auto',
+                padding: '6px 16px',
                 borderRadius: '6px',
-                backgroundColor: '#3b82f6',
-                border: 'none',
-                color: '#fff',
                 fontSize: '12px',
                 fontWeight: 500,
-                cursor: adding ? 'not-allowed' : 'pointer',
-                opacity: adding ? 0.6 : 1,
+                cursor: 'pointer',
+                backgroundColor: '#10b981',
+                border: 'none',
+                color: '#fff',
               }}
             >
-              {adding ? t('settings.knowledge.loading') : t('settings.knowledge.save')}
+              {adding ? '...' : t('settings.knowledge.save')}
             </button>
           </div>
         </form>
       )}
 
-      {/* Scope Filtering Tabs & Search Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {(['all', 'user', 'group', 'repo', 'public'] as const).map(sc => {
-            const labelMap = {
-              all: t('settings.knowledge.scopeAll'),
-              user: t('settings.knowledge.scopePersonal'),
-              group: t('settings.knowledge.scopeGroup'),
-              repo: t('settings.knowledge.scopeRepo'),
-              public: t('settings.knowledge.scopePublic'),
-            };
-            const active = scopeFilter === sc;
-            return (
-              <button
-                key={sc}
-                type="button"
-                onClick={() => setScopeFilter(sc)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '14px',
-                  fontSize: '11px',
-                  fontWeight: active ? 600 : 400,
-                  backgroundColor: active ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  border: active ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  color: active ? '#60a5fa' : 'var(--dsw-alias-label-secondary, #d1d5db)',
-                  cursor: 'pointer',
-                }}
-              >
-                {labelMap[sc]}
-              </button>
-            );
-          })}
+      {/* Filter and Search Bar */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          {(['all', 'user', 'group', 'repo', 'public'] as const).map(sc => (
+            <button
+              key={sc}
+              type="button"
+              onClick={() => setScopeFilter(sc)}
+              style={{
+                padding: '4px 10px',
+                fontSize: '11px',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: scopeFilter === sc ? 'rgba(59, 130, 246, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                color: scopeFilter === sc ? '#60a5fa' : 'var(--dsw-alias-label-secondary, #9ca3af)',
+              }}
+            >
+              {sc === 'all' ? t('settings.knowledge.scopeAll') :
+               sc === 'user' ? t('settings.knowledge.scopePersonal') :
+               sc === 'group' ? t('settings.knowledge.scopeGroup') :
+               sc === 'repo' ? t('settings.knowledge.scopeRepo') :
+               t('settings.knowledge.scopePublic')}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          {(['all', 'axiom', 'evidence', 'hypothesis'] as const).map(ec => (
+            <button
+              key={ec}
+              type="button"
+              onClick={() => setClassFilter(ec)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '11px',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: classFilter === ec ? 'rgba(16, 185, 129, 0.2)' : 'rgba(0, 0, 0, 0.1)',
+                color: classFilter === ec ? '#34d399' : 'var(--dsw-alias-label-secondary, #9ca3af)',
+              }}
+            >
+              {ec === 'all' ? 'All Classes' : ec === 'axiom' ? '🛡️ Axiom' : ec === 'evidence' ? '✓ Evidence' : '📝 Hypothesis'}
+            </button>
+          ))}
         </div>
 
         <input
@@ -381,7 +384,8 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
           onChange={e => setFilter(e.target.value)}
           placeholder={t('settings.knowledge.searchPlaceholder')}
           style={{
-            width: '280px',
+            marginLeft: 'auto',
+            width: '260px',
             padding: '6px 12px',
             borderRadius: '6px',
             backgroundColor: 'rgba(0, 0, 0, 0.2)',
@@ -415,7 +419,7 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '2.5fr 2fr 2.5fr 1.2fr 48px',
+              gridTemplateColumns: '80px 2.2fr 1.8fr 2.2fr 1.1fr 40px',
               padding: '8px 12px',
               backgroundColor: 'rgba(255, 255, 255, 0.04)',
               borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
@@ -424,6 +428,7 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
               color: 'var(--dsw-alias-label-secondary, #d1d5db)',
             }}
           >
+            <div>{t('settings.knowledge.colClass')}</div>
             <div>{t('settings.knowledge.colSubject')}</div>
             <div>{t('settings.knowledge.colPredicate')}</div>
             <div>{t('settings.knowledge.colObject')}</div>
@@ -444,12 +449,16 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
                 fact.scopeType === 'repo' ? '#facc15' :
                 '#34d399';
 
+              const isAxiom = fact.epistemicClass === 'axiom';
+              const classLabel = isAxiom ? '🛡️ Axiom' : fact.epistemicClass === 'hypothesis' ? '📝 Hypo' : '✓ Evid';
+              const classColor = isAxiom ? '#60a5fa' : fact.epistemicClass === 'hypothesis' ? '#facc15' : '#34d399';
+
               return (
                 <div
                   key={fact.id || idx}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '2.5fr 2fr 2.5fr 1.2fr 48px',
+                    gridTemplateColumns: '80px 2.2fr 1.8fr 2.2fr 1.1fr 40px',
                     padding: '9px 12px',
                     borderBottom: idx === filteredFacts.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
                     fontSize: '11px',
@@ -457,6 +466,9 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
                     alignItems: 'center',
                   }}
                 >
+                  <div style={{ fontSize: '10px', color: classColor, fontWeight: 500 }}>
+                    {classLabel}
+                  </div>
                   <div style={{ wordBreak: 'break-all', color: '#60a5fa' }}>{fact.subject}</div>
                   <div style={{ wordBreak: 'break-all', opacity: 0.85 }}>{fact.predicate}</div>
                   <div style={{ wordBreak: 'break-all', color: '#34d399' }}>{fact.object}</div>
@@ -476,22 +488,26 @@ export function KnowledgeSettingsSection({ t = (k: string) => k }: KnowledgeSect
                     </span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteFact(fact.id)}
-                      title={t('settings.knowledge.delete')}
-                      style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        color: 'rgba(239, 68, 68, 0.8)',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                      }}
-                    >
-                      ×
-                    </button>
+                    {!isAxiom ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFact(fact)}
+                        title={t('settings.knowledge.delete')}
+                        style={{
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          color: 'rgba(239, 68, 68, 0.8)',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                        }}
+                      >
+                        ×
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '10px', opacity: 0.4 }} title="Axiom: Immutable">🔒</span>
+                    )}
                   </div>
                 </div>
               );

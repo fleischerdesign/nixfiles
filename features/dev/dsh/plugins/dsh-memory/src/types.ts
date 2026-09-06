@@ -1,10 +1,11 @@
 /**
  * @module @dsh/memory/types
- * Formal types for Bitemporal Knowledge Representation, Lattice Security, and Datalog Inferences.
+ * Formal types for Bitemporal Knowledge Representation, Epistemic Classes, Lattice Security, and Datalog Inferences.
  */
 
 export type SecurityLabel = 'system' | 'operator' | 'user';
 export type MemoryScopeType = 'public' | 'group' | 'user' | 'repo';
+export type EpistemicClass = 'axiom' | 'evidence' | 'hypothesis';
 
 export interface BitemporalFact {
   id?: string;
@@ -22,6 +23,7 @@ export interface BitemporalFact {
   scopeType: MemoryScopeType;
   scopeId: string; // 'public', 'group:dev', 'user:philipp', 'repo:nixfiles'
   author: string;
+  epistemicClass?: EpistemicClass;
   embedding?: number[];
 }
 
@@ -35,6 +37,7 @@ export interface FactQueryFilter {
   minConfidence?: number;
   scopeType?: MemoryScopeType;
   scopeId?: string;
+  epistemicClass?: EpistemicClass;
   search?: string; // FTS5 fulltext search query
 }
 
@@ -61,6 +64,7 @@ export interface StoreFactArgs {
   scope_type?: MemoryScopeType;
   scope_id?: string;
   author?: string;
+  epistemic_class?: EpistemicClass;
 }
 
 export interface QueryMemoryArgs {
@@ -88,4 +92,5 @@ export interface MemoryPluginConfig {
   factsFile?: string;
   autoConsolidate?: boolean; // Automatic turn-stopping memory consolidation
   maxRecallTokens?: number;
+  minRecallThreshold?: number;
 }

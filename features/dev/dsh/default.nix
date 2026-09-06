@@ -640,6 +640,16 @@ in
         default = [ ];
         description = "System-wide declarative invariant facts provisioned via Nix.";
       };
+      maxRecallTokens = lib.mkOption {
+        type = lib.types.int;
+        default = 150;
+        description = "Hard token cap for memory context injected into the prompt.";
+      };
+      minRecallThreshold = lib.mkOption {
+        type = lib.types.float;
+        default = -1.5;
+        description = "Minimum BM25 score threshold (FTS5 rank cutoff; more negative = stronger match).";
+      };
     };
   };
 
@@ -812,6 +822,8 @@ in
               };
               "dsh-memory" = {
                 facts = allConfiguredFacts;
+                maxRecallTokens = systemCfg.memory.maxRecallTokens or 150;
+                minRecallThreshold = systemCfg.memory.minRecallThreshold or (-1.5);
               };
               "dsh-mesh" = {
                 nodeId = currentHost;

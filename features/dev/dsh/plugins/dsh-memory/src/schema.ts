@@ -18,7 +18,7 @@ export function initializeDatabase(dbPath: string): DatabaseSync {
   }
   db.exec('PRAGMA foreign_keys = ON;');
 
-  // Bitemporal Facts Schema (Oktatupel + Scopes + Author)
+  // Bitemporal Facts Schema (Oktatupel + Scopes + Author + EpistemicClass)
   db.exec(`
     CREATE TABLE IF NOT EXISTS facts (
       id TEXT PRIMARY KEY,
@@ -36,6 +36,7 @@ export function initializeDatabase(dbPath: string): DatabaseSync {
       scope_type TEXT NOT NULL DEFAULT 'public',
       scope_id TEXT NOT NULL DEFAULT 'public',
       author TEXT NOT NULL DEFAULT 'system',
+      epistemic_class TEXT NOT NULL DEFAULT 'evidence',
       embedding_blob BLOB
     );
 
@@ -45,6 +46,7 @@ export function initializeDatabase(dbPath: string): DatabaseSync {
     CREATE INDEX IF NOT EXISTS idx_facts_status ON facts(status);
     CREATE INDEX IF NOT EXISTS idx_facts_scope ON facts(scope_type, scope_id);
     CREATE INDEX IF NOT EXISTS idx_facts_author ON facts(author);
+    CREATE INDEX IF NOT EXISTS idx_facts_epistemic ON facts(epistemic_class);
 
     -- SQLite FTS5 Fulltext Search Index
     CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5(

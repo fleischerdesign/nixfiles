@@ -8,6 +8,7 @@ import type {
   QueryMemoryArgs,
   SecurityLabel,
   MemoryScopeType,
+  EpistemicClass,
   MemoryPluginConfig,
   StaticFactDeclaration
 } from './types.js';
@@ -52,9 +53,10 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
             const search = parsedUrl.searchParams.get('search') || undefined;
             const scopeType = (parsedUrl.searchParams.get('scopeType') as MemoryScopeType) || undefined;
             const scopeId = parsedUrl.searchParams.get('scopeId') || undefined;
+            const epistemicClass = (parsedUrl.searchParams.get('epistemicClass') as EpistemicClass) || undefined;
 
             const result = engine.query(
-              { search, scopeType, scopeId },
+              { search, scopeType, scopeId, epistemicClass },
               tenant
             );
 
@@ -101,38 +103,31 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
                 if (tenant.clearance !== 'Admin' && (!groupName || !tenant.groups?.includes(groupName))) {
                   res.statusCode = 403;
                   res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ error: `Not a member of group: ${groupName}` }));
+                  res.end(JSON.stringify({ error: `Not a member of group "${groupName}"` }));
                   return;
                 }
                 resolvedScopeId = `group:${groupName}`;
-              } else if (requestedScopeType === 'repo') {
-                if (!resolvedScopeId) {
-                  res.statusCode = 400;
-                  res.setHeader('Content-Type', 'application/json');
-                  res.end(JSON.stringify({ error: 'Repo scope requires scopeId (e.g. repo:name)' }));
-                  return;
-                }
-                if (!resolvedScopeId.startsWith('repo:')) {
-                  resolvedScopeId = `repo:${resolvedScopeId}`;
-                }
               }
 
-              const stored = engine.storeFact({
-                subject: String(payload.subject).trim(),
-                predicate: String(payload.predicate).trim(),
-                object: String(payload.object).trim(),
-                typeConstraint: payload.typeConstraint || 'String',
-                confidence: typeof payload.confidence === 'number' ? payload.confidence : 1.0,
-                securityLabel: payload.securityLabel || 'user',
-                ttlSeconds: typeof payload.ttlSeconds === 'number' ? payload.ttlSeconds : undefined,
+              const fact = engine.storeFact({
+                subject: payload.subject,
+                predicate: payload.predicate,
+                object: payload.object,
+                validFrom: payload.validFrom ?? Date.now(),
+                validTo: payload.validTo ?? Infinity,
+                typeConstraint: payload.typeConstraint ?? 'String',
+                confidence: payload.confidence ?? 1.0,
+                securityLabel: payload.securityLabel ?? 'user',
+                ttlSeconds: payload.ttlSeconds,
                 scopeType: requestedScopeType,
                 scopeId: resolvedScopeId,
-                author: tenant.username
+                author: tenant.username,
+                epistemicClass: payload.epistemicClass ?? 'evidence'
               });
 
               res.statusCode = 201;
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ fact: stored }));
+              res.end(JSON.stringify({ fact }));
             } catch (err: any) {
               res.statusCode = 400;
               res.setHeader('Content-Type', 'application/json');
@@ -145,6 +140,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         if (req.method === 'DELETE') {
           const parsedUrl = new URL(`http://${req.headers.host || 'localhost'}${req.url}`);
           const id = parsedUrl.searchParams.get('id');
+
           if (!id) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
@@ -172,7 +168,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     });
   });
 
-  // Ingest declarative static facts from configuration (Agnostic Ingestion)
+  // Ingest declarative static facts from configuration (Agnostic Ingestion) - Class 1: Axioms!
   const factsToIngest: StaticFactDeclaration[] = [...(config.facts || [])];
 
   if (config.factsFile && fs.existsSync(config.factsFile)) {
@@ -193,14 +189,15 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         subject: item.subject,
         predicate: item.predicate,
         object: item.object,
-        validFrom: 0, // Invariant fact: valid from epoch start
-        validTo: item.valid_to ?? Infinity,
+        validFrom: 0, // Axiom: valid from epoch start
+        validTo: Infinity, // Axiom: immutable, never expires
         typeConstraint: item.type_constraint ?? 'String',
         confidence: item.confidence ?? 1.0,
         securityLabel: item.security_label ?? 'system',
         scopeType: item.scope_type ?? 'public',
         scopeId: item.scope_id ?? 'public',
-        author: 'system'
+        author: 'system',
+        epistemicClass: 'axiom' // Tagged as Class 1 Axiom
       });
     }
   }
@@ -211,25 +208,35 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     order: 260,
     text: [
       'Use memory_query to retrieve verified infrastructure facts, host parameters, and dependency graphs.',
-      'Use memory_store to persist invariant knowledge, architectural decisions, and observed system constraints.'
+      'Use memory_store to persist verified empirical architectural decisions and constraints (Class 2 Evidence).'
     ].join(' ')
   });
 
-  // Turn-stopping automatic memory consolidation & Turn-injection
+  // Token-Guarded Context Recall Gate
   if (config.autoConsolidate !== false) {
     ctx.inject(['llm'], (llmCtx: any) => {
-      // Auto-recall top relevant memories for prompt context
       llmCtx.llm.on('llm/pre-request', async (request: any, next: () => Promise<any>) => {
         try {
           const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
-          const lastUserMessage = [...(request?.messages || [])].reverse().find((m: any) => m.role === 'user');
+          const messages = request?.messages || [];
+          const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user');
+
           if (lastUserMessage && typeof lastUserMessage.content === 'string') {
-            const recalled = engine.recallContext(lastUserMessage.content, tenant, undefined, 4);
+            // Extract recent turn texts for deduplication
+            const recentTurnTexts = messages.slice(-4).map((m: any) => typeof m.content === 'string' ? m.content : '');
+
+            const recalled = engine.recallContextGuarded({
+              queryText: lastUserMessage.content,
+              identity: tenant,
+              recentTurnTexts,
+              maxTokens: config.maxRecallTokens ?? 150,
+              minThreshold: config.minRecallThreshold ?? -1.5
+            });
+
             if (recalled.length > 0) {
-              const memoryLines = recalled.map(f => `- ${f.subject} ${f.predicate} ${f.object} (${f.scopeId})`).join('\n');
+              const memoryLines = recalled.map(f => `- ${f.subject} ${f.predicate} ${f.object} [${f.epistemicClass || 'evidence'}] (${f.scopeId})`).join('\n');
               const memoryContextBlock = `\n[Recalled Knowledge Memories]:\n${memoryLines}\n`;
 
-              // Inject context into system prompt if available, or prepend to turn
               if (request.messages && request.messages.length > 0 && request.messages[0].role === 'system') {
                 request.messages[0].content += memoryContextBlock;
               }
@@ -255,6 +262,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         recursive_closure: { type: 'boolean', description: 'Whether to compute recursive transitive closure (Datalog fixpoint).' },
         scope_type: { type: 'string', enum: ['public', 'group', 'user', 'repo'], description: 'Filter facts by memory scope.' },
         scope_id: { type: 'string', description: 'Filter facts by scope ID (e.g. "user:name" or "group:dev").' },
+        epistemic_class: { type: 'string', enum: ['axiom', 'evidence', 'hypothesis'], description: 'Filter by epistemic class.' },
         search: { type: 'string', description: 'Full-text search keyword query across facts.' }
       },
       output: {
@@ -273,7 +281,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
           }
         ]
       },
-      async execute(args: QueryMemoryArgs & { scope_type?: MemoryScopeType; scope_id?: string; search?: string }): Promise<any> {
+      async execute(args: QueryMemoryArgs & { scope_type?: MemoryScopeType; scope_id?: string; epistemic_class?: EpistemicClass; search?: string }): Promise<any> {
         if (args.recursive_closure && args.subject && args.predicate) {
           const transitive = engine.queryTransitiveClosure(args.subject, args.predicate);
           return { facts: [], transitive };
@@ -287,6 +295,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
           asOfValid: args.as_of_time,
           scopeType: args.scope_type,
           scopeId: args.scope_id,
+          epistemicClass: args.epistemic_class,
           search: args.search
         }, tenant);
 
@@ -298,11 +307,11 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     })
   );
 
-  // Tool 2: Fact Ingestion with Belief Revision
+  // Tool 2: Fact Ingestion with Epistemic Protection & Belief Revision
   ctx.tools.register(
     defineTool({
       name: 'memory_store',
-      description: 'Store a verified system fact or architectural constraint into bitemporal memory.',
+      description: 'Store a verified system fact or architectural constraint into bitemporal memory (Class 2 Evidence or Class 3 Hypothesis).',
       parameters: {
         subject: { type: 'string', required: true, description: 'Subject entity URI (e.g. "urn:nix:host:strummer").' },
         predicate: { type: 'string', required: true, description: 'Predicate relation (e.g. "nix:hasOption").' },
@@ -312,7 +321,8 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         security_label: { type: 'string', enum: ['system', 'operator', 'user'], description: 'Lattice security classification.' },
         ttl_seconds: { type: 'number', description: 'Optional time-to-live in seconds for ephemeral facts.' },
         scope_type: { type: 'string', enum: ['public', 'group', 'user', 'repo'], description: 'Memory scope tier (default: user).' },
-        scope_id: { type: 'string', description: 'Identifier of the target scope (e.g. group name or repo ID).' }
+        scope_id: { type: 'string', description: 'Identifier of the target scope (e.g. group name or repo ID).' },
+        epistemic_class: { type: 'string', enum: ['evidence', 'hypothesis'], description: 'Epistemic class (evidence = verified fact, hypothesis = unconfirmed assumption).' }
       },
       output: {
         schema: {
@@ -351,6 +361,9 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
           resolvedScopeId = `group:${groupName}`;
         }
 
+        // Tools cannot store Class 1 Axioms (only declarative NixOS can do that)
+        const targetClass: EpistemicClass = args.epistemic_class === 'hypothesis' ? 'hypothesis' : 'evidence';
+
         const fact = engine.storeFact({
           subject: args.subject,
           predicate: args.predicate,
@@ -363,47 +376,14 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
           ttlSeconds: args.ttl_seconds,
           scopeType: requestedScopeType,
           scopeId: resolvedScopeId,
-          author: tenant.username
+          author: tenant.username,
+          epistemicClass: targetClass
         });
 
         return {
           id: fact.id,
-          status: fact.status
-        };
-      }
-    })
-  );
-
-  // Tool 3: Fact Retraction
-  ctx.tools.register(
-    defineTool({
-      name: 'memory_retract',
-      description: 'Retract a previously stored fact by its unique ID (Belief Revision).',
-      parameters: {
-        id: { type: 'string', required: true, description: 'Unique ID of the fact to retract.' }
-      },
-      output: {
-        schema: {
-          type: 'object',
-          additionalProperties: true,
-          properties: {
-            success: { type: 'boolean', required: true },
-            id: { type: 'string', required: true }
-          }
-        },
-        render: (_args, value: any) => [
-          {
-            type: 'text',
-            text: `Retracted memory fact ${value.id}.`
-          }
-        ]
-      },
-      async execute(args: { id: string }): Promise<any> {
-        const tenant = ctx.auth?.activeTenant || { username: 'local', clearance: 'Admin', groups: [] };
-        engine.retractFact(args.id, tenant);
-        return {
-          success: true,
-          id: args.id
+          status: fact.status,
+          epistemic_class: fact.epistemicClass
         };
       }
     })
