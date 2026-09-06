@@ -725,6 +725,94 @@ in
           description = "Override the transformers.js model identifier (defaults to the bundled local model dir).";
         };
       };
+      replication = {
+        enable = lib.mkEnableOption "cross-node memory replication (C7) in dsh-memory" // {
+          default = false;
+          description = "HMAC-signed delta sync (union-CRDT) of public/group/user facts across peer nodes. Fail-closed: without a resolvable HMAC secret, replication silently stays off.";
+        };
+        nodeId = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Local nodeId used as this node's origin identifier (defaults to DSH_NODE_ID or 'standalone').";
+        };
+        secretEnv = lib.mkOption {
+          type = lib.types.str;
+          default = "DSH_MEMORY_HMAC";
+          description = "Credential/env reference holding the HMAC shared secret (resolved via the dsh credential store, never in settings).";
+        };
+        listenPort = lib.mkOption {
+          type = lib.types.nullOr lib.types.int;
+          default = null;
+          description = "Bind a local HTTP endpoint so peers can pull from this node. Null disables serving.";
+        };
+        listenHost = lib.mkOption {
+          type = lib.types.str;
+          default = "0.0.0.0";
+          description = "Bind address for the serving HTTP endpoint.";
+        };
+        syncIntervalMs = lib.mkOption {
+          type = lib.types.int;
+          default = 30000;
+          description = "Pull cadence in ms (0/negative run sync only once at startup).";
+        };
+        maxVersionsPerSync = lib.mkOption {
+          type = lib.types.int;
+          default = 512;
+          description = "Max versions per delta response (pagination).";
+        };
+        peers = lib.mkOption {
+          type = lib.types.listOf (
+            lib.types.submodule {
+              options = {
+                nodeId = lib.mkOption {
+                  type = lib.types.str;
+                  description = "Remote peer nodeId.";
+                };
+                endpoint = lib.mkOption {
+                  type = lib.types.str;
+                  description = "Peer endpoint (host:port or http URL) where /mesh/memory/sync is served.";
+                };
+                direction = lib.mkOption {
+                  type = lib.types.enum [
+                    "pull"
+                    "push"
+                    "bidirectional"
+                  ];
+                  default = "bidirectional";
+                  description = "Sync direction for this peer.";
+                };
+                scopes = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [ "public" ];
+                  example = [
+                    "public"
+                    "group:dev"
+                  ];
+                  description = "Scope ids to replicate (public, group:<g>, user:<u>). repo:* is never replicated by default.";
+                };
+              };
+            }
+          );
+          default = [ ];
+          description = "Peers to pull from / serve to.";
+        };
+      };
+      decay = {
+        enable = lib.mkEnableOption "derived confidence decay (A1) in dsh-memory" // {
+          default = false;
+          description = "Effective confidence decays exponentially with age for evidence/hypothesis (Axioms never decay). Derived, never stored — stays convergent across nodes.";
+        };
+        halfLifeSeconds = lib.mkOption {
+          type = lib.types.int;
+          default = 7776000;
+          description = "Half-life in seconds (default 90 days). 0 disables decay.";
+        };
+        floor = lib.mkOption {
+          type = lib.types.float;
+          default = 0.15;
+          description = "Below this derived confidence a fact is dropped from recall. -1 disables the filter.";
+        };
+      };
     };
 
     lsp = {
@@ -1046,6 +1134,45 @@ in
                       apiBase = systemCfg.memory.embedding.apiBase or null;
                       apiModel = systemCfg.memory.embedding.apiModel or null;
                       apiKeyEnv = systemCfg.memory.embedding.apiKeyEnv or null;
+                    };
+                  }
+                else
+                  { }
+              )
+              // (
+                if systemCfg.memory.replication.enable or false then
+                  {
+                    replication = {
+                      inherit (systemCfg.memory.replication)
+                        enable
+                        secretEnv
+                        listenHost
+                        syncIntervalMs
+                        maxVersionsPerSync
+                        ;
+                      nodeId = systemCfg.memory.replication.nodeId or currentHost;
+                      listenPort = systemCfg.memory.replication.listenPort or null;
+                      peers = map (p: {
+                        inherit (p)
+                          nodeId
+                          endpoint
+                          direction
+                          scopes
+                          ;
+                      }) (systemCfg.memory.replication.peers or [ ]);
+                    };
+                  }
+                else
+                  { }
+              )
+              // (
+                if systemCfg.memory.decay.enable or false then
+                  {
+                    decay = {
+                      inherit (systemCfg.memory.decay)
+                        halfLifeSeconds
+                        floor
+                        ;
                     };
                   }
                 else

@@ -33,11 +33,14 @@ export class BitemporalMemoryEngine {
   private readonly minSimilarity: number;
   private readonly similarityMargin: number;
   private readonly weight: number;
+  private readonly decayHalfLifeSeconds: number;
+  private readonly decayFloor: number;
 
   constructor(
     db: DatabaseSync,
     embeddingProvider?: EmbeddingProvider,
     vectorOptions: { topK?: number; minSimilarity?: number; weight?: number; similarityMargin?: number } = {},
+    decayOptions: { halfLifeSeconds?: number; floor?: number } = {},
   ) {
     this.db = db;
     this.embeddingProvider = embeddingProvider;
@@ -45,7 +48,22 @@ export class BitemporalMemoryEngine {
     this.minSimilarity = vectorOptions.minSimilarity ?? 0;
     this.similarityMargin = vectorOptions.similarityMargin ?? 0.2;
     this.weight = vectorOptions.weight ?? 0.7;
+    this.decayHalfLifeSeconds = decayOptions.halfLifeSeconds ?? 0;
+    this.decayFloor = decayOptions.floor ?? -1;
     this.ensureSchemaMigrations();
+  }
+
+  /**
+   * A1 Decay-Governance: the effective confidence is DERIVED (never stored),
+   * so it stays deterministic and convergent across nodes. Axioms never decay;
+   * evidence/hypothesis decay exponentially with the configured half-life.
+   * `exp(−ln2 · age / halfLife)` — the Bayesian term from formal-foundations §4.2.
+   */
+  effectiveConfidence(fact: { confidence: number; validFrom: number; epistemicClass?: EpistemicClass }, now = Date.now()): number {
+    const hl = this.decayHalfLifeSeconds;
+    if (hl <= 0 || fact.epistemicClass === 'axiom') return fact.confidence;
+    const ageSec = Math.max(0, now - fact.validFrom) / 1000;
+    return fact.confidence * Math.exp(-Math.log(2) * ageSec / hl);
   }
 
   private ensureSchemaMigrations(): void {
@@ -499,6 +517,8 @@ export class BitemporalMemoryEngine {
     for (const c of candidates) {
       const key = dedupKey(c.fact.subject, c.fact.predicate, c.fact.object, c.fact.scopeId);
       if (seen.has(key)) continue;
+      // A1 Decay: drop facts whose derived confidence fell below the floor.
+      if (this.decayFloor >= 0 && this.effectiveConfidence(c.fact) < this.decayFloor) continue;
       const line = `- ${c.fact.subject} ${c.fact.predicate} ${c.fact.object} (${c.fact.scopeId})\n`;
       const estimatedTokens = Math.ceil(line.length / 4);
       if (accumulatedTokens + estimatedTokens > maxTokens) break; // Hard budget reached

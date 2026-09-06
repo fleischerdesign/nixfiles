@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { initializeDatabase } from './schema.js';
 import { BitemporalMemoryEngine } from './engine.js';
 import { createEmbeddingProvider } from './embedding.js';
+import { MemoryReplicator } from './replication.js';
 import type {
   StoreFactArgs,
   QueryMemoryArgs,
@@ -91,9 +92,37 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     minSimilarity: config.embedding?.minSimilarity ?? (embeddingProvider?.id === 'api' || embeddingProvider?.id === 'onnx' ? 0.5 : 0),
     similarityMargin: config.embedding?.similarityMargin ?? 0.2,
     weight: config.embedding?.weight ?? 0.7,
+  }, {
+    halfLifeSeconds: config.decay?.halfLifeSeconds ?? 0,
+    floor: config.decay?.floor ?? -1,
   });
   ctx.provide('memory');
   ctx.memory = engine;
+
+  // Cross-Node Memory Replication (C7, P1). Fail-closed: if enabled but no HMAC
+  // secret resolves (credential store or env), replication stays OFF — never an
+  // insecure silent sync. Runs out-of-band; versions merge as an idempotent
+  // CvRDT union, so partial runs converge on the next interval.
+  void (async () => {
+    const replCfg = config.replication;
+    if (!replCfg?.enabled) return;
+    const secret = await resolveKey(replCfg.secretEnv || 'DSH_MEMORY_HMAC');
+    if (!secret) return; // fail-closed
+    const replicator = new MemoryReplicator({
+      db,
+      secret,
+      nodeId: replCfg.nodeId || process.env.DSH_NODE_ID || 'standalone',
+      peers: replCfg.peers,
+      syncIntervalMs: replCfg.syncIntervalMs,
+      maxVersionsPerSync: replCfg.maxVersionsPerSync,
+    });
+    if (replCfg.listenPort) {
+      replicator.startServer(replCfg.listenPort, replCfg.listenHost || '0.0.0.0');
+    }
+    replicator.startPullLoop(replCfg.syncIntervalMs ?? 30000);
+    await replicator.syncAll();
+    ctx.effect(() => () => replicator.close());
+  })();
 
   // Register HTTP routes for web UI when webServer is available
   ctx.inject(['webServer'], (wsCtx: any) => {

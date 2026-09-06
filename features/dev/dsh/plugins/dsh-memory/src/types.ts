@@ -128,4 +128,44 @@ export interface MemoryPluginConfig {
     /** Minimum substantive stems for a query to trigger recall (default 1). */
     entropyMinStems?: number;
   };
+
+  /**
+   * Optional cross-node memory replication (C7). When enabled, the plugin
+   * serves a HMAC-signed `/mesh/memory/sync` endpoint and pulls deltas from
+   * peer nodes, merging immutable versions as a CvRDT union (idempotent).
+   */
+  replication?: {
+    enabled?: boolean;
+    /** Local nodeId (authoritative origin for this node's facts). */
+    nodeId?: string;
+    /** HMAC secret; resolved from `secretEnv` or the dsh credential store. */
+    secretEnv?: string;
+    /** Peers to pull from / serve to. `endpoint` is "host:port" or URL. */
+    peers?: Array<{
+      nodeId: string;
+      endpoint: string;
+      direction?: 'pull' | 'push' | 'bidirectional';
+      /** Scope ids to replicate (e.g. "public", "group:dev", "user:philipp"). Default ["public"]. */
+      scopes?: string[];
+    }>;
+    /** Bind a local HTTP endpoint for peers to pull from this node. */
+    listenPort?: number;
+    listenHost?: string;
+    /** Pull cadence in ms (default 30_000). */
+    syncIntervalMs?: number;
+    /** Max versions per delta response (default 512). */
+    maxVersionsPerSync?: number;
+  };
+
+  /**
+   * Optional memory decay governance (A1). Decay is DERIVED, not stored: the
+   * effective confidence is a pure function of base confidence + age, so it
+   * stays convergent across nodes without replicating a mutating state.
+   */
+  decay?: {
+    /** Half-life in seconds for evidence/hypothesis; 0 or undefined disables decay. */
+    halfLifeSeconds?: number;
+    /** Below this effective confidence a fact is dropped from recall (opt-in). */
+    floor?: number;
+  };
 }
