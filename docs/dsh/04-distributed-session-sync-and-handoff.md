@@ -216,23 +216,23 @@ Stellt `yorke` beim Öffnen der Session fest, dass der lokale Git-Zustand abweic
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ 📍 Projekt existiert auf "jello" (/home/philipp/dev/commpact-ui)                 │
-│    Status auf diesem Gerät ("yorke"): Nicht ausgecheckt / lokaler Drift.         │
+│ 📍 Projekt existiert primär auf "jello" (commpact-ui)                            │
+│    Status auf diesem Gerät ("yorke"): Auf diesem Gerät noch nicht synchron       │
 │                                                                                  │
-│   [ 🚀 Remote auf Jello (Alt+R) ]  [ 📥 Hierher synchronisieren ]  [ 💬 Nur Chatten ] │
+│   [ 🚀 Remote auf jello (Alt+R) ]            [ 💬 Nur Chatten (Kein Dateizugriff) ] │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Option A: Remote Execution via Jello (`Alt+R`)**:
-   - Die DSH-UI läuft auf `yorke`, alle Werkzeugaufrufe (`bash`, `write_to_file`, `lsp`) werden jedoch mit sichtbarem Badge `[via jello]` per OCAP-Delegation über Tailscale direkt auf `jello` ausgeführt.
-   - **Edge Case: Jello schläft ein / Netzwerk bricht ab:**
+1. **Option A: Remote Execution via Ziel-Node (`Alt+R`) [Empfohlen]**:
+   - Die DSH-UI läuft lokal auf dem aktuellen Gerät (z. B. `yorke`), alle Werkzeugaufrufe (`bash`, `write_to_file`, `lsp`) werden jedoch mit sichtbarem Badge `[via jello]` per OCAP-Delegation über Tailscale direkt auf dem Ursprungs-Host (`jello`) ausgeführt.
+   - **Vorteil:** Kein Risiko von Patch-Konflikten, kein Überschreiben lokaler Daten, voller Zugriff auf uncommittete Änderungen, `.env`-Dateien und Build-Artefakte direkt an der Quelle.
+   - **Edge Case: Ursprungs-Host offline / schläft ein:**
      Bricht während eines Remote-Calls die Verbindung ab, wechselt DSH in den Zustand `Remote Node Unreachable`. Der laufende Turn wird sauber mit `RemoteNetworkError` angehalten; es gibt keine hängenden Prozesse.
-2. **Option B: Workspace Clonen & Patch anwenden**:
-   - `dsh-mesh` stößt im Hintergrund `git clone` an und überträgt den flüchtigen Patch (`git diff HEAD`) von `jello`.
-   - **Edge Case: Merge-Konflikt beim Patch-Anwenden:**
-     Schlägt `git apply` auf `yorke` fehl (weil dort bereits manuelle Änderungen vorlagen), verwirft DSH nichts. Stattdessen wird der Patch als `.dsh/patches/incoming-<ts>.patch` abgelegt und das UI schlägt automatisch den Wechsel zu *Option A (Remote auf Jello)* vor, bis der Konflikt gelöst ist.
-3. **Option C: Reiner Planungs- & Diskussions-Modus (Chat Only)**:
+
+2. **Option B: Reiner Planungs- & Diskussions-Modus (Chat Only)**:
    - Alle dateisystem-mutierenden Tools werden stummgeschaltet. Der Agent agiert rein beratend auf Basis des synchronisierten Chat-Kontexts.
+
+*(Hinweis: Automatischer Hintergrund-Git-Sync und Over-the-Wire Patch-Transfers wurden bewusst verworfen, um Datenverluste, kaputte Worktrees und Merge-Konflikte im Hintergrund deterministisch auszuschließen).*
 
 ---
 

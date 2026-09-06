@@ -10,19 +10,15 @@ Dieses Dokument dokumentiert die abgestimmten, akademisch sauberen und praxisnah
 - **Status:** Vollständig ausdetailliert in `docs/dsh/01-dual-pane-canvas.md` und `docs/dsh/01-canvas-deep-dive-plan.md`.
 - **Kern:** Entkopplung von Chat-Strom und Code-Artefakten im Split-Pane mit Monaco-Engine, gezieltem In-Place Refactoring (`Strg+K`), sandboxed Web-Previews und Revisions-Historie.
 
-### 1.2 Active Context Chips & Git Diff Pinning (`dsh-context-chips`)
-- **Status:** Spezifiziert in `docs/dsh/02-context-pinning-git-diff.md`.
-- **Kern:** Interaktive Context-Pills (`@git:diff`, `@file`) im Composer mit visueller Token-Budget-Leiste und staleness-resistentem Session-Pinning.
-
-### 1.3 Declarative LSP Code Intelligence (`dsh-lsp`)
+### 1.2 Declarative LSP Code Intelligence (`dsh-lsp`)
 - **Status:** Spezifiziert in `docs/dsh/03-declarative-lsp-intelligence.md`.
 - **Kern:** Direkte NixOS-Anbindung von Store-Binaries (`nil`, `typescript-language-server`, `pyright`, `gopls`) für typ- und symbolgenaue Codegenerierung sowie Vorab-Prüfung.
 
-### 1.4 Distributed Session Synchronization & Handoff Fabric (`dsh-mesh`)
-- **Status:** Vollständig spezifiziert in `docs/dsh/04-distributed-session-sync-and-handoff.md`.
-- **Kern:** P2P & VPS-Relay-gestützte Delta-Replikation von Zstandard-Event-Logs, Distributed Write Leases gegen Split-Brain und portable Workspace-Resolution für nahtloses Arbeiten über alle Geräte hinweg.
+### 1.3 Distributed Session Synchronization & Handoff Fabric (`dsh-mesh`)
+- **Status:** Vollständig spezifiziert in `docs/dsh/04-distributed-session-sync-and-handoff.md` und implementiert.
+- **Kern:** P2P & VPS-Relay-gestützte Delta-Replikation von Zstandard-Event-Logs, Distributed Write Leases gegen Split-Brain, kanonische Git-Workspace-Resolution und Remote-Task-Delegation.
 
-### 1.5 Semantic AST & Tree-sitter Code Intelligence (`dsh-ast-nav`)
+### 1.4 Semantic AST & Tree-sitter Code Intelligence (`dsh-ast-nav`)
 - **Status:** In Ausarbeitung.
 - **Kern:** Syntaxbaum-basierte Abfragen (Funktionshierarchien, Scope-Auflösung, Typ-Definitionen) für präzises Code-Verständnis jenseits von unscharfem Text-Grep.
 
@@ -40,8 +36,12 @@ Dieses Dokument dokumentiert die abgestimmten, akademisch sauberen und praxisnah
 
 ---
 
-## 2. Abgelehnte / Verworfene Ideen
+## 2. Abgelehnte / Verworfene Ideen & Architektur-Rationale
 
+- **Context Pinning / Chips**: Verwässert Prefix- und KV-Prompt-Caching (höhere Token-Kosten und Latenz); Agenten laden benötigte Dateien bedarfsgerecht per Tool Lazy-Loading (`view_file`).
+- **Dedizierte Git-Diff UI**: Redundant; LLMs greifen direkt über Terminal-Tools auf `git diff` zu.
+- **Automatischer Hintergrund-Git-Sync**: Hohes Risiko von Merge-Konflikten, Branch-Divergenzen und defekten Worktrees im Hintergrund.
+- **Automatischer Patch-Transfer (WIP Over-the-Wire)**: Risiko von Datenverlusten und unvollständigen Arbeitsständen (untracked files, `.env`); durch die sichere **Remote Task Execution (`via <nodeId>`)** des Mesh-Banners architektonisch sauber und verlustfrei gelöst.
 - **Terminal Stream Replay**: Unnötig in einer vollwertigen Desktop-/Web-UI-Umgebung mit dedizierten Tool-Widgets.
 - **Context Compression / Sliding Window Pruning**: Zu heuristisch und birgt Kontextverlust-Risiken; widerspricht der deterministischen Prompt-Transparenz.
 - **Workspace Attention Heatmap**: Geringer Mehrwert bei hoher visueller Unruhe.
