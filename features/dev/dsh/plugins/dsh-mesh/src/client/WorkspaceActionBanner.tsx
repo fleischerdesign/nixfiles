@@ -69,7 +69,10 @@ export function WorkspaceActionBanner({
       const res = await fetch('/api/mesh/workspace/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceUrn: resolvedUrn })
+        body: JSON.stringify({
+          workspaceUrn: resolvedUrn,
+          peerNode: originNode
+        })
       });
 
       const data = await res.json();

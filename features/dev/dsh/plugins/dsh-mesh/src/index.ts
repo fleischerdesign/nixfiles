@@ -3,6 +3,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import * as http from 'node:http';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { spawn } from 'node:child_process';
 import { MeshTransportClient } from './protocol.js';
 import {
   computeCanonicalWorkspaceUrn,
@@ -401,17 +402,57 @@ export class MeshCoordinatorService extends Service {
 
   private startServer(port: number, host: string): void {
     this.server = http.createServer((req, res) => {
-      // Support GET /mesh/sessions
-      if (req.method === 'GET' && req.url === '/mesh/sessions') {
-        try {
-          const sessions = this.getLocalSessions();
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(sessions));
-        } catch (e: any) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: e.message || String(e) }));
+      // Support GET /mesh/sessions and GET /mesh/workspace/archive
+      if (req.method === 'GET') {
+        const parsedUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+        if (parsedUrl.pathname === '/mesh/sessions') {
+          try {
+            const sessions = this.getLocalSessions();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(sessions));
+          } catch (e: any) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message || String(e) }));
+          }
+          return;
         }
-        return;
+
+        if (parsedUrl.pathname === '/mesh/workspace/archive') {
+          const relPath = parsedUrl.searchParams.get('path');
+          if (!relPath) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing path query parameter' }));
+            return;
+          }
+
+          const home = process.env.HOME || '/root';
+          const absPath = path.resolve(home, relPath);
+
+          // Prevent path traversal outside home
+          if (!absPath.startsWith(home) || !fs.existsSync(absPath) || !fs.statSync(absPath).isDirectory()) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Directory not found or access forbidden' }));
+            return;
+          }
+
+          // Stream directory 1:1 via tar | zstd -3 into HTTP response
+          res.writeHead(200, {
+            'Content-Type': 'application/x-zstd-tar',
+            'Transfer-Encoding': 'chunked'
+          });
+
+          const tar = spawn('tar', ['-C', absPath, '-cf', '-', '.']);
+          const zstd = spawn('zstd', ['-3', '-c']);
+
+          tar.stdout.pipe(zstd.stdin);
+          zstd.stdout.pipe(res);
+
+          req.on('close', () => {
+            tar.kill();
+            zstd.kill();
+          });
+          return;
+        }
       }
 
       if (req.method !== 'POST') {
@@ -694,7 +735,7 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
           req.on('end', () => {
             try {
               const payload = JSON.parse(body || '{}');
-              const { workspaceUrn, preferredDir } = payload;
+              const { workspaceUrn, preferredDir, peerNode } = payload;
               if (!workspaceUrn) {
                 res.statusCode = 400;
                 res.setHeader('Content-Type', 'application/json');
@@ -702,7 +743,14 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
                 return;
               }
 
-              const result = syncWorkspaceLocally(workspaceUrn, preferredDir);
+              // Resolve peer endpoint if peerNode was provided
+              let peerEndpoint = payload.peerEndpoint;
+              if (!peerEndpoint && peerNode) {
+                const p = service.peers.get(peerNode);
+                if (p) peerEndpoint = p.endpoint;
+              }
+
+              const result = syncWorkspaceLocally(workspaceUrn, preferredDir, peerEndpoint);
               res.statusCode = result.success ? 200 : 422;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify(result));

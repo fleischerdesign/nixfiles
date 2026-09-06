@@ -239,7 +239,8 @@ export function getWorkspaceGitFingerprint(cwd: string): {
  */
 export function syncWorkspaceLocally(
   workspaceUrn: string,
-  preferredParentDir?: string
+  preferredParentDir?: string,
+  peerEndpoint?: string
 ): { success: boolean; localPath: string; message: string } {
   const home = process.env.HOME || '/root';
   const defaultBaseDir = preferredParentDir || path.join(home, 'dev');
@@ -252,17 +253,15 @@ export function syncWorkspaceLocally(
     }
   }
 
-  // Parse URN
+  // 1. Git Repository URN
   if (workspaceUrn.startsWith('urn:dsh:workspace:git:')) {
     const rawRepo = workspaceUrn.replace('urn:dsh:workspace:git:', '');
-    // e.g. "github.com/fleischerdesign/commpact-ui" or "github.com/fleischerdesign/commpact-ui:packages/core"
     const [repoPath] = rawRepo.split(':');
     const repoName = path.basename(repoPath);
     const targetDir = path.join(defaultBaseDir, repoName);
     const cloneUrl = `https://${repoPath}`;
 
     if (fs.existsSync(targetDir)) {
-      // Local directory exists: attempt fast-forward pull
       try {
         const isGit = fs.existsSync(path.join(targetDir, '.git'));
         if (!isGit) {
@@ -293,7 +292,6 @@ export function syncWorkspaceLocally(
         };
       }
     } else {
-      // Clone repository
       try {
         execSync(`git clone "${cloneUrl}" "${targetDir}"`, {
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -316,10 +314,84 @@ export function syncWorkspaceLocally(
     }
   }
 
+  // 2. Non-Git Home-Relative Workspace URN
+  if (workspaceUrn.startsWith('urn:dsh:workspace:relhome:')) {
+    const relPath = workspaceUrn.replace('urn:dsh:workspace:relhome:', '');
+    const targetDir = path.resolve(home, relPath);
+
+    // Prevent path traversal
+    if (!targetDir.startsWith(home)) {
+      return {
+        success: false,
+        localPath: '',
+        message: `Security violation: Path "${relPath}" resolves outside user home directory.`
+      };
+    }
+
+    if (!peerEndpoint) {
+      return {
+        success: false,
+        localPath: targetDir,
+        message: `Direct peer sync requires peerEndpoint to stream workspace archive.`
+      };
+    }
+
+    try {
+      const url = peerEndpoint.startsWith('http') ? peerEndpoint : `http://${peerEndpoint}`;
+      const exportUrl = `${url}/mesh/workspace/archive?path=${encodeURIComponent(relPath)}`;
+
+      const parentDir = path.dirname(targetDir);
+      if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true });
+      }
+
+      // Stage in temporary directory for atomic extract
+      const tmpDir = `${targetDir}.sync-${Date.now()}`;
+      fs.mkdirSync(tmpDir, { recursive: true });
+
+      try {
+        // Stream directly from peer into tar | zstd -d
+        execSync(`curl -fsSL "${exportUrl}" | zstd -dc | tar -xf - -C "${tmpDir}"`, {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 120000
+        });
+
+        // Backup existing destination if present
+        if (fs.existsSync(targetDir)) {
+          const backupDir = `${targetDir}.bak-${Date.now()}`;
+          fs.renameSync(targetDir, backupDir);
+        }
+
+        fs.renameSync(tmpDir, targetDir);
+
+        return {
+          success: true,
+          localPath: targetDir,
+          message: `Workspace "${path.basename(targetDir)}" successfully synchronized from peer.`
+        };
+      } catch (err: any) {
+        if (fs.existsSync(tmpDir)) {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+        return {
+          success: false,
+          localPath: targetDir,
+          message: `Non-git archive transfer failed from "${exportUrl}": ${err.stderr || err.message}`
+        };
+      }
+    } catch (e: any) {
+      return {
+        success: false,
+        localPath: targetDir,
+        message: `Workspace sync error: ${e.message}`
+      };
+    }
+  }
+
   return {
     success: false,
     localPath: '',
-    message: `Workspace URN "${workspaceUrn}" is not a valid Git repository URN.`
+    message: `Unsupported workspace URN format: "${workspaceUrn}".`
   };
 }
 
