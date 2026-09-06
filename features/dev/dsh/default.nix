@@ -1137,6 +1137,7 @@ in
             config = lib.mkIf userCfg.enable {
               home.packages = [
                 (if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh)
+                pkgs.bubblewrap
               ]
               ++ lib.catAttrs "package" (lib.attrValues mcpServers)
               ++ lib.optionals lspEnabled (lib.catAttrs "package" (lib.attrValues activeLspServers));
