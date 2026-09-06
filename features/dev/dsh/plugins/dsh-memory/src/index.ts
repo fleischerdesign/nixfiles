@@ -301,10 +301,13 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
           search: args.search
         }, tenant);
 
-        return {
+        // Sanitize to lossless JSON (converts Infinity timestamps to null and removes undefined)
+        const sanitized = JSON.parse(JSON.stringify({
           facts: result.facts,
           transitive: []
-        };
+        }));
+
+        return sanitized;
       }
     })
   );
