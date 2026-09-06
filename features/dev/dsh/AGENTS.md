@@ -113,3 +113,4 @@ Boot-log gates: zero `failed to import`, `EACCES`, `duplicate loader entry`,
 | `docs/event-ingress-and-webhooks.md` | Reactive Trigger Mesh: CloudEvents, HMAC, debouncing alert storms, local journal ingress |
 | `docs/ui-ux-architecture.md` | UI/UX Architecture: Slot composition, MR-2PC approval inspector, mesh status & graph HUD |
 | `docs/formal-foundations-and-invariants.md` | Formal Foundations: CoW-OverlayFS OCC, Risk Lattices (R0-R2), AGM Belief Revision & Biscuit Mesh |
+| `/etc/nixos/docs/dsh/dsh-slot-inventory.md` | Complete DSH Client SlotMap Inventory: Scopes, kinds, and injection surfaces across all UI packages |

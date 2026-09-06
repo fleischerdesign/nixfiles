@@ -266,4 +266,8 @@ DeepSeek Harness (dsh) wird als **generisches Multi-Tenant & Agent-Harness-Featu
   - `dsh-mesh`: PeerScope (`system` / `user` / `group`), Delegation Tokens und cluster-weite Agent-Delegation.
   - `dsh-workspace-tx`: Transaktionale Copy-on-Write Workspace-Mutationen mit human-in-the-loop Approval und Gruppen-Gating.
   - `dsh-share`: Capability-basiertes Session-Sharing (`/share/dsh_sh_...`), Zero-Leakage Redaction (Secrets/API-Keys/Pfade) und Instant Revocation, integriert in das Drei-Punkte-Menü (`...`) der Sidebar-Sessions.
+- **Client-Slot-Architektur (`@deepseek-ai/dsh-client-ui-slots`)**:
+  - Alle UI-Erweiterungen (Modals, Panels, Menüs, Split-Views) klinken sich deklarativ über typisierte `SlotMap`-Einträge ein (z. B. `conversation.view`, `conversation.composer.dock`, `conversation.input.left`, `sidebar.footer.action`, `settings.section`).
+  - Das vollständige Slot-Inventar mit Typen, Scopes und Quellpaketen ist dokumentiert unter `docs/dsh/dsh-slot-inventory.md`.
+
 
