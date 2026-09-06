@@ -1,6 +1,7 @@
 import { Service, type Context } from '@deepseek-ai/cordis';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { initializeDatabase } from './schema.js';
 import { BitemporalMemoryEngine } from './engine.js';
 import type {
@@ -25,13 +26,15 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
-  const dbPath = config.dbPath || process.env.DSH_MEMORY_DB || '/var/lib/dsh/shared/knowledge.db';
+  const dshHome = process.env.DSH_HOME || path.join(process.env.HOME || '/root', '.dsh');
+  const defaultDbPath = path.join(dshHome, 'knowledge.db');
+  const dbPath = config.dbPath || process.env.DSH_MEMORY_DB || defaultDbPath;
   let db;
 
   try {
     db = initializeDatabase(dbPath);
   } catch {
-    // Fallback to in-memory for non-root / unprivileged runs
+    // Fallback to in-memory only if persistent file open fails
     db = initializeDatabase(':memory:');
   }
 
