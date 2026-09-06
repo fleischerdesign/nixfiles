@@ -169,10 +169,12 @@ let
       persona,
       pluginConfigs ? { },
       pluginBundleNames,
+      extraEntries ? [ ],
     }:
     lib.optionals (mcpServers != { }) (lib.mapAttrsToList mkMcpEntry mcpServers)
     ++ lib.optional (persona != null) (mkPersonaEntry persona)
-    ++ map (name: mkPluginEntry name (pluginConfigs.${name} or { })) pluginBundleNames;
+    ++ map (name: mkPluginEntry name (pluginConfigs.${name} or { })) pluginBundleNames
+    ++ extraEntries;
 
   # A profile manifest (`package.json` beside the profile patch layer). Called
   # only for profiles with bundles or patchReload configured (the upstream
@@ -198,6 +200,7 @@ in
     mkBaseSettings
     mkCredentialsDoc
     mkMcpEntry
+    mkEntry
     mkPersonaEntry
     mkPluginEntry
     mkHomePatch

@@ -651,6 +651,101 @@ in
         description = "Minimum BM25 score threshold (FTS5 rank cutoff; more negative = stronger match).";
       };
     };
+
+    lsp = {
+      enable = lib.mkEnableOption "declarative LSP code intelligence in dsh" // {
+        default = true;
+      };
+      maxLocations = lib.mkOption {
+        type = lib.types.int;
+        default = 100;
+        description = "Largest number of rendered locations before an omission marker.";
+      };
+      maxResultChars = lib.mkOption {
+        type = lib.types.int;
+        default = 16000;
+        description = "Largest complete rendered result in characters, including truncation metadata.";
+      };
+      timeoutMs = lib.mkOption {
+        type = lib.types.int;
+        default = 60000;
+        description = "Tool-call timeout budget in milliseconds covering the queued open/query/close lifecycle.";
+      };
+      servers = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = true;
+                description = "Whether this language server is enabled.";
+              };
+              package = lib.mkOption {
+                type = lib.types.nullOr lib.types.package;
+                default = null;
+                description = "Nix package providing the language server binary.";
+              };
+              command = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Explicit executable path, overriding package binary lookup.";
+              };
+              args = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = "Command-line arguments passed to the language server.";
+              };
+              extensionToLanguage = lib.mkOption {
+                type = lib.types.attrsOf lib.types.str;
+                description = "Lowercase leading-dot extension to LSP language ID mapping (e.g. { \".nix\" = \"nix\"; }).";
+              };
+              env = lib.mkOption {
+                type = lib.types.attrsOf lib.types.str;
+                default = { };
+                description = "Extra environment variables merged into the server process.";
+              };
+              initializationOptions = lib.mkOption {
+                type = lib.types.nullOr lib.types.anything;
+                default = null;
+                description = "Static initialization options forwarded to the server.";
+              };
+              configuration = lib.mkOption {
+                type = lib.types.nullOr lib.types.anything;
+                default = null;
+                description = "Static answer to workspace/configuration items.";
+              };
+              maxMessageBytes = lib.mkOption {
+                type = lib.types.nullOr lib.types.int;
+                default = null;
+                description = "Largest single framed message accepted from the server in bytes (default 16MB).";
+              };
+              maxStderrBytes = lib.mkOption {
+                type = lib.types.nullOr lib.types.int;
+                default = null;
+                description = "Largest stderr tail retained for diagnostics in bytes (default 1MB).";
+              };
+              maxDocumentBytes = lib.mkOption {
+                type = lib.types.nullOr lib.types.int;
+                default = null;
+                description = "Largest source file this host will open in bytes (default 4MB).";
+              };
+              shutdownTimeoutMs = lib.mkOption {
+                type = lib.types.nullOr lib.types.int;
+                default = null;
+                description = "Graceful shutdown/exit budget before escalation in ms (default 5000).";
+              };
+              killGraceMs = lib.mkOption {
+                type = lib.types.nullOr lib.types.int;
+                default = null;
+                description = "Request-cancel and SIGTERM to SIGKILL grace in ms (default 2000).";
+              };
+            };
+          }
+        );
+        default = { };
+        description = "Configured stdio language servers registered on ctx.lsp.";
+      };
+    };
   };
 
   config = lib.mkMerge [
@@ -673,6 +768,33 @@ in
           };
         }
       );
+
+      my.features.dev.dsh.lsp.servers = lib.mkDefault {
+        nil = {
+          package = pkgs.nil;
+          extensionToLanguage = {
+            ".nix" = "nix";
+          };
+        };
+        typescript = {
+          package = pkgs.typescript-language-server;
+          args = [ "--stdio" ];
+          extensionToLanguage = {
+            ".ts" = "typescript";
+            ".tsx" = "typescriptreact";
+            ".js" = "javascript";
+            ".jsx" = "javascriptreact";
+            ".mjs" = "javascript";
+            ".cjs" = "javascript";
+          };
+        };
+        csharp = {
+          package = pkgs.csharp-ls;
+          extensionToLanguage = {
+            ".cs" = "csharp";
+          };
+        };
+      };
     }
 
     {
@@ -832,10 +954,54 @@ in
               };
             };
 
+            lspCfg = systemCfg.lsp or { };
+            lspEnabled = lspCfg.enable or false;
+            activeLspServers = lib.filterAttrs (_: s: s.enable) (lspCfg.servers or { });
+
+            lspConfiguredServers = lib.mapAttrs (
+              _: server:
+              render.optionalFields {
+                command =
+                  if server.command != null then
+                    server.command
+                  else if server.package != null then
+                    "${server.package}/bin/${
+                      server.package.meta.mainProgram or server.package.pname or server.package.name
+                    }"
+                  else
+                    null;
+                extensionToLanguage = server.extensionToLanguage;
+                args = if server.args == [ ] then null else server.args;
+                env = if server.env == { } then null else server.env;
+                initializationOptions = server.initializationOptions;
+                configuration = server.configuration;
+                maxMessageBytes = server.maxMessageBytes;
+                maxStderrBytes = server.maxStderrBytes;
+                maxDocumentBytes = server.maxDocumentBytes;
+                shutdownTimeoutMs = server.shutdownTimeoutMs;
+                killGraceMs = server.killGraceMs;
+              }
+            ) activeLspServers;
+
+            lspPatchEntries = lib.optionals (lspEnabled && lspConfiguredServers != { }) [
+              (render.mkEntry "lsp" "@deepseek-ai/dsh-lsp" { })
+              (render.mkEntry "lsp-stdio" "@deepseek-ai/dsh-lsp-stdio" {
+                servers = lspConfiguredServers;
+              })
+              (render.mkEntry "tool-lsp" "@deepseek-ai/dsh-tool-lsp" (
+                render.optionalFields {
+                  maxLocations = lspCfg.maxLocations;
+                  maxResultChars = lspCfg.maxResultChars;
+                  timeoutMs = lspCfg.timeoutMs;
+                }
+              ))
+            ];
+
             patchEntries = render.mkHomePatchEntries {
               inherit mcpServers pluginConfigs;
               persona = systemCfg.persona or null;
               pluginBundleNames = activePluginBundleNames;
+              extraEntries = lspPatchEntries;
             };
             homePatch = render.mkHomePatch patchEntries;
 
@@ -970,7 +1136,8 @@ in
               home.packages = [
                 (if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh)
               ]
-              ++ lib.catAttrs "package" (lib.attrValues mcpServers);
+              ++ lib.catAttrs "package" (lib.attrValues mcpServers)
+              ++ lib.optionals lspEnabled (lib.catAttrs "package" (lib.attrValues activeLspServers));
 
               home.sessionVariables = lib.optionalAttrs (systemCfg.dshHome or null != null) {
                 DSH_HOME = systemCfg.dshHome;

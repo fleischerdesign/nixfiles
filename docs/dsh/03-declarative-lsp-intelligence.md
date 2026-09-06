@@ -135,38 +135,48 @@ export interface LspDiagnostic {
 
 ## 6. NixOS & Feature Deklaration
 
-Die Deklaration in NixOS erfolgt akademisch sauber, modular und strikt ohne hartcodierte Pfade:
+Die Deklaration in NixOS erfolgt akademisch sauber, modular und strikt ohne hartcodierte Pfade (`features/dev/dsh/default.nix`). Die Server-Binaries werden deklarativ über Nix-Store-Pfade aufgelöst (`package.meta.mainProgram` bzw. `pname` / `command`):
 
 ```nix
 my.features.dev.dsh.lsp = {
   enable = true;
+  maxLocations = 100;
+  maxResultChars = 16000;
+  timeoutMs = 60000;
   servers = {
-    nix = {
+    nil = {
       enable = true;
       package = pkgs.nil;
-      command = "nil";
-      patterns = [ "*.nix" ];
+      extensionToLanguage = {
+        ".nix" = "nix";
+      };
     };
     typescript = {
       enable = true;
-      package = pkgs.nodePackages.typescript-language-server;
-      command = "typescript-language-server";
+      package = pkgs.typescript-language-server;
       args = [ "--stdio" ];
-      patterns = [ "*.ts" "*.tsx" "*.js" ];
+      extensionToLanguage = {
+        ".ts" = "typescript";
+        ".tsx" = "typescriptreact";
+        ".js" = "javascript";
+        ".jsx" = "javascriptreact";
+        ".mjs" = "javascript";
+        ".cjs" = "javascript";
+      };
     };
-    python = {
+    csharp = {
       enable = true;
-      package = pkgs.pyright;
-      command = "pyright-langserver";
-      args = [ "--stdio" ];
-      patterns = [ "*.py" ];
-    };
-    go = {
-      enable = true;
-      package = pkgs.gopls;
-      command = "gopls";
-      patterns = [ "*.go" ];
+      package = pkgs.csharp-ls;
+      extensionToLanguage = {
+        ".cs" = "csharp";
+      };
     };
   };
 };
 ```
+
+Das Modul rendert diese Konfiguration nahtlos in die drei Upstream-Cordis-Bundles in `cordis.patch.yml`:
+1. `@deepseek-ai/dsh-lsp`: Registriert `ctx.lsp` als Provider-Registry.
+2. `@deepseek-ai/dsh-lsp-stdio`: Verwaltet Serverprozesse (`servers`-Tabelle) über Standard-IO, single-flighted pro Canonical-Workspace.
+3. `@deepseek-ai/dsh-tool-lsp`: Exponiert das Modell-Tool `lsp` (`goToDefinition`, `findReferences`, `goToImplementation`, `hover`) mit konfigurierter Timeout- und Resultatsgrenze.
+
