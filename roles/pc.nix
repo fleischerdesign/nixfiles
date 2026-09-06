@@ -66,8 +66,8 @@
       };
 
       defaultModel = lib.mkDefault {
-        provider = "openrouter-contributor";
-        model = "meta/muse-spark-1.3-contributor";
+        provider = "deepseek";
+        model = "deepseek-v4-flash";
       };
 
       web.enable = lib.mkDefault true;
