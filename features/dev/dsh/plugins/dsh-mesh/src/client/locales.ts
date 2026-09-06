@@ -26,6 +26,13 @@ export const zh = {
   'settings.cluster.groupPlaceholder': '群组名称 (如: dev, team)',
   'settings.cluster.loading': '正在探测集群节点...',
   'settings.cluster.empty': '当前未配置任何集群 Peer 节点 (独立运行模式)。',
+  'settings.cluster.tabNodes': '集群节点',
+  'settings.cluster.tabSessions': '分布式会话',
+  'settings.cluster.sessionsEmpty': '未在集群中发现任何远程会话。',
+  'settings.cluster.colSession': '会话 ID',
+  'settings.cluster.colWorkspace': '工作区 (URN)',
+  'settings.cluster.colLease': '租约所有者',
+  'settings.cluster.claim': '接管会话',
 } satisfies Record<string, string>;
 
 export type ClusterSettingsKey = keyof typeof zh;
@@ -56,4 +63,11 @@ export const en = {
   'settings.cluster.groupPlaceholder': 'Group name (e.g. dev, infra)',
   'settings.cluster.loading': 'Probing cluster nodes...',
   'settings.cluster.empty': 'No cluster peer nodes configured (standalone mode).',
+  'settings.cluster.tabNodes': 'Nodes',
+  'settings.cluster.tabSessions': 'Distributed Sessions',
+  'settings.cluster.sessionsEmpty': 'No active remote sessions found across the cluster.',
+  'settings.cluster.colSession': 'Session ID',
+  'settings.cluster.colWorkspace': 'Workspace (URN)',
+  'settings.cluster.colLease': 'Lease Holder',
+  'settings.cluster.claim': 'Claim Session',
 } satisfies Record<ClusterSettingsKey, string>;

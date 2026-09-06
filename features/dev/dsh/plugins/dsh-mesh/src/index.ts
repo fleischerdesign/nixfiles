@@ -4,6 +4,12 @@ import * as http from 'node:http';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { MeshTransportClient } from './protocol.js';
+import {
+  computeCanonicalWorkspaceUrn,
+  getWorkspaceGitFingerprint,
+  resolveWorkspacePath,
+  extractCwdFromSessionDir
+} from './workspace.js';
 import type {
   MeshPluginConfig,
   PeerScope,
@@ -11,7 +17,12 @@ import type {
   PeerEndpoint,
   HeartbeatPayload,
   SyncDeltaRequest,
-  SyncDeltaResponse
+  SyncDeltaResponse,
+  RemoteSessionInfo,
+  LeaseRecord,
+  LeaseHandoffRequest,
+  LeaseHandoffResponse,
+  LiveStreamChunk
 } from './types.js';
 
 export const name = 'mesh';
@@ -27,6 +38,7 @@ declare module '@deepseek-ai/cordis' {
 
 export class MeshCoordinatorService extends Service {
   private peers = new Map<string, PeerStatus>();
+  private leases = new Map<string, LeaseRecord>();
   private client: MeshTransportClient;
   private server?: http.Server;
   private heartbeatTimer?: NodeJS.Timeout;
@@ -61,6 +73,22 @@ export class MeshCoordinatorService extends Service {
     }
 
     this.startHeartbeatLoop(config.heartbeatIntervalMs || 10000);
+
+    // 3. Register SIGUSR1 hook for instant lease release upon OS suspend (powerManagement.powerDownCommands)
+    process.on('SIGUSR1', () => {
+      this.releaseAllLocalLeases();
+    });
+  }
+
+  /**
+   * Release all leases held by this node upon OS suspend or shutdown.
+   */
+  releaseAllLocalLeases(): void {
+    for (const [sessionId, lease] of this.leases.entries()) {
+      if (lease.holderNodeId === this.config.nodeId) {
+        this.leases.delete(sessionId);
+      }
+    }
   }
 
   private loadDynamicPeers(): void {
@@ -261,8 +289,130 @@ export class MeshCoordinatorService extends Service {
     });
   }
 
+  /**
+   * Scans local DSH session persistence store for active and archived sessions.
+   */
+  getLocalSessions(): RemoteSessionInfo[] {
+    const sessions: RemoteSessionInfo[] = [];
+    const dshHome = process.env.DSH_HOME || path.join(process.env.HOME || '/root', '.dsh');
+    const sessionsDir = path.join(dshHome, 'sessions');
+
+    if (!fs.existsSync(sessionsDir)) return sessions;
+
+    try {
+      const workspaceDirs = fs.readdirSync(sessionsDir);
+      for (const wsDir of workspaceDirs) {
+        const wsPath = path.join(sessionsDir, wsDir);
+        if (!fs.statSync(wsPath).isDirectory()) continue;
+
+        const sessionDirs = fs.readdirSync(wsPath);
+        for (const sDir of sessionDirs) {
+          if (!sDir.startsWith('session-')) continue;
+          const sPath = path.join(wsPath, sDir);
+          if (!fs.statSync(sPath).isDirectory()) continue;
+
+          const sessionId = sDir.replace('session-', '');
+          const lockFile = path.join(sPath, 'session.lock');
+          const hasLock = fs.existsSync(lockFile);
+
+          const lease = this.leases.get(sessionId);
+          const leaseActive = lease ? lease.expiresAt > Date.now() && lease.holderNodeId === this.config.nodeId : hasLock;
+
+          // 1. First attempt to extract authoritative execution cwd directly from session file header
+          const sessionCwd = extractCwdFromSessionDir(sPath);
+          // 2. Fall back to smart filesystem-aware directory resolution
+          const realWsPath = sessionCwd && fs.existsSync(sessionCwd)
+            ? sessionCwd
+            : resolveWorkspacePath(wsDir, sessionsDir);
+
+          const canonical = computeCanonicalWorkspaceUrn(realWsPath);
+          const gitFp = getWorkspaceGitFingerprint(realWsPath);
+
+          sessions.push({
+            sessionId,
+            workspaceUrn: canonical.urn,
+            workspaceLabel: canonical.label,
+            workspaceType: canonical.type,
+            nodeId: this.config.nodeId,
+            lastTurnSeq: 0,
+            updatedAt: fs.statSync(sPath).mtimeMs,
+            leaseEpoch: lease?.leaseEpoch || 1,
+            leaseHolder: lease?.holderNodeId || (hasLock ? this.config.nodeId : 'none'),
+            isLeaseActive: leaseActive,
+            gitFingerprint: gitFp
+          });
+        }
+      }
+    } catch {
+      // Ignore directory scan errors
+    }
+
+    return sessions;
+  }
+
+  /**
+   * Distributed Lease Token acquisition.
+   */
+  acquireLease(sessionId: string, requestingNodeId: string, epoch: number, force = false): LeaseHandoffResponse {
+    const existing = this.leases.get(sessionId);
+    const now = Date.now();
+
+    if (existing && existing.expiresAt > now && existing.holderNodeId !== requestingNodeId && !force) {
+      return {
+        sessionId,
+        success: false,
+        grantedEpoch: existing.leaseEpoch,
+        holderNodeId: existing.holderNodeId,
+        lastSeq: 0,
+        error: `Session "${sessionId}" is actively leased to node "${existing.holderNodeId}".`
+      };
+    }
+
+    const nextEpoch = Math.max((existing?.leaseEpoch || 0) + 1, epoch);
+    const lease: LeaseRecord = {
+      sessionId,
+      holderNodeId: requestingNodeId,
+      leaseEpoch: nextEpoch,
+      expiresAt: now + (this.config.leaseTtlMs || 30000),
+      grantedAt: now
+    };
+
+    this.leases.set(sessionId, lease);
+
+    return {
+      sessionId,
+      success: true,
+      grantedEpoch: nextEpoch,
+      holderNodeId: requestingNodeId,
+      lastSeq: 0
+    };
+  }
+
+  /**
+   * Release lease upon suspend or user handoff.
+   */
+  releaseLease(sessionId: string, holderNodeId: string): boolean {
+    const existing = this.leases.get(sessionId);
+    if (!existing || existing.holderNodeId !== holderNodeId) return false;
+    this.leases.delete(sessionId);
+    return true;
+  }
+
   private startServer(port: number, host: string): void {
     this.server = http.createServer((req, res) => {
+      // Support GET /mesh/sessions
+      if (req.method === 'GET' && req.url === '/mesh/sessions') {
+        try {
+          const sessions = this.getLocalSessions();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(sessions));
+        } catch (e: any) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: e.message || String(e) }));
+        }
+        return;
+      }
+
       if (req.method !== 'POST') {
         res.writeHead(405);
         res.end();
@@ -273,7 +423,7 @@ export class MeshCoordinatorService extends Service {
       req.on('data', (d) => { body += d; });
       req.on('end', () => {
         try {
-          const parsed = JSON.parse(body);
+          const parsed = JSON.parse(body || '{}');
 
           if (req.url === '/mesh/heartbeat') {
             const resp: HeartbeatPayload = {
@@ -283,6 +433,21 @@ export class MeshCoordinatorService extends Service {
             };
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(resp));
+          } else if (req.url === '/mesh/lease/handoff') {
+            // Direct P2P Lease Token handoff
+            const handoffReq = parsed as LeaseHandoffRequest;
+            const resp = this.acquireLease(
+              handoffReq.sessionId,
+              handoffReq.requestingNodeId,
+              handoffReq.currentEpoch,
+              handoffReq.force
+            );
+            res.writeHead(resp.success ? 200 : 409, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(resp));
+          } else if (req.url === '/mesh/stream/chunk') {
+            // Ingest live streamed token chunk or tool event from peer
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ acknowledged: true }));
           } else if (req.url === '/mesh/sync') {
             // Delta response for CvRDT merge
             const resp: SyncDeltaResponse = {
@@ -370,6 +535,28 @@ export class MeshCoordinatorService extends Service {
   close(): void {
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.server?.close();
+  }
+
+  /**
+   * Aggregate local sessions and all remote sessions from healthy mesh peers.
+   */
+  async getAllMeshSessions(): Promise<RemoteSessionInfo[]> {
+    const local = this.getLocalSessions();
+    const results: RemoteSessionInfo[] = [...local];
+
+    for (const peer of this.peers.values()) {
+      if (!peer.healthy) continue;
+      try {
+        const remote = await this.client.listRemoteSessions(peer.endpoint);
+        if (Array.isArray(remote)) {
+          results.push(...remote);
+        }
+      } catch {
+        // Skip unreachable peer
+      }
+    }
+
+    return results;
   }
 }
 
@@ -469,6 +656,32 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
         res.end(JSON.stringify({ error: 'Method Not Allowed' }));
       }
     });
+
+    wsCtx.webServer.register({
+      kind: 'exact',
+      path: '/api/mesh/sessions',
+      handler: async (req: any, res: any) => {
+        if (req.method === 'GET') {
+          try {
+            const allSessions = await service.getAllMeshSessions();
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              nodeId: config?.nodeId || 'standalone',
+              sessions: allSessions
+            }));
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: err.message }));
+          }
+          return;
+        }
+
+        res.statusCode = 405;
+        res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+      }
+    });
   });
 
   ctx.systemPrompt.section({
@@ -545,6 +758,38 @@ export function apply(ctx: Context, config: MeshPluginConfig): void {
         const tenant = authService?.activeTenant;
         const res = await service.dispatchTask(args.peer_id, args.tool_name, args.arguments || {}, tenant);
         return JSON.parse(JSON.stringify(res));
+      }
+    })
+  );
+
+  // Tool: Cluster-wide Session Discovery
+  ctx.tools.register(
+    defineTool({
+      name: 'mesh_sessions',
+      description: 'Discover active and archived agent sessions across all connected peer nodes in the cluster.',
+      parameters: {},
+      output: {
+        schema: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            nodeId: { type: 'string' },
+            sessions: { type: 'array' }
+          }
+        },
+        render: (_args, value: any) => [
+          {
+            type: 'text',
+            text: `<mesh_sessions local_node="${value.nodeId}">\n${JSON.stringify(value.sessions, null, 2)}\n</mesh_sessions>`
+          }
+        ]
+      },
+      async execute(): Promise<any> {
+        const all = await service.getAllMeshSessions();
+        return {
+          nodeId: config.nodeId || 'unknown',
+          sessions: JSON.parse(JSON.stringify(all))
+        };
       }
     })
   );

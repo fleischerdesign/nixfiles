@@ -18,7 +18,11 @@ Dieses Dokument dokumentiert die abgestimmten, akademisch sauberen und praxisnah
 - **Status:** Spezifiziert in `docs/dsh/03-declarative-lsp-intelligence.md`.
 - **Kern:** Direkte NixOS-Anbindung von Store-Binaries (`nil`, `typescript-language-server`, `pyright`, `gopls`) für typ- und symbolgenaue Codegenerierung sowie Vorab-Prüfung.
 
-### 1.4 Semantic AST & Tree-sitter Code Intelligence (`dsh-ast-nav`)
+### 1.4 Distributed Session Synchronization & Handoff Fabric (`dsh-mesh`)
+- **Status:** Vollständig spezifiziert in `docs/dsh/04-distributed-session-sync-and-handoff.md`.
+- **Kern:** P2P & VPS-Relay-gestützte Delta-Replikation von Zstandard-Event-Logs, Distributed Write Leases gegen Split-Brain und portable Workspace-Resolution für nahtloses Arbeiten über alle Geräte hinweg.
+
+### 1.5 Semantic AST & Tree-sitter Code Intelligence (`dsh-ast-nav`)
 - **Status:** In Ausarbeitung.
 - **Kern:** Syntaxbaum-basierte Abfragen (Funktionshierarchien, Scope-Auflösung, Typ-Definitionen) für präzises Code-Verständnis jenseits von unscharfem Text-Grep.
 

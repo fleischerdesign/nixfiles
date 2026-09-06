@@ -14,13 +14,26 @@ interface PeerItem {
   dynamic: boolean;
 }
 
+interface RemoteSessionItem {
+  sessionId: string;
+  workspaceUrn: string;
+  nodeId: string;
+  lastTurnSeq: number;
+  updatedAt: number;
+  leaseEpoch: number;
+  leaseHolder: string;
+  isLeaseActive: boolean;
+}
+
 export interface ClusterSectionProps {
   close?: () => void;
   t?: (key: ClusterSettingsKey) => string;
 }
 
 export function ClusterSettingsSection({ t = (k: string) => k }: ClusterSectionProps) {
+  const [activeTab, setActiveTab] = useState<'nodes' | 'sessions'>('nodes');
   const [peers, setPeers] = useState<PeerItem[]>([]);
+  const [sessions, setSessions] = useState<RemoteSessionItem[]>([]);
   const [localNodeId, setLocalNodeId] = useState<string>('standalone');
   const [loading, setLoading] = useState(true);
 
@@ -49,9 +62,42 @@ export function ClusterSettingsSection({ t = (k: string) => k }: ClusterSectionP
     }
   };
 
+  const fetchSessions = async () => {
+    try {
+      const res = await fetch('/api/mesh/sessions');
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data.sessions || []);
+      }
+    } catch {
+      // Offline / network failure
+    }
+  };
+
   useEffect(() => {
     fetchPeers();
+    fetchSessions();
   }, []);
+
+  const handleClaimSession = async (sessionId: string, holderNodeId: string) => {
+    try {
+      const res = await fetch('/mesh/lease/handoff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          requestingNodeId: localNodeId,
+          currentEpoch: 1,
+          force: true
+        })
+      });
+      if (res.ok) {
+        fetchSessions();
+      }
+    } catch {
+      // Ignore failure
+    }
+  };
 
   const handleAddPeer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,6 +163,40 @@ export function ClusterSettingsSection({ t = (k: string) => k }: ClusterSectionP
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, #9ca3af)' }}>
             {t('settings.cluster.description')}
           </p>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('nodes')}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '5px',
+                backgroundColor: activeTab === 'nodes' ? '#2563eb' : 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              {t('settings.cluster.tabNodes')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('sessions'); fetchSessions(); }}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '5px',
+                backgroundColor: activeTab === 'sessions' ? '#2563eb' : 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              {t('settings.cluster.tabSessions')} ({sessions.length})
+            </button>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
@@ -306,124 +386,225 @@ export function ClusterSettingsSection({ t = (k: string) => k }: ClusterSectionP
         </span>
       </div>
 
-      {/* Peer Nodes Table */}
-      {loading ? (
-        <div style={{ fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, #9ca3af)', padding: '20px 0' }}>
-          {t('settings.cluster.loading')}
-        </div>
-      ) : peers.length === 0 ? (
-        <div style={{ fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, #9ca3af)', padding: '20px 0' }}>
-          {t('settings.cluster.empty')}
-        </div>
-      ) : (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            overflow: 'hidden',
-          }}
-        >
+      {/* Tab 1: Peer Nodes Table */}
+      {activeTab === 'nodes' && (
+        loading ? (
+          <div style={{ fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, #9ca3af)', padding: '20px 0' }}>
+            {t('settings.cluster.loading')}
+          </div>
+        ) : peers.length === 0 ? (
+          <div style={{ fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, #9ca3af)', padding: '20px 0' }}>
+            {t('settings.cluster.empty')}
+          </div>
+        ) : (
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: '2fr 2.5fr 1.5fr 1.2fr 1.4fr',
-              padding: '8px 12px',
-              backgroundColor: 'rgba(255, 255, 255, 0.04)',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-              fontSize: '11px',
-              fontWeight: 600,
-              color: 'var(--dsw-alias-label-secondary, #d1d5db)',
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              overflow: 'hidden',
             }}
           >
-            <div>{t('settings.cluster.colNode')}</div>
-            <div>{t('settings.cluster.colEndpoint')}</div>
-            <div>{t('settings.cluster.colScope')}</div>
-            <div>{t('settings.cluster.colLatency')}</div>
-            <div style={{ textAlign: 'right' }}>{t('settings.cluster.colStatus')}</div>
-          </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '2fr 2.5fr 1.5fr 1.2fr 1.4fr',
+                padding: '8px 12px',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--dsw-alias-label-secondary, #d1d5db)',
+              }}
+            >
+              <div>{t('settings.cluster.colNode')}</div>
+              <div>{t('settings.cluster.colEndpoint')}</div>
+              <div>{t('settings.cluster.colScope')}</div>
+              <div>{t('settings.cluster.colLatency')}</div>
+              <div style={{ textAlign: 'right' }}>{t('settings.cluster.colStatus')}</div>
+            </div>
 
-          <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
-            {peers.map((peer, idx) => (
-              <div
-                key={peer.id || idx}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '2fr 2.5fr 1.5fr 1.2fr 1.4fr',
-                  padding: '10px 12px',
-                  borderBottom: idx === peers.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
-                  fontSize: '11px',
-                  fontFamily: 'monospace',
-                  alignItems: 'center',
-                }}
-              >
-                <div style={{ fontWeight: 600, color: '#60a5fa' }}>{peer.id}</div>
-                <div style={{ opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {peer.endpoint}
-                </div>
-                <div>
-                  <span
-                    style={{
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      backgroundColor:
-                        peer.scope === 'system' ? 'rgba(99, 102, 241, 0.15)' :
-                        peer.scope === 'group' ? 'rgba(168, 85, 247, 0.15)' :
-                        'rgba(59, 130, 246, 0.15)',
-                      color:
-                        peer.scope === 'system' ? '#818cf8' :
-                        peer.scope === 'group' ? '#c084fc' :
-                        '#60a5fa',
-                      fontSize: '10px',
-                    }}
-                    title={peer.group ? `Group: ${peer.group}` : (peer.owner ? `Owner: ${peer.owner}` : undefined)}
-                  >
-                    {peer.scope === 'system' ? t('settings.cluster.scopeSystem') :
-                     peer.scope === 'group' ? `${t('settings.cluster.scopeGroup')}:${peer.group}` :
-                     t('settings.cluster.scopeUser')}
-                  </span>
-                </div>
-                <div style={{ opacity: 0.85 }}>
-                  {peer.rttMs >= 0 ? `${peer.rttMs} ms` : '—'}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                  <span
-                    style={{
-                      padding: '2px 7px',
-                      borderRadius: '4px',
-                      backgroundColor: peer.healthy ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                      color: peer.healthy ? '#34d399' : '#f87171',
-                      fontSize: '10px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {peer.healthy ? t('settings.cluster.healthy') : t('settings.cluster.unreachable')}
-                  </span>
-                  {peer.dynamic && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePeer(peer.id)}
-                      title={t('settings.cluster.delete')}
+            <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+              {peers.map((peer, idx) => (
+                <div
+                  key={peer.id || idx}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 2.5fr 1.5fr 1.2fr 1.4fr',
+                    padding: '10px 12px',
+                    borderBottom: idx === peers.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#60a5fa' }}>{peer.id}</div>
+                  <div style={{ opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {peer.endpoint}
+                  </div>
+                  <div>
+                    <span
                       style={{
                         padding: '2px 6px',
                         borderRadius: '4px',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
-                        color: '#f87171',
+                        backgroundColor:
+                          peer.scope === 'system' ? 'rgba(99, 102, 241, 0.15)' :
+                          peer.scope === 'group' ? 'rgba(168, 85, 247, 0.15)' :
+                          'rgba(59, 130, 246, 0.15)',
+                        color:
+                          peer.scope === 'system' ? '#818cf8' :
+                          peer.scope === 'group' ? '#c084fc' :
+                          '#60a5fa',
                         fontSize: '10px',
-                        cursor: 'pointer',
+                      }}
+                      title={peer.group ? `Group: ${peer.group}` : (peer.owner ? `Owner: ${peer.owner}` : undefined)}
+                    >
+                      {peer.scope === 'system' ? t('settings.cluster.scopeSystem') :
+                       peer.scope === 'group' ? `${t('settings.cluster.scopeGroup')}:${peer.group}` :
+                       t('settings.cluster.scopeUser')}
+                    </span>
+                  </div>
+                  <div style={{ opacity: 0.85 }}>
+                    {peer.rttMs >= 0 ? `${peer.rttMs} ms` : '—'}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                    <span
+                      style={{
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        backgroundColor: peer.healthy ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: peer.healthy ? '#34d399' : '#f87171',
+                        fontSize: '10px',
+                        fontWeight: 600,
                       }}
                     >
-                      ✕
-                    </button>
-                  )}
+                      {peer.healthy ? t('settings.cluster.healthy') : t('settings.cluster.unreachable')}
+                    </span>
+                    {peer.dynamic && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePeer(peer.id)}
+                        title={t('settings.cluster.delete')}
+                        style={{
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                          color: '#f87171',
+                          fontSize: '10px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )
+      )}
+
+      {/* Tab 2: Distributed Sessions Table */}
+      {activeTab === 'sessions' && (
+        sessions.length === 0 ? (
+          <div style={{ fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, #9ca3af)', padding: '20px 0' }}>
+            {t('settings.cluster.sessionsEmpty')}
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '2fr 3fr 1.5fr 1.2fr',
+                padding: '8px 12px',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--dsw-alias-label-secondary, #d1d5db)',
+              }}
+            >
+              <div>{t('settings.cluster.colSession')}</div>
+              <div>{t('settings.cluster.colWorkspace')}</div>
+              <div>{t('settings.cluster.colLease')}</div>
+              <div style={{ textAlign: 'right' }}>Aktion</div>
+            </div>
+
+            <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+              {sessions.map((s, idx) => (
+                <div
+                  key={s.sessionId || idx}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 3fr 1.5fr 1.2fr',
+                    padding: '10px 12px',
+                    borderBottom: idx === sessions.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#60a5fa' }}>{s.sessionId.substring(0, 12)}...</div>
+                  <div style={{ opacity: 0.95, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.workspaceUrn}>
+                    <span style={{ fontWeight: 600, color: '#f1f5f9' }}>
+                      {s.workspaceLabel || s.workspaceUrn}
+                    </span>
+                    {s.workspaceLabel && s.workspaceLabel !== s.workspaceUrn && (
+                      <span style={{ marginLeft: '6px', fontSize: '10px', color: '#94a3b8' }}>
+                        ({s.workspaceUrn.replace(/^urn:dsh:workspace:/, '')})
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span
+                      style={{
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: s.isLeaseActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                        color: s.isLeaseActive ? '#34d399' : '#9ca3af',
+                        fontSize: '10px',
+                      }}
+                    >
+                      {s.leaseHolder}
+                    </span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    {s.leaseHolder !== localNodeId && (
+                      <button
+                        type="button"
+                        onClick={() => handleClaimSession(s.sessionId, s.leaseHolder)}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: '#2563eb',
+                          border: 'none',
+                          color: '#fff',
+                          fontSize: '10px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {t('settings.cluster.claim')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
       )}
     </div>
   );

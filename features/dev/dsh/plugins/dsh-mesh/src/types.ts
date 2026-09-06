@@ -81,3 +81,56 @@ export interface RemoteTaskResponse {
   error?: string;
   executedAt: number;
 }
+
+export interface RemoteSessionInfo {
+  sessionId: string;
+  workspaceUrn: string;
+  workspaceLabel?: string;
+  workspaceType?: 'git' | 'relhome' | 'raw';
+  nodeId: string;
+  lastTurnSeq: number;
+  updatedAt: number;
+  leaseEpoch: number;
+  leaseHolder: string;
+  isLeaseActive: boolean;
+  gitFingerprint?: {
+    commit?: string;
+    branch?: string;
+    isDirty?: boolean;
+    diffHash?: string;
+  };
+  summary?: string;
+}
+
+export interface LeaseRecord {
+  sessionId: string;
+  holderNodeId: string;
+  leaseEpoch: number;
+  expiresAt: number;
+  grantedAt: number;
+}
+
+export interface LeaseHandoffRequest {
+  sessionId: string;
+  requestingNodeId: string;
+  currentEpoch: number;
+  force?: boolean;
+}
+
+export interface LeaseHandoffResponse {
+  sessionId: string;
+  success: boolean;
+  grantedEpoch: number;
+  holderNodeId: string;
+  lastSeq: number;
+  error?: string;
+}
+
+export interface LiveStreamChunk {
+  sessionId: string;
+  fromNodeId: string;
+  type: 'token_chunk' | 'tool_in_progress' | 'user_draft' | 'turn_completed';
+  payload: any;
+  timestamp: number;
+}
+

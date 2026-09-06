@@ -281,6 +281,6 @@ DeepSeek Harness (dsh) wird als **generisches Multi-Tenant & Agent-Harness-Featu
   - Upstream-Dokumentation: `features/dev/dsh/docs/upstream/` (u. a. `cordis-primer.md`, `cordis-tutorial/`, `tool-execution-pipeline.md`, `cookbook/adding-a-tool.md`, `capability-seams.md`).
   - Plugin-Entwicklungs-Skill: `features/dev/dsh/docs/skills/cordis-plugin-development/SKILL.md`.
   - Feature-Architektur & Guides: `features/dev/dsh/docs/` (`plugins.md`, `multi-tenancy.md`, `memory-architecture.md`, `distributed-agent-mesh.md`).
-  - Spezifikationen & Roadmaps: `docs/dsh/` (`01-dual-pane-canvas.md`, `02-context-pinning-git-diff.md`, `03-declarative-lsp-intelligence.md`, `04-feature-ideation-and-roadmap.md`, `05-memory-reliability-and-edge-cases.md`, `dsh-slot-inventory.md`).
+  - Spezifikationen & Roadmaps: `docs/dsh/` (`01-dual-pane-canvas.md`, `02-context-pinning-git-diff.md`, `03-declarative-lsp-intelligence.md`, `04-distributed-session-sync-and-handoff.md`, `04-feature-ideation-and-roadmap.md`, `05-memory-reliability-and-edge-cases.md`, `dsh-slot-inventory.md`).
 
 

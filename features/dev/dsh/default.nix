@@ -823,6 +823,11 @@ in
           "d /run/dsh 0775 root users -"
         ]
         ++ tenantDirs;
+
+      # Instantly release distributed session leases when suspending/sleeping
+      powerManagement.powerDownCommands = ''
+        ${pkgs.procps}/bin/pkill -SIGUSR1 -f "dsh" || true
+      '';
     })
 
     {

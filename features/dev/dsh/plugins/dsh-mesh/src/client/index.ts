@@ -3,9 +3,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots';
 import type {} from '@deepseek-ai/dsh-client-locale/client';
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 import { ClusterSettingsSection } from './ClusterSettingsSection.js';
+import { WorkspaceActionBanner } from './WorkspaceActionBanner.js';
 import { zh, en, type ClusterSettingsKey } from './locales.js';
 
 export { ClusterSettingsSection } from './ClusterSettingsSection.js';
+export { WorkspaceActionBanner } from './WorkspaceActionBanner.js';
 export type { ClusterSectionProps } from './ClusterSettingsSection.js';
 export type { ClusterSettingsKey } from './locales.js';
 
@@ -34,5 +36,14 @@ export function apply(ctx: ClientContext): void {
       locale: NS,
       label: () => t('settings.cluster.nav'),
     }, ClusterSettingsSection);
+  });
+
+  // Inject Workspace Action Banner above the Composer
+  (ctx as any).slots.inject('conversation.composer.dock', () => {
+    (ctx as any).slots.register({
+      name: 'conversation.composer.dock',
+      id: 'mesh-workspace-action',
+      order: 10,
+    }, WorkspaceActionBanner);
   });
 }
