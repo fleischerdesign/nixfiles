@@ -142,6 +142,8 @@ export interface MemoryPluginConfig {
     secretEnv?: string;
     /** Tenant replication context: "user:<u>" or "group:<g>". Defaults to "user:local". */
     tenantContext?: string;
+    /** Scopes this node is willing to replicate (public, group:<g>, user:<u>). Derived per-peer from presence. */
+    scopes?: string[];
     /** Peers to pull from / serve to. `endpoint` is "host:port" or URL. */
     peers?: Array<{
       nodeId: string;

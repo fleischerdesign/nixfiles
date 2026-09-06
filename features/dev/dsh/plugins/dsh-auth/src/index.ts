@@ -1,6 +1,7 @@
 import { Service, type Context } from '@deepseek-ai/cordis';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AuthPluginConfig, UserIdentity, ClearanceLevel } from './types.js';
 import {
@@ -11,6 +12,7 @@ import {
   LdapStrategy,
   type AuthStrategy
 } from './strategy.js';
+import { PresenceRegistry } from './presence.js';
 
 export const name = 'auth';
 export const inject = ['webServer'];
@@ -32,6 +34,7 @@ interface TokenBucketState {
 
 export class IdentityAuthGatewayService extends Service {
   public activeTenant?: UserIdentity;
+  public presence: PresenceRegistry;
   private strategies: AuthStrategy[] = [];
   private signingSecret: Buffer;
   private tokenBuckets = new Map<string, TokenBucketState>();
@@ -48,6 +51,12 @@ export class IdentityAuthGatewayService extends Service {
 
     // Load or generate durable cookie signing secret
     this.signingSecret = this.resolveSigningSecret();
+
+    // Tenant-Presence-Registry: which OIDC tenants/groups have been seen here.
+    // Feeds agnostic memory-scope peer derivation (docs/dsh/08-...).
+    const dshHome = process.env.DSH_HOME || path.join(process.env.HOME || '/root', '.dsh');
+    this.presence = new PresenceRegistry(path.join(dshHome, 'auth', 'presence.db'));
+    ctx.effect(() => () => this.presence.close());
 
     // Intercept web requests and connection authorization
     this.interceptWebServer();
@@ -165,6 +174,8 @@ export class IdentityAuthGatewayService extends Service {
           // Attach tenant identity to request and service
           (req as any).tenant = identity;
           self.activeTenant = identity;
+          // Record presence for agnostic memory-scope peer derivation.
+          try { self.presence.noteTenant(identity); } catch { /* non-fatal */ }
 
           // Auto-mint session cookie if absent or renew with full tenant identity
           self.ensureSessionCookie(req, res, identity);

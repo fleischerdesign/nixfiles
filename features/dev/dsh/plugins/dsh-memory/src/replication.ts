@@ -104,6 +104,40 @@ export function canReplicateScope(scopeType: string, scopeId: string, allowed: s
   return allowed.includes(id);
 }
 
+/** A peer's advertised presence: which tenants/groups it hosts (agnostic). */
+export interface PeerPresence {
+  nodeId: string;
+  tenants: string[]; // usernames with an authenticated presence on that node
+  groups: string[];  // e.g. ['group:dev', 'group:family']
+  updatedAt: number;
+}
+
+/**
+ * Agnostic scope→peer derivation (docs/dsh/08): given the scopes this node
+ * *wants* to replicate, a peer's presence, and the LOCAL subject, return the
+ * subset that should actually sync to that peer.
+ *   - `public`      -> always (opt-in by `wantScopes`)
+ *   - `group:<g>`   -> only if the peer hosts group `g`
+ *   - `user:<u>`    -> only if `u` is the LOCAL subject (privacy: a node never
+ *                      pulls another user's private facts just because the peer
+ *                      hosts them; the serve-side canSee re-enforces this too)
+ *   - `repo:*`      -> never (node-bound, I-SEC3)
+ */
+export function deriveScopes(wantScopes: string[], peer: PeerPresence | null | undefined, localUser: string): string[] {
+  const out = new Set<string>();
+  for (const s of wantScopes || []) {
+    if (s === 'public') { out.add('public'); continue; }
+    if (s.startsWith('group:')) {
+      if (peer && peer.groups.includes(s)) out.add(s);
+    } else if (s.startsWith('user:')) {
+      const u = s.slice('user:'.length);
+      if (u === localUser) out.add(s);
+    }
+    // repo:* and unknown scopes are intentionally not derived (never replicate).
+  }
+  return Array.from(out);
+}
+
 function cursorTuple(c: HlcCursor): [number, number, string] {
   return [c.phys, c.counter, c.node];
 }
@@ -115,6 +149,8 @@ export class MemoryReplicator {
   private readonly peerNodes: ReplicationPeer[];
   private readonly maxVersions: number;
   private readonly db: DatabaseSync;
+  private readonly wantScopes: string[];
+  private readonly getPresence: () => PeerPresence;
   private server?: http.Server;
   private timer?: NodeJS.Timeout;
 
@@ -127,6 +163,8 @@ export class MemoryReplicator {
       peers?: ReplicationPeer[];
       syncIntervalMs?: number;
       maxVersionsPerSync?: number;
+      wantScopes?: string[];
+      getPresence?: () => PeerPresence;
     },
   ) {
     this.db = opts.db;
@@ -135,7 +173,13 @@ export class MemoryReplicator {
     this.tenantContext = opts.tenantContext || 'user:local';
     this.peerNodes = (opts.peers || []).filter((p) => p.nodeId !== this.nodeId);
     this.maxVersions = opts.maxVersionsPerSync ?? 512;
+    this.wantScopes = opts.wantScopes || ['public'];
+    this.getPresence = opts.getPresence || (() => ({ nodeId: this.nodeId, tenants: [], groups: [], updatedAt: Date.now() }));
     this.ensureSyncTables();
+  }
+
+  private myPresence(): PeerPresence {
+    return this.getPresence();
   }
 
   private ensureSyncTables(): void {
@@ -156,15 +200,32 @@ export class MemoryReplicator {
   // --- Token helpers --------------------------------------------------------
 
   /** Token grant for this node talking to `targetPeer` (only the allowed scopes). */
-  private makeGrant(targetPeer: ReplicationPeer, since: HlcCursor): CapabilityToken {
+  private makeGrant(targetPeer: ReplicationPeer, since: HlcCursor, scopes: string[]): CapabilityToken {
     return createToken(this.secret, {
       iss: this.nodeId,
       sub: this.tenantContext,
-      scopes: (targetPeer.scopes && targetPeer.scopes.length ? targetPeer.scopes : ['public']),
+      scopes: (scopes && scopes.length ? scopes : ['public']),
       ops: ['sync'],
       sink: targetPeer.nodeId,
       exp: Date.now() + 120_000,
     });
+  }
+
+  /** Fetch a peer's presence (agnostic derivation input). */
+  private async fetchPresence(peer: ReplicationPeer): Promise<PeerPresence> {
+    const base = peer.endpoint.startsWith('http') ? peer.endpoint : `http://${peer.endpoint}`;
+    const url = `${base}/mesh/memory/presence`;
+    const token = createToken(this.secret, {
+      iss: this.nodeId,
+      sub: this.tenantContext,
+      scopes: ['public'],
+      ops: ['sync'],
+      sink: peer.nodeId,
+      exp: Date.now() + 120_000,
+    });
+    const text = await this.get(url, { 'X-DSH-CAP': encodeToken(token) });
+    const p = safeParse(text);
+    return p && Array.isArray(p.tenants) ? (p as PeerPresence) : { nodeId: peer.nodeId, tenants: [], groups: [], updatedAt: Date.now() };
   }
 
   // --- Serving (receive a peer's pull request) -----------------------------
@@ -172,6 +233,23 @@ export class MemoryReplicator {
   startServer(port: number, host = '0.0.0.0'): void {
     if (this.server) return;
     this.server = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
+      // Presence advertisement (agnostic peer derivation). Presence is not
+      // sensitive (I-SEC10: only host listing, no facts), but we still require a
+      // valid capability so only trusted peers learn it.
+      if (req.method === 'GET' && req.url === '/mesh/memory/presence') {
+        const capStr = req.headers['x-dsh-cap'] as string | undefined;
+        if (!capStr) { this.reject(res, 401, 'missing capability'); return; }
+        try {
+          const claims = decodeToken(this.secret, capStr);
+          if (claims.sink && claims.sink !== this.nodeId) { this.reject(res, 403, 'token not issued to this node'); return; }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(this.myPresence()));
+        } catch (e: any) {
+          this.reject(res, 403, e.message || String(e));
+        }
+        return;
+      }
+
       if (req.method !== 'POST' || req.url !== '/mesh/memory/sync') {
         res.writeHead(404);
         res.end();
@@ -185,7 +263,6 @@ export class MemoryReplicator {
           const capStr = req.headers['x-dsh-cap'] as string | undefined;
           if (!capStr) { this.reject(res, 401, 'missing capability'); return; }
           const claims = decodeToken(this.secret, capStr);
-          if (claims.sub !== this.tenantContext) { this.reject(res, 403, `tenant mismatch (${claims.sub})`); return; }
           if (claims.sink && claims.sink !== this.nodeId) { this.reject(res, 403, 'token not issued to this node'); return; }
           if (!claims.ops.includes('sync')) { this.reject(res, 403, 'op not granted'); return; }
           if (this.nonceReplayed(claims.nonce, claims.exp)) { this.reject(res, 401, 'replayed nonce'); return; }
@@ -212,6 +289,13 @@ export class MemoryReplicator {
           // Enforce scope caveat: the requested scopes must be a subset of grant.
           if (!req_.scopes.every((s) => claims.scopes.includes(s))) {
             this.reject(res, 403, 'requested scope not in grant');
+            return;
+          }
+          // Multi-tenant user-scope ownership: a `user:<u>` scope may only be
+          // served if the requesting tenant owns it (privacy, I-SEC2). Nodes are
+          // multi-tenant, so we do NOT require an exact single-tenantContext match.
+          if (!req_.scopes.every((s) => !s.startsWith('user:') || s === claims.sub)) {
+            this.reject(res, 403, 'user scope not owned by requester');
             return;
           }
           const resp = this.produceDelta(req_);
@@ -269,7 +353,7 @@ export class MemoryReplicator {
     ].sort((a, b) => HLC.compare(a.hlc, b.hlc));
 
     let scanned = 0;
-    let lastHlc = req.since;
+    let lastHlc = new HLC(req.since.phys, req.since.counter, req.since.node);
     for (const it of merged) {
       lastHlc = it.hlc;
       scanned++;
@@ -310,12 +394,19 @@ export class MemoryReplicator {
     const key = peer.nodeId;
     const cur = (this.db.prepare(`SELECT cur_phys, cur_counter, cur_node FROM memory_sync_cursor WHERE peer_key = ?`).get(key) as any);
     const since: HlcCursor = cur ? { phys: cur.cur_phys, counter: cur.cur_counter, node: cur.cur_node } : { phys: 0, counter: 0, node: '' };
-    const scopes = (peer.scopes && peer.scopes.length ? peer.scopes : ['public']);
+    // Agnostic scope derivation: if the peer declares explicit scopes, honour
+    // them (back-compat); otherwise derive the scopes to replicate from the
+    // peer's presence + local subject (docs/dsh/08-...).
+    const localUser = this.tenantContext.startsWith('user:') ? this.tenantContext.slice('user:'.length) : '';
+    const scopes = (peer.scopes && peer.scopes.length)
+      ? peer.scopes
+      : deriveScopes(this.wantScopes, await this.fetchPresence(peer), localUser);
+    if (scopes.length === 0) { return 0; }
     const base = peer.endpoint.startsWith('http') ? peer.endpoint : `http://${peer.endpoint}`;
     const url = `${base}/mesh/memory/sync`;
     const payload = { fromNodeId: this.nodeId, since, scopes, max: this.maxVersions, timestamp: Date.now() };
     const body = JSON.stringify(payload);
-    const token = this.makeGrant(peer, since);
+    const token = this.makeGrant(peer, since, scopes);
 
     const dataText = await this.post(url, body, {
       'Content-Type': 'application/json',
@@ -429,6 +520,33 @@ export class MemoryReplicator {
       if (dir === 'push') continue;
       try { await this.pullPeer(peer); } catch { /* non-fatal */ }
     }
+  }
+
+  private get(urlStr: string, headers: Record<string, string>): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const url = new URL(urlStr);
+      const req = http.request(
+        {
+          hostname: url.hostname,
+          port: url.port || 80,
+          path: url.pathname,
+          method: 'GET',
+          headers,
+          timeout: 10000,
+        },
+        (res) => {
+          let resData = '';
+          res.on('data', (d) => { resData += d; });
+          res.on('end', () => {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) resolve(resData);
+            else reject(new Error(`Presence HTTP ${res.statusCode}: ${resData}`));
+          });
+        },
+      );
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('Presence timeout')); });
+      req.end();
+    });
   }
 
   private post(urlStr: string, body: string, headers: Record<string, string>): Promise<string> {

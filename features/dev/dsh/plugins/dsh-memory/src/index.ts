@@ -119,6 +119,19 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
       peers: replCfg.peers,
       syncIntervalMs: replCfg.syncIntervalMs,
       maxVersionsPerSync: replCfg.maxVersionsPerSync,
+      wantScopes: replCfg.scopes || ['public'],
+      getPresence: () => {
+        // Advertise this node's hosted tenants/groups (falls back to empty if
+        // dsh-auth presence is unavailable).
+        try {
+          const presence = (ctx.get('auth') as any)?.presence;
+          const tenants = presence?.tenants?.().map((t: any) => t.username) ?? [];
+          const groups = presence?.groups?.() ?? [];
+          return { nodeId: replicationNodeId, tenants, groups, updatedAt: Date.now() };
+        } catch {
+          return { nodeId: replicationNodeId, tenants: [], groups: [], updatedAt: Date.now() };
+        }
+      },
     });
     if (replCfg.listenPort) {
       replicator.startServer(replCfg.listenPort, replCfg.listenHost || '0.0.0.0');
