@@ -85,6 +85,10 @@ export function attenuate(secret: string, parent: CapabilityToken, restriction: 
     scopes,
     ops,
     sink: restriction.sink ?? p.sink,
+    // Each attenuation is a fresh issuance: a NEW nonce so replay protection
+    // does not false-positive on independently-issued child tokens (the parent
+    // signature still chains for authority verification).
+    nonce: crypto.randomBytes(8).toString('hex'),
     parent: parent.sig,
   };
   const encoded = b64u(JSON.stringify(child));

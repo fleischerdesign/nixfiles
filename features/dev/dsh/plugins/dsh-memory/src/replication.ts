@@ -10,7 +10,7 @@ import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { HLC } from './hlc.js';
-import { createToken, decodeToken, encodeToken, type CapClaims, type CapabilityToken } from './capability.js';
+import { createToken, decodeToken, encodeToken, attenuate, type CapabilityToken } from './capability.js';
 
 export interface ReplicationPeer {
   nodeId: string;
@@ -151,6 +151,7 @@ export class MemoryReplicator {
   private readonly db: DatabaseSync;
   private readonly wantScopes: string[];
   private readonly getPresence: () => PeerPresence;
+  private readonly rootToken: CapabilityToken;
   private server?: http.Server;
   private timer?: NodeJS.Timeout;
 
@@ -175,6 +176,16 @@ export class MemoryReplicator {
     this.maxVersions = opts.maxVersionsPerSync ?? 512;
     this.wantScopes = opts.wantScopes || ['public'];
     this.getPresence = opts.getPresence || (() => ({ nodeId: this.nodeId, tenants: [], groups: [], updatedAt: Date.now() }));
+    // Root capability: the maximum grant this node owns (its wantScopes). Per-peer
+    // tokens are AT TENUATED from it, chaining the parent signature (P2/I-SEC5).
+    this.rootToken = createToken(this.secret, {
+      iss: this.nodeId,
+      sub: this.tenantContext,
+      scopes: this.wantScopes,
+      ops: ['sync'],
+      sink: '',
+      exp: Date.now() + 120_000,
+    });
     this.ensureSyncTables();
   }
 
@@ -199,15 +210,11 @@ export class MemoryReplicator {
 
   // --- Token helpers --------------------------------------------------------
 
-  /** Token grant for this node talking to `targetPeer` (only the allowed scopes). */
-  private makeGrant(targetPeer: ReplicationPeer, since: HlcCursor, scopes: string[]): CapabilityToken {
-    return createToken(this.secret, {
-      iss: this.nodeId,
-      sub: this.tenantContext,
+  /** Token grant for this node talking to `targetPeer`: attenuated from the root. */
+  private makeGrant(targetPeer: ReplicationPeer, _since: HlcCursor, scopes: string[]): CapabilityToken {
+    return attenuate(this.secret, this.rootToken, {
       scopes: (scopes && scopes.length ? scopes : ['public']),
-      ops: ['sync'],
       sink: targetPeer.nodeId,
-      exp: Date.now() + 120_000,
     });
   }
 
@@ -215,14 +222,7 @@ export class MemoryReplicator {
   private async fetchPresence(peer: ReplicationPeer): Promise<PeerPresence> {
     const base = peer.endpoint.startsWith('http') ? peer.endpoint : `http://${peer.endpoint}`;
     const url = `${base}/mesh/memory/presence`;
-    const token = createToken(this.secret, {
-      iss: this.nodeId,
-      sub: this.tenantContext,
-      scopes: ['public'],
-      ops: ['sync'],
-      sink: peer.nodeId,
-      exp: Date.now() + 120_000,
-    });
+    const token = attenuate(this.secret, this.rootToken, { scopes: ['public'], sink: peer.nodeId });
     const text = await this.get(url, { 'X-DSH-CAP': encodeToken(token) });
     const p = safeParse(text);
     return p && Array.isArray(p.tenants) ? (p as PeerPresence) : { nodeId: peer.nodeId, tenants: [], groups: [], updatedAt: Date.now() };

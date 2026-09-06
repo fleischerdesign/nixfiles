@@ -741,6 +741,16 @@ in
           example = "group:dev";
           description = "Tenant replication context: 'user:<u>' or 'group:<g>'. Replication never crosses this boundary (MTAA isolation). Defaults to 'user:local'.";
         };
+        scopes = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "public" ];
+          example = [
+            "public"
+            "group:dev"
+            "user:philipp"
+          ];
+          description = "Scopes this node is willing to replicate (public, group:<g>, user:<u>). Peers are derived agnostically from presence + OIDC (no hand-list); only these scopes are ever shared.";
+        };
         secretEnv = lib.mkOption {
           type = lib.types.str;
           default = "DSH_MEMORY_HMAC";
@@ -1158,6 +1168,7 @@ in
                         ;
                       nodeId = systemCfg.memory.replication.nodeId or currentHost;
                       tenantContext = systemCfg.memory.replication.tenantContext or "user:${currentUser}";
+                      scopes = systemCfg.memory.replication.scopes or [ "public" ];
                       listenPort = systemCfg.memory.replication.listenPort or null;
                       peers = map (p: {
                         inherit (p)
