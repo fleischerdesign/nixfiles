@@ -67,7 +67,7 @@
 
       defaultModel = lib.mkDefault {
         provider = "deepseek";
-        model = "deepseek-v4-flash";
+        model = "deepseek-v4-flash-vision-exp";
       };
 
       web.enable = lib.mkDefault true;
