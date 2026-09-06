@@ -13,6 +13,7 @@ import {
   cosine
 } from './embedding.js';
 import { STOPWORDS, decomposeToStems, floatToBlob, blobToFloat } from './text.js';
+import { HlcGenerator, HLC } from './hlc.js';
 
 const SECURITY_RANKS: Record<SecurityLabel, number> = {
   system: 0,
@@ -26,6 +27,17 @@ function bm25Norm(score: number): number {
   return abs / (1 + abs);
 }
 
+/** A logical retract (tombstone) of a proposition slot, causally ordered. */
+export interface Tombstone {
+  id: string;
+  subject: string;
+  predicate: string;
+  scopeType: string;
+  scopeId: string;
+  tx: HLC;
+  origin: string;
+}
+
 export class BitemporalMemoryEngine {
   private db: DatabaseSync;
   private readonly embeddingProvider?: EmbeddingProvider;
@@ -35,12 +47,14 @@ export class BitemporalMemoryEngine {
   private readonly weight: number;
   private readonly decayHalfLifeSeconds: number;
   private readonly decayFloor: number;
+  private readonly hlcGen: HlcGenerator;
 
   constructor(
     db: DatabaseSync,
     embeddingProvider?: EmbeddingProvider,
     vectorOptions: { topK?: number; minSimilarity?: number; weight?: number; similarityMargin?: number } = {},
     decayOptions: { halfLifeSeconds?: number; floor?: number } = {},
+    metaOptions: { originNode?: string } = {},
   ) {
     this.db = db;
     this.embeddingProvider = embeddingProvider;
@@ -50,6 +64,7 @@ export class BitemporalMemoryEngine {
     this.weight = vectorOptions.weight ?? 0.7;
     this.decayHalfLifeSeconds = decayOptions.halfLifeSeconds ?? 0;
     this.decayFloor = decayOptions.floor ?? -1;
+    this.hlcGen = new HlcGenerator(metaOptions.originNode ?? 'local');
     this.ensureSchemaMigrations();
   }
 
@@ -74,6 +89,14 @@ export class BitemporalMemoryEngine {
       if (!hasEpistemic) {
         this.db.exec(`ALTER TABLE facts ADD COLUMN epistemic_class TEXT NOT NULL DEFAULT 'evidence';`);
       }
+
+      // HLC columns (tx_counter/tx_node). For rows created before the HLC
+      // migration, backfill tx_node='' and tx_counter=0 (legacy rows are
+      // ordered by tx_from alone, which is a total order within their origin).
+      const hasTxCounter = info.some((col: any) => col.name === 'tx_counter');
+      const hasTxNode = info.some((col: any) => col.name === 'tx_node');
+      if (!hasTxCounter) this.db.exec(`ALTER TABLE facts ADD COLUMN tx_counter INTEGER NOT NULL DEFAULT 0;`);
+      if (!hasTxNode) this.db.exec(`ALTER TABLE facts ADD COLUMN tx_node TEXT NOT NULL DEFAULT '';`);
 
       const hasFtsTokens = info.some((col: any) => col.name === 'fts_tokens');
       if (!hasFtsTokens) {
@@ -141,7 +164,10 @@ export class BitemporalMemoryEngine {
   async storeFact(fact: Omit<BitemporalFact, 'id' | 'txFrom' | 'txTo' | 'status' | 'validFrom' | 'validTo'> & { validFrom?: number; validTo?: number; ttlSeconds?: number }): Promise<BitemporalFact> {
     const id = crypto.randomUUID();
     const now = Date.now();
-    const txFrom = now;
+    const hlc = this.hlcGen.next(now);
+    const txFrom = hlc.physical;
+    const txCounter = hlc.counter;
+    const txNode = hlc.nodeId;
     const txTo = Infinity;
     const validFrom = fact.validFrom ?? now;
     let validTo = fact.validTo ?? Infinity;
@@ -243,10 +269,10 @@ export class BitemporalMemoryEngine {
     const insertStmt = this.db.prepare(`
       INSERT INTO facts (
         id, subject, predicate, object, fts_tokens,
-        valid_from, valid_to, tx_from, tx_to,
+        valid_from, valid_to, tx_from, tx_to, tx_counter, tx_node,
         type_constraint, confidence, security_label, status,
         scope_type, scope_id, author, epistemic_class, embedding_blob
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertStmt.run(
@@ -259,6 +285,8 @@ export class BitemporalMemoryEngine {
       validTo,
       txFrom,
       txTo,
+      txCounter,
+      txNode,
       fact.typeConstraint ?? 'String',
       fact.confidence ?? 1.0,
       fact.securityLabel ?? 'system',
@@ -310,7 +338,57 @@ export class BitemporalMemoryEngine {
 
     const now = Date.now();
     this.db.prepare(`UPDATE facts SET status = 'retracted', tx_to = ? WHERE id = ?`).run(now, id);
+    // Emit a logical tombstone (OR-Set) so the retract propagates cluster-wide.
+    this.addTombstone({
+      id: crypto.randomUUID(),
+      subject: row.subject,
+      predicate: row.predicate,
+      scopeType: row.scope_type,
+      scopeId: row.scope_id,
+      tx: this.hlcGen.next(now),
+      origin: row.tx_node || '',
+    });
     return true;
+  }
+
+  /** Record a logical tombstone (idempotent by id). */
+  addTombstone(t: Tombstone): void {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO memory_tombstones (
+        id, subject, predicate, scope_type, scope_id, tx_from, tx_counter, tx_node, origin, tombstone_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '0')
+    `).run(t.id, t.subject, t.predicate, t.scopeType, t.scopeId, t.tx.physical, t.tx.counter, t.tx.nodeId, t.origin);
+  }
+
+  /** All active tombstones (for replication serving). */
+  listTombstones(): Tombstone[] {
+    const rows = this.db.prepare(`SELECT * FROM memory_tombstones WHERE tombstone_status = '0'`).all() as any[];
+    return rows.map((r) => ({
+      id: r.id,
+      subject: r.subject,
+      predicate: r.predicate,
+      scopeType: r.scope_type,
+      scopeId: r.scope_id,
+      tx: new HLC(r.tx_from, r.tx_counter, r.tx_node),
+      origin: r.origin,
+    }));
+  }
+
+  /** Apply a replicated tombstone: mark affected active facts retracted. */
+  applyTombstone(t: Tombstone): number {
+    const hlc = t.tx;
+    this.addTombstone(t);
+    // Mark any active version of the slot that LITERALLY PRECEDES the tombstone
+    // ((tx_from, tx_counter, tx_node) < tombstone tx) as retracted — causal order.
+    const res = this.db.prepare(`
+      UPDATE facts SET status = 'retracted', tx_to = ?
+      WHERE subject = ? AND predicate = ? AND scope_type = ? AND scope_id = ?
+        AND status IN ('active','disputed')
+        AND epistemic_class != 'axiom'
+        AND (tx_from, tx_counter, tx_node) < (?, ?, ?)
+    `);
+    const info = res.run(hlc.physical, t.subject, t.predicate, t.scopeType, t.scopeId, hlc.physical, hlc.counter, hlc.nodeId);
+    return Number(info.changes ?? 0);
   }
 
   /**

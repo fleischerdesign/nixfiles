@@ -140,6 +140,8 @@ export interface MemoryPluginConfig {
     nodeId?: string;
     /** HMAC secret; resolved from `secretEnv` or the dsh credential store. */
     secretEnv?: string;
+    /** Tenant replication context: "user:<u>" or "group:<g>". Defaults to "user:local". */
+    tenantContext?: string;
     /** Peers to pull from / serve to. `endpoint` is "host:port" or URL. */
     peers?: Array<{
       nodeId: string;

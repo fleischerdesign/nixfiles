@@ -29,6 +29,8 @@ export function initializeDatabase(dbPath: string): DatabaseSync {
       valid_to REAL NOT NULL,
       tx_from REAL NOT NULL,
       tx_to REAL NOT NULL,
+      tx_counter INTEGER NOT NULL DEFAULT 0,
+      tx_node TEXT NOT NULL DEFAULT '',
       type_constraint TEXT NOT NULL DEFAULT 'String',
       confidence REAL NOT NULL DEFAULT 1.0,
       security_label TEXT NOT NULL DEFAULT 'system',
@@ -40,6 +42,25 @@ export function initializeDatabase(dbPath: string): DatabaseSync {
       fts_tokens TEXT NOT NULL DEFAULT '',
       embedding_blob BLOB
     );
+
+    -- OR-Set Tombstones: a logical retract of a (subject, predicate, scope)
+    -- proposition slot, causally ordered by its HLC. An active fact whose HLC
+    -- precedes a matching tombstone is considered retracted cluster-wide.
+    CREATE TABLE IF NOT EXISTS memory_tombstones (
+      id TEXT PRIMARY KEY,
+      subject TEXT NOT NULL,
+      predicate TEXT NOT NULL,
+      scope_type TEXT NOT NULL,
+      scope_id TEXT NOT NULL,
+      tx_from REAL NOT NULL,
+      tx_counter INTEGER NOT NULL DEFAULT 0,
+      tx_node TEXT NOT NULL DEFAULT '',
+      origin TEXT NOT NULL DEFAULT '',
+      -- 0 = active tombstone, 1 = retracted tombstone (cancelled)
+      tombstone_status TEXT NOT NULL DEFAULT '0'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tombstones_sp ON memory_tombstones(subject, predicate, scope_id);
 
     CREATE INDEX IF NOT EXISTS idx_facts_subject_predicate ON facts(subject, predicate);
     CREATE INDEX IF NOT EXISTS idx_facts_bitemporal ON facts(valid_from, valid_to, tx_from, tx_to);

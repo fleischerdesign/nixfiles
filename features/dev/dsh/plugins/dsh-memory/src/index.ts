@@ -84,6 +84,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         ? { ...config.embedding, resolveKey }
         : config.embedding,
   );
+  const replicationNodeId = config.replication?.nodeId || process.env.DSH_NODE_ID || 'local';
   const engine = new BitemporalMemoryEngine(db, embeddingProvider, {
     topK: config.embedding?.topK ?? 8,
     // Provider-aware relevance floor: neural semantic embeddings (api/onnx) get
@@ -95,14 +96,16 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
   }, {
     halfLifeSeconds: config.decay?.halfLifeSeconds ?? 0,
     floor: config.decay?.floor ?? -1,
+  }, {
+    originNode: replicationNodeId,
   });
   ctx.provide('memory');
   ctx.memory = engine;
 
-  // Cross-Node Memory Replication (C7, P1). Fail-closed: if enabled but no HMAC
+  // Cross-Node Memory Replication (C7). Fail-closed: if enabled but no HMAC/cap
   // secret resolves (credential store or env), replication stays OFF — never an
   // insecure silent sync. Runs out-of-band; versions merge as an idempotent
-  // CvRDT union, so partial runs converge on the next interval.
+  // CvRDT union + OR-Set tombstone stream, so partial runs converge.
   void (async () => {
     const replCfg = config.replication;
     if (!replCfg?.enabled) return;
@@ -111,7 +114,8 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
     const replicator = new MemoryReplicator({
       db,
       secret,
-      nodeId: replCfg.nodeId || process.env.DSH_NODE_ID || 'standalone',
+      nodeId: replicationNodeId,
+      tenantContext: replCfg.tenantContext || 'user:local',
       peers: replCfg.peers,
       syncIntervalMs: replCfg.syncIntervalMs,
       maxVersionsPerSync: replCfg.maxVersionsPerSync,

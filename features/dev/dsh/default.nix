@@ -728,17 +728,23 @@ in
       replication = {
         enable = lib.mkEnableOption "cross-node memory replication (C7) in dsh-memory" // {
           default = false;
-          description = "HMAC-signed delta sync (union-CRDT) of public/group/user facts across peer nodes. Fail-closed: without a resolvable HMAC secret, replication silently stays off.";
+          description = "Capability-token-signed delta sync (union-CRDT + OR-Set tombstones, HLC-ordered) of public/group/user facts across peer nodes. Fail-closed: without a resolvable secret, replication silently stays off.";
         };
         nodeId = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
           default = null;
           description = "Local nodeId used as this node's origin identifier (defaults to DSH_NODE_ID or 'standalone').";
         };
+        tenantContext = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "group:dev";
+          description = "Tenant replication context: 'user:<u>' or 'group:<g>'. Replication never crosses this boundary (MTAA isolation). Defaults to 'user:local'.";
+        };
         secretEnv = lib.mkOption {
           type = lib.types.str;
           default = "DSH_MEMORY_HMAC";
-          description = "Credential/env reference holding the HMAC shared secret (resolved via the dsh credential store, never in settings).";
+          description = "Credential/env reference holding the shared secret for capability signing + body HMAC (resolved via the dsh credential store, never in settings).";
         };
         listenPort = lib.mkOption {
           type = lib.types.nullOr lib.types.int;
@@ -1151,6 +1157,7 @@ in
                         maxVersionsPerSync
                         ;
                       nodeId = systemCfg.memory.replication.nodeId or currentHost;
+                      tenantContext = systemCfg.memory.replication.tenantContext or "user:${currentUser}";
                       listenPort = systemCfg.memory.replication.listenPort or null;
                       peers = map (p: {
                         inherit (p)

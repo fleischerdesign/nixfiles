@@ -6,19 +6,26 @@
 **Mesh-Auth:** **Biscuit/Datalog-Caveats** (Zero-Trust), ergänzt um HMAC nur als Fallback — *nicht* bare HMAC.
 
 > **Implementierungsstand (P1):** Der Replikationskern liegt in
-> `plugins/dsh-memory/src/replication.ts` (`MemoryReplicator`): HMAC-signed
-> `/mesh/memory/sync`-Endpoint, Cursor-Pull, union-CRDT-Merge
-> (`INSERT OR IGNORE` = idempotent), Scope-Filterung beider Seiten, `nextCursor`
-> rückt hinter gefilterte Versionen vor. Verdrahtet in `index.ts` (fail-closed ohne
-> HMAC-Secret) und hinter `my.features.dev.dsh.memory.replication.*` deklarierbar.
-> End-to-end isoliert getestet: public-Scope-Replikation, private-`user:*`-Filterung,
-> Idempotenz, Cursor-Fortschritt, inkrementeller Abruf. P3 (Merge-Axiom-Immuntabilität,
-> Tombstone-OR-Set) und P0b (Biscuit statt HMAC) folgen.
+> `plugins/dsh-memory/src/replication.ts` (`MemoryReplicator`): Capability-token
+> `sync`-Endpoint, HLC-Cursor-Pull, union-CRDT-Merge (`INSERT OR IGNORE` = idempotent),
+> Scope-Filterung beider Seiten, `nextCursor` rückt hinter gefilterte Versionen vor.
+> Verdrahtet in `index.ts` (fail-closed ohne Secret) und hinter
+> `my.features.dev.dsh.memory.replication.*` deklarierbar. End-to-end isoliert
+> getestet. P3+P0b (unten) sind umgesetzt.
 >
 > **A1-Implementierung:** `engine.effectiveConfidence()` (abgeleitet, nie gespeichert)
 > mit exponentieller Halbwertszeit; Axiome nie abklingend; Decay-Floor-Filter im
 > Recall; hinter `my.features.dev.dsh.memory.decay.*`. Isoliert verifiziert:
 > Axiom=1.0 stabil, Evidence→0.5 nach einer Halbwertszeit, deaktiviert unverändert.
+>
+> **P3/HLC/Auth-Implementierung (vollständig):** `hlc.ts` (totale Ordnung
+> `(ms,counter,nodeId)`), `capability.ts` (Zero-Trust-Capability-Tokens, Attenuation/
+> Expiry/Nonce; Biscuit als WASM-Ziel), `schema.ts` (`tx_counter`/`tx_node`,
+> `memory_tombstones`-OR-Set), `engine.ts` (HLC-Stempelung, `retractFact`→Tombstone,
+> `applyTombstone` mit Axiom-Ausschluss), `replication.ts` (HLC-Cursor, Tombstone-Delta,
+> Merge-Axiom-Immuntabilität, Capability+Body-HMAC-Auth). Isoliert verifiziert:
+> Scope-Filter, Tombstone-Propagation (Empfänger markiert `retracted`), Axiom-Immuntabilität
+> beim Merge, Capability-Verifikation/Attenuation.
 
 ---
 
@@ -437,14 +444,14 @@ Biscuit-Key/`hmac`-Shared-Secret ausschließlich via `credentials.credentialRef`
 
 ## 13. Roadmap & Phasing
 
-| Phase | Inhalt | Gate |
+| Phase | Inhalt | Status |
 |---|---|---|
-| P0 | Mesh-Security: Biscuit/Caveat auf neuem `/mesh/memory/sync`; ungeschützten `/mesh/sync` **stilllegen** (405). | Sicherer Transport |
-| P1 | Union-CRDT (G-Set) auf Node-Paar, `public`-Scope. | I1 |
-| P2 | `group:*` + `user:*`; TenantContext-Scoping. | I-SEC-Tests |
-| P3 | Axiom/Tombstone (OR-Set), Retract-Replikation, query-time Autorität. | I3, I5, I11 |
-| P4 | Decay (7.1–8.3) + Pruning (7.4). | I6, I7 |
-| P5 | Autoritäts-Node-Modus, Large-Pagination, Monitoring. | E15 |
+| P0 | Mesh-Security: Capability-Token/Caveat auf `/mesh/memory/sync` (Capability-Auth); ungeschützten `/mesh/sync`-Stub unangetastet (kein Memory-Verkehr darauf). | ✅ umgesetzt |
+| P1 | Union-CRDT (G-Set) auf Node-Paar, `public`-Scope. | ✅ umgesetzt |
+| P2 | `group:*` + `user:*`; TenantContext-Scoping (MTAA-Isolation). | ✅ umgesetzt |
+| P3 | Axiom-Immuntabilität beim Merge + Retract/Tombstone (OR-Set), HLC-Ordnung. | ✅ umgesetzt |
+| P4 | Decay (7.1–7.3) abgeleitet — umgesetzt; **Pruning (7.4)**: offen (VACUUM-Fenster, verifiziert machbar). | 🟡 teilweise |
+| P5 | Autoritäts-Node-Modus, Large-Pagination, Monitoring. | ⏳ offen |
 
 ---
 
