@@ -1,117 +1,98 @@
 # Feature Ideation, Ergonomie-Innovationen und Future Roadmap
 
-Dieses Dokument dient als zentrale Sammelstelle und architektonische Diskussionsgrundlage für zukünftige High-Value-Erweiterungen im DeepSeek Harness (`dsh`). Ziel ist es, innovative Ideen aus modernen Entwicklerumgebungen (Cursor, Claude Code Desktop, Windsurf, Devin, Zed, Neovim) mit der formalen NixOS- und Multi-Tenant-Architektur von `dsh` zu verschmelzen.
+Dieses Dokument dient als kuratierte Sammelstelle für geprüfte, akademisch saubere und systemagnostische Erweiterungen im DeepSeek Harness (`dsh`).
 
 ---
 
-## Übersicht der Feature-Kandidaten
+## 1. Bereinigte & validierte Feature-Kandidaten
 
-```mermaid
-mindmap
-  root((dsh Innovations))
-    Intelligente Kontext- & Wissensebene
-      Autonomous Test & Fix Loop
-      Semantic AST Search & Tree-sitter
-      Graph of Thoughts Visualizer
-    UI / UX & Developer Ergonomics
-      Multi-Cursor Collaborative Canvas
-      Voice-to-Prompt & Speech-to-Intent
-      Terminal Shell Recording & Replay
-    Deployment & Infrastructure
-      Ephemeral Dev Sandboxes Disko / MicroVM
-      Continuous Agent Review Bot Forgejo
-      Time-Travel Reversible Execution Pkg rollback
-```
+### 1.1 Semantic AST & Tree-sitter Code Intelligence (`dsh-ast-nav`)
+- **Status:** Hohe Priorität, essenzieller Code-Intelligence-Baustein.
+- **Problemstellung:**
+  - Vektor-Embeddings und Volltextsuche (`grep`, `ripgrep`) sind blind für Syntaxstrukturen.
+  - LLMs übersehen bei Refactorings oft Methodenüberladungen, Vererbungshierarchien oder importierte Typen.
+- **Architektur & Funktionsweise:**
+  - Headless Tree-sitter Daemon / Parser im Node-Prozess oder via WASM-Grammatiken für alle relevanten Sprachen (Nix, TypeScript, Rust, Python, Go, Bash, C).
+  - Stellt dem Agenten exakte syntaktische Abfrage-Tools bereit:
+    - `ast_find_symbols(pattern, kind: "function" | "class" | "type" | "nix_option")`
+    - `ast_get_call_hierarchy(symbol, direction: "incoming" | "outgoing")`
+    - `ast_get_scope_definitions(filePath, line, col)`
+  - Ermöglicht dem Modell ein strukturelles Verständnis des Repositories, bevor Code editiert wird.
 
 ---
 
-## 1. Autonomous Test & Fix Loop (`dsh-verify-loop`)
-
-### Motivation & Konzept
-Wenn ein Agent Code generiert, scheitert er oft nicht am Verständnis der Aufgabe, sondern am Fehlen einer unmittelbaren Rückkopplungsschleife. Anstatt dass der Entwickler Compiler-Fehler manuell zurück in den Chat kopieren muss, orchestriert `dsh-verify-loop` eine automatisierte Verifikations-Kaskade.
-
-### Funktionsweise
-1. Nach jeder Datei-Mutation führt das System im Hintergrund die passende Test-Suite aus (z. B. `cargo test`, `npm test`, `nix flake check`, `pytest`).
-2. Schlägt der Build oder ein Test fehl:
-   - Die Fehlermeldung wird strukturiert erfasst (Exit-Code, Stacktrace, fehlschlagende Assertion).
-   - Ein interner Sub-Turn wird gestartet: *"Test `test_auth_token_expiry` schlug mit Zeile 104 fehl. Analysiere und korrigiere den Code."*
-   - Der Agent iteriert bis zu $N$ Versuchen (konfigurierbar) autonom, bevor er das Ergebnis an den Benutzer übergibt.
-3. Im UI erscheint ein kompaktes Status-Badge: `[🔄 Auto-Fix Iteration 2/3: npm test passing ✓]`.
-
----
-
-## 2. Ephemeral Dev Sandboxes & MicroVMs (`dsh-sandbox`)
-
-### Motivation & Konzept
-Agenten mit `exec_shell`-Berechtigungen stellen ein Sicherheitsrisiko für das Host-System dar (Versehentliches Löschen von Pfaden, Secret-Exfiltration). Eine lokale Sandbox mit KVM/MicroVM (z. B. via NixOS `nixos-rebuild build-vm` oder MicroVM.nix / Firecracker) isoliert die Ausführung vollständig.
-
-### Funktionsweise
-- Für jede Session wird ein flüchtiger, isolierter MicroVM- oder Bubblewrap-Container instanziiert.
-- Das Projektverzeichnis wird als Copy-on-Write Overlay gemountet.
-- Der Agent kann beliebige zerstörerische Befehle (`rm -rf`, Netzwerk-Tests, Root-Privilegien) ausführen, ohne das Host-Dateisystem zu gefährden.
-- Nach Abschluss der Session wird die Sandbox verworfen; nur die explizit genehmigten Diffs fließen in das Host-Repository zurück.
+### 1.2 Time-Travel Session Branching & Conversation DAG (`dsh-branching`)
+- **Status:** Hohe Priorität, direkte Ergonomie- und UX-Verbesserung.
+- **Problemstellung:**
+  - Lineare Chats zwingen Entwickler in eine Sackgasse, wenn ein Prompt-Turn in die falsche Richtung abbiegt.
+  - Das Löschen von Nachrichten führt zu Kontextverlust; das Weiterschreiben mit "Vergiss das vorherige" verwirrt das LLM.
+- **Architektur & Funktionsweise:**
+  - Der Session-Speicher modelliert die Konversation nicht als flache Liste, sondern als gerichteten azyklischen Graphen (DAG) von Turns.
+  - An jedem Turn existiert ein `[Fork / Branch]’-Aktionspunkt.
+  - **UI/UX:**
+    - Ein interaktiver History-Navigator (Git-Tree-Style / U-Bahn-Netzplan) im Header oder in der Seitenleiste.
+    - Nahtloses Umschalten zwischen parallelen Experimentier-Zweigen innerhalb derselben Session (`Branch A: Redis Sentinel` vs. `Branch B: Redis Cluster`).
+    - Paralleles Erhalten von Zwischenergebnissen und Artefakten.
 
 ---
 
-## 3. Semantic AST Search & Tree-sitter Navigation (`dsh-ast-nav`)
-
-### Motivation & Konzept
-Reine Vektor-Embeddings oder Text-Grep sind oft ungenau für die Code-Navigation (z. B. Übersehen von Vererbungen oder Verwechseln von Variablennamen mit Strings).
-
-### Funktionsweise
-- Integration von Tree-sitter direkt in den DSH-Indexierer.
-- Ermöglicht strukturierte Code-Queries:
-  - *"Finde alle Funktionen, die `UserIdentity` als Parameter annehmen."*
-  - *"Zeige alle NixOS-Optionen, die den Typ `lib.types.submodule` haben."*
-- Der Agent kann vor dem Refactoring exakte Abhängigkeitsgraphen auf Funktions- und Modulebene abfragen.
-
----
-
-## 4. Time-Travel Session Branching & Git History Graph (`dsh-branching`)
-
-### Motivation & Konzept
-Oft begibt sich ein Agent bei komplexen Problemen in eine Sackgasse. Aktuell muss der Benutzer die Session abbrechen oder die Konversation manuell zurückscrollen.
-
-### Funktionsweise
-- Jede Chat-Nachricht und jedes Werkzeug-Ergebnis ist ein Knoten in einem gerichteten azyklischen Graphen (DAG).
-- Der Benutzer kann an **jedem Punkt der Historie** einen neuen Zweig abspalten (`Fork Session from Turn 14`).
-- Im UI wird der Konversationsbaum visuell als U-Bahn-Netzplan dargestellt. So können alternative Lösungsansätze für dieselbe Aufgabe parallel verglichen werden.
+### 1.3 Voice-to-Intent & Push-to-Talk (`dsh-voice`)
+- **Status:** Mittlere Priorität, starker Ergonomie-Gewinn beim Pair-Programming.
+- **Problemstellung:**
+  - Längere Gedanken, architektonische Zusammenhänge oder komplexe Refactoring-Absichten im Code lassen sich oft viel schneller sprechen als tippen.
+  - Cloud-basierte Spracherkennung verletzt lokale Datenschutzprinzipien.
+- **Architektur & Funktionsweise:**
+  - Lokale Whisper-Integration (z. B. via `whisper.cpp` Daemon auf `jello` oder als lokaler Stream-Endpunkt).
+  - Push-to-Talk Button (oder Shortcut `Leertaste` halten / `Alt+V`) direkt im DSH-Composer.
+  - **Streaming-Transkription:** Sprache fließt live als Text in das Eingabefeld.
+  - **Code-Token Heuristik:** Erkennung technischer Begriffe (CamelCase, Snake_case, Pfade, Symbole), damit gesprochenes "nix flake check" nicht als "Nix Flake Check" oder "nix like check" landet.
 
 ---
 
-## 5. Forgejo / Git Webhook Agent Automation (`dsh-ci-bot`)
-
-### Motivation & Konzept
-DSH läuft als dauerhafter Dienst auf `mackaye` oder `rollins`. Warum soll er nur auf manuelle Chat-Eingaben reagieren?
-
-### Funktionsweise
-- Registrierung von Webhook-Endpunkten in Forgejo/GitHub über `dsh-ingress`.
-- Bei einem neuen Pull-Request oder Issue:
-  1. DSH erzeugt automatisch eine isolierte Session.
-  2. Führt Code-Review, Sicherheitsprüfungen und Linting (`statix`, `deadnix`) durch.
-  3. Postet konstruktive Review-Kommentare oder schlägt direkt einen Fix-Branch vor.
+### 1.4 Universeller Projekt-Contract / Manifest-gesteuerte Verifikation (`dsh-verify-contract`)
+- **Status:** Neu konzipiert (agnostische Weiterentwicklung der Test-Loop).
+- **Problemstellung:**
+  - Jedes Projekt nutzt andere Build-Tools (`cargo`, `nix`, `npm`, `pnpm`, `make`, `pytest`, `go test`, `gradle`).
+  - Ein hartcodierter Mechanismus ist unbrauchbar und verletzt das Agnostizitäts-Prinzip von `/etc/nixos/AGENTS.md`.
+- **Architektur & Lösungsansatz:**
+  - **Projekt-Agnostischer Kontrakt (`.dsh/contract.yml` oder Auto-Discovery):**
+    - Statt feste Befehle vorzuschreiben, definiert das Projekt oder das Repository einen standardisierten Verifikations-Kontrakt:
+      ```yaml
+      # .dsh/contract.yml (optional im Repo-Root oder via DSH-Settings)
+      verify:
+        lint: "nixfmt --check && statix check"
+        build: "nix build .#nixosConfigurations.jello.config.system.build.toplevel"
+        test: "nix flake check"
+      ```
+    - **Zero-Config Fallback:** Erkennt automatisch vorhandene Standarddateien:
+      - `flake.nix` -> `nix flake check`
+      - `Cargo.toml` -> `cargo check && cargo test`
+      - `package.json` -> `npm test` (falls Script vorhanden)
+      - `Makefile` -> `make check` oder `make test`
+  - **Autonomer Feedback-Loop:**
+    - Wenn aktiviert, führt DSH nach dem Anwenden von Diffs den definierten Verify-Befehl im Projektverzeichnis aus.
+    - Schlägt der Kontrakt fehl, analysiert der Agent die Exit-Codes und Stderr-Ausgaben selbstständig in einem internen Sub-Turn.
 
 ---
 
-## 6. Voice-to-Intent & Voice Interaction (`dsh-voice`)
+## 2. Aussortierte / Verworfene Ideen
 
-### Motivation & Konzept
-Beim Pair-Programming tippt man oft ungern lange Erklärungen in eine Chatzeile, wenn man gerade mit den Händen im Code vertieft ist.
-
-### Funktionsweise
-- Lokale Whisper-Integration (z. B. via `whisper.cpp` oder Faster-Whisper auf dem Desktop `jello`).
-- Floating Push-to-Talk Button im DSH-Composer.
-- Lokale Transkription mit automatischer Markdown-Formatierung und Entity-Erkennung (Code-Tokens, Dateinamen).
+| Feature-Idee | Entscheidung | Begründung |
+|---|---|---|
+| **Hardcodierte Test & Fix Loop** | **Verworfen** | Zu unflexibel. Ersetzt durch das universelle, manifest-gesteuerte Modell (`dsh-verify-contract`). |
+| **Ephemeral MicroVM Sandboxes** | **Zurückgestellt** | Aktuell kein Bedarf; Overhead und Komplexität stehen in keinem Verhältnis zum unmittelbaren Mehrwert. |
+| **Forgejo / CI Webhook Bot** | **Verworfen** | Redundant. Das Webhook-Ingress-System (`dsh-ingress`) existiert bereits und deckt Event-getriebene Anwendungsfälle vollständig ab. |
 
 ---
 
-## Priorisierungs- und Bewertungsmatrix
+## 3. Neue Ideensammlung: Weitere High-Value Konzepte
 
-| Feature | Komplexität | Mehrwert / Impact | Architektonische Vorbedingungen |
-|---|---|---|---|
-| **Autonomous Test & Fix Loop** | Mittel | Extrem Hoch | DSH Execution Context, Tool Event Feedback |
-| **Ephemeral Sandboxes (Bubblewrap/MicroVM)** | Hoch | Sehr Hoch | NixOS System-Konfiguration, Cgroups / KVM |
-| **AST Tree-sitter Navigation** | Mittel | Hoch | Tree-sitter Bindings, AST Parser Daemon |
-| **Time-Travel Session Branching** | Niedrig-Mittel | Hoch | Session Store Snapshotting |
-| **Forgejo Webhook Review Bot** | Mittel | Hoch | `dsh-ingress` (bereits existent!), API-Tokens |
-| **Voice-to-Intent (Whisper)** | Niedrig | Mittel | Lokales Whisper Modell, Web-Audio Stream |
+Welche zusätzlichen Konzepte bieten echten praktischen Mehrwert?
+
+1. **Terminal Stream Replay & Session Recording (`dsh-terminal-cast`)**:
+   - Strukturierte Erfassung aller Terminal-Outputs inklusive ANSI-Colors.
+   - Der Benutzer kann interaktiv durch Terminal-Historien scrollen, Fehlerzeilen anklicken und mit einem Klick *"Erkläre diesen Stacktrace"* an den Agenten senden.
+2. **Context Compression & Selective Sliding Window (`dsh-context-prune`)**:
+   - Wenn Konversationen sehr lang werden (> 60k Tokens), fasst das System alte Turns nicht plump zusammen, sondern behält exakt die aufgerufenen Tool-Signaturen und Dateipfade im Fokus, während repetitive Ausgaben komprimiert werden.
+3. **Workspace File-Tree HUD mit Live Agent Attention Tracker**:
+   - Eine dezente Datei-Explorer-Leiste, die visuell anzeigt, welche Dateien der Agent gerade im aktuellen Turn gelesen, analysiert oder modifiziert hat (Heatmap der Agent-Aufmerksamkeit).
