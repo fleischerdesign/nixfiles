@@ -1006,6 +1006,8 @@ in
             homePatch = render.mkHomePatch patchEntries;
 
             renderedProfiles = systemCfg.profiles or { };
+
+            dshPackage = if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh;
           in
           {
             options.my.features.dev.dsh = {
@@ -1187,6 +1189,13 @@ in
                     }) activePluginDrvs
                   )
                 ))
+                (lib.optionalAttrs (lspEnabled && lspConfiguredServers != { }) {
+                  ".dsh/node_modules/@deepseek-ai/dsh-lsp".source = "${dshPackage}/lib/dsh/packages/lsp/lsp";
+                  ".dsh/node_modules/@deepseek-ai/dsh-lsp-stdio".source =
+                    "${dshPackage}/lib/dsh/packages/lsp/lsp-stdio";
+                  ".dsh/node_modules/@deepseek-ai/dsh-tool-lsp".source =
+                    "${dshPackage}/lib/dsh/packages/lsp/tool-lsp";
+                })
                 (lib.mapAttrs' (name: profile: {
                   name = ".dsh/profiles/${name}/cordis.patch.yml";
                   value.text = render.mkProfilePatch profile;
