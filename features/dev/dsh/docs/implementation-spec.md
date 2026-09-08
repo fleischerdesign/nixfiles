@@ -27,6 +27,28 @@ The following upstream seams and plugins are present and are read, not written b
 3. Loopback-based anonymous `local` (Admin) identity fragments user-scoped memory.
 4. `memory.replication.enable` defaults `false` — replication not wired.
 
+### 0.1 Codebase topography — what you can actually edit
+
+**Critical.** The upstream seams referenced below (`ctx.sandbox`, `sandbox-local`, `fs-sandbox`, `sandbox-policy`, `permission-presets`, `subprocess`) are **NOT in this repository** — they ship inside `pkgs.custom.dsh` (built from upstream via `packages/custom/dsh`). You **do not fork or edit them here.** You wrap/configure them, or hook them, from the dsh feature layer.
+
+**Editable here:**
+- `features/dev/dsh/plugins/<name>/src/*.ts` — the dsh feature plugins: `dsh-auth`, `dsh-memory`, `dsh-mesh`, `dsh-workspace-tx`, `dsh-share`. This is where the capability token, the shared `authorise()` primitive, the LBAC/`tools/pre-execute` hook, and cross-node attribution live.
+- `features/dev/dsh/default.nix` + `lib/render.nix` + `lib/runtime.nix` — the declarative NixOS/Cordis wiring (patch layer, settings, `agent.packages`/`agent.workspaces`).
+- `docs/` (this family).
+
+**Not editable (upstream, configure/wrap instead):** the process sandbox, `fs-sandbox`, `sandbox-policy`, `permission-presets`, `subprocess`. Reach their behaviour via the Cordis patch layer (`cordis.patch.yml`, rendered by `lib/render.nix`) and via the `my.features.dev.dsh.*` options.
+
+**Consequence for the design:** the shared `authorise()` primitive and the path-capability layer are implemented **in a dsh plugin** (e.g. extend `dsh-auth`, which already intercepts `tools/pre-execute`) — **not** by modifying upstream `fs-sandbox`. You hook the fs provider group through the plugin layer's event gates, not by forking upstream code.
+
+### 0.2 Build & verification loop
+
+- **Plugin change** → rebuild the dsh package: `nix build .#dsh` (or `nix build .dsh`), and re-evaluate the host that uses it: `nix build .#nixosConfigurations.<host>.config.system.build.toplevel --dry-run`.
+- **Smoke test** the service after a rebuild: `OUT=$(nix build .#dsh --print-out-paths --no-link | tail -1); DSH_HOME=$(mktemp -d) timeout 40 "$OUT/bin/dsh" web --no-open` (stable server = exit 124).
+- **Lint gate:** `nix flake check` (all 5 hosts + statix + deadnix). `nixfmt`/`deadnix`/`statix` are only in a dev shell / the flake checks — not on a bare PATH.
+- **Config test:** `nixos-rebuild switch` + `systemctl restart dsh-web` on the deployment host; verify with the V-matrix.
+
+**Deployment specifics (already in place, from this session):** the dsh agent runs as the unprivileged `dsh` system user (no home-manager profile, shell `nologin`); each host grants itself access via `agent.workspaces` (durable oneshot: ACL traverse + group-write) and `agent.packages` (dsh-user tool set, incl. `git`/`gh`, wired to the service PATH via `makeBinPath`). The identity is `user:<oidc-sub>` (OIDC everywhere, loopback disabled).
+
 ---
 
 ## 1. Resolved Decisions
