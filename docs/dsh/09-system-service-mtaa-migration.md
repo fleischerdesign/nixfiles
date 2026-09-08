@@ -1,8 +1,27 @@
 # System-Service → `/var/lib/dsh` Multi-Tenant Migration (dsh)
 
-**Status:** Entwurf / Migrationsplan — noch nicht implementiert  
+**Status:** ✅ **UMGESETZT (Weg A)** — P1–P5 fertig & committet; Deployment (`deploy .#rollins`) + Live-Verifikation offen. Zusätzlich zu diesem Plan wurde **Weg A (pures System-Modul auf allen Hosts)** umgesetzt: das Home-Manager-User-Modul wurde entfernt, dsh läuft überall als dedizierter System-Daemon.
 **Ziel:** dsh läuft als **persistenter System-Service** eines dedizierten `dsh`-System-Users mit **`DSH_HOME=/var/lib/dsh`** (MTAA-konform, `multi-tenancy.md §3`), d. h. die Config-Dokumente werden **systemseitig** gerendert statt im Home-Manager-Benutzerverzeichnis.
 **Ausgangslage (erreicht & stabil):** `ai.rls.ancoris.ovh` läuft als `systemd.services.dsh-web` (`User=philipp`, `DSH_HOME=/home/philipp/.dsh`), OIDC-Login funktioniert. Diese Funktionalität MUSS während der Migration erhalten bleiben.
+
+---
+
+## 7. UmgESETZT: Weg A (reines System-Modul)
+
+Zusätzlich zur System-Service-Migration wurde entschieden, das Home-Manager-User-Modul **vollständig zu entfernen** — dsh läuft auf allen 5 Hosts als dedizierter System-Daemon.
+
+**Referenz-Commit:** `eb3833d` (Weg A).
+
+| Host | Regime | User | DSH_HOME |
+|---|---|---|---|
+| rollins, jello, mackaye, strummer, yorke | System-Daemon | `dsh` | `/var/lib/dsh` |
+
+- `features/dev/dsh/default.nix`: pures System-Modul (`home-manager.sharedModules` entfernt). `web.systemService`/`web.dedicatedUser` defaulten auf `true`; `web.user` entfernt (`serviceUser`/`serviceDshHome` fest auf `dedicatedUserName`/`/var/lib/dsh`).
+- Alle Hosts setzen `my.features.dev.dsh.web.enable = true`.
+- `user/philipp/dsh.nix` entfernt + Import gelöscht.
+- Desktop-PWA-Launcher: als normaler `my.features.desktop.webapps.apps.dsh`-Eintrag (unabhängig vom Feature-Modul).
+- Config-Dokumente werden von `mkDshRuntimeSeed` nach `/var/lib/dsh` gerendert (`dsh-web-config`-Oneshot vor `dsh-web`).
+
 
 ---
 
