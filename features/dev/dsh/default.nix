@@ -69,19 +69,8 @@ in
       "dsh"
     ] { };
 
-    dshHome = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "Harness home override; sets DSH_HOME (defaults to ~/.dsh).";
-    };
-
     web = {
       enable = lib.mkEnableOption "background dsh web server daemon";
-      systemService = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Run dsh-web as a persistent systemd SYSTEM service (default; the Home-Manager per-user service has been removed).";
-      };
       port = lib.mkOption {
         type = lib.types.port;
         default = 3080;
@@ -91,11 +80,6 @@ in
         type = lib.types.str;
         default = "127.0.0.1";
         description = "Host/IP address for the dsh web server to bind to.";
-      };
-      dedicatedUser = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Run dsh-web as a DEDICATED unprivileged system user with DSH_HOME=/var/lib/dsh (MTAA multi-tenant layout) instead of reading an existing user's ~/.dsh.";
       };
       dedicatedUserName = lib.mkOption {
         type = lib.types.str;
@@ -1081,16 +1065,16 @@ in
       systemd.tmpfiles.rules =
         let
           normalUsers = lib.filterAttrs (_: u: u.isNormalUser) config.users.users;
-          owner = if cfg.web.dedicatedUser then cfg.web.dedicatedUserName else "root";
-          group = if cfg.web.dedicatedUser then cfg.web.dedicatedUserName else "root";
+          # The /var/lib/dsh store root belongs to the dedicated dsh service user.
+          dshUser = cfg.web.dedicatedUserName;
           tenantDirs = lib.mapAttrsToList (
             name: _: "d /var/lib/dsh/tenants/${name} 0700 ${name} users -"
           ) normalUsers;
         in
         [
-          "d /var/lib/dsh 0755 ${owner} ${group} -"
-          "d /var/lib/dsh/tenants 0755 ${owner} ${group} -"
-          "d /var/lib/dsh/shared 0755 ${owner} ${group} -"
+          "d /var/lib/dsh 0755 ${dshUser} ${dshUser} -"
+          "d /var/lib/dsh/tenants 0755 ${dshUser} ${dshUser} -"
+          "d /var/lib/dsh/shared 0755 ${dshUser} ${dshUser} -"
           "d /run/dsh 0775 root users -"
         ]
         ++ tenantDirs;
@@ -1104,7 +1088,7 @@ in
     # MTAA: dedicated unprivileged `dsh` system user whose home IS the
     # multi-tenant store root /var/lib/dsh. The dsh-web SYSTEM service runs as
     # this user; operator + tenant data all lives under /var/lib/dsh.
-    (lib.mkIf cfg.web.dedicatedUser {
+    {
       users.groups.${cfg.web.dedicatedUserName} = { };
 
       users.users.${cfg.web.dedicatedUserName} = {
@@ -1116,9 +1100,8 @@ in
       };
 
       # Config-document seed for /var/lib/dsh, rendered from the same
-      # mkDshRuntime documents the Home-Manager ~/.dsh materialization uses
-      # (byte-identical by construction). Installed as the dsh user before the
-      # dsh-web service starts.
+      # mkDshRuntime documents the dsh-web system service reads. Installed as
+      # the dsh user before the dsh-web service starts.
       systemd.services.dsh-web-config = {
         description = "Populate /var/lib/dsh with the dsh configuration documents";
         wantedBy = [ "multi-user.target" ];
@@ -1150,14 +1133,18 @@ in
             chmod -R u+rwX,g-rwx,o-rwx "${target}"
           '';
       };
-    })
+    }
 
     # Run dsh-web as a persistent systemd SYSTEM service on the public /
     # multi-tenant node (independent of any user session). The service runs as
     # serviceUser with DSH_HOME=serviceDshHome (/var/lib/dsh when a dedicated
     # MTAA user is configured). The dsh-web-config unit instantiates the
     # configuration documents into DSH_HOME first.
-    (lib.mkIf (cfg.web.enable && cfg.web.systemService) {
+    # Run dsh-web as a persistent systemd SYSTEM service (independent of any
+    # user session). It runs as the dedicated dsh user with
+    # DSH_HOME=/var/lib/dsh; the dsh-web-config unit instantiates the config
+    # documents into the store root first.
+    (lib.mkIf cfg.web.enable {
       systemd.services.dsh-web = {
         description = "DeepSeek Harness (dsh) Web UI Service (systemd system service)";
         wantedBy = [ "multi-user.target" ];

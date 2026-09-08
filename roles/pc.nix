@@ -74,8 +74,6 @@
         thinking = lib.mkDefault "enabled";
         reasoningEffort = lib.mkDefault "low";
       };
-
-      web.enable = lib.mkDefault true;
     };
   };
 
