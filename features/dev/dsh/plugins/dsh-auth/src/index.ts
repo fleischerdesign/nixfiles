@@ -106,11 +106,11 @@ export class IdentityAuthGatewayService extends Service {
       redirectUri,
       scopes: o.scopes || ['openid', 'profile', 'email'],
       logoutUri: o.logoutUri,
-      // Prefer discovery-discovered endpoints (provider-agnostic, e.g. Authentik
-      // /application/o/authorize/ + /application/o/token/) over issuer-derived.
-      authorizeUrl: this.oidcDiscovery?.authorizeUrl,
-      tokenUrl: this.oidcDiscovery?.tokenUrl,
-      jwksUrl: this.oidcDiscovery?.jwksUrl,
+      // Explicit config endpoints (deterministic, no discovery race) take
+      // precedence over discovery; discovery over issuer-derived fallback.
+      authorizeUrl: o.authorizeUrl ?? this.oidcDiscovery?.authorizeUrl,
+      tokenUrl: o.tokenUrl ?? this.oidcDiscovery?.tokenUrl,
+      jwksUrl: o.jwksUrl ?? this.oidcDiscovery?.jwksUrl,
     };
   }
 
@@ -240,7 +240,7 @@ export class IdentityAuthGatewayService extends Service {
    */
   private async redirectToOidc(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
     if (!(this.oidcFlow && this.config.oidc?.enabled)) return false;
-    const flow = this.oidcFlow.begin();
+    const flow = this.oidcFlow.begin(req.url || '/');
     const cfg = await this.ensureDiscovery(this.oidcCfg());
     const loc = buildAuthorizeUrl(cfg, {
       state: flow.state,
@@ -261,7 +261,7 @@ export class IdentityAuthGatewayService extends Service {
    */
   private writeOidcRedirect(req: IncomingMessage, res: ServerResponse): boolean {
     if (!(this.oidcFlow && this.config.oidc?.enabled)) return false;
-    const flow = this.oidcFlow.begin();
+    const flow = this.oidcFlow.begin(req.url || '/');
     const loc = buildAuthorizeUrl(this.oidcCfg(), {
       state: flow.state,
       nonce: flow.nonce,
@@ -381,7 +381,8 @@ export class IdentityAuthGatewayService extends Service {
             crypto.createHmac('sha256', this.signingSecret).update(body).digest()
           );
 
-          if (sig === expectedSig) {
+          // Timing-safe signature comparison (reject String-== timing leaks).
+          if (this.signatureMatches(sig, expectedSig)) {
             try {
               const decodedJson = Buffer.from(body, 'base64url').toString('utf8');
               const payload = JSON.parse(decodedJson);
@@ -691,6 +692,14 @@ export class IdentityAuthGatewayService extends Service {
 
   private encodeBase64Url(buf: Buffer): string {
     return buf.toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  }
+
+  /** Constant-time comparison of two base64url signature strings. */
+  private signatureMatches(a: string, b: string): boolean {
+    const ab = Buffer.from(a, 'base64url');
+    const bb = Buffer.from(b, 'base64url');
+    if (ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
   }
 }
 

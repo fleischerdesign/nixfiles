@@ -98,7 +98,7 @@ export function buildAuthorizeUrl(
   return u.toString();
 }
 
-/** Verify an RS256-signed JWT (by kid) against a JWKS key set; enforce iss/aud/exp/nonce. */
+/** Verify an RS256-signed JWT (by kid) against a JWKS key set; enforce iss/aud/exp/nbf/nonce/alg. */
 export function verifyIdToken(opts: {
   idToken: string;
   jwks: Array<{ kid?: string; kty: string; n: string; e: string; alg?: string }>;
@@ -109,9 +109,15 @@ export function verifyIdToken(opts: {
 }): Record<string, unknown> {
   const claims = jwtClaims(opts.idToken);
   const header = JSON.parse(unb64url(opts.idToken.split('.')[0]).toString('utf8')) as { alg?: string; kid?: string };
+  const now = Math.floor((opts.nowMs ?? Date.now()) / 1000);
 
-  // 1. Signature (RS256 against the matching JWK).
-  const key = (header.kid ? opts.jwks.find((k) => k.kid === header.kid) : opts.jwks[0]) as any;
+  // 1. Algorithm must be RS256 (rejects alg-confusion: an HS256 token must
+  //    never be verified against an RSA public key). OIDC requires the alg
+  //    claim to be checked, not silently trusted.
+  if (header.alg !== 'RS256') throw new Error('oidc: unsupported id_token alg');
+
+  // 2. Signature (RS256 against the matching JWK).
+  const key = (header.kid ? opts.jwks.find((k) => k.kid === header.kid) : opts.jwks.find((k) => k.alg === 'RS256')) as any;
   if (!key || key.kty !== 'RSA') throw new Error('oidc: no matching RSA key');
   const signingInput = `${opts.idToken.split('.')[0]}.${opts.idToken.split('.')[1]}`;
   const signature = unb64url(opts.idToken.split('.')[2]);
@@ -122,9 +128,9 @@ export function verifyIdToken(opts: {
   const ok = crypto.verify('RSA-SHA256', Buffer.from(signingInput), publicKey, signature);
   if (!ok) throw new Error('oidc: invalid id_token signature');
 
-  // 2. Timestamp & claims.
-  const now = Math.floor((opts.nowMs ?? Date.now()) / 1000);
-  if (typeof claims.exp === 'number' && claims.exp < now) throw new Error('oidc: id_token expired');
+  // 3. Timestamp & claims. OIDC requires exp (and it should be present).
+  if (typeof claims.exp !== 'number' || claims.exp < now) throw new Error('oidc: id_token expired');
+  if (typeof claims.nbf === 'number' && claims.nbf > now) throw new Error('oidc: id_token not yet valid');
   if (claims.iss !== opts.issuer) throw new Error('oidc: issuer mismatch');
   const aud = claims.aud;
   const audMatch = Array.isArray(aud) ? aud.includes(opts.audience) : aud === opts.audience;
@@ -137,6 +143,9 @@ export interface FetchLike {
   (url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ ok: boolean; status: number; json: () => Promise<any> }>;
 }
 
+/** Maximum response body bytes read by the OIDC HTTP helper (speaker safety). */
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
 function httpsFetch(url: string, opts: { method?: string; headers?: Record<string, string>; body?: string } = {}): Promise<{ ok: boolean; status: number; json: () => Promise<any> }> {
   return new Promise((resolve, reject) => {
     const u = new URL.URL(url);
@@ -145,7 +154,15 @@ function httpsFetch(url: string, opts: { method?: string; headers?: Record<strin
       { hostname: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80), path: u.pathname + u.search, method: opts.method || 'GET', headers: opts.headers },
       (res) => {
         let data = '';
-        res.on('data', (d: Buffer) => { data += d; });
+        let bytes = 0;
+        res.on('data', (d: Buffer) => {
+          bytes += d.length;
+          if (bytes > MAX_RESPONSE_BYTES) {
+            req.destroy(new Error(`oidc: response exceeds ${MAX_RESPONSE_BYTES} bytes`));
+            return;
+          }
+          data += d;
+        });
         res.on('end', () => {
           resolve({ ok: !!res.statusCode && res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode || 0, json: async () => JSON.parse(data) });
         });
@@ -199,14 +216,14 @@ export async function fetchJwks(cfg: OidcFlowConfig, fetch?: FetchLike): Promise
 export class OidcFlowStore {
   private store = new Map<string, { nonce: string; verifier: string; redirectTo: string; expiresAt: number }>();
 
-  begin(ttlMs = 600_000): { state: string; nonce: string; verifier: string; challenge: string; redirectTo: string } {
+  begin(redirectTo = '/', ttlMs = 600_000): { state: string; nonce: string; verifier: string; challenge: string; redirectTo: string } {
     const state = crypto.randomBytes(16).toString('hex');
     const nonce = crypto.randomBytes(16).toString('hex');
     const pair = pkcePair();
-    const redirectTo = '/';
-    this.store.set(state, { nonce, verifier: pair.verifier, redirectTo, expiresAt: Date.now() + ttlMs });
+    const safeRedirect = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/';
+    this.store.set(state, { nonce, verifier: pair.verifier, redirectTo: safeRedirect, expiresAt: Date.now() + ttlMs });
     this.gc();
-    return { state, nonce, verifier: pair.verifier, challenge: pair.challenge, redirectTo };
+    return { state, nonce, verifier: pair.verifier, challenge: pair.challenge, redirectTo: safeRedirect };
   }
 
   consume(state: string): { nonce: string; verifier: string; redirectTo: string } | null {

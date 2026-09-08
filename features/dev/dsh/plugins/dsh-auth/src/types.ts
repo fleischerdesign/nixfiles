@@ -36,6 +36,9 @@ export interface OidcConfig {
   logoutUri?: string;        // Authentik end_session endpoint (optional)
   adminClaim?: string;       // e.g. "groups"
   adminValues?: string[];    // e.g. ["admin"]
+  authorizeUrl?: string;     // Discovery-derived authorization endpoint (default issuer + '/authorize')
+  tokenUrl?: string;         // Discovery-derived token endpoint (default issuer + '/token')
+  jwksUrl?: string;          // Discovery-derived JWKS endpoint (default issuer + '/.well-known/jwks.json')
 }
 
 export interface LdapConfig {

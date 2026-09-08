@@ -138,6 +138,11 @@
       "admin"
     ];
     clientSecretEnv = "DHS_OIDC_CLIENT_SECRET";
+    # Authentik uses provider-agnostic endpoints (not issuer-slug derived), so
+    # we set them explicitly to avoid a discovery race on the first redirect.
+    authorizeUrl = "https://auth.ancoris.ovh/application/o/authorize/";
+    tokenUrl = "https://auth.ancoris.ovh/application/o/token/";
+    jwksUrl = "https://auth.ancoris.ovh/application/o/deepseek-harness/jwks/";
   };
 
   # Public multi-tenant node: OIDC is the ONLY authentication path. Disable the

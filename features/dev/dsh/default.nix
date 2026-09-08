@@ -521,6 +521,24 @@ in
           default = null;
           description = "Authentik end_session endpoint (optional).";
         };
+        authorizeUrl = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "https://auth.ancoris.ovh/application/o/authorize/";
+          description = "OIDC authorization endpoint. Set for providers with provider-agnostic endpoints (e.g. Authentik /application/o/authorize/); falls back to discovery, then issuer + '/authorize'.";
+        };
+        tokenUrl = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "https://auth.ancoris.ovh/application/o/token/";
+          description = "OIDC token endpoint. Set for providers with provider-agnostic endpoints; falls back to discovery, then issuer + '/token'.";
+        };
+        jwksUrl = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "https://auth.ancoris.ovh/application/o/deepseek-harness/jwks/";
+          description = "OIDC JWKS endpoint for id_token signature verification; falls back to discovery, then issuer + '/.well-known/jwks.json'.";
+        };
         adminClaim = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
           default = null;
