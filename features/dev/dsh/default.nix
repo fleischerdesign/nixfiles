@@ -30,6 +30,15 @@ let
       ;
   };
 
+  # Owner of the sops-rendered credential/OIDC documents. These MUST be readable
+  # by the process that reads them — the dsh-web SYSTEM service's User. Until P4
+  # that is cfg.web.user (philipp/~/.dsh); from P4 onward it is the dedicated
+  # multi-tenant user (dedicatedUserName, DSH_HOME=/var/lib/dsh). Keeping this
+  # tied to the ACTUAL service user (not the dedicatedUser flag) means flipping
+  # dedicatedUser alone never redirects secrets out from under the running
+  # service — dsh refuses group/other-readable credential files (0600 + owner).
+  credOwner = cfg.web.user;
+
   mcpServerAssertions = lib.flatten (
     lib.mapAttrsToList (name: server: [
       {
@@ -83,6 +92,16 @@ in
         type = lib.types.str;
         default = "127.0.0.1";
         description = "Host/IP address for the dsh web server to bind to.";
+      };
+      dedicatedUser = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Run dsh-web as a DEDICATED unprivileged system user with DSH_HOME=/var/lib/dsh (MTAA multi-tenant layout) instead of reading an existing user's ~/.dsh.";
+      };
+      dedicatedUserName = lib.mkOption {
+        type = lib.types.str;
+        default = "dsh";
+        description = "Username of the dedicated dsh system user (group of the same name), with home /var/lib/dsh.";
       };
     };
 
@@ -1041,7 +1060,7 @@ in
 
     (lib.mkIf (cfg.enable || cfg.credentials != { } || cfg.auth.oidc.enabled) {
       sops.templates."dsh-credentials.yaml" = lib.mkIf (cfg.credentials != { }) {
-        owner = config.my.user.primary or "root";
+        owner = credOwner;
         # dsh refuses credential files readable by group or others.
         mode = "0600";
         content = builtins.toJSON (render.mkCredentialsDoc cfg.credentials);
@@ -1049,11 +1068,11 @@ in
 
       # OIDC client secret for the dsh-web process (never in the flake).
       sops.secrets."dsh_oidc_client_secret" = lib.mkIf (cfg.auth.oidc.enabled) {
-        owner = config.my.user.primary or "root";
+        owner = credOwner;
         mode = "0600";
       };
       sops.templates."dsh-oidc.env" = lib.mkIf (cfg.auth.oidc.enabled) {
-        owner = config.my.user.primary or "root";
+        owner = credOwner;
         mode = "0600";
         content = ''
           DHS_OIDC_CLIENT_SECRET=${config.sops.placeholder."dsh_oidc_client_secret"}
@@ -1063,14 +1082,16 @@ in
       systemd.tmpfiles.rules =
         let
           normalUsers = lib.filterAttrs (_: u: u.isNormalUser) config.users.users;
+          owner = if cfg.web.dedicatedUser then cfg.web.dedicatedUserName else "root";
+          group = if cfg.web.dedicatedUser then cfg.web.dedicatedUserName else "root";
           tenantDirs = lib.mapAttrsToList (
             name: _: "d /var/lib/dsh/tenants/${name} 0700 ${name} users -"
           ) normalUsers;
         in
         [
-          "d /var/lib/dsh 0755 root root -"
-          "d /var/lib/dsh/tenants 0755 root root -"
-          "d /var/lib/dsh/shared 0755 root root -"
+          "d /var/lib/dsh 0755 ${owner} ${group} -"
+          "d /var/lib/dsh/tenants 0755 ${owner} ${group} -"
+          "d /var/lib/dsh/shared 0755 ${owner} ${group} -"
           "d /run/dsh 0775 root users -"
         ]
         ++ tenantDirs;
@@ -1079,6 +1100,21 @@ in
       powerManagement.powerDownCommands = ''
         ${pkgs.procps}/bin/pkill -SIGUSR1 -f "dsh" || true
       '';
+    })
+
+    # MTAA: dedicated unprivileged `dsh` system user whose home IS the
+    # multi-tenant store root /var/lib/dsh. The dsh-web SYSTEM service runs as
+    # this user; operator + tenant data all lives under /var/lib/dsh.
+    (lib.mkIf cfg.web.dedicatedUser {
+      users.groups.${cfg.web.dedicatedUserName} = { };
+
+      users.users.${cfg.web.dedicatedUserName} = {
+        isSystemUser = true;
+        group = cfg.web.dedicatedUserName;
+        home = "/var/lib/dsh";
+        createHome = true;
+        description = "DeepSeek Harness (dsh) multi-tenant system user";
+      };
     })
 
     # Run dsh-web as a persistent systemd SYSTEM service on the public /

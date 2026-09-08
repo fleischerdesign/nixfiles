@@ -114,11 +114,13 @@
   };
 
   # dsh-web on rollins runs as a persistent SYSTEM service (public node),
-  # independent of any user session.
+  # independent of any user session. MTAA: it runs as a DEDICATED `dsh` system
+  # user with DSH_HOME=/var/lib/dsh (multi-tenant store root).
   my.features.dev.dsh.web = {
     enable = true;
     systemService = true;
-    user = "philipp";
+    dedicatedUser = true;
+    dedicatedUserName = "dsh";
     host = "127.0.0.1";
     port = 3080;
   };
