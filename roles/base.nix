@@ -17,6 +17,11 @@
 
   my.features.system.networking.ssh.enable = lib.mkDefault true;
 
+  # dsh (DeepSeek Harness) runs as a persistent system-wide daemon (dedicated
+  # `dsh` system user, DSH_HOME=/var/lib/dsh, MTAA layout) on every host. The
+  # systemService/dedicatedUser defaults are already true in the feature module.
+  my.features.dev.dsh.web.enable = lib.mkDefault true;
+
   nod = {
     enable = lib.mkDefault true;
     targetHost = lib.mkDefault (

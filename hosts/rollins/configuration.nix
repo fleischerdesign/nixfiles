@@ -113,17 +113,10 @@
     };
   };
 
-  # dsh-web on rollins runs as a persistent SYSTEM service (public node),
-  # independent of any user session. MTAA: it runs as a DEDICATED `dsh` system
-  # user with DSH_HOME=/var/lib/dsh (multi-tenant store root).
-  my.features.dev.dsh.web = {
-    enable = true;
-    systemService = true;
-    dedicatedUser = true;
-    dedicatedUserName = "dsh";
-    host = "127.0.0.1";
-    port = 3080;
-  };
+  # dsh-web runs as a persistent SYSTEM daemon on every host (dedicated `dsh`
+  # user, DSH_HOME=/var/lib/dsh) — configured once in roles/base.nix. rollins
+  # only differentiates its public multi-tenant identity via the OIDC config
+  # below (dsh-auth interactive Authorization Code + PKCE).
 
   # dsh-auth interactive OIDC (Authorization Code + PKCE) against the existing
   # Authentik. clientId + clientSecret (via env) are filled once the Authentik
