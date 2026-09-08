@@ -3,6 +3,23 @@
 **Status:** Implementation spec for a fresh implementer.
 **Read before:** [`mesh-capability-authorization.md`](mesh-capability-authorization.md) (the capability model) and [`filesystem-capability-layer.md`](filesystem-capability-layer.md) (the filesystem dimension). This document ties the design to concrete code seams, resolves the open decisions, and defines the verification matrix.
 
+---
+
+## 📋 Handoff brief
+
+You are implementing **granular, capability-based authorization for the dsh agent mesh** so that a trusted-but-bounded principal (operator, family, friends) can reach and steer nodes **only within an explicit, attestable, attenuable grant** — and no principal has whole-filesystem access by default.
+
+**The 3 docs, in order:**
+1. `mesh-capability-authorization.md` — the **what/why** (principals, capability tuple, cross-node attribution, open decisions).
+2. `filesystem-capability-layer.md` — the **filesystem dimension** (path canonicalization, prefix match, three enforcement axes, tenant isolation).
+3. this `implementation-spec.md` — the **how** (design→code mapping at §2, resolved decisions §1, verification matrix §3, phases §4).
+
+**Start with Phase 1 (`§4 P1 — Policy primitive`):** canonicalizer + root automaton + shared `authorise()` primitive, wired into the dsh-auth `tools/pre-execute` hook + the fs event gate; default-deny.
+
+**Definition of done per phase:** the phase's `§3` verification rows pass **and** `nix flake check` (all 5 hosts + statix + deadnix) is green. Do not mark a phase done on passing tests alone — confirm the runtime smoke test (`§0.2`) too. Build one phase, verify it, commit, then the next.
+
+---
+
 > **Honest framing for the implementer.** "Perfect" means *coherent within the stated threat model*, not absolute. Build in phases; every phase must pass `nix flake check` and the corresponding verification matrix. Do not claim completion on a phase whose matrix tests fail.
 
 ---
