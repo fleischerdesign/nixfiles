@@ -30,14 +30,16 @@ let
       ;
   };
 
+  # The dsh-web SYSTEM service's resolved runtime identity. With a dedicated
+  # MTAA user it is the unprivileged multi-tenant user (home /var/lib/dsh);
+  # otherwise it reads an existing operator user's ~/.dsh.
+  serviceUser = if cfg.web.dedicatedUser then cfg.web.dedicatedUserName else cfg.web.user;
+  serviceDshHome = if cfg.web.dedicatedUser then "/var/lib/dsh" else "/home/${cfg.web.user}/.dsh";
+
   # Owner of the sops-rendered credential/OIDC documents. These MUST be readable
-  # by the process that reads them — the dsh-web SYSTEM service's User. Until P4
-  # that is cfg.web.user (philipp/~/.dsh); from P4 onward it is the dedicated
-  # multi-tenant user (dedicatedUserName, DSH_HOME=/var/lib/dsh). Keeping this
-  # tied to the ACTUAL service user (not the dedicatedUser flag) means flipping
-  # dedicatedUser alone never redirects secrets out from under the running
-  # service — dsh refuses group/other-readable credential files (0600 + owner).
-  credOwner = cfg.web.user;
+  # by the process that reads them — the dsh-web SYSTEM service's User — because
+  # dsh refuses group/other-readable credential files (0600 + owner).
+  credOwner = serviceUser;
 
   mcpServerAssertions = lib.flatten (
     lib.mapAttrsToList (name: server: [
@@ -1154,20 +1156,27 @@ in
     })
 
     # Run dsh-web as a persistent systemd SYSTEM service on the public /
-    # multi-tenant node (independent of any user session). The operator reads
-    # that user's DSH_HOME config, which home-manager materializes declaratively.
+    # multi-tenant node (independent of any user session). The service runs as
+    # serviceUser with DSH_HOME=serviceDshHome (/var/lib/dsh when a dedicated
+    # MTAA user is configured). The dsh-web-config unit instantiates the
+    # configuration documents into DSH_HOME first.
     (lib.mkIf (cfg.web.enable && cfg.web.systemService) {
       systemd.services.dsh-web = {
         description = "DeepSeek Harness (dsh) Web UI Service (systemd system service)";
         wantedBy = [ "multi-user.target" ];
-        after = [ "network.target" ];
+        after = [
+          "network.target"
+          "dsh-web-config.service"
+        ];
+        requires = [ "dsh-web-config.service" ];
         serviceConfig = {
           Type = "simple";
-          User = cfg.web.user;
+          User = serviceUser;
+          WorkingDirectory = serviceDshHome;
           ExecStart = "${
             if cfg.package or null != null then cfg.package else pkgs.custom.dsh
           }/bin/dsh web --no-open --host ${cfg.web.host} --port ${toString cfg.web.port}";
-          Environment = [ "DSH_HOME=/home/${cfg.web.user}/.dsh" ];
+          Environment = [ "DSH_HOME=${serviceDshHome}" ];
           EnvironmentFile = lib.optionals (config.sops.templates ? "dsh-oidc.env") [
             config.sops.templates."dsh-oidc.env".path
           ];
@@ -1190,6 +1199,12 @@ in
           let
             userCfg = config.my.features.dev.dsh;
             systemCfg = osConfig.my.features.dev.dsh or { };
+
+            # On a node where a dsh-web SYSTEM service owns the dsh runtime
+            # (public/multi-tenant node), the per-user ~/.dsh materialization and
+            # user service are disabled — the configuration lives in the system
+            # service's DSH_HOME (/var/lib/dsh for the dedicated MTAA user).
+            materializeUserConfig = !(systemCfg.web.systemService or false);
 
             rt = runtime.mkDshRuntime {
               inherit systemCfg osConfig;
@@ -1332,7 +1347,7 @@ in
               };
             };
 
-            config = lib.mkIf userCfg.enable {
+            config = lib.mkIf (userCfg.enable && materializeUserConfig) {
               home.packages = [
                 (if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh)
                 pkgs.bubblewrap
