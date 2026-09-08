@@ -382,11 +382,16 @@ export class IdentityAuthGatewayService extends Service {
           );
 
           // Timing-safe signature comparison (reject String-== timing leaks).
-          if (this.signatureMatches(sig, expectedSig)) {
+          const sigOk = this.signatureMatches(sig, expectedSig);
+          // eslint-disable-next-line no-console
+          console.error(`[dsh-auth:debug] cookieCandidate authority=${authority} sigOk=${sigOk}`);
+          if (sigOk) {
             try {
               const decodedJson = Buffer.from(body, 'base64url').toString('utf8');
               const payload = JSON.parse(decodedJson);
               const now = Date.now();
+              // eslint-disable-next-line no-console
+              console.error(`[dsh-auth:debug] cookie payload expValid=${payload.expiresAt > now} hasIdentity=${!!payload.identity}`);
               if (payload.expiresAt && payload.expiresAt > now && payload.identity) {
                 return payload.identity;
               }
