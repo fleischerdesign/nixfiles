@@ -22,6 +22,52 @@
   # always a systemd SYSTEM service; this merely turns the daemon on.
   my.features.dev.dsh.web.enable = lib.mkDefault true;
 
+  # LLM credentials + default model for the dsh agent, shared by every host
+  # (the daemon is system-wide). DeepSeek is the primary route; OpenRouter is
+  # the fallback / multi-provider route. These secrets are encrypted for all
+  # hosts (see .sops.yaml) and consumed via the dsh credentials service.
+  sops.secrets."pi/deepseek" = lib.mkDefault { };
+  sops.secrets."pi/openrouter" = lib.mkDefault { };
+
+  my.features.dev.dsh = {
+    credentials = {
+      "DEEPSEEK_API_KEY".key = lib.mkDefault config.sops.placeholder."pi/deepseek";
+      "OPENROUTER_API_KEY".key = lib.mkDefault config.sops.placeholder."pi/openrouter";
+    };
+
+    piAi.providers = {
+      openrouter.apiKeyEnv = lib.mkDefault "OPENROUTER_API_KEY";
+      openrouter-contributor = {
+        displayName = lib.mkDefault "OpenRouter (Contributor)";
+        apiKeyEnv = lib.mkDefault "OPENROUTER_API_KEY";
+        api = lib.mkDefault "openai-completions";
+        baseURL = lib.mkDefault "https://openrouter.ai/api/v1";
+        models = lib.mkDefault [
+          {
+            id = "meta/muse-spark-1.3-contributor";
+            name = "Muse Spark 1.3 (Contributor)";
+            contextWindow = 1048576;
+            maxTokens = 943718;
+            input = [
+              "text"
+              "image"
+            ];
+          }
+        ];
+      };
+    };
+
+    defaultModel = lib.mkDefault {
+      provider = "deepseek-official";
+      model = "deepseek-v4-flash-vision-exp";
+    };
+
+    deepseek = {
+      thinking = lib.mkDefault "enabled";
+      reasoningEffort = lib.mkDefault "low";
+    };
+  };
+
   nod = {
     enable = lib.mkDefault true;
     targetHost = lib.mkDefault (
