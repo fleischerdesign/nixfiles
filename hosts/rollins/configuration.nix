@@ -139,6 +139,12 @@
     clientSecretEnv = "DHS_OIDC_CLIENT_SECRET";
   };
 
+  # Public multi-tenant node: OIDC is the ONLY authentication path. Disable the
+  # loopback admin fallback so nothing can be mistaken for a local privileged
+  # connection (defense-in-depth; the socket IP behind Caddy is loopback, so
+  # the X-Forwarded-For resolution is also enforced by the auth plugin).
+  my.features.dev.dsh.auth.loopback.enabled = false;
+
   my.features.services.camofox.enable = true;
 
   sops.secrets."pi/deepseek" = { };

@@ -226,9 +226,42 @@ export class IdentityAuthGatewayService extends Service {
     return crypto.randomBytes(32);
   }
 
+  /**
+   * Resolve the effective client IP for authentication.
+   *
+   * When running behind a reverse proxy (e.g. Caddy → dsh on 127.0.0.1), the
+   * socket peer is always the proxy. To avoid an untrusted client being
+   * mistaken for a loopback/admin connection, we honor X-Forwarded-For when
+   * the immediate peer is a trusted proxy, and take the rightmost hop that is
+   * NOT itself a trusted proxy. Otherwise (direct connection) the socket IP is
+   * authoritative.
+   */
+  private resolveRemoteIp(req: IncomingMessage): string {
+    const socketIp = req.socket.remoteAddress?.replace(/^.*:/, '') || '127.0.0.1';
+    const trusted = this.config.forwardProxy?.trustedProxies || ['127.0.0.1', '::1'];
+    const trustedSet = new Set(trusted.map((ip) => ip.replace(/^.*:/, '')));
+
+    const isTrustedPeer = trustedSet.has(socketIp) || socketIp === '127.0.0.1' || socketIp === '::1';
+    if (!isTrustedPeer) return socketIp;
+
+    // Walk the X-Forwarded-For chain right-to-left; the rightmost untrusted
+    // entry is the effective client. If every hop claims to be trusted (or the
+    // header is absent), fall back to the socket IP.
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+      const chain = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded)
+        .split(',')
+        .map((ip) => ip.trim().replace(/^.*:/, ''));
+      for (let i = chain.length - 1; i >= 0; i--) {
+        if (!trustedSet.has(chain[i])) return chain[i];
+      }
+    }
+    return socketIp;
+  }
+
   async authenticateRequest(req: IncomingMessage): Promise<UserIdentity | null> {
     // 1. Try strategy authentication first (Header, JWT, PeerMesh, Loopback)
-    const remoteIp = req.socket.remoteAddress?.replace(/^.*:/, '') || '127.0.0.1';
+    const remoteIp = this.resolveRemoteIp(req);
     for (const strategy of this.strategies) {
       if (strategy.canHandle(req, remoteIp)) {
         const identity = await strategy.authenticate(req, remoteIp);
@@ -384,7 +417,7 @@ export class IdentityAuthGatewayService extends Service {
       const originalAuthorizeIndex = conn.authorizeIndex?.bind(conn);
       if (originalAuthorizeIndex) {
         conn.authorizeIndex = (req: any, res: any) => {
-          const remoteIp = req.socket?.remoteAddress?.replace(/^.*:/, '') || '127.0.0.1';
+          const remoteIp = self.resolveRemoteIp(req);
           for (const strategy of self.strategies) {
             if (strategy.canHandle(req, remoteIp)) {
               // Ensure the browser session cookie is minted
@@ -402,7 +435,7 @@ export class IdentityAuthGatewayService extends Service {
       const originalRequestRejection = conn.requestRejection?.bind(conn);
       if (originalRequestRejection) {
         conn.requestRejection = (req: any) => {
-          const remoteIp = req.socket?.remoteAddress?.replace(/^.*:/, '') || '127.0.0.1';
+          const remoteIp = self.resolveRemoteIp(req);
           for (const strategy of self.strategies) {
             if (strategy.canHandle(req, remoteIp)) {
               return undefined; // Authorized!
