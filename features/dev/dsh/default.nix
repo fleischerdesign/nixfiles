@@ -1,10 +1,13 @@
 # features/dev/dsh/default.nix — Generic DeepSeek Harness (dsh) feature module.
 #
 # Architecture & Guidelines:
-# - System Level: model adapter options, credential records (sops), MCP servers,
-#   personas, and the machine-wide Cordis patch layer.
-# - User-Scoped Level (home-manager.sharedModules): exposes my.features.dev.dsh.enable
-#   and materializes the three dsh configuration documents under $DSH_HOME.
+# - Pure SYSTEM module: dsh runs as a persistent systemd SYSTEM service as a
+#   dedicated, unprivileged `dsh` system user with DSH_HOME=/var/lib/dsh (MTAA
+#   multi-tenant store root) on every host. There is no Home-Manager per-user
+#   ~/.dsh materialization; the configuration documents are rendered by
+#   mkDshRuntimeSeed into /var/lib/dsh by the dsh-web-config oneshot unit.
+# - Model adapter options, credential records (sops), MCP servers, personas,
+#   and the machine-wide Cordis patch layer are all system-level.
 # - Agnostic & Generic: Zero hardcoded usernames, hostnames, or stacks.
 # - Declarative posture: settings.yaml and the Cordis patch layer are rendered
 #   from Nix options (JSON ⊂ YAML); dsh's hot reload reads them untouched.
@@ -30,11 +33,10 @@ let
       ;
   };
 
-  # The dsh-web SYSTEM service's resolved runtime identity. With a dedicated
-  # MTAA user it is the unprivileged multi-tenant user (home /var/lib/dsh);
-  # otherwise it reads an existing operator user's ~/.dsh.
-  serviceUser = if cfg.web.dedicatedUser then cfg.web.dedicatedUserName else cfg.web.user;
-  serviceDshHome = if cfg.web.dedicatedUser then "/var/lib/dsh" else "/home/${cfg.web.user}/.dsh";
+  # The dsh-web SYSTEM service's runtime identity. It runs as the dedicated,
+  # unprivileged multi-tenant user with DSH_HOME=/var/lib/dsh (MTAA store root).
+  serviceUser = cfg.web.dedicatedUserName;
+  serviceDshHome = "/var/lib/dsh";
 
   # Owner of the sops-rendered credential/OIDC documents. These MUST be readable
   # by the process that reads them — the dsh-web SYSTEM service's User — because
@@ -77,13 +79,8 @@ in
       enable = lib.mkEnableOption "background dsh web server daemon";
       systemService = lib.mkOption {
         type = lib.types.bool;
-        default = false;
-        description = "Run dsh-web as a systemd SYSTEM service (persistent daemon, e.g. public multi-tenant node) instead of a per-user home-manager service.";
-      };
-      user = lib.mkOption {
-        type = lib.types.str;
-        default = "philipp";
-        description = "User the dsh-web SYSTEM service runs as (reads that user's DSH_HOME).";
+        default = true;
+        description = "Run dsh-web as a persistent systemd SYSTEM service (default; the Home-Manager per-user service has been removed).";
       };
       port = lib.mkOption {
         type = lib.types.port;
@@ -97,7 +94,7 @@ in
       };
       dedicatedUser = lib.mkOption {
         type = lib.types.bool;
-        default = false;
+        default = true;
         description = "Run dsh-web as a DEDICATED unprivileged system user with DSH_HOME=/var/lib/dsh (MTAA multi-tenant layout) instead of reading an existing user's ~/.dsh.";
       };
       dedicatedUserName = lib.mkOption {
@@ -1185,289 +1182,5 @@ in
         };
       };
     })
-
-    {
-      home-manager.sharedModules = [
-        (
-          {
-            config,
-            lib,
-            pkgs,
-            osConfig ? { },
-            ...
-          }:
-          let
-            userCfg = config.my.features.dev.dsh;
-            systemCfg = osConfig.my.features.dev.dsh or { };
-
-            # On a node where a dsh-web SYSTEM service owns the dsh runtime
-            # (public/multi-tenant node), the per-user ~/.dsh materialization and
-            # user service are disabled — the configuration lives in the system
-            # service's DSH_HOME (/var/lib/dsh for the dedicated MTAA user).
-            materializeUserConfig = !(systemCfg.web.systemService or false);
-
-            rt = runtime.mkDshRuntime {
-              inherit systemCfg osConfig;
-              userCfg = userCfg;
-              currentUser = osConfig.my.user.name or (builtins.getEnv "USER");
-            };
-
-            mcpServers = rt.mcpServers;
-            settingsDoc = rt.settingsDoc;
-            homePatch = rt.homePatch;
-            renderedProfiles = rt.renderedProfiles;
-            activePluginDrvs = rt.activePluginDrvs;
-            activeLspServers = rt.activeLspServers;
-            lspEnabled = rt.lspEnabled;
-            lspConfiguredServers = rt.lspConfiguredServers;
-            dshPackage = rt.dshPackage;
-          in
-          {
-            options.my.features.dev.dsh = {
-              enable = lib.mkEnableOption "dsh (DeepSeek Harness) for this Home Manager user";
-
-              instructions = lib.mkOption {
-                type = lib.types.nullOr lib.types.path;
-                default = ./AGENTS-PROMPT.md;
-                description = "AGENTS.md source materialized as the user-global $DSH_HOME/AGENTS.md.";
-              };
-
-              settings = lib.mkOption {
-                type = lib.types.attrsOf lib.types.anything;
-                default = { };
-                description = "User-specific settings.yaml override (merged above host defaults).";
-              };
-
-              web = {
-                enable = lib.mkOption {
-                  type = lib.types.bool;
-                  default = systemCfg.web.enable or false;
-                  description = "Run dsh web as a background systemd user service.";
-                };
-                port = lib.mkOption {
-                  type = lib.types.port;
-                  default = systemCfg.web.port or 3080;
-                  description = "Port for the dsh web server.";
-                };
-                host = lib.mkOption {
-                  type = lib.types.str;
-                  default = systemCfg.web.host or "127.0.0.1";
-                  description = "Host/IP address for the dsh web server to bind to.";
-                };
-                desktopLauncher = lib.mkOption {
-                  type = lib.types.bool;
-                  default = (osConfig.my.role or "server") != "server";
-                  description = "Generate a native desktop launcher via my.features.desktop.webapps.";
-                };
-              };
-
-              mesh = {
-                userPeers = lib.mkOption {
-                  type = lib.types.listOf (
-                    lib.types.submodule {
-                      options = {
-                        id = lib.mkOption {
-                          type = lib.types.str;
-                          description = "Personal peer node identifier.";
-                        };
-                        endpoint = lib.mkOption {
-                          type = lib.types.str;
-                          description = "Peer endpoint (host:port or URL).";
-                        };
-                        tags = lib.mkOption {
-                          type = lib.types.listOf lib.types.str;
-                          default = [ ];
-                          description = "Node tags/capabilities (e.g. personal, laptop).";
-                        };
-                      };
-                    }
-                  );
-                  default = [ ];
-                  description = "Personal cluster peer nodes dedicated to this specific user.";
-                };
-              };
-
-              memory = {
-                userFacts = lib.mkOption {
-                  type = lib.types.listOf (
-                    lib.types.submodule {
-                      options = {
-                        subject = lib.mkOption {
-                          type = lib.types.str;
-                          description = "Subject entity URI.";
-                        };
-                        predicate = lib.mkOption {
-                          type = lib.types.str;
-                          description = "Predicate relation.";
-                        };
-                        object = lib.mkOption {
-                          type = lib.types.str;
-                          description = "Target entity URI or literal value.";
-                        };
-                        type_constraint = lib.mkOption {
-                          type = lib.types.nullOr lib.types.str;
-                          default = "String";
-                          description = "Type constraint (e.g. String, Port, IPv4, FQDN).";
-                        };
-                        confidence = lib.mkOption {
-                          type = lib.types.float;
-                          default = 1.0;
-                          description = "Confidence value between 0.0 and 1.0.";
-                        };
-                        security_label = lib.mkOption {
-                          type = lib.types.enum [
-                            "system"
-                            "operator"
-                            "user"
-                          ];
-                          default = "user";
-                          description = "Lattice security clearance required.";
-                        };
-                        scope_type = lib.mkOption {
-                          type = lib.types.enum [
-                            "public"
-                            "group"
-                            "user"
-                            "repo"
-                          ];
-                          default = "user";
-                          description = "Memory scope type (defaults to personal user memory).";
-                        };
-                        scope_id = lib.mkOption {
-                          type = lib.types.nullOr lib.types.str;
-                          default = null;
-                          description = "Memory scope target ID (e.g. group:dev, repo:nixfiles; defaults to user:username).";
-                        };
-                      };
-                    }
-                  );
-                  default = [ ];
-                  description = "Personal declarative facts and preferences provisioned for this user.";
-                };
-              };
-            };
-
-            config = lib.mkIf (userCfg.enable && materializeUserConfig) {
-              home.packages = [
-                (if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh)
-                pkgs.bubblewrap
-              ]
-              ++ lib.catAttrs "package" (lib.attrValues mcpServers)
-              ++ lib.optionals lspEnabled (lib.catAttrs "package" (lib.attrValues activeLspServers));
-
-              home.sessionVariables = lib.optionalAttrs (systemCfg.dshHome or null != null) {
-                DSH_HOME = systemCfg.dshHome;
-              };
-
-              home.file = lib.mkMerge [
-                {
-                  ".dsh/settings.yaml" = {
-                    text = builtins.toJSON settingsDoc;
-                    force = true;
-                  };
-                }
-                (lib.optionalAttrs (homePatch != null) {
-                  ".dsh/cordis.patch.yml".text = homePatch;
-                })
-                (lib.optionalAttrs (userCfg.instructions != null) {
-                  ".dsh/AGENTS.md".source = userCfg.instructions;
-                })
-                (lib.optionalAttrs (osConfig ? sops && osConfig.sops.templates ? "dsh-credentials.yaml") {
-                  ".dsh/.credentials.yaml" = {
-                    source = config.lib.file.mkOutOfStoreSymlink osConfig.sops.templates."dsh-credentials.yaml".path;
-                    force = true;
-                  };
-                })
-                (lib.mapAttrs'
-                  (name: profile: {
-                    name = ".dsh/profiles/${name}/package.json";
-                    value.text = builtins.toJSON (render.mkProfileManifest name profile);
-                  })
-                  (
-                    lib.filterAttrs (
-                      _: profile: profile.bundles != null || profile.patchReload != null
-                    ) renderedProfiles
-                  )
-                )
-                (lib.optionalAttrs (activePluginDrvs != [ ]) (
-                  lib.listToAttrs (
-                    # Plugin injection at ~/.dsh/node_modules: it sits on the
-                    # Node parent-walk of every profile's patch-layer imports
-                    # (profiles/web → profiles → ~/.dsh), and unlike
-                    # profiles/node_modules the launcher never writes there
-                    # (its healing owns that directory), so a read-only
-                    # HM-managed directory is safe.
-                    map (drv: {
-                      name = ".dsh/node_modules/${drv.dshPluginName}";
-                      value.source = "${drv}/lib/node_modules/${drv.dshPluginName}";
-                    }) activePluginDrvs
-                  )
-                ))
-                (lib.optionalAttrs (lspEnabled && lspConfiguredServers != { }) {
-                  ".dsh/node_modules/@deepseek-ai/dsh-lsp".source = "${dshPackage}/lib/dsh/packages/lsp/lsp";
-                  ".dsh/node_modules/@deepseek-ai/dsh-lsp-stdio".source =
-                    "${dshPackage}/lib/dsh/packages/lsp/lsp-stdio";
-                  ".dsh/node_modules/@deepseek-ai/dsh-tool-lsp".source =
-                    "${dshPackage}/lib/dsh/packages/lsp/tool-lsp";
-                })
-                (lib.mapAttrs' (name: profile: {
-                  name = ".dsh/profiles/${name}/cordis.patch.yml";
-                  value.text = render.mkProfilePatch profile;
-                }) (lib.filterAttrs (_: profile: profile.patches != [ ]) renderedProfiles))
-              ];
-
-              systemd.user.services.dsh-web =
-                lib.mkIf (userCfg.web.enable && !(osConfig.my.features.dev.dsh.web.systemService or false))
-                  {
-                    Unit = {
-                      Description = "DeepSeek Harness (dsh) Web UI Service";
-                      Documentation = [ "https://github.com/deepseek-ai/deepseek-harness" ];
-                      After = [ "network.target" ];
-                      X-Restart-Triggers = activePluginDrvs ++ [
-                        (builtins.toJSON settingsDoc)
-                        (if homePatch != null then homePatch else "")
-                      ];
-                    };
-
-                    Service = {
-                      Type = "simple";
-                      ExecStart = "${
-                        if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh
-                      }/bin/dsh web --no-open --host ${userCfg.web.host} --port ${toString userCfg.web.port}";
-                      Restart = "on-failure";
-                      RestartSec = "5s";
-                      Environment = lib.optionals (systemCfg.dshHome or null != null) [
-                        "DSH_HOME=${systemCfg.dshHome}"
-                      ];
-                      EnvironmentFile = lib.optionals (osConfig.sops.templates ? "dsh-oidc.env") [
-                        osConfig.sops.templates."dsh-oidc.env".path
-                      ];
-                    };
-
-                    Install = {
-                      WantedBy = [ "default.target" ];
-                    };
-                  };
-
-              my.features.desktop.webapps.apps.dsh =
-                lib.mkIf (userCfg.web.enable && userCfg.web.desktopLauncher)
-                  {
-                    displayName = "DeepSeek Harness";
-                    url = "http://${userCfg.web.host}:${toString userCfg.web.port}";
-                    icon = "${
-                      if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh
-                    }/lib/dsh/apps/web/public/favicon.svg";
-                    comment = "DeepSeek Harness (dsh) Agent Web Interface";
-                    categories = [
-                      "Development"
-                      "Utility"
-                    ];
-                    wmClass = "dsh";
-                  };
-            };
-          }
-        )
-      ];
-    }
   ];
 }

@@ -1,21 +1,17 @@
 # features/dev/dsh/lib/runtime.nix — Shared dsh configuration-document runtime.
 #
-# Single source of truth for the option → dsh-document computation, shared by
-# BOTH the NixOS system level (credential records, system service, and the
-# /var/lib/dsh materialization) and the Home-Manager user level (the per-user
-# ~/.dsh materialization). Hoisting this out of the home-manager.sharedModules
-# let keeps the two surfaces byte-identical and lets the system level render
-# the same documents without duplication.
+# Single source of truth for the option → dsh-document computation. It is used
+# by the NixOS system level to render the configuration documents that
+# mkDshRuntimeSeed materializes into the /var/lib/dsh store root for the
+# dedicated dsh system service. The Home-Manager per-user surface has been
+# removed (dsh runs purely as a system daemon).
 #
 # Inputs:
-#   systemCfg  — the NixOS option set my.features.dev.dsh (options, not the
-#                resolved home-manager user config).
+#   systemCfg  — the NixOS option set my.features.dev.dsh.
 #   osConfig   — the parent NixOS config (topology, sops, ...).
-#   userCfg    — the home-manager user option set my.features.dev.dsh (default
-#                {} when rendering at system level, which contributes no
-#                user-specific settings/facts/peers).
-#   currentUser- resolved operator identity (osConfig.my.user.name at system
-#                level; defaulted inside).
+#   userCfg    — optional user-scoped overrides (settings/facts/peers); kept for
+#                genericity, always {} at the system level.
+#   currentUser- resolved operator identity; defaulted inside when null.
 #
 # Returns the full rendered runtime attrset consumed by both surfaces.
 {

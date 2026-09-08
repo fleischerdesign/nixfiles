@@ -44,5 +44,9 @@
     environmentFile = "restic_env_mackaye";
   };
 
+  # dsh runs as a persistent system-wide daemon (systemd SYSTEM service,
+  # dedicated dsh user, DSH_HOME=/var/lib/dsh) on every host.
+  my.features.dev.dsh.web.enable = true;
+
   system.stateVersion = "24.11";
 }

@@ -36,6 +36,10 @@
 
   # dsh (DeepSeek Harness): local vector embeddings for the memory recall
   # cascade. Provider "api" uses an OpenAI-compatible embeddings endpoint
+  # dsh runs as a persistent system-wide daemon (systemd SYSTEM service,
+  # dedicated dsh user, DSH_HOME=/var/lib/dsh) on every host.
+  my.features.dev.dsh.web.enable = true;
+
   # (OpenRouter, via the existing dsh credential key) and is agnostic/scalable;
   # BM25 remains as the offline supplement + fallback.
   my.features.dev.dsh.memory.embedding = {
