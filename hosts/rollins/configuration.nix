@@ -117,6 +117,7 @@
   my.features.dev.dsh.auth.oidc = {
     enabled = true;
     issuer = "https://auth.ancoris.ovh/application/o/dsh/";
+    clientId = "BbvVsvWMTO7d1SYewJGbB0rkWTYmWrKtiPeFqImX";
     redirectUri = "https://ai.rls.ancoris.ovh/oidc/callback";
     scopes = [
       "openid"

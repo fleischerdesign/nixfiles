@@ -1033,6 +1033,19 @@ in
         content = builtins.toJSON (render.mkCredentialsDoc cfg.credentials);
       };
 
+      # OIDC client secret for the dsh-web process (never in the flake).
+      sops.secrets."dsh_oidc_client_secret" = lib.mkIf (cfg.auth.oidc.enabled) {
+        owner = config.my.user.primary or "root";
+        mode = "0600";
+      };
+      sops.templates."dsh-oidc.env" = lib.mkIf (cfg.auth.oidc.enabled) {
+        owner = config.my.user.primary or "root";
+        mode = "0600";
+        content = ''
+          DHS_OIDC_CLIENT_SECRET=${config.sops.placeholder."dsh_oidc_client_secret"}
+        '';
+      };
+
       systemd.tmpfiles.rules =
         let
           normalUsers = lib.filterAttrs (_: u: u.isNormalUser) config.users.users;
@@ -1519,6 +1532,9 @@ in
                   RestartSec = "5s";
                   Environment = lib.optionals (systemCfg.dshHome or null != null) [
                     "DSH_HOME=${systemCfg.dshHome}"
+                  ];
+                  EnvironmentFile = lib.optionals (osConfig.sops.templates ? "dsh-oidc.env") [
+                    osConfig.sops.templates."dsh-oidc.env".path
                   ];
                 };
 
