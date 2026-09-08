@@ -46,9 +46,9 @@ let
 
       # --- Settings document ($DSH_HOME/settings.yaml) ---
       baseSettings = render.mkBaseSettings systemCfg;
-      settingsDoc = lib.recursiveUpdate (lib.recursiveUpdate baseSettings (
-        systemCfg.settings or { }
-      )) userCfg.settings;
+      settingsDoc = lib.recursiveUpdate (lib.recursiveUpdate baseSettings (systemCfg.settings or { })) (
+        userCfg.settings or { }
+      );
 
       # --- Identity ---
       topologyHosts = osConfig.my.features.system.networking.topology.hosts or { };
@@ -304,5 +304,110 @@ let
         renderedProfiles
         ;
     };
+
+  # Build a store derivation that materializes the full dsh configuration
+  # document set (settings.yaml, cordis.patch.yml, profiles/, and the
+  # node_modules plugin symlinks) under $out/. The caller (NixOS-level
+  # /var/lib/dsh seed) installs these contents; because this uses the SAME
+  # mkDshRuntime documents as the Home-Manager ~/.dsh materialization, the two
+  # surfaces are byte-identical by construction.
+  mkDshRuntimeSeed =
+    {
+      systemCfg,
+      osConfig ? { },
+      userCfg ? { },
+      currentUser ? null,
+    }:
+    let
+      rt = mkDshRuntime {
+        inherit
+          systemCfg
+          osConfig
+          userCfg
+          currentUser
+          ;
+      };
+      dshPackage = rt.dshPackage;
+
+      # (relative-path → text) for every text document rendered in the seed.
+      textDocs = [
+        {
+          path = "settings.yaml";
+          text = builtins.toJSON rt.settingsDoc;
+        }
+      ]
+      ++ lib.optionals (rt.homePatch != null) [
+        {
+          path = "cordis.patch.yml";
+          text = rt.homePatch;
+        }
+      ]
+      ++ lib.flatten (
+        lib.mapAttrsToList (
+          name: profile:
+          lib.optionals (profile.bundles != null || profile.patchReload != null) [
+            {
+              path = "profiles/${name}/package.json";
+              text = builtins.toJSON (render.mkProfileManifest name profile);
+            }
+          ]
+          ++ lib.optionals (profile.patches != [ ]) [
+            {
+              path = "profiles/${name}/cordis.patch.yml";
+              text = render.mkProfilePatch profile;
+            }
+          ]
+        ) rt.renderedProfiles
+      );
+
+      # (storePath → symlink-name) for every plugin package injected into
+      # DSH_HOME/node_modules, mirroring the Home-Manager injection exactly.
+      # dir is the parent directory of name under node_modules (e.g.
+      # "@deepseek-ai" for scoped packages, "." for unscoped ones).
+      nodeModules = map (m: m // { dir = lib.dirOf m.name; }) (
+        map (drv: {
+          name = drv.dshPluginName;
+          target = "${drv}/lib/node_modules/${drv.dshPluginName}";
+        }) rt.activePluginDrvs
+        ++ lib.optionals (rt.lspEnabled && rt.lspConfiguredServers != { }) [
+          {
+            name = "@deepseek-ai/dsh-lsp";
+            target = "${dshPackage}/lib/dsh/packages/lsp/lsp";
+          }
+          {
+            name = "@deepseek-ai/dsh-lsp-stdio";
+            target = "${dshPackage}/lib/dsh/packages/lsp/lsp-stdio";
+          }
+          {
+            name = "@deepseek-ai/dsh-tool-lsp";
+            target = "${dshPackage}/lib/dsh/packages/lsp/tool-lsp";
+          }
+        ]
+      );
+    in
+    pkgs.runCommand "dsh-runtime-seed" { } (
+      # Write each text document as its own writeText store file (no shell
+      # heredocs — the patch/settings JSONs can contain arbitrary bytes, and
+      # quoting them as shell heredocs is fragile), then install the tree and
+      # the node_modules plugin symlinks under $out. All lines are joined by a
+      # single \n (raw concatenation between groups would merge adjacent
+      # lines).
+      let
+        docFiles = map (d: {
+          inherit (d) path;
+          drv = pkgs.writeText ("dsh-seed-" + (builtins.replaceStrings [ "/" ] [ "-" ] d.path)) d.text;
+        }) textDocs;
+      in
+      lib.concatStringsSep "\n" (
+        [
+          "mkdir -p \"$out/profiles\" \"$out/node_modules\""
+        ]
+        ++ map (d: "cp '${d.drv}' \"\$out/${d.path}\"") docFiles
+        ++ map (m: "mkdir -p \"\$out/node_modules/${m.dir}\"") nodeModules
+        ++ map (m: "ln -s \"${m.target}\" \"\$out/node_modules/${m.name}\"") nodeModules
+      )
+    );
 in
-mkDshRuntime
+{
+  inherit mkDshRuntime mkDshRuntimeSeed;
+}

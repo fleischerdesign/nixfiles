@@ -1115,6 +1115,42 @@ in
         createHome = true;
         description = "DeepSeek Harness (dsh) multi-tenant system user";
       };
+
+      # Config-document seed for /var/lib/dsh, rendered from the same
+      # mkDshRuntime documents the Home-Manager ~/.dsh materialization uses
+      # (byte-identical by construction). Installed as the dsh user before the
+      # dsh-web service starts.
+      systemd.services.dsh-web-config = {
+        description = "Populate /var/lib/dsh with the dsh configuration documents";
+        wantedBy = [ "multi-user.target" ];
+        before = [ "dsh-web.service" ];
+        after = [ "network.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          User = "root";
+        };
+        script =
+          let
+            seed = runtime.mkDshRuntimeSeed {
+              # Match the system runtime: no user-specific settings/facts/peers.
+              systemCfg = cfg;
+              osConfig = config;
+              userCfg = { };
+              currentUser = null;
+            };
+            dshUser = cfg.web.dedicatedUserName;
+            target = "/var/lib/dsh";
+          in
+          ''
+            mkdir -p "${target}"
+            # Copy the declarative seed (settings.yaml, cordis.patch.yml,
+            # profiles/, node_modules) into /var/lib/dsh, owned by ${dshUser}.
+            cp -a "${seed}"/. "${target}"/
+            chown -R "${dshUser}:${dshUser}" "${target}"
+            chmod -R u+rwX,g-rwx,o-rwx "${target}"
+          '';
+      };
     })
 
     # Run dsh-web as a persistent systemd SYSTEM service on the public /
@@ -1155,7 +1191,7 @@ in
             userCfg = config.my.features.dev.dsh;
             systemCfg = osConfig.my.features.dev.dsh or { };
 
-            rt = runtime {
+            rt = runtime.mkDshRuntime {
               inherit systemCfg osConfig;
               userCfg = userCfg;
               currentUser = osConfig.my.user.name or (builtins.getEnv "USER");
