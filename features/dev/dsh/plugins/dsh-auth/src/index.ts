@@ -195,6 +195,26 @@ export class IdentityAuthGatewayService extends Service {
       || /\.(js|css|png|svg|ico|woff2?|map|json|txt)$/.test(p);
   }
 
+  /**
+   * Begin the interactive OIDC Authorization Code + PKCE flow: mint a fresh
+   * state/nonce/pkce-challenge and redirect the browser to the IdP authorize
+   * endpoint. Returns true if a redirect was written (caller must not write the
+   * response further), false if OIDC is not configured/available.
+   */
+  private redirectToOidc(req: IncomingMessage, res: ServerResponse): boolean {
+    if (!(this.oidcFlow && this.config.oidc?.enabled)) return false;
+    const flow = this.oidcFlow.begin();
+    const loc = buildAuthorizeUrl(this.oidcCfg(), {
+      state: flow.state,
+      nonce: flow.nonce,
+      challenge: flow.challenge,
+      method: 'S256',
+    });
+    res.writeHead(302, { Location: loc });
+    res.end();
+    return true;
+  }
+
   private resolveSigningSecret(): Buffer {
     // Check if credentials.yaml has client-connection/browser-session secret
     const credPath = `${process.env.DSH_HOME || process.env.HOME + '/.dsh'}/.credentials.yaml`;
@@ -340,16 +360,7 @@ export class IdentityAuthGatewayService extends Service {
           self.ensureSessionCookie(req, res, identity);
         } else if (self.oidcFlow && self.config.oidc?.enabled && !self.isPublicPath(req.url || '/')) {
           // Interactive OIDC: no identity and this is a gated app route -> redirect.
-          const flow = self.oidcFlow.begin();
-          const loc = buildAuthorizeUrl(self.oidcCfg(), {
-            state: flow.state,
-            nonce: flow.nonce,
-            challenge: flow.challenge,
-            method: 'S256',
-          });
-          res.writeHead(302, { Location: loc });
-          res.end();
-          return;
+          if (self.redirectToOidc(req, res)) return;
         }
         return originalHandler(req, res);
       };
@@ -427,6 +438,13 @@ export class IdentityAuthGatewayService extends Service {
           }
           if (self.extractIdentityFromCookie(req)) {
             return true;
+          }
+          // No identity. On an OIDC-gated deployment, redirect the browser to
+          // the IdP instead of letting the connection-layer index auth reject
+          // it with the "authentication required" 401 (which must be addressed
+          // by a real login, not a loopback). Assets/callback remain public.
+          if (!self.isPublicPath(req.url || '/') && self.redirectToOidc(req, res)) {
+            return false; // redirect written; connection must not continue
           }
           return originalAuthorizeIndex(req, res);
         };
