@@ -17,6 +17,7 @@ import {
   OidcFlowStore,
   buildAuthorizeUrl,
   exchangeCode,
+  fetchDiscovery,
   fetchJwks,
   verifyIdToken,
   jwtClaims,
@@ -49,6 +50,7 @@ export class IdentityAuthGatewayService extends Service {
   private tokenBuckets = new Map<string, TokenBucketState>();
   private oidcFlow?: OidcFlowStore;
   private oidcJwks?: { keys: any[]; expiresAt: number };
+  private oidcDiscovery?: { authorizeUrl?: string; tokenUrl?: string; jwksUrl?: string; expiresAt: number };
 
   constructor(ctx: Context, private config: AuthPluginConfig) {
     super(ctx, 'auth');
@@ -72,6 +74,11 @@ export class IdentityAuthGatewayService extends Service {
     // Interactive OIDC (Authorization Code + PKCE) setup when enabled.
     if (this.config.oidc?.enabled) {
       this.setupOidc(ctx);
+      // Pre-warm the OIDC discovery (endpoints) so the synchronous
+      // authorizeIndex redirect can resolve the authorize URL without awaiting
+      // (fire-and-forget; redirectToOidc/ensureDiscovery fall back to cached or
+      // issuer-derived endpoints in the meantime).
+      void this.ensureDiscovery(this.oidcCfg());
     }
 
     // Intercept web requests and connection authorization
@@ -99,7 +106,37 @@ export class IdentityAuthGatewayService extends Service {
       redirectUri,
       scopes: o.scopes || ['openid', 'profile', 'email'],
       logoutUri: o.logoutUri,
+      // Prefer discovery-discovered endpoints (provider-agnostic, e.g. Authentik
+      // /application/o/authorize/ + /application/o/token/) over issuer-derived.
+      authorizeUrl: this.oidcDiscovery?.authorizeUrl,
+      tokenUrl: this.oidcDiscovery?.tokenUrl,
+      jwksUrl: this.oidcDiscovery?.jwksUrl,
     };
+  }
+
+  /**
+   * Resolve the OIDC endpoints from the provider's discovery document
+   * (issuer + '/.well-known/openid-configuration'), cached for an hour. Falls
+   * back to issuer-derived endpoints when discovery is unavailable.
+   */
+  private async ensureDiscovery(cfg: OidcFlowConfig): Promise<OidcFlowConfig> {
+    const cached = this.oidcDiscovery;
+    if (cached && cached.expiresAt > Date.now()) {
+      return { ...cfg, authorizeUrl: cached.authorizeUrl, tokenUrl: cached.tokenUrl, jwksUrl: cached.jwksUrl };
+    }
+    try {
+      const d = await fetchDiscovery(cfg);
+      this.oidcDiscovery = {
+        authorizeUrl: d.authorization_endpoint,
+        tokenUrl: d.token_endpoint,
+        jwksUrl: d.jwks_uri,
+        expiresAt: Date.now() + 3_600_000,
+      };
+      return { ...cfg, authorizeUrl: d.authorization_endpoint, tokenUrl: d.token_endpoint, jwksUrl: d.jwks_uri };
+    } catch {
+      // Discovery unavailable: keep issuer-derived endpoints and retry later.
+      return cfg;
+    }
   }
 
   /** Register the OIDC callback + logout routes (raw, before the interceptor). */
@@ -127,7 +164,7 @@ export class IdentityAuthGatewayService extends Service {
     const entry = this.oidcFlow?.consume(state);
     if (!entry) { res.writeHead(400); res.end('Invalid or expired state'); return; }
     try {
-      const cfg = this.oidcCfg();
+      const cfg = await this.ensureDiscovery(this.oidcCfg());
       const tokens = await exchangeCode(cfg, { code, verifier: entry.verifier });
       const jwks = await this.jwks();
       const claims = verifyIdToken({
@@ -161,7 +198,7 @@ export class IdentityAuthGatewayService extends Service {
   }
 
   private async jwks(): Promise<any[]> {
-    const cfg = this.oidcCfg();
+    const cfg = await this.ensureDiscovery(this.oidcCfg());
     if (this.oidcJwks && this.oidcJwks.expiresAt > Date.now()) return this.oidcJwks.keys;
     const keys = await fetchJwks(cfg);
     this.oidcJwks = { keys, expiresAt: Date.now() + 3600_000 };
@@ -201,7 +238,28 @@ export class IdentityAuthGatewayService extends Service {
    * endpoint. Returns true if a redirect was written (caller must not write the
    * response further), false if OIDC is not configured/available.
    */
-  private redirectToOidc(req: IncomingMessage, res: ServerResponse): boolean {
+  private async redirectToOidc(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+    if (!(this.oidcFlow && this.config.oidc?.enabled)) return false;
+    const flow = this.oidcFlow.begin();
+    const cfg = await this.ensureDiscovery(this.oidcCfg());
+    const loc = buildAuthorizeUrl(cfg, {
+      state: flow.state,
+      nonce: flow.nonce,
+      challenge: flow.challenge,
+      method: 'S256',
+    });
+    res.writeHead(302, { Location: loc });
+    res.end();
+    return true;
+  }
+
+  /**
+   * Synchronous OIDC redirect for the connection-layer authorizeIndex path.
+   * Uses oidcCfg() (which resolves endpoints from the pre-warmed discovery
+   * cache). Returns false when OIDC is not available so the caller can fall
+   * back to connection rejection.
+   */
+  private writeOidcRedirect(req: IncomingMessage, res: ServerResponse): boolean {
     if (!(this.oidcFlow && this.config.oidc?.enabled)) return false;
     const flow = this.oidcFlow.begin();
     const loc = buildAuthorizeUrl(this.oidcCfg(), {
@@ -360,7 +418,7 @@ export class IdentityAuthGatewayService extends Service {
           self.ensureSessionCookie(req, res, identity);
         } else if (self.oidcFlow && self.config.oidc?.enabled && !self.isPublicPath(req.url || '/')) {
           // Interactive OIDC: no identity and this is a gated app route -> redirect.
-          if (self.redirectToOidc(req, res)) return;
+          if (await self.redirectToOidc(req, res)) return;
         }
         return originalHandler(req, res);
       };
@@ -443,8 +501,11 @@ export class IdentityAuthGatewayService extends Service {
           // the IdP instead of letting the connection-layer index auth reject
           // it with the "authentication required" 401 (which must be addressed
           // by a real login, not a loopback). Assets/callback remain public.
-          if (!self.isPublicPath(req.url || '/') && self.redirectToOidc(req, res)) {
-            return false; // redirect written; connection must not continue
+          // Synchronous: use the (pre-warmed) cached discovery endpoints.
+          if (self.oidcFlow && self.config.oidc?.enabled && !self.isPublicPath(req.url || '/')) {
+            if (self.writeOidcRedirect(req, res)) {
+              return false; // redirect written; connection must not continue
+            }
           }
           return originalAuthorizeIndex(req, res);
         };

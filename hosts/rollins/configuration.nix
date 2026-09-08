@@ -123,7 +123,8 @@
   # OAuth2/OIDC application for dsh exists.
   my.features.dev.dsh.auth.oidc = {
     enabled = true;
-    issuer = "https://auth.ancoris.ovh/application/o/dsh/";
+    # Authentik OIDC application slug is "deepseek-harness" (not "dsh").
+    issuer = "https://auth.ancoris.ovh/application/o/deepseek-harness/";
     clientId = "BbvVsvWMTO7d1SYewJGbB0rkWTYmWrKtiPeFqImX";
     redirectUri = "https://ai.rls.ancoris.ovh/oidc/callback";
     scopes = [

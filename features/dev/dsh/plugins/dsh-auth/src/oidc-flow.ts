@@ -18,6 +18,40 @@ export interface OidcFlowConfig {
   redirectUri: string;
   scopes: string[];
   logoutUri?: string; // end_session endpoint (optional, validated separately)
+  // OIDC-discovery-derived endpoints. When absent, endpoints are derived from
+  // the issuer (issuer + '/authorize', issuer + '/token', issuer +
+  // '/.well-known/jwks.json'). Providers that serve provider-agnostic
+  // endpoints (e.g. Authentik: /application/o/authorize/, /application/o/token/)
+  // MUST supply these from discovery.
+  authorizeUrl?: string;
+  tokenUrl?: string;
+  jwksUrl?: string;
+}
+
+/** Fetch + parse an OIDC discovery document (cached by the caller). */
+export async function fetchDiscovery(
+  cfg: OidcFlowConfig,
+  fetch?: FetchLike,
+): Promise<{ authorization_endpoint?: string; token_endpoint?: string; jwks_uri?: string; issuer?: string }> {
+  const fetchFn = fetch || DEFAULT_FETCH;
+  const res = await fetchFn(`${cfg.issuer}/.well-known/openid-configuration`);
+  if (!res.ok) throw new Error(`oidc: discovery fetch failed (${res.status})`);
+  return res.json();
+}
+
+/** Resolve the effective authorize endpoint (discovery first, issuer-derived fallback). */
+export function authorizeEndpoint(cfg: OidcFlowConfig): string {
+  return cfg.authorizeUrl || `${cfg.issuer}/authorize`;
+}
+
+/** Resolve the effective token endpoint (discovery first, issuer-derived fallback). */
+export function tokenEndpoint(cfg: OidcFlowConfig): string {
+  return cfg.tokenUrl || `${cfg.issuer}/token`;
+}
+
+/** Resolve the effective JWKS endpoint (discovery first, issuer-derived fallback). */
+export function jwksEndpoint(cfg: OidcFlowConfig): string {
+  return cfg.jwksUrl || `${cfg.issuer}/.well-known/jwks.json`;
 }
 
 export interface PkcePair { verifier: string; challenge: string; method: 'S256'; }
@@ -52,7 +86,7 @@ export function buildAuthorizeUrl(
   cfg: OidcFlowConfig,
   opts: { state: string; nonce: string; challenge: string; method: string },
 ): string {
-  const u = new URL.URL(cfg.issuer + '/authorize');
+  const u = new URL.URL(authorizeEndpoint(cfg));
   u.searchParams.set('response_type', 'code');
   u.searchParams.set('client_id', cfg.clientId);
   u.searchParams.set('redirect_uri', cfg.redirectUri);
@@ -139,7 +173,7 @@ export async function exchangeCode(
   params.set('client_id', cfg.clientId);
   params.set('code_verifier', opts.verifier);
   if (cfg.clientSecret) params.set('client_secret', cfg.clientSecret);
-  const res = await fetchFn(`${cfg.issuer}/token`, {
+  const res = await fetchFn(tokenEndpoint(cfg), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
@@ -152,7 +186,7 @@ export async function exchangeCode(
 /** Retrieve + cache the issuer's JWKS (for ID-token signature verification). */
 export async function fetchJwks(cfg: OidcFlowConfig, fetch?: FetchLike): Promise<Array<{ kid?: string; kty: string; n: string; e: string; alg?: string }>> {
   const fetchFn = fetch || DEFAULT_FETCH;
-  const res = await fetchFn(`${cfg.issuer}/.well-known/jwks.json`);
+  const res = await fetchFn(jwksEndpoint(cfg));
   const body = await res.json();
   if (!res.ok) throw new Error('oidc: jwks fetch failed');
   return (body.keys || []) as Array<{ kid?: string; kty: string; n: string; e: string; alg?: string }>;
