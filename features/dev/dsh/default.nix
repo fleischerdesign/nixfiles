@@ -1178,6 +1178,16 @@ in
           ExecStart = "${
             if cfg.package or null != null then cfg.package else pkgs.custom.dsh
           }/bin/dsh web --no-open --host ${cfg.web.host} --port ${toString cfg.web.port}";
+          # Point DSH_HOME/.credentials.yaml at the sops-rendered credential
+          # store so the LLM/provider keys (DEEPSEEK_API_KEY etc.) are visible.
+          # The sops template is created at activation; recreate the symlink at
+          # every start so credential changes are picked up.
+          ExecStartPre = lib.optionals (config.sops.templates ? "dsh-credentials.yaml") [
+            "${pkgs.coreutils}/bin/ln -sfn '${
+              config.sops.templates."dsh-credentials.yaml".path
+            }' '${serviceDshHome}/.credentials.yaml'"
+            "${pkgs.coreutils}/bin/chmod 600 '${serviceDshHome}/.credentials.yaml'"
+          ];
           Environment = [ "DSH_HOME=${serviceDshHome}" ];
           EnvironmentFile = lib.optionals (config.sops.templates ? "dsh-oidc.env") [
             config.sops.templates."dsh-oidc.env".path
