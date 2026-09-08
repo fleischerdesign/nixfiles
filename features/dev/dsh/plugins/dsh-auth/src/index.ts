@@ -304,11 +304,6 @@ export class IdentityAuthGatewayService extends Service {
     return crypto.randomBytes(32);
   }
 
-  /** Short fingerprint of the signing secret (for diagnostics only). */
-  private secretFingerprint(): string {
-    return this.encodeBase64Url(crypto.createHash('sha256').update(this.signingSecret).digest()).slice(0, 8);
-  }
-
   /**
    * Resolve the effective client IP for authentication.
    *
@@ -388,16 +383,16 @@ export class IdentityAuthGatewayService extends Service {
 
           // Timing-safe signature comparison (reject String-== timing leaks).
           const sigOk = this.signatureMatches(sig, expectedSig);
-          // eslint-disable-next-line no-console
-          console.error(`[dsh-auth:debug] cookieCandidate authority=${authority} sigOk=${sigOk} secret=${this.secretFingerprint()}`);
           if (sigOk) {
             try {
               const decodedJson = Buffer.from(body, 'base64url').toString('utf8');
               const payload = JSON.parse(decodedJson);
               const now = Date.now();
-              // eslint-disable-next-line no-console
-              console.error(`[dsh-auth:debug] cookie payload expValid=${payload.expiresAt > now} hasIdentity=${!!payload.identity}`);
+              // On an OIDC-gated node (loopback disabled) a loopback/local
+              // identity cookie is stale/illegitimate: reject it so the caller
+              // drops it and redirects to the IdP for a real OIDC identity.
               if (payload.expiresAt && payload.expiresAt > now && payload.identity) {
+                if (this.config.loopback?.enabled === false && payload.identity.provider === 'loopback') return null;
                 return payload.identity;
               }
             } catch {
@@ -408,6 +403,30 @@ export class IdentityAuthGatewayService extends Service {
       }
     }
     return null;
+  }
+
+  /**
+   * Reset the browser dsh-auth session cookie for a request's authority
+   * (Max-Age=0). Used when a stale/unauthorized cookie is presented, so the
+   * browser drops it instead of looping on a redirect to the IdP.
+   */
+  private clearAuthCookie(req: IncomingMessage, res: ServerResponse): void {
+    const hostHeader = req.headers['host'] || '127.0.0.1:3080';
+    let authority: string;
+    try {
+      authority = new URL(`http://${hostHeader}`).host;
+    } catch {
+      authority = hostHeader;
+    }
+    const cookieName = 'dsh-auth-' + this.encodeBase64Url(crypto.createHash('sha256').update(authority).digest());
+    const header = `${cookieName}=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict`;
+    const prev = res.getHeader('set-cookie');
+    if (prev) {
+      const list = Array.isArray(prev) ? prev : [String(prev)];
+      res.setHeader('set-cookie', [...list, header]);
+    } else {
+      res.setHeader('set-cookie', header);
+    }
   }
 
   private interceptWebServer(): void {
@@ -429,6 +448,9 @@ export class IdentityAuthGatewayService extends Service {
           self.ensureSessionCookie(req, res, identity);
         } else if (self.oidcFlow && self.config.oidc?.enabled && !self.isPublicPath(req.url || '/')) {
           // Interactive OIDC: no identity and this is a gated app route -> redirect.
+          // Also drop any stale browser cookie so the IdP redirect leads to a
+          // fresh login instead of bouncing on a rotated-signature cookie.
+          self.clearAuthCookie(req, res);
           if (await self.redirectToOidc(req, res)) return;
         }
         return originalHandler(req, res);
@@ -450,10 +472,18 @@ export class IdentityAuthGatewayService extends Service {
     const existingCookies = req.headers['cookie'] || '';
     // If cookie is absent or if we need to embed identity
     if (!existingCookies.includes(cookieName)) {
+      // Only mint an anonymous "local" identity when loopback access is enabled.
+      // On an OIDC-gated node (no loopback) there is no fabricatable local/admin
+      // identity — we must NOT write a cookie here; the caller redirects to the
+      // IdP instead.
+      const loopbackAllowed = this.config.loopback?.enabled !== false;
+      if (!identity && !loopbackAllowed) {
+        return;
+      }
       const issuedAt = Date.now();
       const expiresAt = issuedAt + (this.config.sessionTtlDays || 30) * 24 * 60 * 60 * 1000;
       const resolvedIdentity: UserIdentity = identity || {
-        id: `usr_local`,
+        id: 'usr_local',
         username: 'local',
         groups: ['wheel'],
         clearance: 'Admin',
@@ -505,8 +535,17 @@ export class IdentityAuthGatewayService extends Service {
               return true;
             }
           }
-          if (self.extractIdentityFromCookie(req)) {
-            return true;
+          const cookieIdentity = self.extractIdentityFromCookie(req);
+          if (cookieIdentity) {
+            // On an OIDC-gated node (loopback disabled) a loopback/local
+            // identity cookie is stale/illegitimate: drop it and fall through
+            // to the IdP redirect so the user gets a real OIDC identity.
+            const loopbackDisabled = self.config.loopback?.enabled === false;
+            if (loopbackDisabled && cookieIdentity.provider === 'loopback') {
+              self.clearAuthCookie(req, res);
+            } else {
+              return true;
+            }
           }
           // No identity. On an OIDC-gated deployment, redirect the browser to
           // the IdP instead of letting the connection-layer index auth reject
@@ -514,6 +553,10 @@ export class IdentityAuthGatewayService extends Service {
           // by a real login, not a loopback). Assets/callback remain public.
           // Synchronous: use the (pre-warmed) cached discovery endpoints.
           if (self.oidcFlow && self.config.oidc?.enabled && !self.isPublicPath(req.url || '/')) {
+            // Break stale-cookie loops: if the browser still holds a dsh-auth
+            // cookie that no longer validates (old secret/rotated), drop it so
+            // the IdP redirect leads to a fresh login instead of bouncing.
+            self.clearAuthCookie(req, res);
             if (self.writeOidcRedirect(req, res)) {
               return false; // redirect written; connection must not continue
             }
