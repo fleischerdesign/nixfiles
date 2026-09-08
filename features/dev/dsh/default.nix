@@ -21,10 +21,14 @@ let
   cfg = config.my.features.dev.dsh;
   render = import ./lib/render.nix { inherit lib; };
   pluginsLib = import ./lib/plugins.nix { inherit lib pkgs; };
-
-  activePluginNames = lib.filter (name: (cfg.plugins.${name}.enable or true)) pluginsLib.pluginNames;
-  activePluginDrvs = map (name: pluginsLib.derivations.${name}) activePluginNames;
-  activePluginBundleNames = map (name: pluginsLib.bundleNameOf name) activePluginNames;
+  runtime = import ./lib/runtime.nix {
+    inherit
+      lib
+      render
+      pluginsLib
+      pkgs
+      ;
+  };
 
   mcpServerAssertions = lib.flatten (
     lib.mapAttrsToList (name: server: [
@@ -1115,242 +1119,21 @@ in
             userCfg = config.my.features.dev.dsh;
             systemCfg = osConfig.my.features.dev.dsh or { };
 
-            mcpServers = systemCfg.mcpServers or { };
-
-            baseSettings = render.mkBaseSettings systemCfg;
-            settingsDoc = lib.recursiveUpdate (lib.recursiveUpdate baseSettings (
-              systemCfg.settings or { }
-            )) userCfg.settings;
-
-            topologyHosts = osConfig.my.features.system.networking.topology.hosts or { };
-            topologyFacts = lib.flatten (
-              lib.mapAttrsToList (hostname: host: [
-                {
-                  subject = "urn:nix:host:${hostname}";
-                  predicate = "sys:hasType";
-                  object = host.hostType or "client";
-                }
-                (lib.optional (host.tailscaleIp != null) {
-                  subject = "urn:nix:host:${hostname}";
-                  predicate = "net:tailscaleIp";
-                  object = host.tailscaleIp;
-                  type_constraint = "IPv4";
-                })
-                (lib.optional (host.domain != null) {
-                  subject = "urn:nix:host:${hostname}";
-                  predicate = "net:domain";
-                  object = host.domain;
-                  type_constraint = "FQDN";
-                })
-              ]) topologyHosts
-            );
-
-            currentHost = osConfig.networking.hostName or "unknown";
-            currentUser = osConfig.my.user.name or (builtins.getEnv "USER");
-
-            # Auto-discovered Tailscale topology peers
-            topologyPeers = lib.flatten (
-              lib.mapAttrsToList (
-                hostname: host:
-                lib.optional (hostname != currentHost && host.tailscaleIp != null) {
-                  id = hostname;
-                  endpoint = "${host.tailscaleIp}:${toString (systemCfg.mesh.listenPort or 3891)}";
-                  tags = [ (host.hostType or "client") ];
-                  scope = "system";
-                }
-              ) topologyHosts
-            );
-
-            # System-wide explicitly configured peers
-            systemExplicitPeers = map (p: p // { scope = "system"; }) (systemCfg.mesh.peers or [ ]);
-
-            # System-wide group-restricted peers
-            systemGroupPeers = lib.flatten (
-              lib.mapAttrsToList (
-                groupName: peersList:
-                map (
-                  p:
-                  p
-                  // {
-                    scope = "group";
-                    group = groupName;
-                  }
-                ) peersList
-              ) (systemCfg.mesh.groupPeers or { })
-            );
-
-            # User-specific personal peers
-            userPersonalPeers = map (
-              p:
-              p
-              // {
-                scope = "user";
-                owner = currentUser;
-              }
-            ) (userCfg.mesh.userPeers or [ ]);
-
-            allConfiguredPeers = topologyPeers ++ systemExplicitPeers ++ systemGroupPeers ++ userPersonalPeers;
-
-            authCfg = systemCfg.auth or { };
-
-            # Invariant memory facts: topology facts + system facts + user personal facts
-            allConfiguredFacts =
-              topologyFacts
-              ++ (systemCfg.memory.facts or [ ])
-              ++ (map (
-                f:
-                f
-                // {
-                  scope_id = if f.scope_id != null then f.scope_id else "user:${currentUser}";
-                }
-              ) (userCfg.memory.userFacts or [ ]));
-
-            pluginConfigs = {
-              "dsh-auth" = {
-                mode = authCfg.mode or "auto";
-                forwardProxy = authCfg.forwardProxy or { enabled = true; };
-                oidc = authCfg.oidc or { enabled = false; };
-                ldap = authCfg.ldap or { enabled = false; };
-                loopback = {
-                  enabled = authCfg.loopback.enabled or true;
-                  defaultUser = currentUser;
-                  defaultClearance = "Admin";
-                };
-                peerMesh = authCfg.peerMesh or { enabled = true; };
-              };
-              "dsh-memory" = {
-                facts = allConfiguredFacts;
-                maxRecallTokens = systemCfg.memory.maxRecallTokens or 150;
-                minRecallThreshold = systemCfg.memory.minRecallThreshold or (-1.5);
-              }
-              // (
-                if systemCfg.memory.embedding.enable or false then
-                  {
-                    embedding = {
-                      inherit (systemCfg.memory.embedding)
-                        provider
-                        dim
-                        minSimilarity
-                        topK
-                        similarityMargin
-                        weight
-                        entropyMinStems
-                        batchSize
-                        ;
-                      modelDir = systemCfg.memory.embedding.modelDir or null;
-                      modelId = systemCfg.memory.embedding.modelId or null;
-                      apiBase = systemCfg.memory.embedding.apiBase or null;
-                      apiModel = systemCfg.memory.embedding.apiModel or null;
-                      apiKeyEnv = systemCfg.memory.embedding.apiKeyEnv or null;
-                    };
-                  }
-                else
-                  { }
-              )
-              // (
-                if systemCfg.memory.replication.enable or false then
-                  {
-                    replication = {
-                      inherit (systemCfg.memory.replication)
-                        enable
-                        secretEnv
-                        listenHost
-                        syncIntervalMs
-                        maxVersionsPerSync
-                        ;
-                      nodeId = systemCfg.memory.replication.nodeId or currentHost;
-                      tenantContext = systemCfg.memory.replication.tenantContext or "user:${currentUser}";
-                      scopes = systemCfg.memory.replication.scopes or [ "public" ];
-                      listenPort = systemCfg.memory.replication.listenPort or null;
-                      peers = map (p: {
-                        inherit (p)
-                          nodeId
-                          endpoint
-                          direction
-                          scopes
-                          ;
-                      }) (systemCfg.memory.replication.peers or [ ]);
-                    };
-                  }
-                else
-                  { }
-              )
-              // (
-                if systemCfg.memory.decay.enable or false then
-                  {
-                    decay = {
-                      inherit (systemCfg.memory.decay)
-                        halfLifeSeconds
-                        floor
-                        retentionSeconds
-                        vacuumIntervalSeconds
-                        ;
-                    };
-                  }
-                else
-                  { }
-              );
-              "dsh-mesh" = {
-                nodeId = currentHost;
-                listenPort = systemCfg.mesh.listenPort or 3891;
-                peers = allConfiguredPeers;
-              };
+            rt = runtime {
+              inherit systemCfg osConfig;
+              userCfg = userCfg;
+              currentUser = osConfig.my.user.name or (builtins.getEnv "USER");
             };
 
-            lspCfg = systemCfg.lsp or { };
-            lspEnabled = lspCfg.enable or false;
-            activeLspServers = lib.filterAttrs (_: s: s.enable) (lspCfg.servers or { });
-
-            lspConfiguredServers = lib.mapAttrs (
-              _: server:
-              render.optionalFields {
-                command =
-                  if server.command != null then
-                    server.command
-                  else if server.package != null then
-                    "${server.package}/bin/${
-                      server.package.meta.mainProgram or server.package.pname or server.package.name
-                    }"
-                  else
-                    null;
-                extensionToLanguage = server.extensionToLanguage;
-                args = if server.args == [ ] then null else server.args;
-                env = if server.env == { } then null else server.env;
-                initializationOptions = server.initializationOptions;
-                configuration = server.configuration;
-                maxMessageBytes = server.maxMessageBytes;
-                maxStderrBytes = server.maxStderrBytes;
-                maxDocumentBytes = server.maxDocumentBytes;
-                shutdownTimeoutMs = server.shutdownTimeoutMs;
-                killGraceMs = server.killGraceMs;
-              }
-            ) activeLspServers;
-
-            lspPatchEntries = lib.optionals (lspEnabled && lspConfiguredServers != { }) [
-              (render.mkEntry "lsp" "@deepseek-ai/dsh-lsp" { })
-              (render.mkEntry "lsp-stdio" "@deepseek-ai/dsh-lsp-stdio" {
-                servers = lspConfiguredServers;
-              })
-              (render.mkEntry "tool-lsp" "@deepseek-ai/dsh-tool-lsp" (
-                render.optionalFields {
-                  maxLocations = lspCfg.maxLocations;
-                  maxResultChars = lspCfg.maxResultChars;
-                  timeoutMs = lspCfg.timeoutMs;
-                }
-              ))
-            ];
-
-            patchEntries = render.mkHomePatchEntries {
-              inherit mcpServers pluginConfigs;
-              persona = systemCfg.persona or null;
-              pluginBundleNames = activePluginBundleNames;
-              extraEntries = lspPatchEntries;
-            };
-            homePatch = render.mkHomePatch patchEntries;
-
-            renderedProfiles = systemCfg.profiles or { };
-
-            dshPackage = if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh;
+            mcpServers = rt.mcpServers;
+            settingsDoc = rt.settingsDoc;
+            homePatch = rt.homePatch;
+            renderedProfiles = rt.renderedProfiles;
+            activePluginDrvs = rt.activePluginDrvs;
+            activeLspServers = rt.activeLspServers;
+            lspEnabled = rt.lspEnabled;
+            lspConfiguredServers = rt.lspConfiguredServers;
+            dshPackage = rt.dshPackage;
           in
           {
             options.my.features.dev.dsh = {
