@@ -13,6 +13,15 @@ import {
   type AuthStrategy
 } from './strategy.js';
 import { PresenceRegistry } from './presence.js';
+import {
+  OidcFlowStore,
+  buildAuthorizeUrl,
+  exchangeCode,
+  fetchJwks,
+  verifyIdToken,
+  jwtClaims,
+  type OidcFlowConfig,
+} from './oidc-flow.js';
 
 export const name = 'auth';
 export const inject = ['webServer'];
@@ -38,6 +47,8 @@ export class IdentityAuthGatewayService extends Service {
   private strategies: AuthStrategy[] = [];
   private signingSecret: Buffer;
   private tokenBuckets = new Map<string, TokenBucketState>();
+  private oidcFlow?: OidcFlowStore;
+  private oidcJwks?: { keys: any[]; expiresAt: number };
 
   constructor(ctx: Context, private config: AuthPluginConfig) {
     super(ctx, 'auth');
@@ -58,6 +69,11 @@ export class IdentityAuthGatewayService extends Service {
     this.presence = new PresenceRegistry(path.join(dshHome, 'auth', 'presence.db'));
     ctx.effect(() => () => this.presence.close());
 
+    // Interactive OIDC (Authorization Code + PKCE) setup when enabled.
+    if (this.config.oidc?.enabled) {
+      this.setupOidc(ctx);
+    }
+
     // Intercept web requests and connection authorization
     this.interceptWebServer();
     this.interceptConnection();
@@ -67,6 +83,113 @@ export class IdentityAuthGatewayService extends Service {
 
     // Enforce Quota & Budget Enforcement (Token-Bucket Theory)
     this.enforceTokenBucketQuota();
+  }
+
+  /** Resolve the OIDC flow config (redirect URI defaults to this host:3080). */
+  private oidcCfg(): OidcFlowConfig {
+    const o = this.config.oidc!;
+    const redirectUri = o.redirectUri || `http://127.0.0.1:3080/oidc/callback`;
+    return {
+      issuer: o.issuer,
+      clientId: o.clientId,
+      clientSecret: o.clientSecret,
+      redirectUri,
+      scopes: o.scopes || ['openid', 'profile', 'email'],
+      logoutUri: o.logoutUri,
+    };
+  }
+
+  /** Register the OIDC callback + logout routes (raw, before the interceptor). */
+  private setupOidc(ctx: Context): void {
+    this.oidcFlow = new OidcFlowStore();
+    ctx.inject(['webServer'], (wsCtx: any) => {
+      wsCtx.webServer.register({
+        kind: 'exact',
+        path: '/oidc/callback',
+        handler: async (req: any, res: any) => { await this.handleOidcCallback(req, res); },
+      });
+      wsCtx.webServer.register({
+        kind: 'exact',
+        path: '/oidc/logout',
+        handler: async (req: any, res: any) => { this.handleOidcLogout(req, res); },
+      });
+    });
+  }
+
+  private async handleOidcCallback(req: any, res: any): Promise<void> {
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    if (!code || !state) { res.writeHead(400); res.end('Missing code/state'); return; }
+    const entry = this.oidcFlow?.consume(state);
+    if (!entry) { res.writeHead(400); res.end('Invalid or expired state'); return; }
+    try {
+      const cfg = this.oidcCfg();
+      const tokens = await exchangeCode(cfg, { code, verifier: entry.verifier });
+      const jwks = await this.jwks();
+      const claims = verifyIdToken({
+        idToken: tokens.id_token || '',
+        jwks,
+        issuer: cfg.issuer,
+        audience: cfg.clientId,
+        nonce: entry.nonce,
+      });
+      const identity = this.mapOidcIdentity(claims);
+      this.presence.noteTenant(identity);
+      this.ensureSessionCookie(req, res, identity);
+      res.writeHead(302, { Location: entry.redirectTo || '/' });
+      res.end();
+    } catch (e: any) {
+      res.writeHead(401);
+      res.end(`OIDC login failed: ${e.message || String(e)}`);
+    }
+  }
+
+  private handleOidcLogout(req: any, res: any): void {
+    // Clear the dsh session cookie; optionally forward to Authentik end_session.
+    const logoutUri = this.oidcCfg().logoutUri;
+    const resUrl = logoutUri ? `${logoutUri}?client_id=${encodeURIComponent(this.config.oidc!.clientId)}` : '/';
+    const hostHeader = req.headers['host'] || '127.0.0.1:3080';
+    const authority = new URL(`http://${hostHeader}`).host;
+    const cookieName = 'dsh-auth-' + this.encodeBase64Url(crypto.createHash('sha256').update(authority).digest());
+    res.setHeader('Set-Cookie', `${cookieName}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax`);
+    res.writeHead(302, { Location: resUrl });
+    res.end();
+  }
+
+  private async jwks(): Promise<any[]> {
+    const cfg = this.oidcCfg();
+    if (this.oidcJwks && this.oidcJwks.expiresAt > Date.now()) return this.oidcJwks.keys;
+    const keys = await fetchJwks(cfg);
+    this.oidcJwks = { keys, expiresAt: Date.now() + 3600_000 };
+    return keys;
+  }
+
+  private mapOidcIdentity(claims: any): UserIdentity {
+    const username = claims.preferred_username || claims.sub || claims.name || 'oidc-user';
+    const groups: string[] = Array.isArray(claims.groups) ? claims.groups : [];
+    const adminClaim = this.config.oidc?.adminClaim || 'groups';
+    const adminVals = this.config.oidc?.adminValues || ['admin', 'admins', 'authentik Admins'];
+    const uc = claims[adminClaim];
+    const isAdmin = Array.isArray(uc) ? uc.some((v: string) => adminVals.includes(v)) : (typeof uc === 'string' && adminVals.includes(uc));
+    return {
+      id: `usr_${username}`,
+      username,
+      email: claims.email,
+      displayName: claims.name,
+      groups,
+      clearance: isAdmin ? 'Admin' : 'Member',
+      provider: 'oidc',
+    };
+  }
+
+  /** Paths that must NOT trigger an OIDC redirect (callback itself, assets, health). */
+  private isPublicPath(p: string): boolean {
+    return p.startsWith('/oidc/')
+      || p === '/favicon.ico'
+      || p.startsWith('/assets/')
+      || p === '/health' || p.startsWith('/api/health')
+      || /\.(js|css|png|svg|ico|woff2?|map|json|txt)$/.test(p);
   }
 
   private resolveSigningSecret(): Buffer {
@@ -179,6 +302,18 @@ export class IdentityAuthGatewayService extends Service {
 
           // Auto-mint session cookie if absent or renew with full tenant identity
           self.ensureSessionCookie(req, res, identity);
+        } else if (self.oidcFlow && self.config.oidc?.enabled && !self.isPublicPath(req.url || '/')) {
+          // Interactive OIDC: no identity and this is a gated app route -> redirect.
+          const flow = self.oidcFlow.begin();
+          const loc = buildAuthorizeUrl(self.oidcCfg(), {
+            state: flow.state,
+            nonce: flow.nonce,
+            challenge: flow.challenge,
+            method: 'S256',
+          });
+          res.writeHead(302, { Location: loc });
+          res.end();
+          return;
         }
         return originalHandler(req, res);
       };

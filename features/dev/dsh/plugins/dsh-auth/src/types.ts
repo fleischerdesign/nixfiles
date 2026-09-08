@@ -30,7 +30,10 @@ export interface OidcConfig {
   issuer: string;            // e.g. "https://auth.ancoris.ovh/application/o/dsh/"
   clientId: string;
   clientSecret?: string;
-  scopes?: string[];
+  clientSecretEnv?: string;  // Env/credential ref for the secret (preferred over plaintext)
+  scopes?: string[];         // e.g. ["openid","profile","email"]
+  redirectUri?: string;      // Callback URI this dsh-web instance expects
+  logoutUri?: string;        // Authentik end_session endpoint (optional)
   adminClaim?: string;       // e.g. "groups"
   adminValues?: string[];    // e.g. ["admin"]
 }

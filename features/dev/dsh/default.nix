@@ -463,7 +463,7 @@ in
         enabled = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "Direct OIDC identity provider integration.";
+          description = "Direct OIDC identity provider integration (interactive Authorization Code + PKCE).";
         };
         issuer = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
@@ -478,7 +478,32 @@ in
         clientSecret = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
           default = null;
-          description = "OIDC client secret.";
+          description = "OIDC client secret (prefer clientSecretEnv/credential over plaintext).";
+        };
+        clientSecretEnv = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Env/credential ref holding the OIDC client secret (avoids plaintext in config).";
+        };
+        scopes = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [
+            "openid"
+            "profile"
+            "email"
+          ];
+          description = "OIDC scopes requested at authorize.";
+        };
+        redirectUri = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "https://dsh.mky.ancoris.ovh/oidc/callback";
+          description = "Callback URI this dsh-web instance expects (defaults to http://127.0.0.1:3080/oidc/callback).";
+        };
+        logoutUri = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Authentik end_session endpoint (optional).";
         };
       };
 
