@@ -304,6 +304,11 @@ export class IdentityAuthGatewayService extends Service {
     return crypto.randomBytes(32);
   }
 
+  /** Short fingerprint of the signing secret (for diagnostics only). */
+  private secretFingerprint(): string {
+    return this.encodeBase64Url(crypto.createHash('sha256').update(this.signingSecret).digest()).slice(0, 8);
+  }
+
   /**
    * Resolve the effective client IP for authentication.
    *
@@ -384,7 +389,7 @@ export class IdentityAuthGatewayService extends Service {
           // Timing-safe signature comparison (reject String-== timing leaks).
           const sigOk = this.signatureMatches(sig, expectedSig);
           // eslint-disable-next-line no-console
-          console.error(`[dsh-auth:debug] cookieCandidate authority=${authority} sigOk=${sigOk}`);
+          console.error(`[dsh-auth:debug] cookieCandidate authority=${authority} sigOk=${sigOk} secret=${this.secretFingerprint()}`);
           if (sigOk) {
             try {
               const decodedJson = Buffer.from(body, 'base64url').toString('utf8');
