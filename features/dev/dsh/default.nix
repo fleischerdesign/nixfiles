@@ -1326,7 +1326,7 @@ in
               ''
                 HOME=${serviceDshHome} git config --global user.name "${config.my.user.fullName}"
                 HOME=${serviceDshHome} git config --global user.email "${config.my.user.email}"
-                HOME=${serviceDshHome} git config --global credential.helper gh
+                HOME=${serviceDshHome} git config --global credential.helper '!gh auth git-credential'
               ''
             ]
             ++ map grantOne cfg.agent.workspaces
