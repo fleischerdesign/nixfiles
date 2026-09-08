@@ -1025,7 +1025,7 @@ in
       assertions = mcpServerAssertions;
     }
 
-    (lib.mkIf (cfg.enable || cfg.credentials != { }) {
+    (lib.mkIf (cfg.enable || cfg.credentials != { } || cfg.auth.oidc.enabled) {
       sops.templates."dsh-credentials.yaml" = lib.mkIf (cfg.credentials != { }) {
         owner = config.my.user.primary or "root";
         # dsh refuses credential files readable by group or others.

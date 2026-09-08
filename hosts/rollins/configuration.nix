@@ -100,14 +100,16 @@
     };
   };
 
-  # Public dsh (AI) web surface on rollins: ai.rls.ancoris.ovh behind Authentik OIDC.
+  # Public dsh (AI) web surface on rollins: ai.rls.ancoris.ovh. Auth is handled
+  # NATIVELY by dsh-auth (interactive OIDC), so NO Caddy forward_auth here
+  # (auth=false) — the Authentik proxy outpost is not used for dsh.
   my.endpoints.dsh = {
     host = "rollins";
     port = 3080;
     proxy = {
       enable = true;
       subdomain = "ai";
-      auth = true;
+      auth = false;
     };
   };
 
