@@ -505,6 +505,16 @@ in
           default = null;
           description = "Authentik end_session endpoint (optional).";
         };
+        adminClaim = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "OIDC claim carrying the user's groups (default 'groups').";
+        };
+        adminValues = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "admin" ];
+          description = "Group values mapped to Admin clearance.";
+        };
       };
 
       ldap = {

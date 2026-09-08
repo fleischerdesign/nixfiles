@@ -89,10 +89,13 @@ export class IdentityAuthGatewayService extends Service {
   private oidcCfg(): OidcFlowConfig {
     const o = this.config.oidc!;
     const redirectUri = o.redirectUri || `http://127.0.0.1:3080/oidc/callback`;
+    // Prefer a config-provided secret, else resolve from the environment via
+    // clientSecretEnv (keeps the secret out of the flake; set by the service env).
+    const secret = o.clientSecret || (o.clientSecretEnv ? process.env[o.clientSecretEnv] : undefined);
     return {
       issuer: o.issuer,
       clientId: o.clientId,
-      clientSecret: o.clientSecret,
+      clientSecret: secret,
       redirectUri,
       scopes: o.scopes || ['openid', 'profile', 'email'],
       logoutUri: o.logoutUri,

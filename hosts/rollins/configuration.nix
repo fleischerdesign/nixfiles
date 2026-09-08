@@ -100,6 +100,37 @@
     };
   };
 
+  # Public dsh (AI) web surface on rollins: ai.rls.ancoris.ovh behind Authentik OIDC.
+  my.endpoints.dsh = {
+    host = "rollins";
+    port = 3080;
+    proxy = {
+      enable = true;
+      subdomain = "ai";
+      auth = true;
+    };
+  };
+
+  # dsh-auth interactive OIDC (Authorization Code + PKCE) against the existing
+  # Authentik. clientId + clientSecret (via env) are filled once the Authentik
+  # OAuth2/OIDC application for dsh exists.
+  my.features.dev.dsh.auth.oidc = {
+    enabled = true;
+    issuer = "https://auth.ancoris.ovh/application/o/dsh/";
+    redirectUri = "https://ai.rls.ancoris.ovh/oidc/callback";
+    scopes = [
+      "openid"
+      "profile"
+      "email"
+    ];
+    adminClaim = "groups";
+    adminValues = [
+      "authentik Admins"
+      "admin"
+    ];
+    clientSecretEnv = "DHS_OIDC_CLIENT_SECRET";
+  };
+
   my.features.services.camofox.enable = true;
 
   sops.secrets."pi/deepseek" = { };
