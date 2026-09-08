@@ -113,6 +113,16 @@
     };
   };
 
+  # dsh-web on rollins runs as a persistent SYSTEM service (public node),
+  # independent of any user session.
+  my.features.dev.dsh.web = {
+    enable = true;
+    systemService = true;
+    user = "philipp";
+    host = "127.0.0.1";
+    port = 3080;
+  };
+
   # dsh-auth interactive OIDC (Authorization Code + PKCE) against the existing
   # Authentik. clientId + clientSecret (via env) are filled once the Authentik
   # OAuth2/OIDC application for dsh exists.

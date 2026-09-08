@@ -60,6 +60,16 @@ in
 
     web = {
       enable = lib.mkEnableOption "background dsh web server daemon";
+      systemService = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Run dsh-web as a systemd SYSTEM service (persistent daemon, e.g. public multi-tenant node) instead of a per-user home-manager service.";
+      };
+      user = lib.mkOption {
+        type = lib.types.str;
+        default = "philipp";
+        description = "User the dsh-web SYSTEM service runs as (reads that user's DSH_HOME).";
+      };
       port = lib.mkOption {
         type = lib.types.port;
         default = 3080;
@@ -1067,6 +1077,30 @@ in
       '';
     })
 
+    # Run dsh-web as a persistent systemd SYSTEM service on the public /
+    # multi-tenant node (independent of any user session). The operator reads
+    # that user's DSH_HOME config, which home-manager materializes declaratively.
+    (lib.mkIf (cfg.web.enable && cfg.web.systemService) {
+      systemd.services.dsh-web = {
+        description = "DeepSeek Harness (dsh) Web UI Service (systemd system service)";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "network.target" ];
+        serviceConfig = {
+          Type = "simple";
+          User = cfg.web.user;
+          ExecStart = "${
+            if cfg.package or null != null then cfg.package else pkgs.custom.dsh
+          }/bin/dsh web --no-open --host ${cfg.web.host} --port ${toString cfg.web.port}";
+          Environment = [ "DSH_HOME=/home/${cfg.web.user}/.dsh" ];
+          EnvironmentFile = lib.optionals (config.sops.templates ? "dsh-oidc.env") [
+            config.sops.templates."dsh-oidc.env".path
+          ];
+          Restart = "on-failure";
+          RestartSec = "5s";
+        };
+      };
+    })
+
     {
       home-manager.sharedModules = [
         (
@@ -1512,36 +1546,38 @@ in
                 }) (lib.filterAttrs (_: profile: profile.patches != [ ]) renderedProfiles))
               ];
 
-              systemd.user.services.dsh-web = lib.mkIf userCfg.web.enable {
-                Unit = {
-                  Description = "DeepSeek Harness (dsh) Web UI Service";
-                  Documentation = [ "https://github.com/deepseek-ai/deepseek-harness" ];
-                  After = [ "network.target" ];
-                  X-Restart-Triggers = activePluginDrvs ++ [
-                    (builtins.toJSON settingsDoc)
-                    (if homePatch != null then homePatch else "")
-                  ];
-                };
+              systemd.user.services.dsh-web =
+                lib.mkIf (userCfg.web.enable && !(osConfig.my.features.dev.dsh.web.systemService or false))
+                  {
+                    Unit = {
+                      Description = "DeepSeek Harness (dsh) Web UI Service";
+                      Documentation = [ "https://github.com/deepseek-ai/deepseek-harness" ];
+                      After = [ "network.target" ];
+                      X-Restart-Triggers = activePluginDrvs ++ [
+                        (builtins.toJSON settingsDoc)
+                        (if homePatch != null then homePatch else "")
+                      ];
+                    };
 
-                Service = {
-                  Type = "simple";
-                  ExecStart = "${
-                    if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh
-                  }/bin/dsh web --no-open --host ${userCfg.web.host} --port ${toString userCfg.web.port}";
-                  Restart = "on-failure";
-                  RestartSec = "5s";
-                  Environment = lib.optionals (systemCfg.dshHome or null != null) [
-                    "DSH_HOME=${systemCfg.dshHome}"
-                  ];
-                  EnvironmentFile = lib.optionals (osConfig.sops.templates ? "dsh-oidc.env") [
-                    osConfig.sops.templates."dsh-oidc.env".path
-                  ];
-                };
+                    Service = {
+                      Type = "simple";
+                      ExecStart = "${
+                        if systemCfg.package or null != null then systemCfg.package else pkgs.custom.dsh
+                      }/bin/dsh web --no-open --host ${userCfg.web.host} --port ${toString userCfg.web.port}";
+                      Restart = "on-failure";
+                      RestartSec = "5s";
+                      Environment = lib.optionals (systemCfg.dshHome or null != null) [
+                        "DSH_HOME=${systemCfg.dshHome}"
+                      ];
+                      EnvironmentFile = lib.optionals (osConfig.sops.templates ? "dsh-oidc.env") [
+                        osConfig.sops.templates."dsh-oidc.env".path
+                      ];
+                    };
 
-                Install = {
-                  WantedBy = [ "default.target" ];
-                };
-              };
+                    Install = {
+                      WantedBy = [ "default.target" ];
+                    };
+                  };
 
               my.features.desktop.webapps.apps.dsh =
                 lib.mkIf (userCfg.web.enable && userCfg.web.desktopLauncher)
