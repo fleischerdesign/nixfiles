@@ -26,6 +26,16 @@
 > Merge-Axiom-Immuntabilität, Capability+Body-HMAC-Auth). Isoliert verifiziert:
 > Scope-Filter, Tombstone-Propagation (Empfänger markiert `retracted`), Axiom-Immuntabilität
 > beim Merge, Capability-Verifikation/Attenuation.
+>
+> **Pruning + Per-Tenant (umgesetzt):** `replication.ts` `prune()` (Retention,
+> incrementale VACUUM-Fenster, **Peer-Cursor-Sicherheit** — nie unter einen Peer-Cursor
+> prunen) + `startPruneLoop()`; **Per-Tenant-Replikation** via `deriveContexts()` (aus
+> lokaler Presence: je presentem User ein `user:<u>`-Kontext, plus geteilter
+> public/group-Kontext; je Kontext eigener Sub/Scopes/Cursor/Root-Token) und
+> **Group-Privacy-Fix** in `deriveScopes` (group:<g> nur wenn auch das LOKALE Node
+> Mitglied ist — kein Group-Leak an Nicht-Mitglieder). Verifiziert: Pruning
+> (Retention/Cursor/FTS), Per-Tenant (philipp↔alice je privates, nie das des anderen),
+> Fremder bekommt nur public.
 
 ---
 
@@ -450,7 +460,7 @@ Biscuit-Key/`hmac`-Shared-Secret ausschließlich via `credentials.credentialRef`
 | P1 | Union-CRDT (G-Set) auf Node-Paar, `public`-Scope. | ✅ umgesetzt |
 | P2 | `group:*` + `user:*`; TenantContext-Scoping (MTAA-Isolation). | ✅ umgesetzt |
 | P3 | Axiom-Immuntabilität beim Merge + Retract/Tombstone (OR-Set), HLC-Ordnung. | ✅ umgesetzt |
-| P4 | Decay (7.1–7.3) abgeleitet — umgesetzt; **Pruning (7.4)**: offen (VACUUM-Fenster, verifiziert machbar). | 🟡 teilweise |
+| P4 | Decay (7.1–7.3) abgeleitet — umgesetzt; **Pruning (7.4)**: umgesetzt (Retention + VACUUM-Fenster + Peer-Cursor-Sicherheit). | ✅ umgesetzt |
 | P5 | Autoritäts-Node-Modus, Large-Pagination, Monitoring. | ⏳ offen |
 
 ---

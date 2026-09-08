@@ -114,21 +114,27 @@ export interface PeerPresence {
 
 /**
  * Agnostic scope→peer derivation (docs/dsh/08): given the scopes this node
- * *wants* to replicate, a peer's presence, and the LOCAL subject, return the
- * subset that should actually sync to that peer.
+ * *wants* to replicate, a peer's presence, and the LOCAL subject + groups,
+ * return the subset that should actually sync to that peer.
  *   - `public`      -> always (opt-in by `wantScopes`)
- *   - `group:<g>`   -> only if the peer hosts group `g`
- *   - `user:<u>`    -> only if `u` is the LOCAL subject (privacy: a node never
- *                      pulls another user's private facts just because the peer
- *                      hosts them; the serve-side canSee re-enforces this too)
+ *   - `group:<g>`   -> only if the LOCAL node is a member of `g` (it must also
+ *                      be hosted by a peer, but membership is the authorization
+ *                      gate — a non-member never pulls group knowledge even if a
+ *                      peer hosts it)
+ *   - `user:<u>`    -> only if `u` is the LOCAL subject (privacy)
  *   - `repo:*`      -> never (node-bound, I-SEC3)
  */
-export function deriveScopes(wantScopes: string[], peer: PeerPresence | null | undefined, localUser: string): string[] {
+export function deriveScopes(
+  wantScopes: string[],
+  peer: PeerPresence | null | undefined,
+  localUser: string,
+  localGroups: string[] = [],
+): string[] {
   const out = new Set<string>();
   for (const s of wantScopes || []) {
     if (s === 'public') { out.add('public'); continue; }
     if (s.startsWith('group:')) {
-      if (peer && peer.groups.includes(s)) out.add(s);
+      if (localGroups.includes(s) && peer && peer.groups.includes(s)) out.add(s);
     } else if (s.startsWith('user:')) {
       const u = s.slice('user:'.length);
       if (u === localUser) out.add(s);
@@ -151,9 +157,12 @@ export class MemoryReplicator {
   private readonly db: DatabaseSync;
   private readonly wantScopes: string[];
   private readonly getPresence: () => PeerPresence;
-  private readonly rootToken: CapabilityToken;
+  private readonly rootTokens = new Map<string, CapabilityToken>();
+  private readonly retentionSeconds: number;
+  private readonly vacuumIntervalSeconds: number;
   private server?: http.Server;
   private timer?: NodeJS.Timeout;
+  private pruneTimer?: NodeJS.Timeout;
 
   constructor(
     opts: {
@@ -166,6 +175,8 @@ export class MemoryReplicator {
       maxVersionsPerSync?: number;
       wantScopes?: string[];
       getPresence?: () => PeerPresence;
+      retentionSeconds?: number;
+      vacuumIntervalSeconds?: number;
     },
   ) {
     this.db = opts.db;
@@ -176,17 +187,62 @@ export class MemoryReplicator {
     this.maxVersions = opts.maxVersionsPerSync ?? 512;
     this.wantScopes = opts.wantScopes || ['public'];
     this.getPresence = opts.getPresence || (() => ({ nodeId: this.nodeId, tenants: [], groups: [], updatedAt: Date.now() }));
-    // Root capability: the maximum grant this node owns (its wantScopes). Per-peer
-    // tokens are AT TENUATED from it, chaining the parent signature (P2/I-SEC5).
-    this.rootToken = createToken(this.secret, {
+    this.retentionSeconds = opts.retentionSeconds ?? 0;
+    this.vacuumIntervalSeconds = opts.vacuumIntervalSeconds ?? 0;
+    // Seed the root capability for the single default context; per-tenant
+    // contexts derive their own root (see rootTokenFor).
+    this.rootTokens.set(this.tenantContext, createToken(this.secret, {
       iss: this.nodeId,
       sub: this.tenantContext,
       scopes: this.wantScopes,
       ops: ['sync'],
       sink: '',
       exp: Date.now() + 120_000,
-    });
+    }));
     this.ensureSyncTables();
+  }
+
+  /**
+   * Per-tenant replication contexts (Phase B): a multi-tenant instance (e.g.
+   * mackaye hosting many family users) runs one context per present tenant plus
+   * a shared context for public/group scopes. Each context has its own subject,
+   * scope set, cursor and capability root — so EVERY user's private knowledge
+   * replicates correctly, instead of a single `tenantContext`.
+   */
+  private deriveContexts(): Array<{ sub: string; user: string; wantScopes: string[]; groups: string[] }> {
+    const pres = this.getPresence();
+    const groups = pres?.groups || [];
+    const shared = this.wantScopes.filter((s) => s === 'public' || s.startsWith('group:'));
+    const ctxs: Array<{ sub: string; user: string; wantScopes: string[]; groups: string[] }> = [];
+    for (const u of pres?.tenants || []) {
+      const userScope = `user:${u}`;
+      if (this.wantScopes.includes(userScope)) {
+        ctxs.push({ sub: userScope, user: u, wantScopes: [...new Set([userScope, ...shared])], groups });
+      }
+    }
+    if (shared.length) {
+      ctxs.push({ sub: this.tenantContext, user: '', wantScopes: shared, groups });
+    }
+    if (ctxs.length === 0) {
+      ctxs.push({ sub: this.tenantContext, user: '', wantScopes: this.wantScopes, groups });
+    }
+    return ctxs;
+  }
+
+  private rootTokenFor(sub: string): CapabilityToken {
+    let t = this.rootTokens.get(sub);
+    if (!t) {
+      t = createToken(this.secret, {
+        iss: this.nodeId,
+        sub,
+        scopes: this.wantScopes,
+        ops: ['sync'],
+        sink: '',
+        exp: Date.now() + 120_000,
+      });
+      this.rootTokens.set(sub, t);
+    }
+    return t;
   }
 
   private myPresence(): PeerPresence {
@@ -210,9 +266,9 @@ export class MemoryReplicator {
 
   // --- Token helpers --------------------------------------------------------
 
-  /** Token grant for this node talking to `targetPeer`: attenuated from the root. */
-  private makeGrant(targetPeer: ReplicationPeer, _since: HlcCursor, scopes: string[]): CapabilityToken {
-    return attenuate(this.secret, this.rootToken, {
+  /** Token grant for this node talking to `targetPeer`: attenuated from the per-subject root. */
+  private makeGrant(targetPeer: ReplicationPeer, scopes: string[], sub: string): CapabilityToken {
+    return attenuate(this.secret, this.rootTokenFor(sub), {
       scopes: (scopes && scopes.length ? scopes : ['public']),
       sink: targetPeer.nodeId,
     });
@@ -222,7 +278,7 @@ export class MemoryReplicator {
   private async fetchPresence(peer: ReplicationPeer): Promise<PeerPresence> {
     const base = peer.endpoint.startsWith('http') ? peer.endpoint : `http://${peer.endpoint}`;
     const url = `${base}/mesh/memory/presence`;
-    const token = attenuate(this.secret, this.rootToken, { scopes: ['public'], sink: peer.nodeId });
+    const token = attenuate(this.secret, this.rootTokenFor(this.tenantContext), { scopes: ['public'], sink: peer.nodeId });
     const text = await this.get(url, { 'X-DSH-CAP': encodeToken(token) });
     const p = safeParse(text);
     return p && Array.isArray(p.tenants) ? (p as PeerPresence) : { nodeId: peer.nodeId, tenants: [], groups: [], updatedAt: Date.now() };
@@ -390,23 +446,21 @@ export class MemoryReplicator {
 
   // --- Pulling (fetch + merge a peer's deltas) ------------------------------
 
-  async pullPeer(peer: ReplicationPeer): Promise<number> {
-    const key = peer.nodeId;
+  async pullPeer(peer: ReplicationPeer, ctx: { sub: string; user: string; wantScopes: string[]; groups: string[] }): Promise<number> {
+    const key = `${peer.nodeId}:${ctx.sub}`;
     const cur = (this.db.prepare(`SELECT cur_phys, cur_counter, cur_node FROM memory_sync_cursor WHERE peer_key = ?`).get(key) as any);
     const since: HlcCursor = cur ? { phys: cur.cur_phys, counter: cur.cur_counter, node: cur.cur_node } : { phys: 0, counter: 0, node: '' };
-    // Agnostic scope derivation: if the peer declares explicit scopes, honour
-    // them (back-compat); otherwise derive the scopes to replicate from the
-    // peer's presence + local subject (docs/dsh/08-...).
-    const localUser = this.tenantContext.startsWith('user:') ? this.tenantContext.slice('user:'.length) : '';
+    // Agnostic scope derivation per context: honour the peer's explicit scopes
+    // (back-compat) or derive from the peer's presence + this context's subject/groups.
     const scopes = (peer.scopes && peer.scopes.length)
       ? peer.scopes
-      : deriveScopes(this.wantScopes, await this.fetchPresence(peer), localUser);
+      : deriveScopes(ctx.wantScopes, await this.fetchPresence(peer), ctx.user, ctx.groups);
     if (scopes.length === 0) { return 0; }
     const base = peer.endpoint.startsWith('http') ? peer.endpoint : `http://${peer.endpoint}`;
     const url = `${base}/mesh/memory/sync`;
     const payload = { fromNodeId: this.nodeId, since, scopes, max: this.maxVersions, timestamp: Date.now() };
     const body = JSON.stringify(payload);
-    const token = this.makeGrant(peer, since, scopes);
+    const token = this.makeGrant(peer, scopes, ctx.sub);
 
     const dataText = await this.post(url, body, {
       'Content-Type': 'application/json',
@@ -432,7 +486,7 @@ export class MemoryReplicator {
         cur_counter = MAX(cur_counter, excluded.cur_counter),
         cur_node = excluded.cur_node
     `).run(key, nc.phys, nc.counter, nc.node);
-    return data.complete ? applied : applied + (await this.pullPeer(peer));
+    return data.complete ? applied : applied + (await this.pullPeer(peer, ctx));
   }
 
   /** Union-CRDT ingest with cluster-wide Axiom immutability (I3/I-SEC5). */
@@ -508,7 +562,9 @@ export class MemoryReplicator {
         for (const peer of this.peerNodes) {
           const dir = peer.direction || 'bidirectional';
           if (dir === 'push') continue;
-          try { await this.pullPeer(peer); } catch { /* non-fatal */ }
+          for (const ctx of this.deriveContexts()) {
+            try { await this.pullPeer(peer, ctx); } catch { /* non-fatal */ }
+          }
         }
       })();
     }, intervalMs);
@@ -518,7 +574,9 @@ export class MemoryReplicator {
     for (const peer of this.peerNodes) {
       const dir = peer.direction || 'bidirectional';
       if (dir === 'push') continue;
-      try { await this.pullPeer(peer); } catch { /* non-fatal */ }
+      for (const ctx of this.deriveContexts()) {
+        try { await this.pullPeer(peer, ctx); } catch { /* non-fatal */ }
+      }
     }
   }
 
@@ -577,8 +635,53 @@ export class MemoryReplicator {
     });
   }
 
+  /**
+   * A1 Pruning (physical compaction). Removes retracted/historical versions
+   * older than `retentionSeconds`, but NEVER below the minimum peer cursor —
+   * a version a peer has not yet synced is always retained (I-A3). FTS stays
+   * consistent via the AFTER DELETE trigger; VACUUM runs outside any
+   * transaction (dedicated scheduler window, no concurrent sync).
+   */
+  prune(now = Date.now()): number {
+    const retentionMs = this.retentionSeconds * 1000;
+    if (retentionMs <= 0) return 0;
+    const cutoff = now - retentionMs;
+    // Minimum peer cursor (HLC triple). Rows at/below it have been synced by
+    // every peer; rows above it may still be pending -> never delete those.
+    // With no peers, prune all expired history (nothing waits on it).
+    const m = this.db.prepare(
+      `SELECT MIN(cur_phys) p, MIN(cur_counter) c, MIN(cur_node) n FROM memory_sync_cursor`
+    ).get() as any;
+    const minPhys = m?.p ?? Number.MAX_SAFE_INTEGER;
+    const minCounter = m?.c ?? Number.MAX_SAFE_INTEGER;
+    const minNode = m?.n ?? '\uffff';
+    const delFacts = this.db.prepare(`
+      DELETE FROM facts
+      WHERE status = 'retracted' AND valid_to < ?
+        AND (tx_from, tx_counter, tx_node) <= (?, ?, ?)
+    `);
+    const df = delFacts.run(cutoff, minPhys, minCounter, minNode);
+    const delTomb = this.db.prepare(`
+      DELETE FROM memory_tombstones
+      WHERE tombstone_status = '0' AND tx_from < ?
+        AND (tx_from, tx_counter, tx_node) <= (?, ?, ?)
+    `);
+    const dt = delTomb.run(cutoff, minPhys, minCounter, minNode);
+    try { this.db.exec('VACUUM'); } catch { /* not critical; incremental vacuum if WAL */ }
+    return Number(df.changes ?? 0) + Number(dt.changes ?? 0);
+  }
+
+  /** Start the physical compaction scheduler (dedicated window). */
+  startPruneLoop(): void {
+    if (this.vacuumIntervalSeconds <= 0 || this.pruneTimer) return;
+    this.pruneTimer = setInterval(() => {
+      try { this.prune(); } catch { /* non-fatal */ }
+    }, this.vacuumIntervalSeconds * 1000);
+  }
+
   close(): void {
     if (this.timer) clearInterval(this.timer);
+    if (this.pruneTimer) clearInterval(this.pruneTimer);
     this.server?.close();
   }
 }

@@ -171,5 +171,9 @@ export interface MemoryPluginConfig {
     halfLifeSeconds?: number;
     /** Below this effective confidence a fact is dropped from recall (opt-in). */
     floor?: number;
+    /** Physical pruning: retain retracted/historical versions for this many seconds before deletion (0 = keep all history). */
+    retentionSeconds?: number;
+    /** Run the physical compaction (VACUUM) every this many seconds (0 = disabled). */
+    vacuumIntervalSeconds?: number;
   };
 }

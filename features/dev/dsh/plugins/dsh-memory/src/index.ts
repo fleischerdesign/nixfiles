@@ -120,6 +120,8 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
       syncIntervalMs: replCfg.syncIntervalMs,
       maxVersionsPerSync: replCfg.maxVersionsPerSync,
       wantScopes: replCfg.scopes || ['public'],
+      retentionSeconds: config.decay?.retentionSeconds ?? 0,
+      vacuumIntervalSeconds: config.decay?.vacuumIntervalSeconds ?? 0,
       getPresence: () => {
         // Advertise this node's hosted tenants/groups (falls back to empty if
         // dsh-auth presence is unavailable).
@@ -137,6 +139,7 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
       replicator.startServer(replCfg.listenPort, replCfg.listenHost || '0.0.0.0');
     }
     replicator.startPullLoop(replCfg.syncIntervalMs ?? 30000);
+    replicator.startPruneLoop();
     await replicator.syncAll();
     ctx.effect(() => () => replicator.close());
   })();

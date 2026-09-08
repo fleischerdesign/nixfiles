@@ -828,6 +828,16 @@ in
           default = 0.15;
           description = "Below this derived confidence a fact is dropped from recall. -1 disables the filter.";
         };
+        retentionSeconds = lib.mkOption {
+          type = lib.types.int;
+          default = 0;
+          description = "Physical pruning: retain retracted/historical versions for this many seconds before deletion (0 = keep all history). Peer-cursor-safe (never prunes below a peer cursor).";
+        };
+        vacuumIntervalSeconds = lib.mkOption {
+          type = lib.types.int;
+          default = 0;
+          description = "Run the physical compaction (VACUUM) every this many seconds (0 = disabled).";
+        };
       };
     };
 
@@ -1190,6 +1200,8 @@ in
                       inherit (systemCfg.memory.decay)
                         halfLifeSeconds
                         floor
+                        retentionSeconds
+                        vacuumIntervalSeconds
                         ;
                     };
                   }
