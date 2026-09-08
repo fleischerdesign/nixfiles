@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchTenantIdentity, parseTenantIdentity } from './identity.js';
 import type { AuthSettingsKey } from './locales.js';
 
 export interface AuthSectionProps {
@@ -7,33 +8,20 @@ export interface AuthSectionProps {
 }
 
 export function AuthSettingsSection({ t = (k: string) => k }: AuthSectionProps) {
-  let username = 'local';
-  let clearance = 'Admin';
-  let provider = 'loopback';
-  let groups: string[] = ['wheel'];
+  // The session cookie is HttpOnly, so identity must come from the server
+  // endpoint (/auth/identity) rather than document.cookie.
+  const [identity, setIdentity] = useState(() => parseTenantIdentity());
 
-  try {
-    if (typeof document !== 'undefined') {
-      const cookies = document.cookie.split(';');
-      for (const c of cookies) {
-        const trimmed = c.trim();
-        if (trimmed.startsWith('dsh-auth-')) {
-          const parts = trimmed.split('=')[1]?.split('.');
-          if (parts && parts.length === 3 && parts[0] === 'v1') {
-            const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-            if (payload?.identity) {
-              username = payload.identity.username || username;
-              clearance = payload.identity.clearance || clearance;
-              provider = payload.identity.provider || provider;
-              groups = payload.identity.groups || groups;
-            }
-          }
-        }
-      }
-    }
-  } catch {
-    // Fall back to default
-  }
+  useEffect(() => {
+    let live = true;
+    fetchTenantIdentity().then((id) => { if (live) setIdentity(id); });
+    return () => { live = false; };
+  }, []);
+
+  const username = identity.username;
+  const clearance = identity.clearance;
+  const provider = identity.provider;
+  const groups = identity.groups;
 
   const clearanceBadgeBg = clearance === 'Admin' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)';
   const clearanceBadgeColor = clearance === 'Admin' ? '#34d399' : '#60a5fa';

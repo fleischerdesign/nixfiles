@@ -44,3 +44,31 @@ export function parseTenantIdentity(): TenantIdentity {
 
   return fallback;
 }
+
+/**
+ * Fetch the tenant identity from the server. The session cookie is HttpOnly, so
+ * JS cannot read it via document.cookie; this endpoint returns the identity that
+ * the server authenticated. Falls back to parseTenantIdentity() on any error so
+ * the UI still renders (e.g. before the first fetch resolves).
+ */
+export async function fetchTenantIdentity(): Promise<TenantIdentity> {
+  try {
+    if (typeof fetch !== 'undefined') {
+      const res = await fetch('/auth/identity', { headers: { accept: 'application/json' }, credentials: 'same-origin' });
+      if (res.ok) {
+        const body = await res.json();
+        if (body && typeof body.username === 'string') {
+          return {
+            username: body.username,
+            clearance: body.clearance || 'Member',
+            provider: body.provider || 'unknown',
+            groups: Array.isArray(body.groups) ? body.groups : [],
+          };
+        }
+      }
+    }
+  } catch {
+    // Fall through to cookie/local parse
+  }
+  return parseTenantIdentity();
+}

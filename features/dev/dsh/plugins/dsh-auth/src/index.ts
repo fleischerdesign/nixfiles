@@ -153,6 +153,24 @@ export class IdentityAuthGatewayService extends Service {
         path: '/oidc/logout',
         handler: async (req: any, res: any) => { this.handleOidcLogout(req, res); },
       });
+      // Tenant identity for the client UI. It reads the signed session cookie
+      // server-side (the cookie is HttpOnly, so JS cannot read it via
+      // document.cookie) and returns the identity as JSON. The UI renders the
+      // real user instead of falling back to "local".
+      wsCtx.webServer.register({
+        kind: 'exact',
+        path: '/auth/identity',
+        handler: async (req: any, res: any) => {
+          const identity = await this.authenticateRequest(req);
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+          res.end(JSON.stringify(identity ? {
+            username: identity.username,
+            clearance: identity.clearance,
+            provider: identity.provider,
+            groups: identity.groups || [],
+          } : { username: null, clearance: null, provider: null, groups: [] }));
+        },
+      });
     });
   }
 
@@ -229,6 +247,7 @@ export class IdentityAuthGatewayService extends Service {
       || p === '/favicon.ico'
       || p.startsWith('/assets/')
       || p === '/health' || p.startsWith('/api/health')
+      || p === '/auth/identity'
       || /\.(js|css|png|svg|ico|woff2?|map|json|txt)$/.test(p);
   }
 

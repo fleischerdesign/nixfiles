@@ -6,7 +6,7 @@ import {
   useDismissOnOutsidePointer,
 } from '@deepseek-ai/dsh-client-ui-primitives';
 import { createPortal } from 'react-dom';
-import { parseTenantIdentity } from './identity.js';
+import { parseTenantIdentity, fetchTenantIdentity } from './identity.js';
 import type { AuthSettingsKey } from './locales.js';
 
 export interface SessionShareActionProps {
@@ -19,7 +19,7 @@ const SESSION_SCOPE_PREFIX = 'dsh-session-scope:';
 
 export function SessionShareAction({ sessionId, useSession, t = (k: string) => k }: SessionShareActionProps) {
   const currentSessionId = sessionId || (useSession ? useSession((s) => s?.id) : undefined);
-  const [identity] = useState(() => parseTenantIdentity());
+  const [identity, setIdentity] = useState(() => parseTenantIdentity());
 
   const [sessionScope, setSessionScope] = useState<string>('personal');
   const [open, setOpen] = useState(false);
@@ -40,6 +40,13 @@ export function SessionShareAction({ sessionId, useSession, t = (k: string) => k
   });
 
   // Load session scope from storage/state
+  useEffect(() => {
+    // The session cookie is HttpOnly, so identity must come from the server.
+    let live = true;
+    fetchTenantIdentity().then((id) => { if (live) setIdentity(id); });
+    return () => { live = false; };
+  }, []);
+
   useEffect(() => {
     if (currentSessionId && typeof window !== 'undefined') {
       const stored = localStorage.getItem(`${SESSION_SCOPE_PREFIX}${currentSessionId}`);

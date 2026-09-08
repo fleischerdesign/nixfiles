@@ -7,7 +7,7 @@ import {
   useDismissOnOutsidePointer,
 } from '@deepseek-ai/dsh-client-ui-primitives';
 import { createPortal } from 'react-dom';
-import { parseTenantIdentity } from './identity.js';
+import { parseTenantIdentity, fetchTenantIdentity } from './identity.js';
 import type { AuthSettingsKey } from './locales.js';
 
 export interface GroupWorkspaceSwitcherProps {
@@ -42,7 +42,10 @@ export function GroupWorkspaceSwitcher({ t = (k: string) => k }: GroupWorkspaceS
   });
 
   useEffect(() => {
-    setIdentity(parseTenantIdentity());
+    let live = true;
+    // The session cookie is HttpOnly, so identity must come from the server.
+    fetchTenantIdentity().then((id) => { if (live) setIdentity(id); });
+    return () => { live = false; };
   }, []);
 
   const selectScope = (scope: string) => {
