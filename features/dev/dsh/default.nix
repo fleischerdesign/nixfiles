@@ -43,6 +43,13 @@ let
   # dsh refuses group/other-readable credential files (0600 + owner).
   credOwner = serviceUser;
 
+  # The operator's gh-hosts credential template (from features/dev/git — a
+  # GitHub PAT for gh). The dsh agent links it into its own gh config so it can
+  # push to GitHub as the operator. Agnostically matched by name prefix.
+  ghHostsTemplateName = lib.findFirst (n: lib.hasPrefix "gh-hosts-" n) null (
+    builtins.attrNames (config.sops.templates or { })
+  );
+
   mcpServerAssertions = lib.flatten (
     lib.mapAttrsToList (name: server: [
       {
@@ -85,6 +92,19 @@ in
         type = lib.types.str;
         default = "dsh";
         description = "Username of the dedicated dsh system user (group of the same name), with home /var/lib/dsh.";
+      };
+    };
+
+    agent = {
+      packages = lib.mkOption {
+        type = lib.types.listOf lib.types.package;
+        default = [ ];
+        description = "Dedicated tool packages for the dsh agent (installed into the dsh user's profile and added to the dsh-web service PATH). The base system path is always available; add the tools the agent needs that are not system-global (e.g. git). Kept as the user's own set rather than modifying environment.systemPackages, so the dsh service user is self-contained.";
+      };
+      workspaces = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Filesystem workspace roots the dsh agent may edit. One uniform grant is applied per path, so it works for both standalone roots (e.g. /etc/nixos) and roots nested under a private 0700 home (e.g. /home/<u>/dev/<repo>): the ancestor chain gets group-traversal (ACL x, harmless where it already applies), and the target gets group rwx + a default ACL (plus plain group-write as a fallback on non-ACL filesystems). This is the durable OS backstop; the logical path-capability layer does the per-principal gating. Hard-wired default-deny: an empty list grants nothing.";
       };
     };
 
@@ -1115,6 +1135,12 @@ in
         home = "/var/lib/dsh";
         createHome = true;
         description = "DeepSeek Harness (dsh) multi-tenant system user";
+        # The dsh agent's own tool packages (git etc.) — kept user-scoped, not
+        # added to the global environment.systemPackages.
+        packages = cfg.agent.packages;
+        # The dsh agent reads the operator's gh-hosts credential template
+        # (group-users, mode 0440) to push to GitHub as the operator.
+        extraGroups = [ "users" ];
       };
 
       # Config-document seed for /var/lib/dsh, rendered from the same
@@ -1170,7 +1196,12 @@ in
           "network.target"
           "dsh-web-config.service"
         ];
-        requires = [ "dsh-web-config.service" ];
+        requires = [
+          "dsh-web-config.service"
+        ]
+        ++ lib.optionals (cfg.agent.workspaces != [ ]) [
+          "dsh-agent-workspaces.service"
+        ];
         serviceConfig = {
           Type = "simple";
           User = serviceUser;
@@ -1182,19 +1213,124 @@ in
           # store so the LLM/provider keys (DEEPSEEK_API_KEY etc.) are visible.
           # The sops template is created at activation; recreate the symlink at
           # every start so credential changes are picked up.
-          ExecStartPre = lib.optionals (config.sops.templates ? "dsh-credentials.yaml") [
-            "${pkgs.coreutils}/bin/ln -sfn '${
-              config.sops.templates."dsh-credentials.yaml".path
-            }' '${serviceDshHome}/.credentials.yaml'"
-            "${pkgs.coreutils}/bin/chmod 600 '${serviceDshHome}/.credentials.yaml'"
+          ExecStartPre =
+            lib.optionals (config.sops.templates ? "dsh-credentials.yaml") [
+              "${pkgs.coreutils}/bin/ln -sfn '${
+                config.sops.templates."dsh-credentials.yaml".path
+              }' '${serviceDshHome}/.credentials.yaml'"
+              "${pkgs.coreutils}/bin/chmod 600 '${serviceDshHome}/.credentials.yaml'"
+            ]
+            # gh-hosts template: rendered by features/dev/git as
+            # owner = <primary user>, group = users, mode = 0440. The dsh
+            # service user reads it through its group membership, so it must
+            # NOT chmod the symlink target (not the owner -> EPERM; and 0400
+            # would strip its own group-read access).
+            ++ lib.optionals (ghHostsTemplateName != null) [
+              "${pkgs.coreutils}/bin/mkdir -p '${serviceDshHome}/.config/gh'"
+              "${pkgs.coreutils}/bin/ln -sfn '${
+                config.sops.templates.${ghHostsTemplateName}.path
+              }' '${serviceDshHome}/.config/gh/hosts.yml'"
+              # Seed config.yml (owned by the dsh user) so gh does not attempt
+              # its one-time hosts.yml -> config.yml migration on first use:
+              # that migration writes hosts.yml through the symlink into the
+              # read-only sops template and fails with EPERM. With config.yml
+              # present, gh reads hosts.yml directly (verified: gh 2.98).
+              "${pkgs.bash}/bin/bash -c 'test -e ${serviceDshHome}/.config/gh/config.yml || echo version: 1 > ${serviceDshHome}/.config/gh/config.yml'"
+            ];
+          Environment = [
+            "DSH_HOME=${serviceDshHome}"
+            # The agent spawns bash/git/nix by bare name; without a PATH the
+            # unprivileged dsh service user (shell nologin) cannot resolve them
+            # (spawn ENOENT). System path + the agent's own package set
+            # (agent.packages: git etc.) — an explicit PATH here must carry
+            # them, because it overrides a systemd unit `path=`.
+            "PATH=${config.system.path}/bin:${config.system.path}/sbin:${lib.makeBinPath cfg.agent.packages}:/run/wrappers/bin"
           ];
-          Environment = [ "DSH_HOME=${serviceDshHome}" ];
           EnvironmentFile = lib.optionals (config.sops.templates ? "dsh-oidc.env") [
             config.sops.templates."dsh-oidc.env".path
           ];
           Restart = "on-failure";
           RestartSec = "5s";
         };
+      };
+    })
+
+    # Durable OS backstop for agent file access: grant the dedicated dsh
+    # service user's group group-write on the configured workspace roots,
+    # re-applied at every boot (survives `nixos-rebuild switch`, unlike a
+    # manual chgrp). The logical path-capability layer (filesystem-capability
+    # layer doc) does the real per-principal gating; this is only the OS
+    # boundary so the agent can reach the paths it is meant to edit.
+    (lib.mkIf (cfg.agent.workspaces != [ ]) {
+      systemd.services.dsh-agent-workspaces = {
+        description = "Grant the dsh service user access to the configured agent workspace roots";
+        wantedBy = [ "multi-user.target" ];
+        before = [ "dsh-web.service" ];
+        after = [ "dsh-web-config.service" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          User = "root";
+          # The unit script needs the binary PATH; a fresh oneshot under the
+          # systemd service env has none. Pin the exact tools.
+          Environment = [
+            "PATH=${
+              lib.makeBinPath [
+                pkgs.coreutils
+                pkgs.findutils
+                pkgs.acl
+                pkgs.git
+              ]
+            }"
+          ];
+        };
+        script =
+          let
+            grantGroup = cfg.web.dedicatedUserName;
+            # One uniform grant per path. Group-traversal on the ancestor
+            # chain (ACL x; harmless where it already applies — also makes a
+            # path inside a 0700 home reachable), then group rwx + default ACL
+            # on the target, plus plain group-write as a fallback on
+            # filesystems that do not honor ACLs.
+            grantOne = path: ''
+              if [ -e "${path}" ]; then
+                p="$(dirname "${path}")"
+                while [ "$p" != "/" ] && [ "$p" != "." ]; do
+                  setfacl -m g:${grantGroup}:x "$p" 2>/dev/null || true
+                  p="$(dirname "$p")"
+                done
+                setfacl -R -m g:${grantGroup}:rwx "${path}"
+                setfacl -R -d -m g:${grantGroup}:rwx "${path}" 2>/dev/null || true
+                chgrp -R '${grantGroup}' "${path}"
+                find "${path}" -type d -exec chmod 2775 {} +
+                find "${path}" -type f -exec chmod 664 {} +
+                # git refuses to operate on a repo it does not own (safe.directory
+                # CVE-2022-24765). The dsh user legitimately works on these
+                # (group-writable, owner = operator, group = dsh), so trust the
+                # workspace root and its immediate sub-repositories in the dsh
+                # user's global git config. HOME pins the right .gitconfig.
+                HOME=${serviceDshHome} git config --global --add safe.directory "${path}"
+                for d in "${path}"/*/; do
+                  [ -d "$d" ] && HOME=${serviceDshHome} git config --global --add safe.directory "$d" 2>/dev/null || true
+                done
+                chown ${grantGroup}:${grantGroup} "${serviceDshHome}/.gitconfig" 2>/dev/null || true
+              fi
+            '';
+          in
+          lib.concatStringsSep "\n" (
+            [
+              # The dsh user does NOT inherit the operator's home-manager git
+              # config (it is a separate system user), so set its author identity
+              # and the gh credential helper explicitly, so git push over HTTPS
+              # uses the operator's PAT (gh reads the linked hosts.yml).
+              ''
+                HOME=${serviceDshHome} git config --global user.name "${config.my.user.fullName}"
+                HOME=${serviceDshHome} git config --global user.email "${config.my.user.email}"
+                HOME=${serviceDshHome} git config --global credential.helper gh
+              ''
+            ]
+            ++ map grantOne cfg.agent.workspaces
+          );
       };
     })
   ];

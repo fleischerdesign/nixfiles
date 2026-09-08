@@ -1,6 +1,12 @@
 # roles/base.nix
 # Base system configurations applicable to all hosts (servers and personal computers).
-{ config, lib, ... }: {
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+{
   my.features = {
     system = {
       common.enable = lib.mkDefault true;
@@ -30,6 +36,19 @@
   sops.secrets."pi/openrouter" = lib.mkDefault { };
 
   my.features.dev.dsh = {
+    # OS backstop: the dsh agent may write to the config repository (the
+    # workspace it is meant to edit). The logical path-capability layer does
+    # the per-principal gating; this is just the durable OS boundary.
+    agent.workspaces = lib.mkDefault [ "/etc/nixos" ];
+
+    # Dedicated package set for the dsh agent (installed into the dsh user's
+    # profile and added to the dsh-web service PATH) — kept user-scoped rather
+    # than modifying the global environment.systemPackages.
+    agent.packages = lib.mkDefault [
+      pkgs.git
+      pkgs.gh
+    ];
+
     credentials = {
       "DEEPSEEK_API_KEY".key = lib.mkDefault config.sops.placeholder."pi/deepseek";
       "OPENROUTER_API_KEY".key = lib.mkDefault config.sops.placeholder."pi/openrouter";
