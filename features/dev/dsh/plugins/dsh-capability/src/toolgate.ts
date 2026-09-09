@@ -15,10 +15,17 @@
 export interface ExecInvocation {
   name?: string;
   resource?: string;
+  // The upstream `tools/pre-execute` ToolExecutionInput carries the parsed
+  // arguments under `arguments` (NOT `args`). FS tools (read/write/edit) use
+  // `file_path`; bash/other tools vary. We read `arguments` and fall back to
+  // `args` for robustness.
+  arguments?: Record<string, any>;
   args?: Record<string, any>;
 }
 
-const PATH_TOOL_FILE_KEYS = ['file', 'path', 'target', 'filePath', 'source'];
+// Upstream FS tools (tool-fs) use `file_path` for read/write/edit. Keep the
+// common aliases as a fallback for other tools.
+const PATH_TOOL_FILE_KEYS = ['file_path', 'path', 'file', 'target', 'filePath', 'source'];
 const PATH_TOOL_LIST_KEYS = ['paths', 'files', 'sources'];
 
 function firstString(v: any): string | undefined {
@@ -45,9 +52,9 @@ export function extractResource(exec: ExecInvocation, pathTools: string[]): stri
   // 1. Explicit declarative resource (the tool/gate may have set exec.resource).
   if (exec.resource && exec.resource.startsWith('path:')) return exec.resource;
 
-  // 2. Raw path from args.
-  const args = exec.args ?? {};
-  const raw = firstString(args.path) ?? firstString(args.file) ?? firstString(args.target);
+  // 2. Raw path from the parsed arguments (upstream: `exec.arguments`).
+  const args = exec.arguments ?? exec.args ?? {};
+  const raw = firstString(args.file_path) ?? firstString(args.path) ?? firstString(args.file) ?? firstString(args.target);
   if (raw) return `path:${raw}`;
 
   // 3. A list of paths (e.g. glob, batch) — authorise the first; the caller can

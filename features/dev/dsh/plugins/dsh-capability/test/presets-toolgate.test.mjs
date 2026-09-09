@@ -33,8 +33,15 @@ test('preset: buildPresetTable honors operator overrides', () => {
 test('toolgate: explicit exec.resource wins', () => {
   assert.equal(extractResource({ name: 'read', resource: 'path:/etc/nixos' }, PATH_TOOLS), 'path:/etc/nixos');
 });
-test('toolgate: raw args.path/file/target', () => {
-  assert.equal(extractResource({ name: 'read', args: { path: '/etc/nixos/flake.nix' } }, PATH_TOOLS), 'path:/etc/nixos/flake.nix');
+test('toolgate: upstream fs read uses arguments.file_path', () => {
+  // The real tools/pre-execute ToolExecutionInput carries `arguments`, and the
+  // fs tool-fs read/write/edit schema uses `file_path` (not path/file).
+  assert.equal(extractResource({ name: 'read', arguments: { file_path: '/etc/passwd' } }, PATH_TOOLS), 'path:/etc/passwd');
+  assert.equal(extractResource({ name: 'write', arguments: { file_path: '/etc/nixos/x' } }, PATH_TOOLS), 'path:/etc/nixos/x');
+  assert.equal(extractResource({ name: 'edit', arguments: { file_path: '/tmp/a' } }, PATH_TOOLS), 'path:/tmp/a');
+});
+test('toolgate: fallback to args.path/file/target', () => {
+  assert.equal(extractResource({ name: 'read', arguments: { path: '/etc/nixos/flake.nix' } }, PATH_TOOLS), 'path:/etc/nixos/flake.nix');
   assert.equal(extractResource({ name: 'write', args: { file: '/tmp/x' } }, PATH_TOOLS), 'path:/tmp/x');
 });
 test('toolgate: path list (glob) takes first element', () => {
