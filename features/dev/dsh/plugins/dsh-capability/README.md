@@ -76,6 +76,15 @@ node --test test/capability.test.mjs
 # 3. Gate: nix flake check
 ```
 
+**Run the reusable verification-matrix against a BUILT plugin (proves the logic
+greifts, no harness needed):**
+```bash
+P=$(nix build .#dsh-capability --print-out-paths --no-link | tail -1)
+DSH_CAPABILITY_LIB="$P/lib/node_modules/dsh-capability/lib" node test/matrix.mjs
+```
+Prints PASS/FAIL per V-row and exits non-zero on any failure. It exercises the
+actual built `.js` (not source), so it verifies the deployed/linked module.
+
 The unit suite covers the verification-matrix rows V1–V6, V11–V15 at the
 primitive level (default-deny, granted read/write, sibling deny, symlink escape,
 `..` traversal, action-not-granted, wrong principal, group dominance, expiry,
