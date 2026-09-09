@@ -1388,10 +1388,27 @@ in
         script =
           let
             grantGroup = cfg.web.dedicatedUserName;
+            # The operator (repo owner) who works alongside the agent. Files the
+            # agent creates are owned by the `dsh` service user, so the operator
+            # (NOT a member of the `dsh` group) only reaches them via a named
+            # ACL. Grant the operator rwx on the workspace ROOT — recursively
+            # (so existing agent-created files are healed on every run) AND as a
+            # default ACL (so newly created agent files are operator-writable
+            # from the start). Agnostic: taken from my.user.name, never hardcoded.
+            operUser = config.my.user.name or null;
+            # Path-scoped operator grant (path is bound per call in grantOne).
+            # Recursive ACL heals existing agent-created files on every run; the
+            # default ACL makes newly created agent files operator-writable.
+            operAcl =
+              path:
+              lib.optionalString (operUser != null) ''
+                setfacl -R -m u:${operUser}:rwx "${path}"
+                setfacl -R -d -m u:${operUser}:rwx "${path}" 2>/dev/null || true
+              '';
             # One uniform grant per path. Group-traversal on the ancestor
             # chain (ACL x; harmless where it already applies — also makes a
-            # path inside a 0700 home reachable), then group rwx + default ACL
-            # on the target, plus plain group-write as a fallback on
+            # path inside a 0700 home reachable), then group/operator rwx +
+            # default ACL on the target, plus plain group-write as a fallback on
             # filesystems that do not honor ACLs.
             grantOne = path: ''
               if [ -e "${path}" ]; then
@@ -1402,6 +1419,7 @@ in
                 done
                 setfacl -R -m g:${grantGroup}:rwx "${path}"
                 setfacl -R -d -m g:${grantGroup}:rwx "${path}" 2>/dev/null || true
+                ${operAcl path}
                 chgrp -R '${grantGroup}' "${path}"
                 find "${path}" -type d -exec chmod 2775 {} +
                 find "${path}" -type f -exec chmod 664 {} +
