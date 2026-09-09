@@ -39,5 +39,38 @@
   sops.secrets."pi/deepseek" = { };
   sops.secrets."pi/openrouter" = { };
 
+  # Capability-based authorization test grant (operator). Enforcement is on:
+  # default-deny except within the granted resources, so an out-of-scope tool
+  # call (e.g. read /etc/passwd) is denied. `group:wheel` dominates for the
+  # operator's principal via its live IdP group membership (agnostic — no
+  # hardcoded username/sub). After the E2E test this can be removed or kept as
+  # the operator base grant.
+  my.features.dev.dsh.authorization = {
+    enable = true;
+    pathTools = [
+      "read"
+      "write"
+      "edit"
+      "glob"
+      "bash"
+    ];
+    grants = [
+      {
+        principal = "group:wheel";
+        resources = [
+          "path:/etc/nixos/**"
+          "path:/home/philipp/dev/**"
+          "path:/var/lib/dsh/tenants/**"
+        ];
+        actions = [
+          "read"
+          "write"
+          "mutate"
+          "exec"
+        ];
+      }
+    ];
+  };
+
   system.stateVersion = "24.05";
 }

@@ -69,6 +69,7 @@ declare module '@deepseek-ai/cordis' {
         resource: string;
         action: Action;
         viaNode?: string;
+        groups?: string[];
       }): Decision;
       /** Evaluate a runtime delegation token as the effective principal. */
       delegate(tokenStr: string, viaNode?: string): Decision | null;
@@ -117,13 +118,17 @@ export function apply(ctx: Context, config: CapabilityPluginConfig = {}): void {
     // ring carries only whitelisted fields (never content), so the transparency
     // panel can answer "who was allowed/denied to do what" without exposing it.
     audit: new AuditRing(config.auditSize ?? 500),
-    authorise(input: { principal: string; resource: string; action: Action; viaNode?: string }): Decision {
+    authorise(input: { principal: string; resource: string; action: Action; viaNode?: string; groups?: string[] }): Decision {
       // Declarative grants are pre-verified by construction (store-sealed). The
       // call is a pure evaluation against the one primitive; default-deny is
-      // structural (empty grants ⇒ `deny`).
+      // structural (empty grants ⇒ `deny`). `dominates` uses the LIVE tenant
+      // groups (passed by the gate/delegate) merged with any static groups, so
+      // a `group:` grant matches the principal's actual IdP memberships — not a
+      // hardcoded set.
+      const effectiveGroups = [...(input.groups ?? []), ...groups];
       const decision = authorise({
         principal: input.principal,
-        groups,
+        groups: effectiveGroups,
         resource: input.resource,
         action: input.action,
         claims: declarative,
@@ -197,9 +202,10 @@ export function apply(ctx: Context, config: CapabilityPluginConfig = {}): void {
         // but no call is denied. When on, default-deny applies.
         if (config.enforce !== true) return next();
 
-        const tenant = toolsCtx.auth?.activeTenant as { username?: string } | undefined;
+        const tenant = toolsCtx.auth?.activeTenant as { username?: string; groups?: string[] } | undefined;
         const principal = tenant?.username ? `user:${tenant.username}` : '';
         if (!principal) return next(); // no identity ⇒ coarse auth downstream; capability is additive
+        const tenantGroups = tenant?.groups ?? [];
 
         const isPathTool = pathTools.includes(exec?.name ?? '') || (exec?.resource?.startsWith('path:') ?? false);
         if (!isPathTool) return next();
@@ -215,7 +221,7 @@ export function apply(ctx: Context, config: CapabilityPluginConfig = {}): void {
             reason: `Capability denied: no determinable path for ${principal} on tool "${exec?.name}" (${action}).`,
           };
         }
-        const decision = svc.authorise({ principal, resource: resource ?? '', action });
+        const decision = svc.authorise({ principal, resource: resource ?? '', action, groups: tenantGroups });
         if (!decision.allowed) {
           return {
             kind: 'deny',
