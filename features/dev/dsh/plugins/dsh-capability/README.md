@@ -83,6 +83,13 @@ bad signature, single-source-of-truth, non-widening attenuation, token
 roundtrip, delegation attribution, cross-node user evaluation), plus the P2
 preset mapping and the fail-closed tool gate, and the P5/P6 logic primitives.
 
+> **P4 (cross-node attribution) is applied where it lives** — in
+> `dsh-auth/src/strategy.ts`: when a peer-mesh request carries a valid
+> `x-dsh-capability` delegation, `PeerMeshStrategy` verifies it against the mesh
+> secret and acts for the **user** principal it carries (bounded, not Admin);
+> with no delegation it retains the existing node identity (trust domain A). A
+> node HMAC alone never grants a user scope.
+
 ## Scope (honest framing)
 
 This delivers **P1**, **P2**, the capability-token model of P3/P4, and the

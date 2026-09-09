@@ -137,7 +137,7 @@ export class PeerMeshStrategy implements AuthStrategy {
       return null; // Clock drift or replay attack
     }
 
-    // Verify HMAC-SHA256 signature
+    // Verify HMAC-SHA256 signature (transport / node channel).
     const method = req.method || 'GET';
     const url = req.url || '/';
     const payload = `${method}:${url}:${timestampStr}:${node}`;
@@ -149,6 +149,29 @@ export class PeerMeshStrategy implements AuthStrategy {
       return null;
     }
 
+    // Cross-node principal attribution (mesh doc §4.5 / impl-spec §2.3). The node
+    // HMAC proves the CHANNEL; authority is granted to the USER carried in the
+    // delegation capability. When a valid `x-dsh-capability` is present, the
+    // target evaluates the user principal — never the node as Admin.
+    const delegation = req.headers['x-dsh-capability'] as string | undefined;
+    if (delegation) {
+      const resolved = verifyDelegationCapability(delegation, pm.clusterSecret, now);
+      if (!resolved) return null; // invalid delegation ⇒ reject the call entirely
+      // Act for the user principal, bounded by the capability's actions. An
+      // `orchestrate` action is admin-equivalent; otherwise bounded to Member.
+      const clearance: ClearanceLevel = resolved.actions.includes('orchestrate') ? 'Admin' : 'Member';
+      return {
+        id: `usr_${resolved.principal}`,
+        username: resolved.principal,
+        groups: ['mesh-users'],
+        clearance,
+        provider: 'peer-mesh',
+      };
+    }
+
+    // No delegation capability: retain the existing peer behaviour (trust domain
+    // A — shared-secret, equal-rights operator peers). Because this is only the
+    // node channel, callers must NOT grant user scopes off it.
     return {
       id: `node_${node}`,
       username: `node:${node}`,
@@ -157,6 +180,48 @@ export class PeerMeshStrategy implements AuthStrategy {
       provider: 'peer-mesh'
     };
   }
+}
+
+/**
+ * Verify a delegation capability (same wire format as dsh-capability:
+ * `base64url(payloadJSON) "." hmacHex(secret, payloadJSON)`), extract the user
+ * principal and actions, and reject anything that is not a `user:` principal.
+ * A malformed/expired/wrongly-signed token is `null` (fail-closed).
+ */
+function verifyDelegationCapability(
+  tokenStr: string,
+  secret: string,
+  now: number,
+): { principal: string; actions: string[] } | null {
+  const dot = tokenStr.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const b64 = tokenStr.slice(0, dot);
+  const sig = tokenStr.slice(dot + 1);
+  let payload: any;
+  try {
+    payload = JSON.parse(Buffer.from(b64, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (typeof payload !== 'object' || payload === null) return null;
+
+  // Verify signature under the SAME secret (operator mesh is symmetric-HMAC).
+  const expected = crypto.createHmac('sha256', secret).update(b64).digest('hex');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(sig);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+  // Expiry.
+  if (payload.exp && payload.exp > 0 && now > payload.exp) return null;
+
+  // Must be a USER principal (a node principal is never a delegation grant).
+  const principal = payload.principal;
+  if (typeof principal !== 'string' || !principal.startsWith('user:')) return null;
+
+  const actions = Array.isArray(payload.actions) ? payload.actions.filter((x: any) => typeof x === 'string') : [];
+  if (actions.length === 0) return null;
+
+  return { principal, actions };
 }
 
 /**
