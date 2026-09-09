@@ -14,6 +14,48 @@
 
   my.features.system.networking.tailscale.acceptRoutes = true;
 
+  # Capability-based authorization on the public multi-tenant gateway.
+  # Enforcement is default-deny: a tenant may only reach the explicit grants
+  # below, keyed on its authenticated IdP groups (agnostic — no hardcoded
+  # username/sub). The operator (`group:wheel`) gets the config + tenant store;
+  # family/members get bounded read-only media/public roots.
+  my.features.dev.dsh.authorization = {
+    enable = true;
+    pathTools = [
+      "read"
+      "write"
+      "edit"
+      "glob"
+      "bash"
+    ];
+    grants = [
+      {
+        principal = "group:wheel";
+        resources = [
+          "path:/etc/nixos/**"
+          "path:/var/lib/dsh/tenants/**"
+        ];
+        actions = [
+          "read"
+          "write"
+          "mutate"
+          "exec"
+        ];
+      }
+      {
+        principal = "group:family";
+        resources = [
+          "path:/srv/media/**"
+          "path:/srv/public/**"
+        ];
+        actions = [
+          "read"
+          "list"
+        ];
+      }
+    ];
+  };
+
   my.features.services.monitoring = {
     pipeline = {
       enable = true;
