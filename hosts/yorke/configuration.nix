@@ -39,9 +39,36 @@
   sops.secrets."pi/deepseek" = { };
   sops.secrets."pi/openrouter" = { };
 
-  # Capability authorization is configured on the public gateway (rollins);
-  # local client hosts keep the default (enforce off) so the local desktop
-  # agent is never locked out.
+  # Capability authorization — local E2E test on yorke. Enforcement is
+  # default-deny; the operator grant (`group:wheel`) covers the config repo +
+  # dev tree + tenant store, so in-scope reads flow and out-of-scope reads
+  # (e.g. /etc/passwd) are denied.
+  my.features.dev.dsh.authorization = {
+    enable = true;
+    pathTools = [
+      "read"
+      "write"
+      "edit"
+      "glob"
+      "bash"
+    ];
+    grants = [
+      {
+        principal = "group:wheel";
+        resources = [
+          "path:/etc/nixos/**"
+          "path:/home/philipp/dev/**"
+          "path:/var/lib/dsh/tenants/**"
+        ];
+        actions = [
+          "read"
+          "write"
+          "mutate"
+          "exec"
+        ];
+      }
+    ];
+  };
 
   system.stateVersion = "24.05";
 }
