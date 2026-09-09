@@ -777,5 +777,10 @@ export class IdentityAuthGatewayService extends Service {
 
 export function apply(ctx: Context, config: AuthPluginConfig = {}): void {
   const service = new IdentityAuthGatewayService(ctx, config);
+  // Expose the gateway as (1) a direct context property and (2) a provided
+  // service, so sibling plugins can read the authenticated tenant via
+  // `ctx.get('auth')`/`ctx.auth` — otherwise their per-call policy (e.g. the
+  // dsh-capability gate) only ever sees the anonymous `local` fallback.
   ctx.auth = service;
+  ctx.provide('auth', service);
 }
