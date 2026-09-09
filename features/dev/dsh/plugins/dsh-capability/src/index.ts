@@ -19,6 +19,8 @@ import { authorise, type Decision, attributionFromDelegation } from './authorise
 import type { Action, CapClaims, Resource } from './capability.js';
 import { gateDecision } from './toolgate.js';
 import { buildPresetTable, presetForClearance, type PresetSpec } from './presets.js';
+import { execDecision, isolationPlan } from './isolation.js';
+import { toAuditRecord, AuditRing } from './audit.js';
 
 export const name = 'capability';
 export const inject = ['tools'];
@@ -50,6 +52,8 @@ export interface CapabilityPluginConfig {
   /** Per-clearance preset overrides (P2): key = clearance level, value =
    *  { sandbox, approval }. Merged over the least-privilege defaults. */
   presetOverrides?: Partial<Record<'Restricted' | 'Member' | 'Admin', PresetSpec>>;
+  /** Capacity of the in-memory audit ring (P6). */
+  auditSize?: number;
   /** When true, the pre-execute gate applies default-deny for ungranted
    *  filesystem-tool calls. When false (default), the gate passes through —
    *  the `authorise` service is still available, but no call is blocked. An
@@ -64,9 +68,22 @@ declare module '@deepseek-ai/cordis' {
         principal: string;
         resource: string;
         action: Action;
+        viaNode?: string;
       }): Decision;
       /** Evaluate a runtime delegation token as the effective principal. */
-      delegate(tokenStr: string): Decision | null;
+      delegate(tokenStr: string, viaNode?: string): Decision | null;
+      /** LBAC clearance → permission preset (P2). */
+      presetFor(clearance: string | undefined): PresetSpec;
+      /** The full preset table with operator overrides (P2). */
+      presetTable(): { presets: Record<string, PresetSpec>; defaultPreset: string };
+      /** Exec gate: grant + tenant-isolation plan (P5). */
+      execPlan(input: { principal: string; resource: string; tenantRoot: string }): {
+        allowed: boolean;
+        isolation: boolean;
+        isolationPlan?: { argv: string[]; bindMasks: { source: string; masked: boolean }[]; apply: boolean };
+      };
+      /** Leak-free decision log for the transparency panel (P6). */
+      auditSnapshot(): import('./audit.js').AuditRecord[];
     };
   }
 }
@@ -96,30 +113,45 @@ export function apply(ctx: Context, config: CapabilityPluginConfig = {}): void {
   const groups = config.groups ?? [];
 
   const svc = {
-    authorise(input: { principal: string; resource: string; action: Action }): Decision {
+    // P6: leak-free audit ring — every decision below is recorded here. The
+    // ring carries only whitelisted fields (never content), so the transparency
+    // panel can answer "who was allowed/denied to do what" without exposing it.
+    audit: new AuditRing(config.auditSize ?? 500),
+    authorise(input: { principal: string; resource: string; action: Action; viaNode?: string }): Decision {
       // Declarative grants are pre-verified by construction (store-sealed). The
       // call is a pure evaluation against the one primitive; default-deny is
       // structural (empty grants ⇒ `deny`).
-      return authorise({
+      const decision = authorise({
         principal: input.principal,
         groups,
         resource: input.resource,
         action: input.action,
         claims: declarative,
       });
+      if (config.enforce === true) {
+        svc.audit.push(toAuditRecord({
+          principal: input.principal,
+          resource: input.resource,
+          action: input.action,
+          result: decision.allowed ? 'allow' : 'deny',
+          reason: decision.allowed ? 'granted' : decision.reason ?? 'no grant',
+          authority: decision.allowed ? decision.grant?.principal : undefined,
+          viaNode: input.viaNode,
+        }));
+      }
+      return decision;
     },
     // Cross-node delegation: extract the USER principal from a token and
     // evaluate it as the effective principal (the node HMAC is only the channel).
-    delegate(tokenStr: string): Decision | null {
+    delegate(tokenStr: string, viaNode?: string): Decision | null {
       if (!config.verifyKey) return null;
       const att = attributionFromDelegation(config.verifyKey, tokenStr);
       if (!att) return null;
-      return authorise({
+      return svc.authorise({
         principal: att.principal,
-        groups,
         resource: att.claims.resources[0] ?? '',
         action: (att.claims.actions[0] as Action) ?? 'read',
-        claims: declarative.concat(att.claims),
+        viaNode,
       });
     },
     // P2: the sandbox-mode/approval preset that bounds a clearance level. This
@@ -133,6 +165,21 @@ export function apply(ctx: Context, config: CapabilityPluginConfig = {}): void {
     presetTable() {
       return buildPresetTable((config.presetOverrides ?? {}) as Record<string, PresetSpec>);
     },
+    // P5: does this principal have `exec` on the resource, and if so with what
+    // tenant-isolation plan? This is the only place the exec gate should look.
+    execPlan(input: { principal: string; resource: string; tenantRoot: string }) {
+      const granted = svc.authorise({
+        principal: input.principal,
+        resource: input.resource,
+        action: 'exec',
+      }).allowed;
+      return execDecision(granted, { tenantRoot: input.tenantRoot, mounts: [] });
+    },
+    // Audit snapshot for the transparency panel.
+    auditSnapshot() {
+      return svc.audit.snapshot();
+    },
+    _isolation: isolationPlan,
   };
   ctx.provide('capability', svc);
   ctx.capability = svc;
