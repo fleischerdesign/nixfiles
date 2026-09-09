@@ -24,6 +24,8 @@ enforces **default-deny** against the operator's declarative grants.
 | `apply()` (Cordis) | `src/index.ts` | provides the `authorise` service + `tools/pre-execute` gate |
 | `extractResource` / `gateDecision` | `src/toolgate.ts` | deterministic, fail-closed resource extraction for the fs gate (V-fail-closed) |
 | `presetForClearance` / `buildPresetTable` | `src/presets.ts` | P2: LBAC clearance → sandbox/approval preset (least privilege) |
+| `isolationPlan` / `execDecision` | `src/isolation.ts` | P5: `unshare -m -u` tenant-isolation argv + grant↔isolation composition |
+| `toAuditRecord` / `AuditRing` | `src/audit.ts` | P6: leak-free, whitelisted decision-log records for the transparency panel |
 
 ## The capability tuple
 
@@ -79,14 +81,17 @@ primitive level (default-deny, granted read/write, sibling deny, symlink escape,
 `..` traversal, action-not-granted, wrong principal, group dominance, expiry,
 bad signature, single-source-of-truth, non-widening attenuation, token
 roundtrip, delegation attribution, cross-node user evaluation), plus the P2
-preset mapping and the fail-closed tool gate.
+preset mapping and the fail-closed tool gate, and the P5/P6 logic primitives.
 
 ## Scope (honest framing)
 
-This delivers **P1**, **P2**, and the capability-token model P3/P4 build on.
-P5 (`unshare` tenant isolation for `exec`), the full P4 PeerMeshStrategy
-delegation flow, and P6 (ergonomics/audit UI) are iterated in the next phases —
-see `docs/implementation-spec.md`. The upstream process sandbox
-(`fs-sandbox`/`sandbox-policy`/`permission-presets`) is not edited here; this
-plugin sits above it as the logical per-principal gate, and P2 turns the
-authenticated clearance into the sandbox-mode/approval preset that gates it.
+This delivers **P1**, **P2**, the capability-token model of P3/P4, and the
+**P5 (tenant isolation) / P6 (audit) logic primitives**. What remains is the
+*runtime wiring* that couples these to the live mesh/process layer: applying the
+P5 `unshare` argv in the exec wrapper, emitting P6 records from every
+`authorise()` call, the full P4 PeerMeshStrategy delegation flow in the child
+`dsh-auth`, and a live service smoke test on a deployment host. The upstream
+process sandbox (`fs-sandbox`/`sandbox-policy`/`permission-presets`) is not
+edited here; this plugin sits above it as the logical per-principal gate, and P2
+turns the authenticated clearance into the sandbox-mode/approval preset that
+gates it.
