@@ -672,6 +672,80 @@ in
       };
     };
 
+    # Granular capability-based authorization (dsh-capability). The agent mesh
+    # never grants whole-filesystem access by default; every principal is
+    # authorized only against the declarative grants below, by its authenticated
+    # `user:<oidc-sub>` principal, default-deny. This is the logical per-principal
+    # gate that sits ABOVE the OS ACL backstop (FS doc §1 two-tier premise).
+    authorization = {
+      enable = lib.mkEnableOption "granular capability-based authorization (dsh-capability)";
+      verifyKeyEnv = lib.mkOption {
+        type = lib.types.str;
+        default = "DSH_CAPABILITY_KEY";
+        description = "Environment variable holding the grant verification key (symmetric secret, or asymmetric public key for public principals).";
+      };
+      pathTools = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [
+          "read"
+          "write"
+          "edit"
+          "glob"
+          "bash"
+        ];
+        description = "Tool names whose calls are authorized against `path:` capabilities (i.e. run through the shared authorise() gate).";
+      };
+      grants = lib.mkOption {
+        type = lib.types.listOf (
+          lib.types.submodule {
+            options = {
+              principal = lib.mkOption {
+                type = lib.types.str;
+                description = "Principal identity URI (e.g. user:<oidc-sub>, group:family, node:strummer).";
+              };
+              resources = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = "Resource URIs granted (node:/tool:/scope:/path:, e.g. path:/etc/nixos/**, node:all).";
+              };
+              actions = lib.mkOption {
+                type = lib.types.listOf (
+                  lib.types.enum [
+                    "read"
+                    "list"
+                    "write"
+                    "mutate"
+                    "exec"
+                    "orchestrate"
+                    "replicate"
+                  ]
+                );
+                default = [ ];
+                description = "Canonical action verbs granted.";
+              };
+              ttlDays = lib.mkOption {
+                type = lib.types.int;
+                default = 30;
+                description = "Grant validity in days (short TTL + re-issuance bounds revocation blast radius). 0 = never expires (operator-only).";
+              };
+              budgetEur = lib.mkOption {
+                type = lib.types.nullOr lib.types.float;
+                default = null;
+                description = "Optional per-grant cost ceiling (EUR).";
+              };
+              maxTurns = lib.mkOption {
+                type = lib.types.nullOr lib.types.int;
+                default = null;
+                description = "Optional cap on agent turns for this grant.";
+              };
+            };
+          }
+        );
+        default = [ ];
+        description = "Declarative capability grants (operator-authored, Nix-versioned). A principal with no matching grant is denied by default.";
+      };
+    };
+
     memory = {
       facts = lib.mkOption {
         type = lib.types.listOf (

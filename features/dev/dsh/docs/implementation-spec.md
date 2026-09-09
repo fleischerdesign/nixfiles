@@ -1,6 +1,6 @@
 # Implementation Specification — Capability Mesh & Filesystem Capability Layer
 
-**Status:** Implementation spec for a fresh implementer.
+**Status:** Implementation spec for a fresh implementer. **P1 (policy primitive) is now implemented** as the `dsh-capability` plugin (see `plugins/dsh-capability/` and its README): canonicalizer + root automaton + the shared `authorise()` primitive + capability-token model, default-deny, unit-tested against the matrix. P2–P6 follow the same phase loop below.
 **Read before:** [`mesh-capability-authorization.md`](mesh-capability-authorization.md) (the capability model) and [`filesystem-capability-layer.md`](filesystem-capability-layer.md) (the filesystem dimension). This document ties the design to concrete code seams, resolves the open decisions, and defines the verification matrix.
 
 ---

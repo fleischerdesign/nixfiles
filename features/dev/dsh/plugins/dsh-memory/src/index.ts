@@ -3,6 +3,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { credentialRef } from '@deepseek-ai/dsh-credentials';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { hostname } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { initializeDatabase } from './schema.js';
 import { BitemporalMemoryEngine } from './engine.js';
@@ -84,7 +85,15 @@ export function apply(ctx: Context, config: MemoryPluginConfig = {}): void {
         ? { ...config.embedding, resolveKey }
         : config.embedding,
   );
-  const replicationNodeId = config.replication?.nodeId || process.env.DSH_NODE_ID || 'local';
+  // Origin/provenance node id. MUST be the mesh node identity (`node:<hostname>`),
+  // never a bare `'local'`: `local` collides across nodes, breaking the CvRDT
+  // total order `(HLC, nodeId)` (mesh doc §2.3, impl-spec §5.5). Falls back to
+  // the OS hostname only when neither config nor DSH_NODE_ID is set, and wraps
+  // the value in the `node:` prefix so the provenance is always a mesh node URI.
+  const replicationNodeId =
+    config.replication?.nodeId ||
+    process.env.DSH_NODE_ID ||
+    `node:${hostname() || 'unknown'}`;
   const engine = new BitemporalMemoryEngine(db, embeddingProvider, {
     topK: config.embedding?.topK ?? 8,
     // Provider-aware relevance floor: neural semantic embeddings (api/onnx) get

@@ -214,6 +214,27 @@ let
           listenPort = systemCfg.mesh.listenPort or 3891;
           peers = allConfiguredPeers;
         };
+        "dsh-capability" =
+          let
+            authz = systemCfg.authorization or { };
+          in
+          lib.optionalAttrs (authz.enable or false) {
+            enforce = true;
+            grants = map (
+              g:
+              {
+                principal = g.principal;
+                resources = g.resources;
+                actions = g.actions;
+              }
+              // {
+                ttlDays = g.ttlDays;
+                budgetEur = g.budgetEur;
+                maxTurns = g.maxTurns;
+              }
+            ) (authz.grants or [ ]);
+            pathTools = authz.pathTools or [ ];
+          };
       };
 
       # --- LSP (system level) ---
