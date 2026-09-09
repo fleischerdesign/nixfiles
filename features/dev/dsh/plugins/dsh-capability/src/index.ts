@@ -202,7 +202,13 @@ export function apply(ctx: Context, config: CapabilityPluginConfig = {}): void {
         // but no call is denied. When on, default-deny applies.
         if (config.enforce !== true) return next();
 
-        const tenant = toolsCtx.auth?.activeTenant as { username?: string; groups?: string[] } | undefined;
+        // The authenticated tenant lives on `ctx.auth` (dsh-auth's
+        // `apply` sets `ctx.auth = service`; the service exposes `.activeTenant`
+        // with the OIDC identity + groups). It is NOT on the tools-scoped
+        // context (`toolsCtx.auth` is absent), which is why reading it there
+        // silently passed every call through.
+        const authEntry = (ctx as any).auth;
+        const tenant = authEntry?.activeTenant as { username?: string; groups?: string[] } | undefined;
         const principal = tenant?.username ? `user:${tenant.username}` : '';
         if (!principal) return next(); // no identity ⇒ coarse auth downstream; capability is additive
         const tenantGroups = tenant?.groups ?? [];
