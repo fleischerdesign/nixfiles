@@ -100,6 +100,16 @@
         inherit home-manager-unstable;
       };
 
+      # dsh feature plugin derivations (auto-discovered from
+      # features/dev/dsh/plugins/*/package.nix); exposed so a plugin change is
+      # rebuildable directly: `nix build .#dshPlugins.dsh-capability`
+      # (impl-spec §0.2). lazily evaluated — flake check only evaluates them.
+      dshPlugins =
+        (import ./features/dev/dsh/lib/plugins.nix {
+          lib = nixpkgs-unstable.lib;
+          inherit pkgs;
+        }).derivations;
+
       globalModules = [
         inputs.sops-nix.nixosModules.sops
         inputs.nod.nixosModules.default
@@ -113,7 +123,7 @@
     {
       formatter.${system} = pkgs.nixfmt;
 
-      packages.${system} = pkgs.custom;
+      packages.${system} = pkgs.custom // dshPlugins;
 
       apps.${system}.update-custom-packages = {
         type = "app";
