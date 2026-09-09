@@ -22,6 +22,8 @@ enforces **default-deny** against the operator's declarative grants.
 | `authorise(...)` | `src/authorise.ts` | **the** primitive: principal dominance → resource match (prefix for `path:`) → action → bounds → deny |
 | `authoriseToken` / `attributionFromDelegation` | `src/authorise.ts` | delegation-token + cross-node user attribution |
 | `apply()` (Cordis) | `src/index.ts` | provides the `authorise` service + `tools/pre-execute` gate |
+| `extractResource` / `gateDecision` | `src/toolgate.ts` | deterministic, fail-closed resource extraction for the fs gate (V-fail-closed) |
+| `presetForClearance` / `buildPresetTable` | `src/presets.ts` | P2: LBAC clearance → sandbox/approval preset (least privilege) |
 
 ## The capability tuple
 
@@ -76,13 +78,15 @@ The unit suite covers the verification-matrix rows V1–V6, V11–V15 at the
 primitive level (default-deny, granted read/write, sibling deny, symlink escape,
 `..` traversal, action-not-granted, wrong principal, group dominance, expiry,
 bad signature, single-source-of-truth, non-widening attenuation, token
-roundtrip, delegation attribution, cross-node user evaluation).
+roundtrip, delegation attribution, cross-node user evaluation), plus the P2
+preset mapping and the fail-closed tool gate.
 
 ## Scope (honest framing)
 
-This delivers **P1** (and the capability token model that P3 builds on). P2
-(clearance→preset mapping), P4 (full PeerMeshStrategy delegation flow), P5
-(`unshare` tenant isolation for `exec`) and P6 (ergonomics/audit UI) are
-iterated in the next phases — see `docs/implementation-spec.md`. The upstream
-process sandbox (`fs-sandbox`/`sandbox-policy`/`permission-presets`) is not
-edited here; this plugin sits above it as the logical per-principal gate.
+This delivers **P1**, **P2**, and the capability-token model P3/P4 build on.
+P5 (`unshare` tenant isolation for `exec`), the full P4 PeerMeshStrategy
+delegation flow, and P6 (ergonomics/audit UI) are iterated in the next phases —
+see `docs/implementation-spec.md`. The upstream process sandbox
+(`fs-sandbox`/`sandbox-policy`/`permission-presets`) is not edited here; this
+plugin sits above it as the logical per-principal gate, and P2 turns the
+authenticated clearance into the sandbox-mode/approval preset that gates it.

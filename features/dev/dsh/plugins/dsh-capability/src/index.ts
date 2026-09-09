@@ -17,6 +17,8 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { authorise, type Decision, attributionFromDelegation } from './authorise.js';
 import type { Action, CapClaims, Resource } from './capability.js';
+import { gateDecision } from './toolgate.js';
+import { buildPresetTable, presetForClearance, type PresetSpec } from './presets.js';
 
 export const name = 'capability';
 export const inject = ['tools'];
@@ -45,6 +47,9 @@ export interface CapabilityPluginConfig {
   groups?: string[];
   /** Tool names that carry a path capability (authorised against `path:`). */
   pathTools?: string[];
+  /** Per-clearance preset overrides (P2): key = clearance level, value =
+   *  { sandbox, approval }. Merged over the least-privilege defaults. */
+  presetOverrides?: Partial<Record<'Restricted' | 'Member' | 'Admin', PresetSpec>>;
   /** When true, the pre-execute gate applies default-deny for ungranted
    *  filesystem-tool calls. When false (default), the gate passes through —
    *  the `authorise` service is still available, but no call is blocked. An
@@ -117,6 +122,17 @@ export function apply(ctx: Context, config: CapabilityPluginConfig = {}): void {
         claims: declarative.concat(att.claims),
       });
     },
+    // P2: the sandbox-mode/approval preset that bounds a clearance level. This
+    // is what the upstream permission-presets/service reads; the capability
+    // layer derives least-privilege (Restricted ⇒ read-only) on unknown input.
+    presetFor(clearance: string | undefined) {
+      return presetForClearance(clearance);
+    },
+    // The full preset table (with operator overrides), for a deployment that
+    // configures the upstream permission-presets service from this layer.
+    presetTable() {
+      return buildPresetTable((config.presetOverrides ?? {}) as Record<string, PresetSpec>);
+    },
   };
   ctx.provide('capability', svc);
   ctx.capability = svc;
@@ -138,12 +154,20 @@ export function apply(ctx: Context, config: CapabilityPluginConfig = {}): void {
         const principal = tenant?.username ? `user:${tenant.username}` : '';
         if (!principal) return next(); // no identity ⇒ coarse auth downstream; capability is additive
 
-        const toolName = exec?.name as string | undefined;
-        const resource = exec?.resource as string | undefined;
-        const isPathTool = pathTools.includes(toolName ?? '') || (resource?.startsWith('path:') ?? false);
+        const isPathTool = pathTools.includes(exec?.name ?? '') || (exec?.resource?.startsWith('path:') ?? false);
         if (!isPathTool) return next();
 
+        // Extract the capability resource from the invocation. Fail-closed: a
+        // path-capability tool with no determinable path is NOT authorizeable —
+        // deny it rather than pass it through.
+        const { authorizable, resource } = gateDecision(exec, pathTools);
         const action = (exec?.action as Action) ?? 'read';
+        if (!authorizable) {
+          return {
+            kind: 'deny',
+            reason: `Capability denied: no determinable path for ${principal} on tool "${exec?.name}" (${action}).`,
+          };
+        }
         const decision = svc.authorise({ principal, resource: resource ?? '', action });
         if (!decision.allowed) {
           return {

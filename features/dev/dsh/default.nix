@@ -744,6 +744,33 @@ in
         default = [ ];
         description = "Declarative capability grants (operator-authored, Nix-versioned). A principal with no matching grant is denied by default.";
       };
+      presets = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options = {
+              sandbox = lib.mkOption {
+                type = lib.types.enum [
+                  "read-only"
+                  "workspace-write"
+                  "danger-full-access"
+                  "bypass"
+                ];
+                description = "Sandbox mode the preset writes through.";
+              };
+              approval = lib.mkOption {
+                type = lib.types.enum [
+                  "ask"
+                  "never"
+                  "always"
+                ];
+                description = "Approval policy the preset writes through.";
+              };
+            };
+          }
+        );
+        default = { };
+        description = "Per-clearance permission-preset overrides (P2). Keys are clearance levels (Restricted/Member/Admin); defaults are Restricted→read-only+ask, Member→workspace-write+ask, Admin→danger-full-access+never. Unknown/absent clearance fail-locks to Restricted.";
+      };
     };
 
     memory = {

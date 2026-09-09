@@ -234,6 +234,7 @@ let
               }
             ) (authz.grants or [ ]);
             pathTools = authz.pathTools or [ ];
+            presetOverrides = authz.presets or { };
           };
       };
 
