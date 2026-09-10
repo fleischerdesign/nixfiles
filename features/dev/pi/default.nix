@@ -33,7 +33,7 @@ in
 
     defaultModel = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
-      default = "deepseek-v4-flash";
+      default = "deepseek-flash";
       description = "Optional default model identifier override.";
     };
 
