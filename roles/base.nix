@@ -3,7 +3,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 {
@@ -23,69 +22,9 @@
 
   my.features.system.networking.ssh.enable = lib.mkDefault true;
 
-  # dsh (DeepSeek Harness) runs as a persistent system-wide daemon (dedicated
-  # `dsh` system user, DSH_HOME=/var/lib/dsh, MTAA layout) on every host. It is
-  # always a systemd SYSTEM service; this merely turns the daemon on.
-  my.features.dev.dsh.web.enable = lib.mkDefault true;
-
-  # LLM credentials + default model for the dsh agent, shared by every host
-  # (the daemon is system-wide). DeepSeek is the primary route; OpenRouter is
-  # the fallback / multi-provider route. These secrets are encrypted for all
-  # hosts (see .sops.yaml) and consumed via the dsh credentials service.
+  # Credentials shared across hosts (consumed by pi/agents)
   sops.secrets."pi/deepseek" = lib.mkDefault { };
   sops.secrets."pi/openrouter" = lib.mkDefault { };
-
-  my.features.dev.dsh = {
-    # OS backstop: the dsh agent may write to the config repository (the
-    # workspace it is meant to edit). The logical path-capability layer does
-    # the per-principal gating; this is just the durable OS boundary.
-    agent.workspaces = lib.mkDefault [ "/etc/nixos" ];
-
-    # Dedicated package set for the dsh agent (installed into the dsh user's
-    # profile and added to the dsh-web service PATH) — kept user-scoped rather
-    # than modifying the global environment.systemPackages.
-    agent.packages = lib.mkDefault [
-      pkgs.git
-      pkgs.gh
-    ];
-
-    credentials = {
-      "DEEPSEEK_API_KEY".key = lib.mkDefault config.sops.placeholder."pi/deepseek";
-      "OPENROUTER_API_KEY".key = lib.mkDefault config.sops.placeholder."pi/openrouter";
-    };
-
-    piAi.providers = {
-      openrouter.apiKeyEnv = lib.mkDefault "OPENROUTER_API_KEY";
-      openrouter-contributor = {
-        displayName = lib.mkDefault "OpenRouter (Contributor)";
-        apiKeyEnv = lib.mkDefault "OPENROUTER_API_KEY";
-        api = lib.mkDefault "openai-completions";
-        baseURL = lib.mkDefault "https://openrouter.ai/api/v1";
-        models = lib.mkDefault [
-          {
-            id = "meta/muse-spark-1.3-contributor";
-            name = "Muse Spark 1.3 (Contributor)";
-            contextWindow = 1048576;
-            maxTokens = 943718;
-            input = [
-              "text"
-              "image"
-            ];
-          }
-        ];
-      };
-    };
-
-    defaultModel = lib.mkDefault {
-      provider = "deepseek-official";
-      model = "deepseek-v4-flash-vision-exp";
-    };
-
-    deepseek = {
-      thinking = lib.mkDefault "enabled";
-      reasoningEffort = lib.mkDefault "low";
-    };
-  };
 
   nod = {
     enable = lib.mkDefault true;

@@ -1,9 +1,0 @@
-{
-  "name": "dsh-share",
-  "version": "0.1.0",
-  "description": "Cryptographically signed capability-based session sharing, targeted ACLs, zero-leakage redaction, and instant revocation for DeepSeek Harness.",
-  "dsh": {
-    "tier": "feature",
-    "priority": 45
-  }
-}

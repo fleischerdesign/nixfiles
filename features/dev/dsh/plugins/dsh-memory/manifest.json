@@ -1,6 +1,0 @@
-{
-  "name": "dsh-memory",
-  "version": "0.1.0",
-  "bundle": "dsh-memory",
-  "description": "Bitemporal knowledge representation, Datalog inference, and vector memory for dsh"
-}

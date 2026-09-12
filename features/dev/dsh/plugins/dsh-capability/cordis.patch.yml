@@ -1,5 +1,0 @@
-patch:
-  - id: dsh-capability
-    insert:
-      after: dsh-base
-    plugin: dsh-capability

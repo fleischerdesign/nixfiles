@@ -56,18 +56,6 @@
         wmClass = "moebius";
       };
 
-      dsh = {
-        displayName = "DeepSeek Harness";
-        url = "http://127.0.0.1:3080";
-        icon = "${pkgs.custom.dsh}/lib/dsh/apps/web/public/favicon.svg";
-        comment = "DeepSeek Harness (dsh) Agent Web Interface";
-        categories = [
-          "Development"
-          "Utility"
-        ];
-        wmClass = "dsh";
-      };
-
       gmail = {
         displayName = "Mail";
         url = "https://mail.google.com";

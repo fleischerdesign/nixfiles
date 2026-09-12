@@ -1,5 +1,0 @@
-patch:
-  - id: dsh-memory
-    insert:
-      after: dsh-base
-    plugin: dsh-memory

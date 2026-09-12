@@ -1,6 +1,0 @@
-{
-  "name": "dsh-capability",
-  "version": "0.1.0",
-  "bundle": "dsh-capability",
-  "description": "Granular capability-based authorization (canonicalizer + shared authorise() primitive) for the dsh mesh"
-}

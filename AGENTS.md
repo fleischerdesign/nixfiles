@@ -255,32 +255,5 @@ nix run .#update-custom-packages [package-name|"all"]
 
 Liest `packages/custom/*/manifest.json`, prüft GitHub Releases auf neue Versionen, lädt AppImage herunter, berechnet SRI-Hash, updated manifest. Erfordert `GITHUB_TOKEN` für authentifizierte API-Calls.
 
-## dsh-Integration
-
-DeepSeek Harness (dsh) wird als **generisches Multi-Tenant & Agent-Harness-Feature** in `features/dev/dsh/default.nix` deklariert:
-- **Architecture**: Stellt das System per `home-manager.sharedModules` bereit. Konfiguriert deklarativ `settings.yaml`, `.credentials.yaml` und den Cordis-Patch-Layer unter `$DSH_HOME` (`~/.dsh`).
-- **Plugin-System & Auto-Discovery**: `features/dev/dsh/lib/plugins.nix` scannt `features/dev/dsh/plugins/<name>/package.nix` und erzeugt deklarative Optionen unter `my.features.dev.dsh.plugins.<name>.enable`.
-- **Multi-Tenant Lattice & Security**:
-  - `dsh-auth`: Unified Identity Gateway, Forward-Proxy, Peer-Mesh & Cookie-Signierung mit HMAC-SHA256, sowie Organization- & Group-Switcher UI (`sidebar.brand.name`).
-  - `dsh-memory`: Multi-Tenant Knowledge-Graph mit Scopes (`public`, `group:*`, `user:*`, `repo:*`), FTS5 BM25 und bitemporaler TTL-Gültigkeit.
-  - `dsh-mesh`: PeerScope (`system` / `user` / `group`), Delegation Tokens und cluster-weite Agent-Delegation.
-  - `dsh-workspace-tx`: Transaktionale Copy-on-Write Workspace-Mutationen mit human-in-the-loop Approval und Gruppen-Gating.
-  - `dsh-share`: Capability-basiertes Session-Sharing (`/share/dsh_sh_...`), Zero-Leakage Redaction (Secrets/API-Keys/Pfade) und Instant Revocation, integriert in das Drei-Punkte-Menü (`...`) der Sidebar-Sessions.
-- **Deklarative LSP-Code-Intelligenz (`dsh-lsp`)**:
-  - Konfiguriert deklarativ unter `my.features.dev.dsh.lsp`: Sprachserver (`nil` für Nix, `typescript-language-server` für TS/JS, `csharp-ls` für C#).
-  - Automatisches Rendering in Cordis-Patch-Layer (`@deepseek-ai/dsh-lsp`, `@deepseek-ai/dsh-lsp-stdio`, `@deepseek-ai/dsh-tool-lsp`).
-  - Modell-Tool `lsp` bietet AST-genaue Code-Navigation (`goToDefinition`, `findReferences`, `goToImplementation`, `hover`) mit Session-CWD-Workspace-Bindung, Zero-Leakage und automatischem Timeout-Budget.
-- **Client-Slot-Architektur (`@deepseek-ai/dsh-client-ui-slots`)**:
-  - Alle UI-Erweiterungen (Modals, Panels, Menüs, Split-Views) klinken sich deklarativ über typisierte `SlotMap`-Einträge ein (z. B. `conversation.view`, `conversation.composer.dock`, `conversation.input.left`, `sidebar.footer.action`, `settings.section`).
-  - Das vollständige Slot-Inventar mit Typen, Scopes und Quellpaketen ist dokumentiert unter `docs/dsh/dsh-slot-inventory.md`.
-- **Plugin-Entwicklung & Cordis-Architektur-Regeln**:
-  - **Service-Injektion (`inject`)**: Plugins müssen alle aufgerufenen Services (z. B. `'tools'`, `'systemPrompt'`, `'auth'`) explizit in `export const inject = [...]` deklarieren. Bei optionalen Abhängigkeiten immer `ctx.get('serviceName')` mit Null-Check verwenden, da Cordis-Proxies (`ReflectService`) bei undeclariertem `ctx.<service>` mit `cannot get property "<service>" without inject` abbrechen.
-  - **Lossless JSON Constraint**: Alle Tool-Ergebnisse (`execute()` in `defineTool`) werden strikt von `@deepseek-ai/dsh-util-values` (`snapshotJsonValue`) validiert. Rückgabewerte dürfen **keine** `undefined`-Werte in Keys/Objekten oder Arrays enthalten (`value is not lossless JSON`). Optionale Felder vor Rückgabe bereinigen (z. B. via `JSON.parse(JSON.stringify(result))`).
-  - **Side-Effects & Disposal**: Alle Event-Listener und Subscriptions müssen über `ctx.on()` oder `ctx.effect()` registriert werden und einen Disposer zurückgeben, damit HMR / Hot-Reloading leckagefrei funktioniert.
-- **Lokale DSH-Dokumentations-Bibliothek**:
-  - Upstream-Dokumentation: `features/dev/dsh/docs/upstream/` (u. a. `cordis-primer.md`, `cordis-tutorial/`, `tool-execution-pipeline.md`, `cookbook/adding-a-tool.md`, `capability-seams.md`).
-  - Plugin-Entwicklungs-Skill: `features/dev/dsh/docs/skills/cordis-plugin-development/SKILL.md`.
-  - Feature-Architektur & Guides: `features/dev/dsh/docs/` (`plugins.md`, `multi-tenancy.md`, `memory-architecture.md`, `distributed-agent-mesh.md`).
-  - Spezifikationen & Roadmaps: `docs/dsh/` (`01-dual-pane-canvas.md`, `03-declarative-lsp-intelligence.md`, `04-distributed-session-sync-and-handoff.md`, `04-feature-ideation-and-roadmap.md`, `05-memory-reliability-and-edge-cases.md`, `dsh-slot-inventory.md`).
 
 

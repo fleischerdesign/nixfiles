@@ -1,5 +1,0 @@
-patch:
-  - id: dsh-ingress
-    insert:
-      after: dsh-base
-    plugin: dsh-ingress
