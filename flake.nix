@@ -81,6 +81,7 @@
         (import ./packages/overlays/fix/bottles)
         (import ./packages/overlays/fix/authentik)
         (import ./packages/overlays/fix/paperless-ngx)
+        (import ./packages/overlays/fix/moonraker)
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];
