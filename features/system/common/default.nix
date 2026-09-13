@@ -45,7 +45,6 @@ in
       trusted-users = [
         "root"
         "@wheel"
-        "hermes"
       ];
 
       substituters = [ "https://cache.rls.ancoris.ovh/nixfiles" ];

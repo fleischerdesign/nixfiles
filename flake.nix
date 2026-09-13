@@ -63,6 +63,11 @@
       url = "github:fleischerdesign/nod/develop";
       inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
     };
+
+    openclaw = {
+      url = "github:openclaw/nix-openclaw";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
   };
 
   outputs =
@@ -83,6 +88,7 @@
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
         inputs.nix-vscode-extensions.overlays.default
+        inputs.openclaw.overlays.default
         (import ./packages/custom)
       ];
 
@@ -104,6 +110,7 @@
       globalModules = [
         inputs.sops-nix.nixosModules.sops
         inputs.nod.nixosModules.default
+        inputs.openclaw.nixosModules.openclaw-gateway
       ];
       hostNames = nixpkgs-unstable.lib.attrNames (
         nixpkgs-unstable.lib.filterAttrs (

@@ -18,6 +18,9 @@
       networking.topology.enable = lib.mkDefault true;
       security.enable = lib.mkDefault true;
     };
+    services = {
+      openclaw.enable = lib.mkDefault true;
+    };
   };
 
   my.features.system.networking.ssh.enable = lib.mkDefault true;

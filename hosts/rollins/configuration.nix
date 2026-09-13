@@ -28,92 +28,21 @@
     role = "agent";
     excludeLogPatterns = [
       ".*cache.*"
-      ".*moebius.*"
+      ".*ai.*"
     ];
   };
 
-  my.features.services.hermes = {
+  my.features.services.openclaw = {
     enable = true;
-    soulContent = builtins.readFile ../../features/services/hermes/SOUL.md;
-    integrations = {
-      hass = {
-        enable = true;
-        url = "https://hass.fls.ancoris.ovh";
-      };
-      paperless = {
-        enable = true;
-        url = "https://paperless.fls.ancoris.ovh";
-      };
-      camofox = {
-        enable = true;
-        url = "http://127.0.0.1:9377";
-      };
-      telegram = {
-        enable = true;
-        chatId = "5838211825";
-      };
-      vikunja = {
-        enable = false;
-        url = "https://vikunja.mky.ancoris.ovh";
-      };
-    };
-    subdomainDelegation = {
-      enable = true;
-      prefix = "moebius";
-    };
-    extensions = {
-      webui.enable = true;
-      webui.oidc = {
-        clientId = "WLcmhxTlLrbN9R4e7bfnlSNYi387OW1ynQWu27dG";
-        issuer = "https://auth.ancoris.ovh/application/o/hermes/";
-        allowValues = "philipp@fleischer.design";
-      };
-      mnemosyne.enable = true;
-      ddgs.enable = true;
-      obsidian.enable = true;
-    };
-    auxiliary = {
-      vision.provider = "deepseek";
-      vision.model = "DeepSeek-V4-Flash-Vision-Exp";
-      title_generation.provider = "deepseek";
-      title_generation.model = "deepseek-v4-flash";
-      compression.provider = "deepseek";
-      compression.model = "deepseek-v4-flash";
-      approval.provider = "deepseek";
-      approval.model = "deepseek-v4-flash";
-      web_extract.provider = "deepseek";
-      web_extract.model = "deepseek-v4-flash";
-    };
-  };
-
-  services.hermes-agent.environment = {
-    API_SERVER_ENABLED = "true";
-    API_SERVER_HOST = "127.0.0.1";
-    API_SERVER_PORT = "8642";
-  };
-
-  my.endpoints.hermes-webui = {
-    proxy = {
-      enable = true;
-      subdomain = "moebius";
-      auth = false;
-    };
+    role = "gateway";
+    subdomain = "ai";
+    auth = true;
   };
 
   my.features.services.camofox.enable = true;
 
   sops.secrets."pi/deepseek" = { };
   sops.secrets."pi/openrouter" = { };
-
-  sops.secrets.hermes_ssh_key = {
-    owner = "hermes";
-    mode = "0600";
-    path = "/var/lib/hermes/.ssh/id_ed25519";
-  };
-
-  systemd.tmpfiles.rules = [
-    "d /var/lib/hermes/.ssh 0700 hermes hermes - -"
-  ];
 
   system.stateVersion = "24.11";
 }

@@ -45,15 +45,15 @@
   my.features.desktop.webapps = {
     enable = true;
     apps = {
-      moebius = {
-        displayName = "Moebius";
-        url = "https://moebius.rls.ancoris.ovh";
-        icon = ../../media/moebius.png;
-        comment = "Hermes Moebius Subdomain Gateway";
+      openclaw = {
+        displayName = "OpenClaw";
+        url = "https://ai.rls.ancoris.ovh";
+        icon = ../../media/openclaw.png;
+        comment = "OpenClaw AI Gateway";
         categories = [
           "Network"
         ];
-        wmClass = "moebius";
+        wmClass = "openclaw";
       };
 
       gmail = {
