@@ -50,6 +50,10 @@ in
       "render"
     ];
 
+    systemd.services.jellyfin.serviceConfig = {
+      UMask = lib.mkForce "0002";
+    };
+
     my.endpoints.jellyfin = {
       host = config.networking.hostName;
       port = 8096;
