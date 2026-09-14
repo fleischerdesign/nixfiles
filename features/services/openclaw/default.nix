@@ -145,6 +145,11 @@ in
                 };
               };
             };
+            memory = {
+              search = {
+                provider = "none";
+              };
+            };
             agents = {
               defaults = {
                 model = {
