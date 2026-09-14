@@ -37,6 +37,7 @@
     role = "gateway";
     subdomain = "ai";
     auth = true;
+    adminUsers = [ "philipp@fleischer.design" ];
   };
 
   my.features.services.camofox.enable = true;

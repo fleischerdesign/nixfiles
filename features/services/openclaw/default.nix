@@ -41,6 +41,12 @@ in
       description = "Whether to protect the web UI via Authentik forward-auth in Caddy.";
     };
 
+    adminUsers = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "List of user emails from Authentik that are granted full operator.admin scopes.";
+    };
+
     gatewayUrl = lib.mkOption {
       type = lib.types.str;
       default = "ws://${rollinsTailscaleIp}:${toString cfg.port}";
@@ -88,6 +94,7 @@ in
               ];
               auth = {
                 mode = "trusted-proxy";
+                identityScopes = lib.genAttrs cfg.adminUsers (_: [ "operator.admin" ]);
                 trustedProxy = {
                   userHeader = "x-authentik-email";
                   allowLoopback = true;
@@ -108,6 +115,33 @@ in
                 allowedOrigins = [
                   "https://${cfg.subdomain}.${config.my.features.services.caddy.baseDomain}"
                 ];
+              };
+            };
+            models = {
+              mode = "merge";
+              providers = {
+                deepseek = {
+                  baseUrl = "https://api.deepseek.com";
+                  api = "openai-completions";
+                  models = [
+                    {
+                      id = "deepseek-flash";
+                      name = "DeepSeek Flash";
+                      reasoning = false;
+                      input = [ "text" ];
+                      contextWindow = 64000;
+                      maxTokens = 8192;
+                    }
+                    {
+                      id = "deepseek-chat";
+                      name = "DeepSeek Chat";
+                      reasoning = false;
+                      input = [ "text" ];
+                      contextWindow = 64000;
+                      maxTokens = 8192;
+                    }
+                  ];
+                };
               };
             };
             agents = {
