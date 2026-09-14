@@ -41,6 +41,11 @@
 
   my.features.services.camofox.enable = true;
 
+  my.features.services.authentik.outpost.proxy = {
+    enable = true;
+    tokenSecretName = "authentik_outpost_proxy_token_rollins";
+  };
+
   sops.secrets."pi/deepseek" = { };
   sops.secrets."pi/openrouter" = { };
 
