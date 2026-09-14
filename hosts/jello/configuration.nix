@@ -23,6 +23,7 @@
     enable = true;
     gateway.host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
     sessionHosting.enable = true;
+    rebuild.enable = true;
   };
 
   my.features.services.attic.client = {

@@ -36,7 +36,7 @@ let
 
   # Fixed, not configurable: it must match systemd's StateDirectory= so that the
   # directory is created (and owned by User=) before ExecStart runs.
-  stateDir = "/var/lib/openclaw-node";
+  stateDir = "/var/lib/openclaw";
 
   serviceHome = config.users.users.${cfg.tunnel.serviceUser}.home;
 
@@ -55,6 +55,10 @@ in
 {
   options.my.features.services.openclaw.node = {
     enable = lib.mkEnableOption "OpenClaw companion node (role: node)";
+
+    rebuild = {
+      enable = lib.mkEnableOption "allow openclaw to test and switch system configurations (nix trusted-user, sudoers for nod and nixos-rebuild)";
+    };
 
     gateway = {
       host = lib.mkOption {
@@ -256,22 +260,56 @@ in
     ];
 
     sops.templates."openclaw-node_env" = lib.mkIf hasPassword {
-      owner = "openclaw-node";
+      owner = "openclaw";
       restartUnits = [ "openclaw-node.service" ];
       content = "OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder.${cfg.passwordSecret}}\n";
     };
 
-    users.groups.openclaw-node = { };
+    users.groups.openclaw = { };
 
-    users.users.openclaw-node = {
+    users.users.openclaw = {
       isSystemUser = true;
-      group = "openclaw-node";
+      group = "openclaw";
       home = stateDir;
       # The directory itself is owned by StateDirectory= below; /var/lib paths are not
       # created by createHome for system users.
       createHome = false;
       shell = pkgs.bashInteractive;
     };
+
+    nix.settings.trusted-users = lib.mkIf cfg.rebuild.enable [ "openclaw" ];
+
+    security.sudo.extraRules = lib.mkIf cfg.rebuild.enable [
+      {
+        users = [ "openclaw" ];
+        commands = [
+          {
+            command = "/run/current-system/sw/bin/nod switch *";
+            options = [ "NOPASSWD" ];
+          }
+          {
+            command = "/run/current-system/sw/bin/nod test *";
+            options = [ "NOPASSWD" ];
+          }
+          {
+            command = "/run/current-system/sw/bin/nod check *";
+            options = [ "NOPASSWD" ];
+          }
+          {
+            command = "/run/current-system/sw/bin/nixos-rebuild switch *";
+            options = [ "NOPASSWD" ];
+          }
+          {
+            command = "/run/current-system/sw/bin/nixos-rebuild test *";
+            options = [ "NOPASSWD" ];
+          }
+          {
+            command = "/run/current-system/sw/bin/nixos-rebuild dry-run *";
+            options = [ "NOPASSWD" ];
+          }
+        ];
+      }
+    ];
 
     environment.etc = lib.mkIf (mergedNodeHost != { }) {
       "openclaw/node.json".source = pkgs.writeText "openclaw-node.json" (
@@ -280,10 +318,8 @@ in
     };
 
     systemd.tmpfiles.rules = [
-      # StateDirectory= only chowns the top-level directory. A previous DynamicUser run
-      # leaves state/ owned by a now-unused dynamic UID, which makes the node fail with
-      # EACCES on its own SQLite files. Repair ownership recursively on every activation.
-      "Z ${stateDir} 0700 openclaw-node openclaw-node - -"
+      # Repair ownership on activation
+      "Z ${stateDir} 0700 openclaw openclaw - -"
     ];
 
     systemd.services.openclaw-node-tunnel = lib.mkIf useTunnel {
@@ -327,10 +363,10 @@ in
       requires = lib.optional useTunnel "openclaw-node-tunnel.service";
 
       serviceConfig = {
-        User = "openclaw-node";
-        Group = "openclaw-node";
+        User = "openclaw";
+        Group = "openclaw";
         WorkingDirectory = stateDir;
-        StateDirectory = "openclaw-node";
+        StateDirectory = "openclaw";
         StateDirectoryMode = "0700";
         Environment = [
           "HOME=${stateDir}"
