@@ -212,6 +212,7 @@ in
         pkgs.git
         pkgs.ripgrep
         pkgs.fd
+        pkgs.procps
       ];
       description = ''
         Packages added to the PATH of commands executed on this node. Defaults to nix, git,

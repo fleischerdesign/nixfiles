@@ -211,6 +211,10 @@ in
     services.openclaw-gateway = {
       enable = true;
       port = cfg.port;
+      servicePath = [
+        pkgs.procps
+        pkgs.git
+      ];
       environmentFiles =
         lib.optional hasSecrets config.sops.templates."openclaw_env".path ++ cfg.extraEnvironmentFiles;
       environment = {
