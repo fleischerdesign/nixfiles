@@ -90,6 +90,7 @@ in
           config = lib.recursiveUpdate {
             gateway = {
               port = cfg.port;
+              mode = "local";
               bind = "lan";
               trustedProxies = [
                 "127.0.0.1"
