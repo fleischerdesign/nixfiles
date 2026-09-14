@@ -74,6 +74,9 @@ in
           owner = "openclaw";
           restartUnits = [ "openclaw-gateway.service" ];
           content = ''
+            ${lib.optionalString (
+              config.sops.secrets ? "openclaw_gateway_password"
+            ) "OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder.openclaw_gateway_password}"}
             ${lib.optionalString (config.sops.secrets ? "pi/deepseek")
               "DEEPSEEK_API_KEY=${config.sops.placeholder."pi/deepseek"}"
             }
