@@ -47,10 +47,10 @@ in
       description = "List of user emails from Authentik that are granted full operator.admin scopes.";
     };
 
-    gatewayUrl = lib.mkOption {
+    gatewayHost = lib.mkOption {
       type = lib.types.str;
-      default = "ws://${rollinsTailscaleIp}:${toString cfg.port}";
-      description = "Gateway WebSocket URL that the node connects to.";
+      default = rollinsTailscaleIp;
+      description = "Gateway host IP or domain that the node connects to.";
     };
 
     settings = lib.mkOption {
@@ -205,7 +205,7 @@ in
             DynamicUser = true;
             StateDirectory = "openclaw-node";
             WorkingDirectory = "/var/lib/openclaw-node";
-            ExecStart = "${pkgs.openclaw}/bin/openclaw node run --gateway ${cfg.gatewayUrl}";
+            ExecStart = "${pkgs.openclaw}/bin/openclaw node run --host ${cfg.gatewayHost} --port ${toString cfg.port} --no-tls --display-name ${config.networking.hostName}";
             Restart = "always";
             RestartSec = 5;
           };
