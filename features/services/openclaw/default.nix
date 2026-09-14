@@ -7,8 +7,6 @@
 }:
 let
   cfg = config.my.features.services.openclaw;
-  rollinsTailscaleIp =
-    config.my.features.system.networking.topology.hosts.rollins.tailscaleIp or "127.0.0.1";
 in
 {
   options.my.features.services.openclaw = {
@@ -49,8 +47,14 @@ in
 
     gatewayHost = lib.mkOption {
       type = lib.types.str;
-      default = rollinsTailscaleIp;
+      default = "ai.rls.ancoris.ovh";
       description = "Gateway host IP or domain that the node connects to.";
+    };
+
+    gatewayTls = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether the node connects to the gateway using TLS (wss://).";
     };
 
     settings = lib.mkOption {
@@ -215,7 +219,9 @@ in
               "HOME=/var/lib/openclaw-node"
               "OPENCLAW_STATE_DIR=/var/lib/openclaw-node"
             ];
-            ExecStart = "${pkgs.openclaw}/bin/openclaw node run --host ${cfg.gatewayHost} --port ${toString cfg.port} --no-tls --display-name ${config.networking.hostName}";
+            ExecStart = "${pkgs.openclaw}/bin/openclaw node run --host ${cfg.gatewayHost} ${
+              if cfg.gatewayTls then "--tls --port 443" else "--no-tls --port ${toString cfg.port}"
+            } --display-name ${config.networking.hostName}";
             Restart = "always";
             RestartSec = 5;
           };
