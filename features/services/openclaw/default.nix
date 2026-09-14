@@ -95,6 +95,9 @@ in
               port = cfg.port;
               mode = "local";
               bind = "lan";
+              remote = {
+                url = "wss://${cfg.subdomain}.${config.my.features.services.caddy.baseDomain}";
+              };
               trustedProxies = [
                 "127.0.0.1"
                 "::1"
