@@ -77,6 +77,9 @@ in
             ${lib.optionalString (config.sops.secrets ? "pi/deepseek")
               "DEEPSEEK_API_KEY=${config.sops.placeholder."pi/deepseek"}"
             }
+            ${lib.optionalString (
+              config.sops.secrets ? "openai_api_key"
+            ) "OPENAI_API_KEY=${config.sops.placeholder.openai_api_key}"}
           '';
         };
 
@@ -147,7 +150,7 @@ in
             };
             memory = {
               search = {
-                provider = "none";
+                provider = "openai";
               };
             };
             agents = {

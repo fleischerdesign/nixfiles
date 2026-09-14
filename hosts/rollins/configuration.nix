@@ -49,6 +49,7 @@
 
   sops.secrets."pi/deepseek" = { };
   sops.secrets."pi/openrouter" = { };
+  sops.secrets.openai_api_key = { };
 
   system.stateVersion = "24.11";
 }
