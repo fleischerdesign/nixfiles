@@ -123,6 +123,7 @@ in
                 deepseek = {
                   baseUrl = "https://api.deepseek.com";
                   api = "openai-completions";
+                  apiKey = "$DEEPSEEK_API_KEY";
                   models = [
                     {
                       id = "deepseek-flash";
