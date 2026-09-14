@@ -21,6 +21,12 @@
   my.features.system.networking.tailscale.enable = true;
   my.features.system.networking.tailscale.acceptRoutes = true;
 
+  my.features.services.openclaw.node = {
+    enable = true;
+    gateway.host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+    sessionHosting.enable = true;
+  };
+
   my.features.services.attic.client = {
     enable = true;
     autoPush = true;

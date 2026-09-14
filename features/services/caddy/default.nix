@@ -40,36 +40,53 @@ in
       virtualHosts =
         let
           localServices = lib.filterAttrs (
-            _: svc:
-            svc.host == config.networking.hostName
-            && svc.proxy.enable
-            && svc.canonicalDomain != null
+            _: svc: svc.host == config.networking.hostName && svc.proxy.enable && svc.canonicalDomain != null
           ) config.my.endpoints;
 
-          mkVHost =
-            _name: conf:
-            {
-              name = conf.canonicalDomain;
-              value = {
-                extraConfig =
-                  if conf.proxy.auth then
-                    ''
-                      import authentik
-                      handle {
-                        forward_auth ${cfg.authentikOutpostAddress} {
-                          uri /outpost.goauthentik.io/auth/caddy
-                          copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
-                          trusted_proxies private_ranges
-                        }
-                        reverse_proxy 127.0.0.1:${toString conf.port}
+          mkVHost = _name: conf: {
+            name = conf.canonicalDomain;
+            value = {
+              extraConfig =
+                let
+                  target = "127.0.0.1:${toString conf.port}";
+
+                  exemptHandlers =
+                    lib.optionalString (conf.proxy.unauthenticatedPaths != [ ]) ''
+                      @unauthenticatedRoute path ${lib.concatStringsSep " " conf.proxy.unauthenticatedPaths}
+                      handle @unauthenticatedRoute {
+                        reverse_proxy ${target}
                       }
                     ''
-                  else
-                    ''
-                      reverse_proxy 127.0.0.1:${toString conf.port}
+                    + lib.optionalString conf.proxy.machineClientsBypassAuth ''
+                      @nonBrowserWebsocket {
+                        header Connection *Upgrade*
+                        header Upgrade websocket
+                        not header Origin *
+                      }
+                      handle @nonBrowserWebsocket {
+                        reverse_proxy ${target}
+                      }
                     '';
-              };
+                in
+                if conf.proxy.auth then
+                  ''
+                    import authentik
+                    ${exemptHandlers}
+                    handle {
+                      forward_auth ${cfg.authentikOutpostAddress} {
+                        uri /outpost.goauthentik.io/auth/caddy
+                        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
+                        trusted_proxies private_ranges
+                      }
+                      reverse_proxy ${target}
+                    }
+                  ''
+                else
+                  ''
+                    reverse_proxy ${target}
+                  '';
             };
+          };
         in
         lib.listToAttrs (lib.mapAttrsToList mkVHost localServices);
     };

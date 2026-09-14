@@ -26,6 +26,10 @@
     webapps.enable = lib.mkDefault true;
   };
 
+  my.features.services = {
+    openclaw.node.enable = lib.mkDefault true;
+  };
+
   my.features.dev = {
     containers.enable = lib.mkDefault true;
     codium.enable = lib.mkDefault true;

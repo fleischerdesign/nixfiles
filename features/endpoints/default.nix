@@ -15,36 +15,34 @@ let
 
   allTcp = lib.concatMap (
     ep:
-    lib.optional
-      (ep.directAccess.interface == "all" && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both"))
-      ep.port
+    lib.optional (
+      ep.directAccess.interface == "all"
+      && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
+    ) ep.port
   ) (lib.attrValues ownEndpoints);
 
   allUdp = lib.concatMap (
     ep:
-    lib.optional
-      (ep.directAccess.interface == "all" && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both"))
-      ep.port
+    lib.optional (
+      ep.directAccess.interface == "all"
+      && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
+    ) ep.port
   ) (lib.attrValues ownEndpoints);
 
   tailscaleTcp = lib.concatMap (
     ep:
-    lib.optional
-      (
-        ep.directAccess.interface == "tailscale"
-        && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
-      )
-      ep.port
+    lib.optional (
+      ep.directAccess.interface == "tailscale"
+      && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
+    ) ep.port
   ) (lib.attrValues ownEndpoints);
 
   tailscaleUdp = lib.concatMap (
     ep:
-    lib.optional
-      (
-        ep.directAccess.interface == "tailscale"
-        && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
-      )
-      ep.port
+    lib.optional (
+      ep.directAccess.interface == "tailscale"
+      && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
+    ) ep.port
   ) (lib.attrValues ownEndpoints);
 in
 {
@@ -91,6 +89,30 @@ in
               type = lib.types.bool;
               default = false;
               description = "Enable WebSocket passthrough in reverse proxy";
+            };
+
+            # Edge-auth exemptions for machine clients. Both options exist because a single
+            # port serves two client classes: browsers (which always send an Origin header)
+            # and non-browser clients such as CLIs, nodes, and workers (which do not).
+            unauthenticatedPaths = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+              description = ''
+                Path globs that bypass forward-auth entirely and are proxied directly.
+                Use for self-authenticating routes that carry their own short-lived
+                credential in the URL (e.g. "/j/*").
+              '';
+            };
+
+            machineClientsBypassAuth = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = ''
+                Bypass forward-auth for WebSocket upgrades that carry no Origin header,
+                i.e. non-browser clients. Browsers always send Origin, so the Control UI
+                stays behind forward-auth. Use for services that enforce their own
+                credential on the WebSocket handshake (device/bootstrap tokens).
+              '';
             };
           };
 
@@ -208,10 +230,7 @@ in
             let
               epConfig = submod.config;
             in
-            if epConfig.canonicalDomain != null then
-              "https://${epConfig.canonicalDomain}"
-            else
-              null;
+            if epConfig.canonicalDomain != null then "https://${epConfig.canonicalDomain}" else null;
 
           localUrl =
             let

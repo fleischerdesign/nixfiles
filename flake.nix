@@ -117,6 +117,13 @@
           name: type: type == "directory" && builtins.pathExists (./hosts + "/${name}/configuration.nix")
         ) (builtins.readDir ./hosts)
       );
+
+      # Every host that runs the OpenClaw gateway gets its rendered config validated
+      # against the upstream schema at build time; `services.openclaw-gateway.config`
+      # itself is only checked with `builtins.isAttrs`.
+      gatewayHosts = nixpkgs-unstable.lib.filter (
+        name: self.nixosConfigurations.${name}.config.services.openclaw-gateway.enable
+      ) hostNames;
     in
     {
       formatter.${system} = pkgs.nixfmt;
@@ -176,7 +183,24 @@
               deadnix --fail ${./.}
               touch $out
             '';
-      };
+      }
+      // nixpkgs-unstable.lib.genAttrs' gatewayHosts (name: {
+        name = "openclaw-config-validity-${name}";
+        value =
+          pkgs.runCommandLocal "openclaw-config-validity-${name}"
+            {
+              nativeBuildInputs = [ self.nixosConfigurations.${name}.config.services.openclaw-gateway.package ];
+            }
+            ''
+              export HOME="$TMPDIR/home"
+              export OPENCLAW_STATE_DIR="$TMPDIR/state"
+              export OPENCLAW_CONFIG_PATH=${
+                self.nixosConfigurations.${name}.config.environment.etc."openclaw/openclaw.json".source
+              }
+              mkdir -p "$HOME" "$OPENCLAW_STATE_DIR"
+              openclaw config validate --json > $out
+            '';
+      });
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [

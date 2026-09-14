@@ -18,17 +18,13 @@
       networking.topology.enable = lib.mkDefault true;
       security.enable = lib.mkDefault true;
     };
-    services = {
-      openclaw.enable = lib.mkDefault true;
-    };
   };
 
   my.features.system.networking.ssh.enable = lib.mkDefault true;
 
-  # Credentials shared across hosts (consumed by pi/agents/openclaw)
+  # Credentials shared across hosts (consumed by pi/agents)
   sops.secrets."pi/deepseek" = lib.mkDefault { };
   sops.secrets."pi/openrouter" = lib.mkDefault { };
-  sops.secrets."openclaw_gateway_password" = lib.mkDefault { };
 
   nod = {
     enable = lib.mkDefault true;

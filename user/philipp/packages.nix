@@ -18,6 +18,7 @@ in
     ]
     ++ lib.optionals (role != "server") [
       # --- Desktop Only ---
+      openclaw
       telegram-desktop
       google-chrome
       nerd-fonts.jetbrains-mono

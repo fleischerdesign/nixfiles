@@ -32,12 +32,56 @@
     ];
   };
 
-  my.features.services.openclaw = {
+  my.features.services.openclaw.gateway = {
     enable = true;
-    role = "gateway";
     subdomain = "ai";
     auth = true;
     adminUsers = [ "philipp@fleischer.design" ];
+    defaultModel = "deepseek/deepseek-flash";
+    memorySearch = "openai";
+    runtimePlugins = [ "deepseek" ];
+    secrets = {
+      deepseek = "pi/deepseek";
+      openai = "openai_api_key";
+      password = "openclaw_gateway_password";
+    };
+
+    # The DeepSeek runtime plugin still ships the retired `deepseek-v4-*` catalogue and
+    # only applies its thinking profile to ids with that prefix, while the DeepSeek API
+    # already serves `deepseek-flash`. Declaring the current model explicitly keeps the
+    # plugin's provider family (request shaping, reasoning_content replay) and adds the
+    # correct catalogue entry; compat/cost mirror the plugin manifest.
+    settings.models.providers.deepseek = {
+      baseUrl = "https://api.deepseek.com";
+      api = "openai-completions";
+      apiKey = "$DEEPSEEK_API_KEY";
+      models = [
+        {
+          id = "deepseek-flash";
+          name = "DeepSeek Flash (V4.1)";
+          reasoning = true;
+          input = [
+            "text"
+            "image"
+          ];
+          contextWindow = 1000000;
+          maxTokens = 384000;
+          cost = {
+            input = 0.14;
+            output = 0.28;
+            cacheRead = 0.0028;
+            cacheWrite = 0;
+          };
+          compat = {
+            supportsUsageInStreaming = true;
+            supportsReasoningEffort = true;
+            maxTokensField = "max_tokens";
+            codeMode = "preferred";
+            requiresReasoningContentOnAssistantMessages = true;
+          };
+        }
+      ];
+    };
   };
 
   my.features.services.camofox.enable = true;
@@ -46,10 +90,6 @@
     enable = true;
     tokenSecretName = "authentik_outpost_proxy_token_rollins";
   };
-
-  sops.secrets."pi/deepseek" = { };
-  sops.secrets."pi/openrouter" = { };
-  sops.secrets.openai_api_key = { };
 
   system.stateVersion = "24.11";
 }
