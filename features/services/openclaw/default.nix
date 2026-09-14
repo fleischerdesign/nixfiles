@@ -205,6 +205,10 @@ in
             DynamicUser = true;
             StateDirectory = "openclaw-node";
             WorkingDirectory = "/var/lib/openclaw-node";
+            Environment = [
+              "HOME=/var/lib/openclaw-node"
+              "OPENCLAW_STATE_DIR=/var/lib/openclaw-node"
+            ];
             ExecStart = "${pkgs.openclaw}/bin/openclaw node run --host ${cfg.gatewayHost} --port ${toString cfg.port} --no-tls --display-name ${config.networking.hostName}";
             Restart = "always";
             RestartSec = 5;
