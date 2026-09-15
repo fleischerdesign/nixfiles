@@ -49,7 +49,7 @@ let
                   fs.writeFileSync(full, c);
                 }
               }
-              // 3. Patch verified-inference-*.mjs to allow symlink entries in runtime artifact scan
+              // 3. Patch verified-inference-*.mjs to allow symlink entries in runtime artifact scan and hash
               if (f.startsWith("verified-inference-") && f.endsWith(".mjs")) {
                 const full = path.join(distDir, f);
                 let c = fs.readFileSync(full, "utf8");
@@ -58,8 +58,11 @@ let
                     "if (entry.kind !== \"file\") throw new Error(`plugin runtime artifact contains unsupported ''${entry.kind} entry`);",
                     "if (entry.kind !== \"file\" && entry.kind !== \"symlink\") throw new Error(`plugin runtime artifact contains unsupported ''${entry.kind} entry`);"
                   );
-                  fs.writeFileSync(full, c);
                 }
+                if (c.includes("rejectHardlinks: false\n\t});") || c.includes("rejectHardlinks: false\n  });") || c.includes("rejectHardlinks: false\r\n\t});")) {
+                  c = c.replace(/rejectHardlinks:\s*false/g, "rejectHardlinks: false,\n\t\trejectSymlinks: false");
+                }
+                fs.writeFileSync(full, c);
               }
             }
           }
