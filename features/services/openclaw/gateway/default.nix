@@ -188,6 +188,7 @@ let
           // lib.optionalAttrs (inst.agentName != null || inst.agentEmoji != null) {
             entries.main = {
               name = inst.agentName;
+              workspace = "${stateDir}/workspace";
               identity = {
                 name = inst.agentName;
               }
