@@ -42,14 +42,28 @@ let
         (secretEnv "OPENCLAW_GATEWAY_PASSWORD" inst.secrets.password)
         (secretEnv "GITHUB_TOKEN" inst.secrets.github)
         (secretEnv "GH_TOKEN" inst.secrets.github)
+        (secretEnv "A2A_TOKEN" (lib.optionalString inst.a2a.enable inst.a2a.tokenSecret))
       ];
 
-      secretNames = lib.filter (s: s != null) [
+      secretNames = lib.filter (s: s != null && s != "") [
         inst.secrets.deepseek
         inst.secrets.openai
         inst.secrets.password
         inst.secrets.github
+        (lib.optionalString inst.a2a.enable inst.a2a.tokenSecret)
       ];
+
+      a2aConfig = lib.optionalAttrs inst.a2a.enable {
+        channels.a2a = {
+          enabled = true;
+          advertisedUrl = inst.a2a.advertisedUrl;
+          peers = builtins.mapAttrs (_peerName: peer: {
+            url = peer.url;
+            token = "$A2A_TOKEN";
+            outboundToken = "$A2A_TOKEN";
+          }) inst.a2a.peers;
+        };
+      };
 
       hasSecrets = secretNames != [ ];
 
@@ -57,12 +71,16 @@ let
         id: !(builtins.hasAttr id pkgs.openclawRuntimePlugins)
       ) inst.runtimePlugins;
 
-      pluginConfig = lib.optionalAttrs (inst.runtimePlugins != [ ]) {
+      pluginConfig = {
         plugins = {
           load.paths = map (id: "${pkgs.openclawRuntimePlugins.${id}}") inst.runtimePlugins;
-          entries = lib.genAttrs inst.runtimePlugins (_: {
-            enabled = true;
-          });
+          entries =
+            (lib.genAttrs inst.runtimePlugins (_: {
+              enabled = true;
+            }))
+            // {
+              workboard.enabled = true;
+            };
         };
       };
 
@@ -118,6 +136,7 @@ let
           agents.defaults.model.primary = inst.defaultModel;
         }
         // pluginConfig
+        // a2aConfig
       ) inst.settings;
     in
     {
@@ -239,6 +258,46 @@ let
           type = lib.types.listOf lib.types.str;
           default = [ ];
           description = "Extra systemd EnvironmentFiles.";
+        };
+
+        a2a = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Enable A2A (Agent-to-Agent) protocol channel.";
+          };
+
+          advertisedUrl = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = publicUrl;
+            description = "Public gateway origin advertised in agent card.";
+          };
+
+          tokenSecret = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = "openclaw_gateway_token";
+            description = "SOPS secret used for A2A peer authentication.";
+          };
+
+          peers = lib.mkOption {
+            type = lib.types.attrsOf (
+              lib.types.submodule {
+                options = {
+                  url = lib.mkOption {
+                    type = lib.types.str;
+                    description = "Target peer URL (e.g. https://katja.ai.rls.ancoris.ovh).";
+                  };
+                  tokenSecret = lib.mkOption {
+                    type = lib.types.nullOr lib.types.str;
+                    default = "openclaw_gateway_token";
+                    description = "SOPS secret containing bearer token for this peer.";
+                  };
+                };
+              }
+            );
+            default = { };
+            description = "Declared A2A peer gateways.";
+          };
         };
 
         settings = lib.mkOption {
@@ -479,6 +538,9 @@ in
               unauthenticatedPaths = [
                 "/j/*"
                 "/__openclaw__/worker*"
+                "/.well-known/agent-card.json"
+                "/.well-known/agent.json"
+                "/a2a/*"
               ];
               machineClientsBypassAuth = true;
             };

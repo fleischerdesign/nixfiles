@@ -163,6 +163,31 @@
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
       };
+
+      # Mutually peer all instances on rollins via A2A
+      instances.philipp.a2a.peers = {
+        katja.url = "https://katja.ai.rls.ancoris.ovh";
+        lilly.url = "https://lilly.ai.rls.ancoris.ovh";
+        kai.url = "https://kai.ai.rls.ancoris.ovh";
+      };
+
+      instances.katja.a2a.peers = {
+        philipp.url = "https://philipp.ai.rls.ancoris.ovh";
+        lilly.url = "https://lilly.ai.rls.ancoris.ovh";
+        kai.url = "https://kai.ai.rls.ancoris.ovh";
+      };
+
+      instances.lilly.a2a.peers = {
+        philipp.url = "https://philipp.ai.rls.ancoris.ovh";
+        katja.url = "https://katja.ai.rls.ancoris.ovh";
+        kai.url = "https://kai.ai.rls.ancoris.ovh";
+      };
+
+      instances.kai.a2a.peers = {
+        philipp.url = "https://philipp.ai.rls.ancoris.ovh";
+        katja.url = "https://katja.ai.rls.ancoris.ovh";
+        lilly.url = "https://lilly.ai.rls.ancoris.ovh";
+      };
     };
 
   # Direct alias / redirect for ai.rls.ancoris.ovh -> philipp.ai.rls.ancoris.ovh
