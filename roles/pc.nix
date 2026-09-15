@@ -35,6 +35,7 @@
     codium.enable = lib.mkDefault true;
     nixvim.enable = lib.mkDefault true;
     obsidian.enable = lib.mkDefault true;
+    openclaw.enable = lib.mkDefault true;
   };
 
   my.features.media = {
