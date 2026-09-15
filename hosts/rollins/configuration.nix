@@ -164,29 +164,77 @@
         };
       };
 
-      # Mutually peer all instances on rollins via A2A
-      instances.philipp.a2a.peers = {
-        katja.url = "https://katja.ai.rls.ancoris.ovh";
-        lilly.url = "https://lilly.ai.rls.ancoris.ovh";
-        kai.url = "https://kai.ai.rls.ancoris.ovh";
+      # Mutually peer all instances on rollins via A2A with unique per-instance tokens
+      instances.philipp.a2a = {
+        tokenSecret = "openclaw_a2a_token_philipp";
+        peers = {
+          katja = {
+            url = "https://katja.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_katja";
+          };
+          lilly = {
+            url = "https://lilly.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_lilly";
+          };
+          kai = {
+            url = "https://kai.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_kai";
+          };
+        };
       };
 
-      instances.katja.a2a.peers = {
-        philipp.url = "https://philipp.ai.rls.ancoris.ovh";
-        lilly.url = "https://lilly.ai.rls.ancoris.ovh";
-        kai.url = "https://kai.ai.rls.ancoris.ovh";
+      instances.katja.a2a = {
+        tokenSecret = "openclaw_a2a_token_katja";
+        peers = {
+          philipp = {
+            url = "https://philipp.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_philipp";
+          };
+          lilly = {
+            url = "https://lilly.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_lilly";
+          };
+          kai = {
+            url = "https://kai.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_kai";
+          };
+        };
       };
 
-      instances.lilly.a2a.peers = {
-        philipp.url = "https://philipp.ai.rls.ancoris.ovh";
-        katja.url = "https://katja.ai.rls.ancoris.ovh";
-        kai.url = "https://kai.ai.rls.ancoris.ovh";
+      instances.lilly.a2a = {
+        tokenSecret = "openclaw_a2a_token_lilly";
+        peers = {
+          philipp = {
+            url = "https://philipp.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_philipp";
+          };
+          katja = {
+            url = "https://katja.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_katja";
+          };
+          kai = {
+            url = "https://kai.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_kai";
+          };
+        };
       };
 
-      instances.kai.a2a.peers = {
-        philipp.url = "https://philipp.ai.rls.ancoris.ovh";
-        katja.url = "https://katja.ai.rls.ancoris.ovh";
-        lilly.url = "https://lilly.ai.rls.ancoris.ovh";
+      instances.kai.a2a = {
+        tokenSecret = "openclaw_a2a_token_kai";
+        peers = {
+          philipp = {
+            url = "https://philipp.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_philipp";
+          };
+          katja = {
+            url = "https://katja.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_katja";
+          };
+          lilly = {
+            url = "https://lilly.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_lilly";
+          };
+        };
       };
     };
 

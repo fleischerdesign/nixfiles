@@ -72,10 +72,10 @@ let
               else
                 osConfig.sops.placeholder.${inst.a2a.tokenSecret};
             outboundToken =
-              if peer.tokenSecret != null then
-                osConfig.sops.placeholder.${peer.tokenSecret}
+              if inst.a2a.tokenSecret != null then
+                osConfig.sops.placeholder.${inst.a2a.tokenSecret}
               else
-                osConfig.sops.placeholder.${inst.a2a.tokenSecret};
+                osConfig.sops.placeholder.${peer.tokenSecret};
           }) inst.a2a.peers;
         };
       };
