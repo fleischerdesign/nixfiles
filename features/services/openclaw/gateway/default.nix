@@ -182,7 +182,20 @@ let
           };
           models.mode = "merge";
           memory.search.provider = inst.memorySearch;
-          agents.defaults.model.primary = inst.defaultModel;
+          agents = {
+            defaults.model.primary = inst.defaultModel;
+          }
+          // lib.optionalAttrs (inst.agentName != null || inst.agentEmoji != null) {
+            entries.main = {
+              name = inst.agentName;
+              identity = {
+                name = inst.agentName;
+              }
+              // lib.optionalAttrs (inst.agentEmoji != null) {
+                emoji = inst.agentEmoji;
+              };
+            };
+          };
           talk = {
             speechLocale = "de-DE";
             realtime = {
@@ -234,6 +247,18 @@ let
           type = lib.types.str;
           default = "deepseek/deepseek-flash";
           description = "Default agent model for this instance.";
+        };
+
+        agentName = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Display name for the primary agent (shown in Web UI header/dropdown).";
+        };
+
+        agentEmoji = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Signature emoji for the primary agent.";
         };
 
         memorySearch = lib.mkOption {

@@ -71,6 +71,8 @@
       instances = {
         philipp = {
           enable = true;
+          agentName = "Moebius";
+          agentEmoji = "🌀";
           port = 18789;
           subdomain = "philipp.ai";
           auth = true;
@@ -93,6 +95,8 @@
 
         katja = {
           enable = true;
+          agentName = "Frida";
+          agentEmoji = "🌸";
           port = 18791;
           subdomain = "katja.ai";
           auth = true;
@@ -117,6 +121,8 @@
 
         lilly = {
           enable = true;
+          agentName = "Cleo";
+          agentEmoji = "✨";
           port = 18792;
           subdomain = "lilly.ai";
           auth = true;
@@ -141,6 +147,8 @@
 
         kai = {
           enable = true;
+          agentName = "Keno";
+          agentEmoji = "⚡";
           port = 18793;
           subdomain = "kai.ai";
           auth = true;
