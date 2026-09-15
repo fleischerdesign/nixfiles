@@ -89,6 +89,7 @@
         (import ./packages/overlays/fix/moonraker)
         inputs.nix-vscode-extensions.overlays.default
         inputs.openclaw.overlays.default
+        (import ./packages/overlays/fix/openclaw)
         (import ./packages/custom)
       ];
 
