@@ -24,6 +24,8 @@
   my.features.services.openclaw.node = {
     enable = true;
     gateway.host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+    transport = "loopback-tunnel";
+    passwordSecret = "openclaw_gateway_password";
     sessionHosting.enable = true;
     rebuild.enable = true;
   };

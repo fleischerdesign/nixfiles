@@ -6,14 +6,12 @@
 # device token.
 #
 # Transports:
-#   direct            (Default / Recommended) The node dials the gateway directly over the
-#                     trusted network (Tailscale / LAN). When the gateway configures
-#                     `gateway.nodes.pairing.autoApproveCidrs` (or `sshVerify`), initial
-#                     pairing is fully unattended and automatic without needing any shared
-#                     passwords or SSH tunnels.
+#   loopback-tunnel   (Default) The node connects to the gateway via an SSH -L forward
+#                     to 127.0.0.1 and authenticates with the shared gateway password.
+#                     This is mandatory when the gateway runs with `auth.mode = "trusted-proxy"`,
+#                     as OpenClaw's security policy requires clean loopback for password auth.
 #
-#   loopback-tunnel   Legacy fallback: systemd keeps an SSH -L forward on 127.0.0.1 and uses
-#                     the shared gateway password.
+#   direct            The node dials the gateway directly (e.g. over Tailscale or token auth).
 {
   config,
   lib,
@@ -89,14 +87,16 @@ in
 
     transport = lib.mkOption {
       type = lib.types.enum [
-        "direct"
         "loopback-tunnel"
+        "direct"
       ];
-      default = "direct";
+      default = "loopback-tunnel";
       description = ''
-        direct: node dials the gateway directly (e.g. over Tailscale or LAN). Pairing is
-                automatically approved when gateway.nodes.pairing.autoApproveCidrs is active.
-        loopback-tunnel: legacy fallback using an SSH -L forward and a shared password.
+        loopback-tunnel: (Default) The node tunnels to the gateway over SSH -L and dials
+                        clean 127.0.0.1 with the shared gateway password. This is required
+                        when the gateway runs in trusted-proxy auth mode because OpenClaw
+                        requires clean loopback for password-authenticated machine connections.
+        direct: node dials the gateway directly (e.g. over Tailscale or token auth).
       '';
     };
 
