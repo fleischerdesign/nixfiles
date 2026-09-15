@@ -44,6 +44,7 @@
       deepseek = "pi/deepseek";
       openai = "openai_api_key";
       password = "openclaw_gateway_password";
+      github = "github_pat_philipp";
     };
 
     # The DeepSeek runtime plugin still ships the retired `deepseek-v4-*` catalogue and

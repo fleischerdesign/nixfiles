@@ -30,12 +30,15 @@ let
     (secretEnv "DEEPSEEK_API_KEY" cfg.secrets.deepseek)
     (secretEnv "OPENAI_API_KEY" cfg.secrets.openai)
     (secretEnv "OPENCLAW_GATEWAY_PASSWORD" cfg.secrets.password)
+    (secretEnv "GITHUB_TOKEN" cfg.secrets.github)
+    (secretEnv "GH_TOKEN" cfg.secrets.github)
   ];
 
   secretNames = lib.filter (name: name != null) [
     cfg.secrets.deepseek
     cfg.secrets.openai
     cfg.secrets.password
+    cfg.secrets.github
   ];
 
   # Deliberately derived from the option values, not from `config.sops.placeholder`:
@@ -143,6 +146,20 @@ in
       description = "Open the gateway port on the Tailscale interface for direct node connections.";
     };
 
+    gitAuthor = {
+      name = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = config.my.user.fullName;
+        description = "Git author and committer name for workspace sync and commits made by agent tools.";
+      };
+
+      email = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = config.my.user.email;
+        description = "Git author and committer email for workspace sync and commits made by agent tools.";
+      };
+    };
+
     secrets = {
       deepseek = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
@@ -167,6 +184,16 @@ in
           reach the gateway over a real loopback transport (`transport = "loopback-tunnel"`),
           because `auth.mode = "trusted-proxy"` only accepts the password for
           "clean loopback/direct callers".
+        '';
+      };
+
+      github = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "github_pat_philipp";
+        description = ''
+          SOPS secret rendered into GITHUB_TOKEN and GH_TOKEN for the gateway process.
+          Also sets gateway.controlUi.github.token for remote project discovery and repository previews.
         '';
       };
     };
@@ -214,6 +241,7 @@ in
       servicePath = [
         pkgs.procps
         pkgs.git
+        pkgs.gh
       ];
       environmentFiles =
         lib.optional hasSecrets config.sops.templates."openclaw_env".path ++ cfg.extraEnvironmentFiles;
@@ -221,6 +249,14 @@ in
         # Nix-managed config is read-only: refuse CLI-side plugin/config mutation.
         OPENCLAW_NIX_MODE = "1";
         OPENCLAW_DISABLE_PERSISTED_PLUGIN_REGISTRY = "1";
+      }
+      // lib.optionalAttrs (cfg.gitAuthor.name != null) {
+        GIT_AUTHOR_NAME = cfg.gitAuthor.name;
+        GIT_COMMITTER_NAME = cfg.gitAuthor.name;
+      }
+      // lib.optionalAttrs (cfg.gitAuthor.email != null) {
+        GIT_AUTHOR_EMAIL = cfg.gitAuthor.email;
+        GIT_COMMITTER_EMAIL = cfg.gitAuthor.email;
       };
       config = lib.recursiveUpdate (
         {
@@ -255,6 +291,9 @@ in
             controlUi = {
               enabled = true;
               allowedOrigins = [ publicUrl ] ++ cfg.controlUiExtraOrigins;
+            }
+            // lib.optionalAttrs (cfg.secrets.github != null) {
+              github.token = "$GITHUB_TOKEN";
             };
             nodes.pairing = {
               autoApproveLocal = true;

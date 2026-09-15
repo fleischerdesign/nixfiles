@@ -209,18 +209,33 @@ in
       '';
     };
 
+    gitAuthor = {
+      name = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = config.my.user.fullName;
+        description = "Git author and committer name for workspace sync and commits made by agent tools.";
+      };
+
+      email = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = config.my.user.email;
+        description = "Git author and committer email for workspace sync and commits made by agent tools.";
+      };
+    };
+
     extraPackages = lib.mkOption {
       type = lib.types.listOf lib.types.package;
       default = [
         pkgs.nix
         pkgs.git
+        pkgs.gh
         pkgs.ripgrep
         pkgs.fd
         pkgs.procps
       ];
       description = ''
         Packages added to the PATH of commands executed on this node. Defaults to nix, git,
-        ripgrep and fd so the agent can build and inspect repositories on the node;
+        gh, ripgrep, fd and procps so the agent can build and inspect repositories on the node;
         set to [ ] to run a restricted node.
       '';
     };
@@ -372,7 +387,11 @@ in
           "HOME=${stateDir}"
           "OPENCLAW_STATE_DIR=${stateDir}"
         ]
-        ++ lib.optional (mergedNodeHost != { }) "OPENCLAW_CONFIG_PATH=/etc/openclaw/node.json";
+        ++ lib.optional (mergedNodeHost != { }) "OPENCLAW_CONFIG_PATH=/etc/openclaw/node.json"
+        ++ lib.optional (cfg.gitAuthor.name != null) "GIT_AUTHOR_NAME=${cfg.gitAuthor.name}"
+        ++ lib.optional (cfg.gitAuthor.name != null) "GIT_COMMITTER_NAME=${cfg.gitAuthor.name}"
+        ++ lib.optional (cfg.gitAuthor.email != null) "GIT_AUTHOR_EMAIL=${cfg.gitAuthor.email}"
+        ++ lib.optional (cfg.gitAuthor.email != null) "GIT_COMMITTER_EMAIL=${cfg.gitAuthor.email}";
         EnvironmentFile = lib.optional hasPassword config.sops.templates."openclaw-node_env".path;
         ExecStart = lib.concatStringsSep " " (
           [
