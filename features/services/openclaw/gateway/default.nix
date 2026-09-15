@@ -45,22 +45,37 @@ let
         (secretEnv "A2A_TOKEN" (lib.optionalString inst.a2a.enable inst.a2a.tokenSecret))
       ];
 
-      secretNames = lib.filter (s: s != null && s != "") [
-        inst.secrets.deepseek
-        inst.secrets.openai
-        inst.secrets.password
-        inst.secrets.github
-        (lib.optionalString inst.a2a.enable inst.a2a.tokenSecret)
-      ];
+      secretNames = lib.filter (s: s != null && s != "") (
+        [
+          inst.secrets.deepseek
+          inst.secrets.openai
+          inst.secrets.password
+          inst.secrets.github
+          (lib.optionalString inst.a2a.enable inst.a2a.tokenSecret)
+        ]
+        ++ lib.optionals inst.a2a.enable (lib.mapAttrsToList (_: p: p.tokenSecret) inst.a2a.peers)
+      );
 
       a2aConfig = lib.optionalAttrs inst.a2a.enable {
         channels.a2a = {
           enabled = true;
           advertisedUrl = inst.a2a.advertisedUrl;
           peers = builtins.mapAttrs (_peerName: peer: {
-            url = peer.url;
-            token = "$A2A_TOKEN";
-            outboundToken = "$A2A_TOKEN";
+            url =
+              let
+                trimmed = lib.removeSuffix "/" peer.url;
+              in
+              if lib.hasSuffix "/a2a/v1" trimmed then trimmed else "${trimmed}/a2a/v1";
+            token =
+              if peer.tokenSecret != null then
+                osConfig.sops.placeholder.${peer.tokenSecret}
+              else
+                osConfig.sops.placeholder.${inst.a2a.tokenSecret};
+            outboundToken =
+              if peer.tokenSecret != null then
+                osConfig.sops.placeholder.${peer.tokenSecret}
+              else
+                osConfig.sops.placeholder.${inst.a2a.tokenSecret};
           }) inst.a2a.peers;
         };
       };
@@ -406,17 +421,33 @@ in
       lib.concatMap (inst: inst._secretNames) (lib.attrValues enabledInstances)
     )) (_: { });
 
-    # Generate one environment file per instance
+    # Generate one environment file and one config file per instance via sops.templates
+    # This ensures placeholders like openclaw_gateway_token in JSON are dynamically expanded without leaking into nix store.
     sops.templates = lib.listToAttrs (
       lib.concatMap (
         name:
         let
           inst = enabledInstances.${name};
+          rawJson = builtins.toJSON inst._renderedConfig;
         in
-        lib.optional inst._hasSecrets {
+        [
+          {
+            name = "openclaw_${name}_config";
+            value = {
+              owner = "openclaw";
+              group = "openclaw";
+              mode = "0640";
+              restartUnits = [ "openclaw-gateway-${name}.service" ];
+              content = rawJson;
+            };
+          }
+        ]
+        ++ lib.optional inst._hasSecrets {
           name = "openclaw_${name}_env";
           value = {
             owner = "openclaw";
+            group = "openclaw";
+            mode = "0640";
             restartUnits = [ "openclaw-gateway-${name}.service" ];
             content = lib.concatLines inst._secretEnvLines;
           };
@@ -428,8 +459,6 @@ in
     systemd.tmpfiles.rules = [
       "d /var/lib/openclaw 0750 openclaw openclaw - -"
       "d /var/lib/openclaw/instances 0750 openclaw openclaw - -"
-      "d /etc/openclaw 0755 root root - -"
-      "d /etc/openclaw/instances 0755 root root - -"
     ]
     ++ lib.concatMap (
       name:
@@ -442,19 +471,6 @@ in
       ]
     ) (lib.attrNames enabledInstances);
 
-    # Write instance JSON configs to /etc/openclaw/instances/<name>.json
-    environment.etc = lib.listToAttrs (
-      map (name: {
-        name = "openclaw/instances/${name}.json";
-        value = {
-          mode = "0644";
-          source = pkgs.writeText "openclaw-${name}.json" (
-            builtins.toJSON enabledInstances.${name}._renderedConfig
-          );
-        };
-      }) (lib.attrNames enabledInstances)
-    );
-
     # Generate isolated systemd units for each instance
     systemd.services = lib.listToAttrs (
       map (
@@ -462,6 +478,7 @@ in
         let
           inst = enabledInstances.${name};
           openclawPkg = pkgs.openclaw;
+          instanceConfigPath = osConfig.sops.templates."openclaw_${name}_config".path;
         in
         {
           name = "openclaw-gateway-${name}";
@@ -471,9 +488,9 @@ in
             after = [ "network.target" ];
 
             environment = {
-              OPENCLAW_CONFIG_PATH = inst._configPath;
+              OPENCLAW_CONFIG_PATH = instanceConfigPath;
               OPENCLAW_STATE_DIR = inst._stateDir;
-              CLAWDBOT_CONFIG_PATH = inst._configPath;
+              CLAWDBOT_CONFIG_PATH = instanceConfigPath;
               CLAWDBOT_STATE_DIR = inst._stateDir;
               OPENCLAW_NIX_MODE = "1";
               OPENCLAW_DISABLE_PERSISTED_PLUGIN_REGISTRY = "1";
