@@ -183,6 +183,12 @@ let
           models.mode = "merge";
           memory.search.provider = inst.memorySearch;
           agents.defaults.model.primary = inst.defaultModel;
+          talk = {
+            speechLocale = "de-DE";
+            realtime = {
+              instructions = "Antworte immer auf Deutsch.";
+            };
+          };
         }
         // pluginConfig
         // a2aConfig
