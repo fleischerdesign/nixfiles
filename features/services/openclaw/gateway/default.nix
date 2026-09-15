@@ -82,20 +82,54 @@ let
 
       hasSecrets = secretNames != [ ];
 
+      effectiveRuntimePlugins = lib.unique (inst.plugins.runtime ++ inst.runtimePlugins);
+
       unknownPlugins = lib.filter (
         id: !(builtins.hasAttr id pkgs.openclawRuntimePlugins)
-      ) inst.runtimePlugins;
+      ) effectiveRuntimePlugins;
+
+      activeMemoryConfig = lib.optionalAttrs inst.plugins.activeMemory.enable {
+        "active-memory" = {
+          enabled = true;
+          config = {
+            enabled = true;
+            mode = inst.plugins.activeMemory.mode;
+            queryMode = inst.plugins.activeMemory.queryMode;
+            promptStyle = inst.plugins.activeMemory.promptStyle;
+            timeoutMs = inst.plugins.activeMemory.timeoutMs;
+            maxSummaryChars = inst.plugins.activeMemory.maxSummaryChars;
+            persistTranscripts = inst.plugins.activeMemory.persistTranscripts;
+            logging = inst.plugins.activeMemory.logging;
+          }
+          // lib.optionalAttrs (inst.plugins.activeMemory.agents != [ ]) {
+            agents = inst.plugins.activeMemory.agents;
+          }
+          // lib.optionalAttrs (inst.plugins.activeMemory.model != null) {
+            model = inst.plugins.activeMemory.model;
+          }
+          // lib.optionalAttrs (inst.plugins.activeMemory.modelFallback != null) {
+            modelFallback = inst.plugins.activeMemory.modelFallback;
+          };
+        };
+      };
+
+      workboardConfig = lib.optionalAttrs inst.plugins.workboard.enable {
+        workboard.enabled = true;
+      };
+
+      runtimePluginEntries = lib.genAttrs effectiveRuntimePlugins (_: {
+        enabled = true;
+      });
+
+      extraPluginEntries = builtins.mapAttrs (_: entry: {
+        inherit (entry) enabled;
+        config = entry.config;
+      }) inst.plugins.extraEntries;
 
       pluginConfig = {
         plugins = {
-          load.paths = map (id: "${pkgs.openclawRuntimePlugins.${id}}") inst.runtimePlugins;
-          entries =
-            (lib.genAttrs inst.runtimePlugins (_: {
-              enabled = true;
-            }))
-            // {
-              workboard.enabled = true;
-            };
+          load.paths = map (id: "${pkgs.openclawRuntimePlugins.${id}}") effectiveRuntimePlugins;
+          entries = runtimePluginEntries // workboardConfig // activeMemoryConfig // extraPluginEntries;
         };
       };
 
@@ -205,10 +239,128 @@ let
           description = "Embedding provider for memory search.";
         };
 
+        plugins = {
+          runtime = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+            description = "External runtime plugins loaded from pkgs.openclawRuntimePlugins (e.g. deepseek).";
+          };
+
+          workboard = {
+            enable = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Enable Workboard task and kanban management plugin.";
+            };
+          };
+
+          activeMemory = {
+            enable = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Enable Active Memory bounded pre-reply retrieval across conversations.";
+            };
+
+            mode = lib.mkOption {
+              type = lib.types.enum [
+                "escalate"
+                "always"
+                "off"
+              ];
+              default = "escalate";
+              description = "Recall mode: escalate deep recall only for recall intent, or always.";
+            };
+
+            agents = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+              description = "Target agent IDs. Empty list targets all eligible agents.";
+            };
+
+            model = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Dedicated provider/model for the blocking memory sub-agent.";
+            };
+
+            modelFallback = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Fallback provider/model if no session or primary agent model resolves.";
+            };
+
+            queryMode = lib.mkOption {
+              type = lib.types.enum [
+                "message"
+                "recent"
+                "full"
+              ];
+              default = "recent";
+              description = "Context seen by memory sub-agent: latest message, recent tail, or full.";
+            };
+
+            promptStyle = lib.mkOption {
+              type = lib.types.enum [
+                "eager"
+                "balanced"
+                "strict"
+              ];
+              default = "balanced";
+              description = "How eager or strict the blocking memory sub-agent is.";
+            };
+
+            timeoutMs = lib.mkOption {
+              type = lib.types.int;
+              default = 15000;
+              description = "Recall work budget in milliseconds.";
+            };
+
+            maxSummaryChars = lib.mkOption {
+              type = lib.types.int;
+              default = 220;
+              description = "Maximum total characters allowed in the active-memory summary.";
+            };
+
+            persistTranscripts = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Persist blocking sub-agent transcripts on disk.";
+            };
+
+            logging = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Enable Active Memory diagnostic logging.";
+            };
+          };
+
+          extraEntries = lib.mkOption {
+            type = lib.types.attrsOf (
+              lib.types.submodule {
+                options = {
+                  enabled = lib.mkOption {
+                    type = lib.types.bool;
+                    default = true;
+                    description = "Whether this plugin entry is enabled.";
+                  };
+                  config = lib.mkOption {
+                    type = lib.types.attrs;
+                    default = { };
+                    description = "Plugin configuration passed to plugins.entries.<id>.config.";
+                  };
+                };
+              }
+            );
+            default = { };
+            description = "Arbitrary plugin configurations passed directly into plugins.entries.";
+          };
+        };
+
+        # Backwards compatibility alias for runtimePlugins
         runtimePlugins = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
-          description = "OpenClaw runtime plugin ids to load for this instance.";
+          description = "Legacy alias for plugins.runtime.";
         };
 
         controlUiExtraOrigins = lib.mkOption {
