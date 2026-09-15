@@ -1,4 +1,8 @@
-{ inputs, ... }:
+{
+  inputs,
+  config,
+  ...
+}:
 {
   imports = [
     inputs.disko.nixosModules.disko
@@ -42,6 +46,63 @@
   my.features.system.backups.restic = {
     enable = true;
     environmentFile = "restic_env_mackaye";
+  };
+
+  my.features.services.openclaw.node = {
+    enable = true;
+    instances = {
+      philipp = {
+        enable = true;
+        displayName = "mackaye";
+        gateway = {
+          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          port = 18789;
+        };
+        transport = "loopback-tunnel";
+        tunnel.localPort = 18790;
+        passwordSecret = "openclaw_gateway_password";
+        sessionHosting.enable = true;
+      };
+
+      katja = {
+        enable = true;
+        displayName = "mackaye";
+        gateway = {
+          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          port = 18791;
+        };
+        transport = "loopback-tunnel";
+        tunnel.localPort = 18794;
+        passwordSecret = "openclaw_gateway_password";
+        sessionHosting.enable = true;
+      };
+
+      lilly = {
+        enable = true;
+        displayName = "mackaye";
+        gateway = {
+          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          port = 18792;
+        };
+        transport = "loopback-tunnel";
+        tunnel.localPort = 18795;
+        passwordSecret = "openclaw_gateway_password";
+        sessionHosting.enable = true;
+      };
+
+      kai = {
+        enable = true;
+        displayName = "mackaye";
+        gateway = {
+          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          port = 18793;
+        };
+        transport = "loopback-tunnel";
+        tunnel.localPort = 18796;
+        passwordSecret = "openclaw_gateway_password";
+        sessionHosting.enable = true;
+      };
+    };
   };
 
   system.stateVersion = "24.11";
