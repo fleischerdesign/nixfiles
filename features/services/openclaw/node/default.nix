@@ -1,9 +1,10 @@
 # features/services/openclaw/node/default.nix
-# OpenClaw companion node (role: node) — a peripheral that connects to a gateway and exposes
-# a command surface (system.run, system.which, browser proxy, MCP servers, …) which the
-# gateway invokes through node.invoke. A node runs no gateway, owns no channels and holds
-# no operator credentials: after pairing it authenticates with a `role: "node"` scoped
-# device token.
+# OpenClaw companion node (role: node) — a peripheral that connects to an OpenClaw gateway
+# and exposes a command surface (system.run, system.which, browser proxy, MCP servers, …)
+# which the gateway invokes through node.invoke.
+#
+# Supports running multiple node instances concurrently (e.g. jello connecting to Philipp's
+# gateway, while shared nodes like strummer can connect instances to multiple user gateways).
 #
 # Transports:
 #   loopback-tunnel   (Default) The node connects to the gateway via an SSH -L forward
@@ -13,282 +14,347 @@
 #
 #   direct            The node dials the gateway directly (e.g. over Tailscale or token auth).
 {
-  config,
   lib,
   pkgs,
   ...
-}:
+}@topArgs:
 let
-  cfg = config.my.features.services.openclaw.node;
+  osConfig = topArgs.config;
+  cfg = osConfig.my.features.services.openclaw.node;
 
-  useTunnel = cfg.transport == "loopback-tunnel";
+  # Submodule schema for a single node instance
+  instanceSubmodule =
+    { name, config, ... }:
+    let
+      inst = config;
 
-  # The node talks plaintext over private/tailnet or SSH tunnel; direct over public routes follows gateway.tls.
-  dial = {
-    host = if useTunnel then "127.0.0.1" else cfg.gateway.host;
-    port = if useTunnel then cfg.tunnel.localPort else cfg.gateway.port;
-    tls = !useTunnel && cfg.gateway.tls;
-  };
+      useTunnel = inst.transport == "loopback-tunnel";
 
-  hasPassword = cfg.passwordSecret != null;
+      dial = {
+        host = if useTunnel then "127.0.0.1" else inst.gateway.host;
+        port = if useTunnel then inst.tunnel.localPort else inst.gateway.port;
+        tls = !useTunnel && inst.gateway.tls;
+      };
 
-  # Fixed, not configurable: it must match systemd's StateDirectory= so that the
-  # directory is created (and owned by User=) before ExecStart runs.
-  stateDir = "/var/lib/openclaw";
+      hasPassword = inst.passwordSecret != null;
 
-  serviceHome = config.users.users.${cfg.tunnel.serviceUser}.home;
+      stateDir = "/var/lib/openclaw/node-instances/${name}";
+      configPath = "/etc/openclaw/node-instances/${name}.json";
 
-  # `~` in identityFile resolves against the service user's home, not root's.
-  identityFile = lib.replaceStrings [ "~/" ] [ "${serviceHome}/" ] cfg.tunnel.identityFile;
+      serviceHome = osConfig.users.users.${inst.tunnel.serviceUser}.home;
+      identityFile = lib.replaceStrings [ "~/" ] [ "${serviceHome}/" ] inst.tunnel.identityFile;
 
-  mergedNodeHost = lib.recursiveUpdate (lib.optionalAttrs cfg.sessionHosting.enable {
-    workerRuns = {
-      enabled = true;
-    }
-    // lib.optionalAttrs (cfg.sessionHosting.capacity != null) {
-      capacity = cfg.sessionHosting.capacity;
+      mergedNodeHost = lib.recursiveUpdate (lib.optionalAttrs inst.sessionHosting.enable {
+        workerRuns = {
+          enabled = true;
+        }
+        // lib.optionalAttrs (inst.sessionHosting.capacity != null) {
+          capacity = inst.sessionHosting.capacity;
+        };
+      }) inst.nodeHost;
+    in
+    {
+      options = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable this node instance.";
+        };
+
+        gateway = {
+          host = lib.mkOption {
+            type = lib.types.str;
+            example = "100.126.5.72";
+            description = "Reachable gateway address: Tailscale IP, MagicDNS hostname or public host name.";
+          };
+
+          port = lib.mkOption {
+            type = lib.types.port;
+            default = 18789;
+            description = "Gateway port. Defaults to 18789.";
+          };
+
+          tls = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = ''
+              Whether a direct connection dials with TLS. Default is false for plain ws://
+              gateway addresses (Tailscale, loopback, private IP literal, .local). Set true
+              when connecting over a public TLS reverse-proxy (port 443).
+            '';
+          };
+        };
+
+        transport = lib.mkOption {
+          type = lib.types.enum [
+            "loopback-tunnel"
+            "direct"
+          ];
+          default = "loopback-tunnel";
+          description = ''
+            loopback-tunnel: (Default) The node tunnels to the gateway over SSH -L and dials
+                            clean 127.0.0.1 with the shared gateway password.
+            direct: node dials the gateway directly (e.g. over Tailscale or token auth).
+          '';
+        };
+
+        sessionHosting = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Enable OpenClaw worker session hosting on this node instance.";
+          };
+
+          capacity = lib.mkOption {
+            type = lib.types.nullOr lib.types.int;
+            default = null;
+            description = "Worker slot capacity limit. Null defaults to one slot per available CPU core.";
+          };
+        };
+
+        tunnel = {
+          localPort = lib.mkOption {
+            type = lib.types.port;
+            default = 18790;
+            description = "Local loopback port the node dials while the tunnel is active.";
+          };
+
+          user = lib.mkOption {
+            type = lib.types.str;
+            default = "root";
+            description = "SSH user on the gateway host.";
+          };
+
+          serviceUser = lib.mkOption {
+            type = lib.types.str;
+            default = osConfig.my.user.primary;
+            description = ''
+              Local user the SSH forward runs as, and whose known_hosts is used. Defaults to
+              the primary user because the key that authorizes root on the gateway host is
+              that user's deploy key — the same one `nod` and deploy-rs use.
+            '';
+          };
+
+          identityFile = lib.mkOption {
+            type = lib.types.str;
+            default = "~/.ssh/deploy-key";
+            description = "SSH private key used for the forward; `~` expands to the home of tunnel.serviceUser.";
+          };
+
+          privateKeySecret = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            example = "openclaw_node_ssh_key";
+            description = ''
+              SOPS secret holding the SSH private key for the forward. When set, it is
+              rendered to identityFile with mode 0400.
+            '';
+          };
+
+          hostKeyPolicy = lib.mkOption {
+            type = lib.types.enum [
+              "accept-new"
+              "strict"
+            ];
+            default = "accept-new";
+            description = "accept-new trusts the gateway host key on first use (TOFU); strict requires a pre-seeded known_hosts entry.";
+          };
+        };
+
+        passwordSecret = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "openclaw_gateway_password";
+          description = "Optional SOPS secret rendered into OPENCLAW_GATEWAY_PASSWORD.";
+        };
+
+        displayName = lib.mkOption {
+          type = lib.types.str;
+          default = osConfig.networking.hostName;
+          description = "Name the node advertises to the gateway.";
+        };
+
+        commands = lib.mkOption {
+          type = lib.types.nullOr (lib.types.listOf lib.types.str);
+          default = null;
+          description = ''
+            Exact command allowlist to advertise instead of the full default surface
+            (system.run, system.which, browser proxy, plugins, MCP).
+          '';
+        };
+
+        nodeHost = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+          description = "Node-side openclaw.json settings (nodeHost.*).";
+        };
+
+        gitAuthor = {
+          name = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = osConfig.my.user.fullName;
+            description = "Git author and committer name for workspace sync and commits made by agent tools.";
+          };
+
+          email = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = osConfig.my.user.email;
+            description = "Git author and committer email for workspace sync and commits made by agent tools.";
+          };
+        };
+
+        extraPackages = lib.mkOption {
+          type = lib.types.listOf lib.types.package;
+          default = [
+            pkgs.nix
+            pkgs.git
+            pkgs.gh
+            pkgs.ripgrep
+            pkgs.fd
+            pkgs.procps
+          ];
+          description = "Packages added to the PATH of commands executed on this node instance.";
+        };
+
+        # Computed internal helpers
+        _useTunnel = lib.mkOption {
+          type = lib.types.bool;
+          internal = true;
+          default = useTunnel;
+        };
+
+        _dial = lib.mkOption {
+          type = lib.types.attrs;
+          internal = true;
+          default = dial;
+        };
+
+        _hasPassword = lib.mkOption {
+          type = lib.types.bool;
+          internal = true;
+          default = hasPassword;
+        };
+
+        _stateDir = lib.mkOption {
+          type = lib.types.str;
+          internal = true;
+          default = stateDir;
+        };
+
+        _configPath = lib.mkOption {
+          type = lib.types.str;
+          internal = true;
+          default = configPath;
+        };
+
+        _identityFile = lib.mkOption {
+          type = lib.types.str;
+          internal = true;
+          default = identityFile;
+        };
+
+        _serviceHome = lib.mkOption {
+          type = lib.types.str;
+          internal = true;
+          default = serviceHome;
+        };
+
+        _mergedNodeHost = lib.mkOption {
+          type = lib.types.attrs;
+          internal = true;
+          default = mergedNodeHost;
+        };
+      };
     };
-  }) cfg.nodeHost;
+
+  enabledInstances = lib.filterAttrs (_: inst: inst.enable) cfg.instances;
 in
 {
   options.my.features.services.openclaw.node = {
-    enable = lib.mkEnableOption "OpenClaw companion node (role: node)";
+    enable = lib.mkEnableOption "OpenClaw companion node service";
 
     rebuild = {
       enable = lib.mkEnableOption "allow openclaw to test and switch system configurations (nix trusted-user, sudoers for nod and nixos-rebuild)";
     };
 
-    gateway = {
-      host = lib.mkOption {
-        type = lib.types.str;
-        example = "100.126.5.72";
-        description = ''
-          Reachable gateway address: Tailscale IP, MagicDNS hostname or public host name.
-          Deliberately has no default — this module must stay agnostic of network topology.
-        '';
-      };
-
-      port = lib.mkOption {
-        type = lib.types.port;
-        default = 18789;
-        description = "Gateway port. Defaults to 18789.";
-      };
-
-      tls = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Whether a direct connection dials with TLS. Default is false for plain ws://
-          gateway addresses (Tailscale, loopback, private IP literal, .local). Set true
-          when connecting over a public TLS reverse-proxy (port 443).
-        '';
-      };
-    };
-
-    transport = lib.mkOption {
-      type = lib.types.enum [
-        "loopback-tunnel"
-        "direct"
-      ];
-      default = "loopback-tunnel";
-      description = ''
-        loopback-tunnel: (Default) The node tunnels to the gateway over SSH -L and dials
-                        clean 127.0.0.1 with the shared gateway password. This is required
-                        when the gateway runs in trusted-proxy auth mode because OpenClaw
-                        requires clean loopback for password-authenticated machine connections.
-        direct: node dials the gateway directly (e.g. over Tailscale or token auth).
-      '';
-    };
-
-    sessionHosting = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Enable OpenClaw worker session hosting on this node (nodeHost.workerRuns.enabled = true).
-          Allows the gateway to dispatch worker sessions and runs directly to this machine.
-        '';
-      };
-
-      capacity = lib.mkOption {
-        type = lib.types.nullOr lib.types.int;
-        default = null;
-        description = "Worker slot capacity limit. Null defaults to one slot per available CPU core.";
-      };
-    };
-
-    tunnel = {
-      localPort = lib.mkOption {
-        type = lib.types.port;
-        default = 18790;
-        description = "Local loopback port the node dials while the tunnel is active.";
-      };
-
-      user = lib.mkOption {
-        type = lib.types.str;
-        default = "root";
-        description = "SSH user on the gateway host.";
-      };
-
-      serviceUser = lib.mkOption {
-        type = lib.types.str;
-        default = config.my.user.primary;
-        description = ''
-          Local user the SSH forward runs as, and whose known_hosts is used. Defaults to
-          the primary user because the key that authorizes root on the gateway host is
-          that user's deploy key — the same one `nod` and deploy-rs use.
-        '';
-      };
-
-      identityFile = lib.mkOption {
-        type = lib.types.str;
-        default = "~/.ssh/deploy-key";
-        description = "SSH private key used for the forward; `~` expands to the home of tunnel.serviceUser.";
-      };
-
-      privateKeySecret = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        example = "openclaw_node_ssh_key";
-        description = ''
-          SOPS secret holding the SSH private key for the forward. When set, it is
-          rendered to identityFile with mode 0400, making the tunnel fully declarative.
-          When unset, the file has to exist on the host already.
-        '';
-      };
-
-      hostKeyPolicy = lib.mkOption {
-        type = lib.types.enum [
-          "accept-new"
-          "strict"
-        ];
-        default = "accept-new";
-        description = ''
-          accept-new trusts the gateway host key on first use (TOFU); strict requires a
-          pre-seeded known_hosts entry.
-        '';
-      };
-    };
-
-    passwordSecret = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      example = "openclaw_gateway_password";
-      description = ''
-        Optional SOPS secret rendered into OPENCLAW_GATEWAY_PASSWORD. Only needed for
-        `transport = "loopback-tunnel"` or password-authenticated direct connections.
-      '';
-    };
-
-    displayName = lib.mkOption {
-      type = lib.types.str;
-      default = config.networking.hostName;
-      description = "Name the node advertises to the gateway.";
-    };
-
-    commands = lib.mkOption {
-      type = lib.types.nullOr (lib.types.listOf lib.types.str);
-      default = null;
-      description = ''
-        Exact command allowlist to advertise instead of the full default surface
-        (system.run, system.which, browser proxy, plugins, MCP). Leaving this unset
-        advertises everything the node host supports.
-      '';
-    };
-
-    nodeHost = lib.mkOption {
-      type = lib.types.attrs;
+    instances = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.submodule instanceSubmodule);
       default = { };
-      example = {
-        browserProxy.enabled = false;
-        mcp.servers.example.command = "example-mcp";
-      };
-      description = ''
-        Node-side openclaw.json settings (nodeHost.*), written to /etc/openclaw/node.json.
-        Use this for browser proxy, MCP servers and skills hosted on the node.
-      '';
-    };
-
-    gitAuthor = {
-      name = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = config.my.user.fullName;
-        description = "Git author and committer name for workspace sync and commits made by agent tools.";
-      };
-
-      email = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = config.my.user.email;
-        description = "Git author and committer email for workspace sync and commits made by agent tools.";
-      };
-    };
-
-    extraPackages = lib.mkOption {
-      type = lib.types.listOf lib.types.package;
-      default = [
-        pkgs.nix
-        pkgs.git
-        pkgs.gh
-        pkgs.ripgrep
-        pkgs.fd
-        pkgs.procps
-      ];
-      description = ''
-        Packages added to the PATH of commands executed on this node. Defaults to nix, git,
-        gh, ripgrep, fd and procps so the agent can build and inspect repositories on the node;
-        set to [ ] to run a restricted node.
-      '';
+      description = "Declared OpenClaw companion node instances.";
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    assertions = [
-      {
-        assertion = !useTunnel || hasPassword;
-        message = ''
-          my.features.services.openclaw.node with transport = "loopback-tunnel" requires
-          passwordSecret: with gateway.auth.mode = "trusted-proxy" the shared password is
-          the only credential accepted for a clean loopback caller.
-        '';
-      }
-      {
-        assertion = !useTunnel || cfg.gateway.host != "127.0.0.1";
-        message = "gateway.host must be the gateway's reachable address, not the local loopback address.";
-      }
-      {
-        assertion = useTunnel || cfg.gateway.host != "127.0.0.1";
-        message = ''transport = "direct" needs a real gateway host, otherwise the node only reaches itself.'';
-      }
-    ];
+  config = lib.mkIf (cfg.enable && enabledInstances != { }) {
+    assertions = lib.concatMap (
+      name:
+      let
+        inst = enabledInstances.${name};
+      in
+      [
+        {
+          assertion = !inst._useTunnel || inst._hasPassword;
+          message = ''
+            OpenClaw node instance '${name}' with transport = "loopback-tunnel" requires
+            passwordSecret: with gateway.auth.mode = "trusted-proxy" the shared password is
+            the only credential accepted for a clean loopback caller.
+          '';
+        }
+        {
+          assertion = !inst._useTunnel || inst.gateway.host != "127.0.0.1";
+          message = "OpenClaw node instance '${name}': gateway.host must be the gateway's reachable address, not the local loopback address.";
+        }
+        {
+          assertion = inst._useTunnel || inst.gateway.host != "127.0.0.1";
+          message = "OpenClaw node instance '${name}': transport = \"direct\" needs a real gateway host, otherwise the node only reaches itself.";
+        }
+      ]
+    ) (lib.attrNames enabledInstances);
 
-    sops.secrets = lib.mkMerge [
-      (lib.mkIf hasPassword {
-        "${cfg.passwordSecret}" = { };
-      })
-      (lib.mkIf (useTunnel && cfg.tunnel.privateKeySecret != null) {
-        "${cfg.tunnel.privateKeySecret}" = {
-          path = identityFile;
-          owner = cfg.tunnel.serviceUser;
-          mode = "0400";
-        };
-      })
-    ];
+    sops.secrets = lib.mkMerge (
+      lib.concatMap (
+        name:
+        let
+          inst = enabledInstances.${name};
+        in
+        [
+          (lib.mkIf inst._hasPassword {
+            "${inst.passwordSecret}" = { };
+          })
+          (lib.mkIf (inst._useTunnel && inst.tunnel.privateKeySecret != null) {
+            "${inst.tunnel.privateKeySecret}" = {
+              path = inst._identityFile;
+              owner = inst.tunnel.serviceUser;
+              mode = "0400";
+            };
+          })
+        ]
+      ) (lib.attrNames enabledInstances)
+    );
 
-    sops.templates."openclaw-node_env" = lib.mkIf hasPassword {
-      owner = "openclaw";
-      restartUnits = [ "openclaw-node.service" ];
-      content = "OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder.${cfg.passwordSecret}}\n";
-    };
+    sops.templates = lib.listToAttrs (
+      lib.concatMap (
+        name:
+        let
+          inst = enabledInstances.${name};
+        in
+        lib.optional inst._hasPassword {
+          name = "openclaw_node_${name}_env";
+          value = {
+            owner = "openclaw";
+            restartUnits = [ "openclaw-node-${name}.service" ];
+            content = "OPENCLAW_GATEWAY_PASSWORD=${osConfig.sops.placeholder.${inst.passwordSecret}}\n";
+          };
+        }
+      ) (lib.attrNames enabledInstances)
+    );
 
     users.groups.openclaw = { };
 
     users.users.openclaw = {
       isSystemUser = true;
       group = "openclaw";
-      home = stateDir;
-      # The directory itself is owned by StateDirectory= below; /var/lib paths are not
-      # created by createHome for system users.
-      createHome = false;
+      home = "/var/lib/openclaw";
+      createHome = true;
       shell = pkgs.bashInteractive;
     };
 
@@ -326,92 +392,128 @@ in
       }
     ];
 
-    environment.etc = lib.mkIf (mergedNodeHost != { }) {
-      "openclaw/node.json".source = pkgs.writeText "openclaw-node.json" (
-        builtins.toJSON { nodeHost = mergedNodeHost; }
-      );
-    };
+    environment.etc = lib.listToAttrs (
+      lib.concatMap (
+        name:
+        let
+          inst = enabledInstances.${name};
+        in
+        lib.optional (inst._mergedNodeHost != { }) {
+          name = "openclaw/node-instances/${name}.json";
+          value = {
+            mode = "0644";
+            source = pkgs.writeText "openclaw-node-${name}.json" (
+              builtins.toJSON { nodeHost = inst._mergedNodeHost; }
+            );
+          };
+        }
+      ) (lib.attrNames enabledInstances)
+    );
 
     systemd.tmpfiles.rules = [
-      # Repair ownership on activation
-      "Z ${stateDir} 0700 openclaw openclaw - -"
-    ];
+      "d /var/lib/openclaw 0750 openclaw openclaw - -"
+      "d /var/lib/openclaw/node-instances 0750 openclaw openclaw - -"
+      "d /etc/openclaw 0755 root root - -"
+      "d /etc/openclaw/node-instances 0755 root root - -"
+    ]
+    ++ map (name: "d ${enabledInstances.${name}._stateDir} 0700 openclaw openclaw - -") (
+      lib.attrNames enabledInstances
+    );
 
-    systemd.services.openclaw-node-tunnel = lib.mkIf useTunnel {
-      description = "OpenClaw gateway loopback tunnel";
-      wantedBy = [ "multi-user.target" ];
-      after = [
-        "network-online.target"
-        "tailscaled.service"
-      ];
-      wants = [ "network-online.target" ];
+    systemd.services = lib.listToAttrs (
+      lib.concatMap (
+        name:
+        let
+          inst = enabledInstances.${name};
+          tunnelServiceName = "openclaw-node-tunnel-${name}";
+          nodeServiceName = "openclaw-node-${name}";
+        in
+        lib.optional inst._useTunnel {
+          name = tunnelServiceName;
+          value = {
+            description = "OpenClaw gateway loopback tunnel (${name})";
+            wantedBy = [ "multi-user.target" ];
+            after = [
+              "network-online.target"
+              "tailscaled.service"
+            ];
+            wants = [ "network-online.target" ];
 
-      serviceConfig = {
-        User = cfg.tunnel.serviceUser;
-        Environment = [ "HOME=${serviceHome}" ];
-        ExecStart = lib.concatStringsSep " " [
-          "${pkgs.openssh}/bin/ssh -N"
-          "-o BatchMode=yes"
-          "-o ExitOnForwardFailure=yes"
-          "-o ConnectTimeout=10"
-          "-o ServerAliveInterval=15"
-          "-o ServerAliveCountMax=3"
-          "-o StrictHostKeyChecking=${cfg.tunnel.hostKeyPolicy}"
-          "-i ${identityFile}"
-          "-L ${toString cfg.tunnel.localPort}:127.0.0.1:${toString cfg.gateway.port}"
-          "${cfg.tunnel.user}@${cfg.gateway.host}"
-        ];
-        Restart = "always";
-        RestartSec = 5;
-      };
-    };
+            serviceConfig = {
+              User = inst.tunnel.serviceUser;
+              Environment = [ "HOME=${inst._serviceHome}" ];
+              ExecStart = lib.concatStringsSep " " [
+                "${pkgs.openssh}/bin/ssh -N"
+                "-o BatchMode=yes"
+                "-o ExitOnForwardFailure=yes"
+                "-o ConnectTimeout=10"
+                "-o ServerAliveInterval=15"
+                "-o ServerAliveCountMax=3"
+                "-o StrictHostKeyChecking=${inst.tunnel.hostKeyPolicy}"
+                "-i ${inst._identityFile}"
+                "-L ${toString inst.tunnel.localPort}:127.0.0.1:${toString inst.gateway.port}"
+                "${inst.tunnel.user}@${inst.gateway.host}"
+              ];
+              Restart = "always";
+              RestartSec = 5;
+            };
+          };
+        }
+        ++ [
+          {
+            name = nodeServiceName;
+            value = {
+              description = "OpenClaw companion node (${name})";
+              wantedBy = [ "multi-user.target" ];
+              after = [
+                "network-online.target"
+                "tailscaled.service"
+              ]
+              ++ lib.optional inst._useTunnel "${tunnelServiceName}.service";
+              wants = [ "network-online.target" ];
+              requires = lib.optional inst._useTunnel "${tunnelServiceName}.service";
 
-    systemd.services.openclaw-node = {
-      description = "OpenClaw companion node";
-      wantedBy = [ "multi-user.target" ];
-      after = [
-        "network-online.target"
-        "tailscaled.service"
-      ]
-      ++ lib.optional useTunnel "openclaw-node-tunnel.service";
-      wants = [ "network-online.target" ];
-      requires = lib.optional useTunnel "openclaw-node-tunnel.service";
+              serviceConfig = {
+                User = "openclaw";
+                Group = "openclaw";
+                WorkingDirectory = inst._stateDir;
+                StateDirectory = "openclaw/node-instances/${name}";
+                StateDirectoryMode = "0700";
+                Environment = [
+                  "HOME=${inst._stateDir}"
+                  "OPENCLAW_STATE_DIR=${inst._stateDir}"
+                ]
+                ++ lib.optional (inst._mergedNodeHost != { }) "OPENCLAW_CONFIG_PATH=${inst._configPath}"
+                ++ lib.optional (inst.gitAuthor.name != null) "GIT_AUTHOR_NAME=${inst.gitAuthor.name}"
+                ++ lib.optional (inst.gitAuthor.name != null) "GIT_COMMITTER_NAME=${inst.gitAuthor.name}"
+                ++ lib.optional (inst.gitAuthor.email != null) "GIT_AUTHOR_EMAIL=${inst.gitAuthor.email}"
+                ++ lib.optional (inst.gitAuthor.email != null) "GIT_COMMITTER_EMAIL=${inst.gitAuthor.email}";
+                EnvironmentFile =
+                  lib.optional inst._hasPassword
+                    osConfig.sops.templates."openclaw_node_${name}_env".path;
+                ExecStart = lib.concatStringsSep " " (
+                  [
+                    "${pkgs.openclaw}/bin/openclaw node run"
+                    "--host ${inst._dial.host}"
+                    "--port ${toString inst._dial.port}"
+                    (if inst._dial.tls then "--tls" else "--no-tls")
+                    "--display-name ${inst.displayName}"
+                  ]
+                  ++ lib.optional (inst.commands != null) "--commands ${lib.concatStringsSep "," inst.commands}"
+                );
+                Restart = "always";
+                RestartSec = 5;
+              };
 
-      serviceConfig = {
-        User = "openclaw";
-        Group = "openclaw";
-        WorkingDirectory = stateDir;
-        StateDirectory = "openclaw";
-        StateDirectoryMode = "0700";
-        Environment = [
-          "HOME=${stateDir}"
-          "OPENCLAW_STATE_DIR=${stateDir}"
+              path = [
+                pkgs.bash
+                pkgs.coreutils
+              ]
+              ++ inst.extraPackages;
+            };
+          }
         ]
-        ++ lib.optional (mergedNodeHost != { }) "OPENCLAW_CONFIG_PATH=/etc/openclaw/node.json"
-        ++ lib.optional (cfg.gitAuthor.name != null) "GIT_AUTHOR_NAME=${cfg.gitAuthor.name}"
-        ++ lib.optional (cfg.gitAuthor.name != null) "GIT_COMMITTER_NAME=${cfg.gitAuthor.name}"
-        ++ lib.optional (cfg.gitAuthor.email != null) "GIT_AUTHOR_EMAIL=${cfg.gitAuthor.email}"
-        ++ lib.optional (cfg.gitAuthor.email != null) "GIT_COMMITTER_EMAIL=${cfg.gitAuthor.email}";
-        EnvironmentFile = lib.optional hasPassword config.sops.templates."openclaw-node_env".path;
-        ExecStart = lib.concatStringsSep " " (
-          [
-            "${pkgs.openclaw}/bin/openclaw node run"
-            "--host ${dial.host}"
-            "--port ${toString dial.port}"
-            (if dial.tls then "--tls" else "--no-tls")
-            "--display-name ${cfg.displayName}"
-          ]
-          ++ lib.optional (cfg.commands != null) "--commands ${lib.concatStringsSep "," cfg.commands}"
-        );
-        Restart = "always";
-        RestartSec = 5;
-      };
-
-      path = [
-        pkgs.bash
-        pkgs.coreutils
-      ]
-      ++ cfg.extraPackages;
-    };
+      ) (lib.attrNames enabledInstances)
+    );
   };
 }

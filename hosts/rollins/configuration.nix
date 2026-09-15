@@ -34,56 +34,66 @@
 
   my.features.services.openclaw.gateway = {
     enable = true;
-    subdomain = "ai";
-    auth = true;
-    adminUsers = [ "philipp@fleischer.design" ];
-    defaultModel = "deepseek/deepseek-flash";
-    memorySearch = "openai";
-    runtimePlugins = [ "deepseek" ];
-    secrets = {
-      deepseek = "pi/deepseek";
-      openai = "openai_api_key";
-      password = "openclaw_gateway_password";
-      github = "github_pat_philipp";
-    };
+    instances = {
+      philipp = {
+        enable = true;
+        port = 18789;
+        subdomain = "philipp.ai";
+        auth = true;
+        adminUsers = [ "philipp@fleischer.design" ];
+        defaultModel = "deepseek/deepseek-flash";
+        memorySearch = "openai";
+        runtimePlugins = [ "deepseek" ];
+        gitAuthor = {
+          name = "Philipp Fleischer";
+          email = "philipp@fleischer.design";
+        };
+        secrets = {
+          deepseek = "pi/deepseek";
+          openai = "openai_api_key";
+          password = "openclaw_gateway_password";
+          github = "github_pat_philipp";
+        };
 
-    # The DeepSeek runtime plugin still ships the retired `deepseek-v4-*` catalogue and
-    # only applies its thinking profile to ids with that prefix, while the DeepSeek API
-    # already serves `deepseek-flash`. Declaring the current model explicitly keeps the
-    # plugin's provider family (request shaping, reasoning_content replay) and adds the
-    # correct catalogue entry; compat/cost mirror the plugin manifest.
-    settings.models.providers.deepseek = {
-      baseUrl = "https://api.deepseek.com";
-      api = "openai-completions";
-      apiKey = "$DEEPSEEK_API_KEY";
-      models = [
-        {
-          id = "deepseek-flash";
-          name = "DeepSeek Flash (V4.1)";
-          reasoning = true;
-          input = [
-            "text"
-            "image"
+        settings.models.providers.deepseek = {
+          baseUrl = "https://api.deepseek.com";
+          api = "openai-completions";
+          apiKey = "$DEEPSEEK_API_KEY";
+          models = [
+            {
+              id = "deepseek-flash";
+              name = "DeepSeek Flash (V4.1)";
+              reasoning = true;
+              input = [
+                "text"
+                "image"
+              ];
+              contextWindow = 1000000;
+              maxTokens = 384000;
+              cost = {
+                input = 0.14;
+                output = 0.28;
+                cacheRead = 0.0028;
+                cacheWrite = 0;
+              };
+              compat = {
+                supportsUsageInStreaming = true;
+                supportsReasoningEffort = true;
+                maxTokensField = "max_tokens";
+                codeMode = "preferred";
+                requiresReasoningContentOnAssistantMessages = true;
+              };
+            }
           ];
-          contextWindow = 1000000;
-          maxTokens = 384000;
-          cost = {
-            input = 0.14;
-            output = 0.28;
-            cacheRead = 0.0028;
-            cacheWrite = 0;
-          };
-          compat = {
-            supportsUsageInStreaming = true;
-            supportsReasoningEffort = true;
-            maxTokensField = "max_tokens";
-            codeMode = "preferred";
-            requiresReasoningContentOnAssistantMessages = true;
-          };
-        }
-      ];
+        };
+      };
     };
   };
+
+  # Direct alias / redirect for ai.rls.ancoris.ovh -> philipp.ai.rls.ancoris.ovh
+  services.caddy.virtualHosts."ai.rls.ancoris.ovh".extraConfig = ''
+    redir https://philipp.ai.rls.ancoris.ovh{uri} permanent
+  '';
 
   my.features.services.camofox.enable = true;
 

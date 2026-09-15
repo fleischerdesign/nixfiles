@@ -23,11 +23,21 @@
 
   my.features.services.openclaw.node = {
     enable = true;
-    gateway.host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
-    transport = "loopback-tunnel";
-    passwordSecret = "openclaw_gateway_password";
-    sessionHosting.enable = true;
     rebuild.enable = true;
+    instances = {
+      philipp = {
+        enable = true;
+        displayName = "yorke";
+        gateway = {
+          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          port = 18789;
+        };
+        transport = "loopback-tunnel";
+        tunnel.localPort = 18790;
+        passwordSecret = "openclaw_gateway_password";
+        sessionHosting.enable = true;
+      };
+    };
   };
 
   my.features.services.attic.client = {
