@@ -31,6 +31,7 @@ let
               database = inst.couchdb.database;
               username = inst.couchdb.username;
               password = osConfig.sops.placeholder.${inst.couchdb.passwordSecret};
+              baseDir = "";
             }
             // lib.optionalAttrs (inst.couchdb.passphraseSecret != null) {
               passphrase = osConfig.sops.placeholder.${inst.couchdb.passphraseSecret};
