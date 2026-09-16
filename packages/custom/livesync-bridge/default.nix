@@ -30,7 +30,7 @@ stdenv.mkDerivation {
     makeWrapper "${deno}/bin/deno" "$out/bin/livesync-bridge" \
       --add-flags "run" \
       --add-flags "-A" \
-      --add-flags "--node-modules-dir=auto" \
+      --add-flags "--node-modules-dir=none" \
       --add-flags "$out/lib/livesync-bridge/main.ts"
     runHook postInstall
   '';
