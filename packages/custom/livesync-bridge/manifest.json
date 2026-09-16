@@ -1,0 +1,11 @@
+{
+  "name": "livesync-bridge",
+  "version": "0.1.0",
+  "rev": "c3760beaa0851214da4860903445d7f6420ca025",
+  "srcHash": "sha256-btLnQNbFzCPaSVcY9rtiPdYeXrZjoK9AYvfA9+ovsIc=",
+  "upstream": {
+    "type": "github-rev",
+    "owner": "vrtmrz",
+    "repo": "livesync-bridge"
+  }
+}

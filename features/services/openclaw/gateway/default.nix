@@ -204,6 +204,30 @@ let
             };
           };
         }
+        // lib.optionalAttrs inst.browser.enable {
+          browser = {
+            enabled = true;
+            headless = inst.browser.headless;
+            noSandbox = inst.browser.noSandbox;
+            executablePath = "${inst.browser.package}/bin/chromium";
+            tabCleanup.enabled = inst.browser.tabCleanup;
+          }
+          //
+            lib.optionalAttrs
+              (
+                inst.browser.ssrfPolicy.dangerouslyAllowPrivateNetwork
+                || inst.browser.ssrfPolicy.allowedHostnames != [ ]
+              )
+              {
+                ssrfPolicy =
+                  lib.optionalAttrs inst.browser.ssrfPolicy.dangerouslyAllowPrivateNetwork {
+                    dangerouslyAllowPrivateNetwork = true;
+                  }
+                  // lib.optionalAttrs (inst.browser.ssrfPolicy.allowedHostnames != [ ]) {
+                    allowedHostnames = inst.browser.ssrfPolicy.allowedHostnames;
+                  };
+              };
+        }
         // pluginConfig
         // a2aConfig
       ) inst.settings;
@@ -411,6 +435,52 @@ let
           type = lib.types.bool;
           default = true;
           description = "Open instance port on Tailscale firewall interface.";
+        };
+
+        browser = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Enable dedicated headless Chromium browser for this gateway instance.";
+          };
+
+          headless = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Run the managed browser headless.";
+          };
+
+          noSandbox = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Disable Chromium sandbox flags (useful if systemd unprivileged sandboxing requires it).";
+          };
+
+          package = lib.mkOption {
+            type = lib.types.package;
+            default = pkgs.chromium;
+            description = "Chromium package used by this gateway instance.";
+          };
+
+          tabCleanup = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Enable automatic cleanup of idle browser tabs opened by sessions.";
+          };
+
+          ssrfPolicy = {
+            dangerouslyAllowPrivateNetwork = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Allow the browser to navigate to private-network address ranges.";
+            };
+
+            allowedHostnames = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+              description = "Hostnames or IP literals allowed by browser SSRF guardrails.";
+            };
+          };
         };
 
         gitAuthor = {
@@ -708,7 +778,8 @@ in
               pkgs.procps
               pkgs.git
               pkgs.gh
-            ];
+            ]
+            ++ lib.optional inst.browser.enable inst.browser.package;
           };
         }
       ) (lib.attrNames enabledInstances)

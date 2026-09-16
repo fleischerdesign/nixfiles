@@ -44,14 +44,24 @@ let
       serviceHome = osConfig.users.users.${inst.tunnel.serviceUser}.home;
       identityFile = lib.replaceStrings [ "~/" ] [ "${serviceHome}/" ] inst.tunnel.identityFile;
 
-      mergedNodeHost = lib.recursiveUpdate (lib.optionalAttrs inst.sessionHosting.enable {
-        workerRuns = {
-          enabled = true;
-        }
-        // lib.optionalAttrs (inst.sessionHosting.capacity != null) {
-          capacity = inst.sessionHosting.capacity;
-        };
-      }) inst.nodeHost;
+      mergedNodeHost = lib.recursiveUpdate (
+        (lib.optionalAttrs inst.sessionHosting.enable {
+          workerRuns = {
+            enabled = true;
+          }
+          // lib.optionalAttrs (inst.sessionHosting.capacity != null) {
+            capacity = inst.sessionHosting.capacity;
+          };
+        })
+        // (lib.optionalAttrs inst.browserProxy.enable {
+          browserProxy = {
+            enabled = true;
+          }
+          // lib.optionalAttrs (inst.browserProxy.allowProfiles != [ ]) {
+            allowProfiles = inst.browserProxy.allowProfiles;
+          };
+        })
+      ) inst.nodeHost;
     in
     {
       options = {
@@ -214,6 +224,26 @@ let
             pkgs.procps
           ];
           description = "Packages added to the PATH of commands executed on this node instance.";
+        };
+
+        browserProxy = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Expose local browser control to the paired gateway via node routing.";
+          };
+
+          package = lib.mkOption {
+            type = lib.types.package;
+            default = pkgs.chromium;
+            description = "Chromium package provided to the node host environment when browserProxy is enabled.";
+          };
+
+          allowProfiles = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+            description = "Optional allowlist of browser profile names exposed through node proxy routing. Empty allows all.";
+          };
         };
 
         # Computed internal helpers
@@ -509,7 +539,8 @@ in
                 pkgs.bash
                 pkgs.coreutils
               ]
-              ++ inst.extraPackages;
+              ++ inst.extraPackages
+              ++ lib.optional inst.browserProxy.enable inst.browserProxy.package;
             };
           }
         ]

@@ -90,6 +90,7 @@
             password = "openclaw_gateway_password";
             github = "github_pat_philipp";
           };
+          browser.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -116,6 +117,7 @@
             openai = "openai_api_key";
             password = "openclaw_gateway_password";
           };
+          browser.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -142,6 +144,7 @@
             openai = "openai_api_key";
             password = "openclaw_gateway_password";
           };
+          browser.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -168,6 +171,7 @@
             openai = "openai_api_key";
             password = "openclaw_gateway_password";
           };
+          browser.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
       };
@@ -256,6 +260,15 @@
   my.features.services.authentik.outpost.proxy = {
     enable = true;
     tokenSecretName = "authentik_outpost_proxy_token_rollins";
+  };
+
+  my.features.services.obsidian-livesync-bridge = {
+    enable = true;
+    instances.philipp = {
+      enable = true;
+      couchdb.url = "https://livesync.mky.ancoris.ovh";
+      couchdb.database = "obsidian-vault";
+    };
   };
 
   system.stateVersion = "24.11";

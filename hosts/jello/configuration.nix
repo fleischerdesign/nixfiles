@@ -34,6 +34,7 @@
         tunnel.localPort = 18790;
         passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
+        browserProxy.enable = true;
       };
     };
   };
