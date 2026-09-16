@@ -91,6 +91,8 @@ let
                 };
             }
       ) inst.settings;
+
+      configFile = pkgs.writeText "openclaw-node-${name}.json" (builtins.toJSON mergedConfig);
     in
     {
       options = {
@@ -355,6 +357,12 @@ let
           internal = true;
           default = mergedConfig;
         };
+
+        _configFile = lib.mkOption {
+          type = lib.types.package;
+          internal = true;
+          default = configFile;
+        };
       };
     };
 
@@ -493,7 +501,7 @@ in
           name = "openclaw/node-instances/${name}.json";
           value = {
             mode = "0644";
-            source = pkgs.writeText "openclaw-node-${name}.json" (builtins.toJSON inst._mergedConfig);
+            source = inst._configFile;
           };
         }
       ) (lib.attrNames enabledInstances)
@@ -554,6 +562,7 @@ in
             value = {
               description = "OpenClaw companion node (${name})";
               wantedBy = [ "multi-user.target" ];
+              restartTriggers = lib.optional (inst._mergedConfig != { }) inst._configFile;
               after = [
                 "network-online.target"
                 "tailscaled.service"
