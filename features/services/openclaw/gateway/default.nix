@@ -14,6 +14,34 @@ let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.openclaw.gateway;
 
+  # Standard baseline toolchain available to OpenClaw execution environments
+  defaultBasePackages = [
+    pkgs.nix
+    pkgs.git
+    pkgs.gh
+    pkgs.ripgrep
+    pkgs.fd
+    pkgs.procps
+    pkgs.curl
+    pkgs.gnutar
+    pkgs.gzip
+    pkgs.zip
+    pkgs.unzip
+    pkgs.jq
+    pkgs.yq-go
+    pkgs.sqlite
+    pkgs.poppler-utils
+    pkgs.imagemagick
+    pkgs.pandoc
+    pkgs.ast-grep
+    pkgs.universal-ctags
+    pkgs.tokei
+    pkgs.lsof
+    pkgs.moreutils
+    pkgs.nvd
+    pkgs.nix-diff
+  ];
+
   # Submodule schema for a single gateway instance
   instanceSubmodule =
     { name, config, ... }:
@@ -569,6 +597,12 @@ let
           };
         };
 
+        extraPackages = lib.mkOption {
+          type = lib.types.listOf lib.types.package;
+          default = defaultBasePackages;
+          description = "Packages added to the PATH of commands executed by this gateway instance.";
+        };
+
         settings = lib.mkOption {
           type = lib.types.attrs;
           default = { };
@@ -775,10 +809,8 @@ in
             path = [
               pkgs.bash
               pkgs.coreutils
-              pkgs.procps
-              pkgs.git
-              pkgs.gh
             ]
+            ++ inst.extraPackages
             ++ lib.optional inst.browser.enable inst.browser.package;
           };
         }

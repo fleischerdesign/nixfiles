@@ -22,6 +22,34 @@ let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.openclaw.node;
 
+  # Standard baseline toolchain available to OpenClaw execution environments
+  defaultBasePackages = [
+    pkgs.nix
+    pkgs.git
+    pkgs.gh
+    pkgs.ripgrep
+    pkgs.fd
+    pkgs.procps
+    pkgs.curl
+    pkgs.gnutar
+    pkgs.gzip
+    pkgs.zip
+    pkgs.unzip
+    pkgs.jq
+    pkgs.yq-go
+    pkgs.sqlite
+    pkgs.poppler-utils
+    pkgs.imagemagick
+    pkgs.pandoc
+    pkgs.ast-grep
+    pkgs.universal-ctags
+    pkgs.tokei
+    pkgs.lsof
+    pkgs.moreutils
+    pkgs.nvd
+    pkgs.nix-diff
+  ];
+
   # Submodule schema for a single node instance
   instanceSubmodule =
     { name, config, ... }:
@@ -246,14 +274,7 @@ let
 
         extraPackages = lib.mkOption {
           type = lib.types.listOf lib.types.package;
-          default = [
-            pkgs.nix
-            pkgs.git
-            pkgs.gh
-            pkgs.ripgrep
-            pkgs.fd
-            pkgs.procps
-          ];
+          default = defaultBasePackages;
           description = "Packages added to the PATH of commands executed on this node instance.";
         };
 
