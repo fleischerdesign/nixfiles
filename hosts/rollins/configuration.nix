@@ -271,5 +271,14 @@
     };
   };
 
+  my.features.services.searxng = {
+    enable = true;
+    port = 8888;
+    domain = "search.rls.ancoris.ovh";
+    auth = true;
+    openTailscaleFirewall = true;
+    enableJsonApi = true;
+  };
+
   system.stateVersion = "24.11";
 }
