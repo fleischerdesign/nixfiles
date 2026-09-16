@@ -62,6 +62,35 @@ let
           };
         })
       ) inst.nodeHost;
+
+      browserExecutable =
+        if inst.browser.executablePath != null then
+          inst.browser.executablePath
+        else if inst.browserProxy.enable then
+          "${inst.browserProxy.package}/bin/chromium"
+        else
+          null;
+
+      mergedConfig = lib.recursiveUpdate (
+        lib.optionalAttrs (mergedNodeHost != { }) {
+          nodeHost = mergedNodeHost;
+        }
+        //
+          lib.optionalAttrs
+            (browserExecutable != null || inst.browser.headless != null || inst.browser.noSandbox != null)
+            {
+              browser =
+                lib.optionalAttrs (browserExecutable != null) {
+                  executablePath = browserExecutable;
+                }
+                // lib.optionalAttrs (inst.browser.headless != null) {
+                  headless = inst.browser.headless;
+                }
+                // lib.optionalAttrs (inst.browser.noSandbox != null) {
+                  noSandbox = inst.browser.noSandbox;
+                };
+            }
+      ) inst.settings;
     in
     {
       options = {
@@ -226,6 +255,26 @@ let
           description = "Packages added to the PATH of commands executed on this node instance.";
         };
 
+        browser = {
+          executablePath = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Explicit path to Chromium browser binary on this node. Defaults to browserProxy.package/bin/chromium if null and browserProxy.enable is true.";
+          };
+
+          headless = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            description = "Explicit headless override for browser sessions managed by this node.";
+          };
+
+          noSandbox = lib.mkOption {
+            type = lib.types.nullOr lib.types.bool;
+            default = null;
+            description = "Disable Chromium sandbox flags on this node if needed.";
+          };
+        };
+
         browserProxy = {
           enable = lib.mkOption {
             type = lib.types.bool;
@@ -244,6 +293,12 @@ let
             default = [ ];
             description = "Optional allowlist of browser profile names exposed through node proxy routing. Empty allows all.";
           };
+        };
+
+        settings = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+          description = "Arbitrary openclaw.json overrides merged into this node instance configuration.";
         };
 
         # Computed internal helpers
@@ -293,6 +348,12 @@ let
           type = lib.types.attrs;
           internal = true;
           default = mergedNodeHost;
+        };
+
+        _mergedConfig = lib.mkOption {
+          type = lib.types.attrs;
+          internal = true;
+          default = mergedConfig;
         };
       };
     };
@@ -428,13 +489,11 @@ in
         let
           inst = enabledInstances.${name};
         in
-        lib.optional (inst._mergedNodeHost != { }) {
+        lib.optional (inst._mergedConfig != { }) {
           name = "openclaw/node-instances/${name}.json";
           value = {
             mode = "0644";
-            source = pkgs.writeText "openclaw-node-${name}.json" (
-              builtins.toJSON { nodeHost = inst._mergedNodeHost; }
-            );
+            source = pkgs.writeText "openclaw-node-${name}.json" (builtins.toJSON inst._mergedConfig);
           };
         }
       ) (lib.attrNames enabledInstances)
@@ -513,7 +572,7 @@ in
                   "HOME=${inst._stateDir}"
                   "OPENCLAW_STATE_DIR=${inst._stateDir}"
                 ]
-                ++ lib.optional (inst._mergedNodeHost != { }) "OPENCLAW_CONFIG_PATH=${inst._configPath}"
+                ++ lib.optional (inst._mergedConfig != { }) "OPENCLAW_CONFIG_PATH=${inst._configPath}"
                 ++ lib.optional (inst.gitAuthor.name != null) "GIT_AUTHOR_NAME=${inst.gitAuthor.name}"
                 ++ lib.optional (inst.gitAuthor.name != null) "GIT_COMMITTER_NAME=${inst.gitAuthor.name}"
                 ++ lib.optional (inst.gitAuthor.email != null) "GIT_AUTHOR_EMAIL=${inst.gitAuthor.email}"
