@@ -20,6 +20,7 @@ let
     pkgs.git
     pkgs.gh
     pkgs.ripgrep
+    pkgs.ripgrep-all
     pkgs.fd
     pkgs.procps
     pkgs.curl
