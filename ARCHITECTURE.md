@@ -140,10 +140,13 @@ Ablösung des Standard-Subnetzes `192.168.178.0/24` durch das kollisionsfreie Su
 
 ### 5.1 Natives Kernel-WireGuard Mesh (Stateless, Autark & Anti-Hairpinning)
 - **Vollständig stateless & im Linux-Kernel integriert:** Keine SaaS-Abhängigkeit von Tailscale und kein Single-Point-of-Failure durch fragile Headscale-Control-Planes oder Datenbanken.
-- **Topologie & Hub:** `cld-edge-01` fungiert dank fester Public-IP als zentraler WireGuard-Hub und Relay für Roaming-Clients (`mob-nb-01`, Smartphones) und Site-to-Site zu `hom-srv-01`.
-- **Zonen-Affines Routing (Anti-Hairpinning):** Ko-lokierte Knoten im selben lokalen Subnetz (`hom-wrk-01` und `hom-srv-01`) kommunizieren direkt über ihre LAN-Interfaces (`10.10.x.x`) mit voller Switch-Line-Speed (1 Gbit/s / 2.5 Gbit/s). Der WireGuard-Hub im Cloud-Rechenzentrum wird strikt nur für standortübergreifenden Verkehr genutzt.
+- **Redundante Dual-Hub Active-Relay Topologie:** Sowohl `cld-edge-01` (`173.249.22.211`) als auch `cld-ops-01` (`37.114.55.91`) fungieren als aktive Relay-Hubs.
+  - **Site-to-Site Inter-Hub Link:** Beide Cloud-Hubs sind direkt und bidirektional miteinander gepeert.
+  - **Dual-Peering aller Spokes:** Alle Spoke-Knoten (`hom-srv-01`, `hom-wrk-01`, `mob-nb-01`) unterhalten gleichzeitige, direkte Kernel-WireGuard-Tunnel zu beiden Hubs mit `persistentKeepalive = 25` für NAT-Traversal.
+  - **Longest-Prefix-Cryptokey-Routing (LPM):** Spoke-Traffic zu Observability/AI-Gateway (`10.10.100.2` / `fd10:1000:100::2`) auf `cld-ops-01` fließt direkt über den Ops-Relay-Tunnel ohne Umweg über Edge. Mesh-weites Transit-Routing für Roaming-Clients nutzt den Primary-Hub (`cld-edge-01`), welcher bei Wartung nahtlos umschaltbar ist.
+- **Zonen-Affines Routing (Anti-Hairpinning):** Ko-lokierte Knoten im selben lokalen Subnetz (`hom-wrk-01` und `hom-srv-01`) kommunizieren direkt über ihre LAN-Interfaces (`10.10.x.x`) mit voller Switch-Line-Speed (1 Gbit/s / 2.5 Gbit/s). Die WireGuard-Relays im Cloud-Rechenzentrum werden strikt nur für standortübergreifenden Verkehr genutzt.
 - **Dual-Stack IPv4 & RFC 4193 ULA IPv6:** Neben dem IPv4-Overlay (`10.10.100.0/24`) spannt das Mesh ein rein kryptografisches IPv6-Overlay (`fd10:1000:100::/64`) auf. Jeder Host besitzt eine unveränderliche ULA (`fd10:1000:100::<host-id>`). Eliminierung von NAT-Traversal-Problemen und zukunftssichere End-to-End-Konnektivität.
-- **TCP-MSS-Clamping & MTU-Garantie:** Deterministische nftables/iptables-Regeln (`iptables` & `ip6tables`) klemmen MSS auf den WireGuard-Interfaces (`clamp-mss-to-pmtu`), um hängende TCP-Handshakes und Paketverlust über mobile DSL/LTE-Uplinks auszuschließen.
+- **Kernel-Forwarding & TCP-MSS-Clamping:** Deterministische nftables/iptables-Regeln (`iptables` & `ip6tables`) klemmen MSS auf den WireGuard-Interfaces (`clamp-mss-to-pmtu`), um hängende TCP-Handshakes und Paketverlust über mobile DSL/LTE-Uplinks auszuschließen. Auf den Relay-Hubs sind `net.ipv4.ip_forward` und `net.ipv6.conf.all.forwarding` sowie Relay-Interface-Forwarding (`-A FORWARD -i wg0 -o wg0 -j ACCEPT`) aktiv.
 - **100% Deklarativ in NixOS:** Private Keys werden via SOPS injiziert, Public Keys und Peerings deterministisch aus `my.topology` abgeleitet.
 
 ### 5.2 Split-Horizon / Dual-Horizon DNS & Lokales Ingress

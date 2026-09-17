@@ -77,6 +77,11 @@ let
         default = null;
         description = "WireGuard Ed25519 public key for mesh peering";
       };
+      wireguardRelay = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Whether this host acts as a public WireGuard mesh relay hub";
+      };
       hostType = lib.mkOption {
         type = lib.types.enum [
           "server"
@@ -191,6 +196,7 @@ in
         gateway = "173.249.22.1";
         wireguardIpv4 = "10.10.100.1";
         wireguardIpv6 = "fd10:1000:100::1";
+        wireguardRelay = true;
         hostType = "server";
         domain = "edge.vyrx.de";
       };
@@ -201,6 +207,7 @@ in
         gateway = "37.114.55.1";
         wireguardIpv4 = "10.10.100.2";
         wireguardIpv6 = "fd10:1000:100::2";
+        wireguardRelay = true;
         hostType = "server";
         domain = "ops.vyrx.de";
       };
