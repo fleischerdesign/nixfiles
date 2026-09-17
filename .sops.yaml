@@ -1,11 +1,11 @@
 # .sops.yaml
 keys:
   - &philipp age1t2z30qm3c9x7n75nwsra7l97609fkmvz7wjqlsz9ahwsz4a50cwsvjly7j
-  - &strummer age15vu7hfhm9ccprhrae3y59gx5dpx7k09ngt6zqynehjrlkhegzpsqk3ltth
-  - &mackaye age1h38e8jystv3lstdxc6txltw2r804uh3geu8nz2x4je90krafs32qfyzk47
-  - &rls age1e2fhq5nwlkha9u3a4438new0ykrqds7f3masy94c60tw6zc6svjq485xgp
-  - &jello age1adeyq89xfwyvmek050nuw26jxtqe0qy3h2nxsjegfqxpj5yvcqnsgsw87h
-  - &yorke age1a9cthssm9cl7qy0uxcm6c7l9mvyja5lzk7g9nf7hzve8dzr5r5ws68tpt4
+  - &hom-srv-01 age15vu7hfhm9ccprhrae3y59gx5dpx7k09ngt6zqynehjrlkhegzpsqk3ltth
+  - &cld-edge-01 age1h38e8jystv3lstdxc6txltw2r804uh3geu8nz2x4je90krafs32qfyzk47
+  - &cld-ops-01 age1e2fhq5nwlkha9u3a4438new0ykrqds7f3masy94c60tw6zc6svjq485xgp
+  - &hom-wrk-01 age1adeyq89xfwyvmek050nuw26jxtqe0qy3h2nxsjegfqxpj5yvcqnsgsw87h
+  - &mob-nb-01 age1a9cthssm9cl7qy0uxcm6c7l9mvyja5lzk7g9nf7hzve8dzr5r5ws68tpt4
   - &ci age19hdr3x7538f0w26dtj877srt7fg804hmhaktr053r9kme9veqv5q8d7w7g
 
 creation_rules:
@@ -14,9 +14,10 @@ creation_rules:
       - pgp: []
         age:
           - *philipp
-          - *strummer
-          - *mackaye
-          - *rls
-          - *jello
-          - *yorke
+          - *hom-srv-01
+          - *cld-edge-01
+          - *cld-ops-01
+          - *hom-wrk-01
+          - *mob-nb-01
           - *ci
+

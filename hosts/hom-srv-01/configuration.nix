@@ -9,7 +9,7 @@
     ../../roles/server.nix
   ];
 
-  networking.hostName = "strummer";
+  networking.hostName = "hom-srv-01";
 
   my.user.extraGroups = [
     "networkmanager"
@@ -22,7 +22,7 @@
     features = {
       services = {
         caddy = {
-          baseDomain = "fls.ancoris.ovh";
+          baseDomain = "srv.lan.vyrx.de";
         };
         home-assistant.enable = true;
         esphome.enable = true;
@@ -39,7 +39,7 @@
         jellyseerr.enable = true;
         cloudflare-dyndns = {
           enable = true;
-          domains = [ "fls.ancoris.ovh" ];
+          domains = [ "srv.lan.vyrx.de" ];
         };
         klipper.enable = true;
         authentik.outpost.proxy = {
@@ -48,7 +48,7 @@
         };
         authentik.outpost.ldap = {
           enable = true;
-          coreAddress = "http://${config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp}:9055";
+          coreAddress = "http://${config.my.features.system.networking.topology.hosts.cld-edge-01.tailscaleIp}:9055";
           tokenSecretName = "authentik_outpost_ldap_token_strummer";
         };
         monitoring = {
@@ -159,9 +159,9 @@
     instances = {
       philipp = {
         enable = true;
-        displayName = "strummer";
+        displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18789;
         };
         transport = "loopback-tunnel";
@@ -172,9 +172,9 @@
 
       katja = {
         enable = true;
-        displayName = "strummer";
+        displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18791;
         };
         transport = "loopback-tunnel";
@@ -185,9 +185,9 @@
 
       lilly = {
         enable = true;
-        displayName = "strummer";
+        displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18792;
         };
         transport = "loopback-tunnel";
@@ -198,9 +198,9 @@
 
       kai = {
         enable = true;
-        displayName = "strummer";
+        displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18793;
         };
         transport = "loopback-tunnel";

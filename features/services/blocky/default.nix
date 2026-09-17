@@ -40,12 +40,15 @@ in
             # Custom DNS Mapping (Split DNS)
             # Subdomains werden automatisch mit aufgelöst (Blocky-Feature)
             # Heimnetz-Hosts: lokale IP (via LAN oder Subnet-Router)
-            # Externe Hosts (mackaye): Tailscale-IP (lokale IP nicht erreichbar)
+            # Externe Cloud-Hosts: WireGuard-Overlay IP
             customDNS = {
               mapping = lib.mapAttrs' (_name: host: {
                 name = host.domain;
                 value =
-                  if host.localIp != null && lib.hasPrefix "192.168.178." host.localIp then
+                  if
+                    host.localIp != null
+                    && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
+                  then
                     host.localIp
                   else if host.tailscaleIp != null then
                     host.tailscaleIp

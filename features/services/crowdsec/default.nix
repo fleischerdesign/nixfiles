@@ -14,7 +14,7 @@ in
     enable = lib.mkEnableOption "CrowdSec IPS";
     masterHost = lib.mkOption {
       type = lib.types.str;
-      default = "mackaye";
+      default = "cld-edge-01";
       description = "The name of the CrowdSec master host (LAPI server) in the topology.";
     };
     role = lib.mkOption {

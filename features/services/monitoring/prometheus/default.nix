@@ -43,14 +43,17 @@ let
     _: svc: svc.proxy.enable && svc.monitoring.http.enable && svc.publicUrl != null
   ) allServices;
 
-  otherServerHosts = lib.filterAttrs (n: h: n != ownHost && h.hostType or "client" == "server") hosts;
+  otherServerHosts = lib.filterAttrs (
+    n: h: n != ownHost && (h.hostType or "client") == "server" && h.tailscaleIp != null
+  ) hosts;
 
   blackboxAddrForHost =
     hostName: if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.tailscaleIp}:9115";
 
   # Collect all direct Prometheus scrape targets across hosts
   allScrapeServices = lib.concatLists (
-    lib.mapAttrsToList (hostName: registry:
+    lib.mapAttrsToList (
+      hostName: registry:
       lib.mapAttrsToList (svcName: svc: {
         inherit svcName hostName svc;
       }) (lib.filterAttrs (_: svc: svc.monitoring.scrape.enable or false) registry)
@@ -62,7 +65,8 @@ let
 
   # Collect all local HTTP Blackbox probes and group them under a single job using exporter_address relabeling
   allHttpLocalProbes = lib.concatLists (
-    lib.mapAttrsToList (hostName: registry:
+    lib.mapAttrsToList (
+      hostName: registry:
       if hostsWithBlackbox ? ${hostName} then
         lib.mapAttrsToList (svcName: svc: {
           target = svc.localUrl + svc.monitoring.http.path;
@@ -81,7 +85,8 @@ let
 
   # Collect all local TCP Blackbox probes and group them under a single job using exporter_address relabeling
   allTcpLocalProbes = lib.concatLists (
-    lib.mapAttrsToList (hostName: registry:
+    lib.mapAttrsToList (
+      hostName: registry:
       if hostsWithBlackbox ? ${hostName} then
         lib.mapAttrsToList (svcName: svc: {
           target = "127.0.0.1:${toString svc.port}";
@@ -115,10 +120,12 @@ in
           metrics_path = (lib.head targetsList).svc.monitoring.scrape.path;
           static_configs = map (t: {
             targets = [
-              (if t.hostName == ownHost then
-                "127.0.0.1:${toString t.svc.monitoring.scrape.port}"
-              else
-                "${hosts.${t.hostName}.tailscaleIp}:${toString t.svc.monitoring.scrape.port}")
+              (
+                if t.hostName == ownHost then
+                  "127.0.0.1:${toString t.svc.monitoring.scrape.port}"
+                else
+                  "${hosts.${t.hostName}.tailscaleIp}:${toString t.svc.monitoring.scrape.port}"
+              )
             ];
             labels = {
               host = t.hostName;

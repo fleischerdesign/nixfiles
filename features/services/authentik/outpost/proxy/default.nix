@@ -17,12 +17,12 @@ in
     };
     coreAddress = lib.mkOption {
       type = lib.types.str;
-      default = "http://${config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp}:9055";
+      default = "http://${config.my.features.system.networking.topology.hosts.cld-edge-01.tailscaleIp}:9055";
       description = "Internal address of the Authentik Core instance.";
     };
     browserUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh";
+      default = "https://auth.vyrx.de";
       description = "Public browser facing URL of the Authentik Core instance.";
     };
   };

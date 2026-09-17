@@ -12,10 +12,10 @@
     ../../roles/server.nix
   ];
 
-  networking.hostName = "mackaye";
+  networking.hostName = "cld-edge-01";
 
   # Features
-  my.features.services.caddy.baseDomain = "mky.ancoris.ovh";
+  my.features.services.caddy.baseDomain = "edge.vyrx.de";
 
   my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.common.geoip.enable = true;
@@ -53,9 +53,9 @@
     instances = {
       philipp = {
         enable = true;
-        displayName = "mackaye";
+        displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18789;
         };
         transport = "loopback-tunnel";
@@ -66,9 +66,9 @@
 
       katja = {
         enable = true;
-        displayName = "mackaye";
+        displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18791;
         };
         transport = "loopback-tunnel";
@@ -79,9 +79,9 @@
 
       lilly = {
         enable = true;
-        displayName = "mackaye";
+        displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18792;
         };
         transport = "loopback-tunnel";
@@ -92,9 +92,9 @@
 
       kai = {
         enable = true;
-        displayName = "mackaye";
+        displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18793;
         };
         transport = "loopback-tunnel";

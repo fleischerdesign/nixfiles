@@ -29,7 +29,7 @@ in
 
     hub = lib.mkOption {
       type = lib.types.str;
-      default = "mackaye";
+      default = "cld-edge-01";
       description = "Hostname of the monitoring hub. Used to configure alloy's loki endpoint on collectors.";
     };
   };

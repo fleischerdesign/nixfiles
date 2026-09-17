@@ -6,18 +6,20 @@
   imports = [
     ./hardware-configuration.nix
     ./hardware-specific.nix
-    ../../roles/desktop.nix
+    ../../roles/notebook.nix
   ];
 
-  networking.hostName = "jello";
+  networking.hostName = "mob-nb-01";
 
   # Features
-  my.features.system.networking.tailscale.enable = true;
-  my.features.system.networking.tailscale.acceptRoutes = true;
+  my.features.desktop.niri.enable = true;
 
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
-  my.features.desktop.niri.enable = true;
+
+  my.features.media.gaming.sunshine.enable = false;
+  my.features.system.networking.tailscale.enable = true;
+  my.features.system.networking.tailscale.acceptRoutes = true;
 
   my.features.services.openclaw.node = {
     enable = true;
@@ -25,16 +27,15 @@
     instances = {
       philipp = {
         enable = true;
-        displayName = "jello";
+        displayName = "mob-nb-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.rollins.tailscaleIp;
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
           port = 18789;
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18790;
         passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
-        browserProxy.enable = true;
       };
     };
   };
