@@ -12,7 +12,13 @@ in
 
     baseDomain = lib.mkOption {
       type = lib.types.str;
-      description = "Base domain for exposed services (e.g. srv.lan.vyrx.de, edge.vyrx.de)";
+      default =
+        let
+          hostName = config.networking.hostName;
+          hostTopo = config.my.topology.hosts.${hostName} or null;
+        in
+        if hostTopo != null && hostTopo.domain != null then hostTopo.domain else config.my.topology.domain;
+      description = "Base domain for exposed services (defaults to host topology domain, e.g. srv.lan.vyrx.de, edge.vyrx.de)";
     };
 
     authentikOutpostAddress = lib.mkOption {
