@@ -40,20 +40,25 @@ in
             # Custom DNS Mapping (Split DNS)
             # Subdomains werden automatisch mit aufgelöst (Blocky-Feature)
             # Heimnetz-Hosts: lokale IP (via LAN oder Subnet-Router)
-            # Externe Cloud-Hosts: WireGuard-Overlay IP
+            # Externe Cloud-Hosts: WireGuard-Overlay IP (IPv4 & RFC 4193 ULA IPv6)
             customDNS = {
               mapping = lib.mapAttrs' (_name: host: {
                 name = host.domain;
                 value =
-                  if
-                    host.localIp != null
-                    && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
-                  then
-                    host.localIp
-                  else if host.tailscaleIp != null then
-                    host.tailscaleIp
-                  else
-                    host.localIp;
+                  let
+                    primaryIp =
+                      if
+                        host.localIp != null
+                        && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
+                      then
+                        host.localIp
+                      else if host.tailscaleIp != null then
+                        host.tailscaleIp
+                      else
+                        host.localIp;
+                    ipv6 = host.wireguardIpv6 or null;
+                  in
+                  if ipv6 != null then "${primaryIp},${ipv6}" else primaryIp;
               }) config.my.features.system.networking.topology.hosts;
             };
 

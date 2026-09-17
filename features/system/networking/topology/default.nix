@@ -67,6 +67,11 @@ let
         default = null;
         description = "Static WireGuard mesh overlay IPv4 (10.10.100.x)";
       };
+      wireguardIpv6 = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Static WireGuard mesh overlay RFC 4193 ULA IPv6 (fd10:1000:100::x)";
+      };
       wireguardPublicKey = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
@@ -162,7 +167,13 @@ in
         cidr = "10.10.100.0/24";
         vlan = null;
         trustLevel = "mesh";
-        description = "Kernel-WireGuard ChaCha20 overlay mesh connecting cloud VPS and home nodes";
+        description = "Kernel-WireGuard ChaCha20 overlay mesh connecting cloud VPS and home nodes (IPv4)";
+      };
+      mesh-ipv6 = {
+        cidr = "fd10:1000:100::/64";
+        vlan = null;
+        trustLevel = "mesh";
+        description = "Kernel-WireGuard RFC 4193 ULA overlay mesh connecting cloud VPS and home nodes (IPv6)";
       };
       guest = {
         cidr = "10.10.99.0/24";
@@ -179,6 +190,7 @@ in
         ipv4 = "173.249.22.211";
         gateway = "173.249.22.1";
         wireguardIpv4 = "10.10.100.1";
+        wireguardIpv6 = "fd10:1000:100::1";
         hostType = "server";
         domain = "edge.vyrx.de";
       };
@@ -188,6 +200,7 @@ in
         ipv4 = "37.114.55.91";
         gateway = "37.114.55.1";
         wireguardIpv4 = "10.10.100.2";
+        wireguardIpv6 = "fd10:1000:100::2";
         hostType = "server";
         domain = "ops.vyrx.de";
       };
@@ -197,6 +210,7 @@ in
         ipv4 = "10.10.10.10";
         gateway = "10.10.10.1";
         wireguardIpv4 = "10.10.100.10";
+        wireguardIpv6 = "fd10:1000:100::10";
         hostType = "server";
         domain = "srv.lan.vyrx.de";
       };
@@ -206,6 +220,7 @@ in
         ipv4 = "10.10.20.10";
         gateway = "10.10.10.10";
         wireguardIpv4 = "10.10.100.20";
+        wireguardIpv6 = "fd10:1000:100::20";
         hostType = "workstation";
         domain = "wrk.lan.vyrx.de";
       };
@@ -215,6 +230,7 @@ in
         ipv4 = null; # Roaming DHCP
         gateway = null;
         wireguardIpv4 = "10.10.100.30";
+        wireguardIpv6 = "fd10:1000:100::30";
         hostType = "client";
         domain = "nb.lan.vyrx.de";
       };
@@ -246,6 +262,7 @@ in
     my.features.system.networking.topology.hosts = lib.mkDefault (
       lib.mapAttrs (_name: h: {
         tailscaleIp = h.wireguardIpv4; # Point legacy references to wireguard IP during transition
+        wireguardIpv6 = h.wireguardIpv6;
         localIp = h.ipv4;
         domain = h.domain;
         hostType = if h.hostType == "workstation" || h.hostType == "client" then "client" else "server";

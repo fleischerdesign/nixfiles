@@ -32,7 +32,10 @@ let
       # Hub peers with everyone that has a public key
       lib.mapAttrsToList (_name: peer: {
         publicKey = peer.wireguardPublicKey;
-        allowedIPs = [ "${peer.wireguardIpv4}/32" ];
+        allowedIPs = [
+          "${peer.wireguardIpv4}/32"
+        ]
+        ++ lib.optional (peer.wireguardIpv6 != null) "${peer.wireguardIpv6}/128";
         # Persistent keepalive for NAT traversal if peer is behind NAT
         persistentKeepalive = 25;
       }) allPeersWithKeys
@@ -41,7 +44,8 @@ let
       lib.optional (hubHost != null && hubHost.wireguardPublicKey != null && hubHost.ipv4 != null) {
         publicKey = hubHost.wireguardPublicKey;
         allowedIPs = [
-          "10.10.100.0/24" # Full mesh overlay routed through hub
+          "10.10.100.0/24" # Full IPv4 mesh overlay routed through hub
+          "fd10:1000:100::/64" # Full RFC 4193 ULA IPv6 mesh overlay routed through hub
         ];
         endpoint = "${hubHost.ipv4}:${toString wireguardPort}";
         persistentKeepalive = 25;
@@ -79,9 +83,12 @@ in
       checkReversePath = "loose";
     };
 
-    # 2. Kernel WireGuard interface configuration
+    # 2. Kernel WireGuard interface configuration (Dual-Stack IPv4 / RFC 4193 ULA IPv6)
     networking.wireguard.interfaces.${cfg.interfaceName} = {
-      ips = [ "${ownHost.wireguardIpv4}/24" ];
+      ips = [
+        "${ownHost.wireguardIpv4}/24"
+      ]
+      ++ lib.optional (ownHost.wireguardIpv6 != null) "${ownHost.wireguardIpv6}/64";
       listenPort = cfg.port;
       privateKeyFile = config.sops.secrets.${cfg.privateKeySecretName}.path;
       peers = peersConfig;
@@ -89,9 +96,11 @@ in
 
     # 3. MSS Clamping via nftables / iptables to prevent packet drop on MTU mismatches (ARCHITECTURE.md 5.1)
     networking.firewall.extraCommands = ''
-      # TCP-MSS-Clamping for WireGuard interface
+      # TCP-MSS-Clamping for WireGuard interface (IPv4 & IPv6)
       ${pkgs.iptables}/bin/iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -o ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true
       ${pkgs.iptables}/bin/iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -i ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true
+      ${pkgs.iptables}/bin/ip6tables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -o ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true
+      ${pkgs.iptables}/bin/ip6tables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -i ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true
     '';
 
     # 4. Assert that SOPS secret is declared

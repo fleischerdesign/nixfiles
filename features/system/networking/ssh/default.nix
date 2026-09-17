@@ -17,6 +17,10 @@ let
       addr = ownHost.tailscaleIp;
       port = 22;
     }
+    ++ lib.optional (ownHost.wireguardIpv6 != null) {
+      addr = ownHost.wireguardIpv6;
+      port = 22;
+    }
   );
 in
 {
