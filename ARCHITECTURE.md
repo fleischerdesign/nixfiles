@@ -46,8 +46,7 @@ Schema: **`<location>-<role>-<index>`**
 | **`rollins`** | **`cld-ops-01`**  | VPS | QEMU / Public Cloud | Monitoring Pipeline (Prometheus/Grafana/Loki), Attic Cache, Hermes Agent, OpenClaw Gateway |
 | **`strummer`**| **`hom-srv-01`**  | Server | Bare Metal (Intel 4TB+1TB) | Storage, Arr-Stack, Jellyfin, Home-Assistant, Klipper, Subnet-Router, Blocky, Local Ingress Caddy |
 | **`jello`**   | **`hom-wrk-01`**  | Client | PC (Intel, NVMe, Intel GPU) | Desktop Workstation (Niri), OpenClaw Node |
-| **`yorke`**   | **`mob-nb-01`**   | Client | Laptop (AMD, NVMe) | Mobile Workstation (Niri), OpenClaw Node |
-| **`-`**       | **`hom-ap-01`**   | Embedded | TP-Link (OpenWrt) | Wi-Fi Bridge (SSIDs: VYRX, VYRX-IOT), Agentless GitOps via nod switch |
+| **`-`**       | **`hom-ap-01`**   | Embedded | TP-Link RE330 | Wi-Fi Bridge / Access Point (SSIDs: VYRX, VYRX-IOT) |
 | **`-`**       | **`hom-rt-01`**   | Embedded | AVM FRITZ!Box | Uplink Gateway / DSL-Modem, Agentless GitOps (TR-064 API) via nod switch |
 
 ---

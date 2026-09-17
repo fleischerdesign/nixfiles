@@ -21,15 +21,22 @@ in
       enable = true;
       user = "klipper";
       group = "klipper";
-      mutableConfig = true;
-      # Initial minimal config to allow Klipper to start
-      configFile = pkgs.writeText "klipper-init.cfg" ''
+      # Declarative Core & Macros from Git, dynamic calibration state from /var/lib/klipper (PROVISIONING.md 4)
+      configFile = pkgs.writeText "klipper-master.cfg" ''
+        # Immutable macros from the Nix store
+        [include ${./printer-config/macros.cfg}]
+
+        # Minimal base fallback to allow startup before hardware attach
         [mcu]
         serial: /dev/null
+
         [printer]
         kinematics: none
         max_velocity: 1000
         max_accel: 1000
+
+        # Dynamic runtime variables / calibration state (Bed-Mesh, Z-Offset, PID)
+        # [include /var/lib/klipper/runtime_variables.cfg]
       '';
     };
 

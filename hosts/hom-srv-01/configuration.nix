@@ -208,6 +208,19 @@
         passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
+
+      rieke = {
+        enable = true;
+        displayName = "hom-srv-01";
+        gateway = {
+          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          port = 18794;
+        };
+        transport = "loopback-tunnel";
+        tunnel.localPort = 18797;
+        passwordSecret = "openclaw_gateway_password";
+        sessionHosting.enable = true;
+      };
     };
   };
 

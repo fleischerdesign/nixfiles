@@ -55,9 +55,9 @@ Unabhängig davon, ob ein Zielgerät ein Multi-Core-Server mit NixOS, ein OpenWr
 
 ---
 
-## 3. OpenWrt Access Point GitOps (`hom-ap-01`)
+## 3. TP-Link RE330 Wi-Fi Access Point (`hom-ap-01`)
 
-Der bestehende TP-Link Wi-Fi Access Point wird mit OpenWrt geflasht und als reines Layer-2-Funkbrücken-Target (`hom-ap-01`) in das Flake integriert.
+Der TP-Link RE330 Wi-Fi Repeater/Access Point wird im Access-Point-Modus als reine Layer-2-Funkbrücke (`hom-ap-01`) in die Infrastruktur integriert (SSIDs: `VYRX`, `VYRX-IOT`). Sämtliche Netzwerkdienste (DHCP, DNS, Routing) werden zentral von `hom-srv-01` bereitgestellt.
 
 ### 3.1 Host-Definition im Flake (`hosts/hom-ap-01/default.nix`)
 ```nix

@@ -214,6 +214,43 @@
           };
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
+
+        rieke = {
+          enable = true;
+          agentName = "Rieke";
+          agentEmoji = "🌸";
+          port = 18794;
+          subdomain = "rieke.ai";
+          auth = true;
+          adminUsers = [
+            "rieke@vyrx.de"
+            "philipp@fleischer.design"
+          ];
+          defaultModel = "deepseek/deepseek-flash";
+          memorySearch = "openai";
+          runtimePlugins = [
+            "deepseek"
+            "tokenjuice"
+          ];
+          gitAuthor = {
+            name = "Rieke Fleischer";
+            email = "rieke@vyrx.de";
+          };
+          secrets = {
+            deepseek = "pi/deepseek";
+            openai = "openai_api_key";
+            password = "openclaw_gateway_password";
+          };
+          browser.enable = true;
+          webSearch.enable = true;
+          codeMode.enable = true;
+          toolSearch.enable = true;
+          googleWorkspace = {
+            enable = true;
+            credentialsSecret = "openclaw_google_credentials";
+          };
+          settings.models.providers.deepseek = commonDeepseekProvider;
+        };
       };
 
       # Mutually peer all instances on rollins via A2A with unique per-instance tokens
@@ -231,6 +268,10 @@
           kai = {
             url = "https://kai.ai.rls.ancoris.ovh";
             tokenSecret = "openclaw_a2a_token_kai";
+          };
+          rieke = {
+            url = "https://rieke.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_rieke";
           };
         };
       };
@@ -250,6 +291,10 @@
             url = "https://kai.ai.rls.ancoris.ovh";
             tokenSecret = "openclaw_a2a_token_kai";
           };
+          rieke = {
+            url = "https://rieke.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_rieke";
+          };
         };
       };
 
@@ -268,6 +313,10 @@
             url = "https://kai.ai.rls.ancoris.ovh";
             tokenSecret = "openclaw_a2a_token_kai";
           };
+          rieke = {
+            url = "https://rieke.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_rieke";
+          };
         };
       };
 
@@ -285,6 +334,32 @@
           lilly = {
             url = "https://lilly.ai.rls.ancoris.ovh";
             tokenSecret = "openclaw_a2a_token_lilly";
+          };
+          rieke = {
+            url = "https://rieke.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_rieke";
+          };
+        };
+      };
+
+      instances.rieke.a2a = {
+        tokenSecret = "openclaw_a2a_token_rieke";
+        peers = {
+          philipp = {
+            url = "https://philipp.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_philipp";
+          };
+          katja = {
+            url = "https://katja.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_katja";
+          };
+          lilly = {
+            url = "https://lilly.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_lilly";
+          };
+          kai = {
+            url = "https://kai.ai.rls.ancoris.ovh";
+            tokenSecret = "openclaw_a2a_token_kai";
           };
         };
       };
