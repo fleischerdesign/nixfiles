@@ -79,7 +79,10 @@
           adminUsers = [ "philipp@fleischer.design" ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
-          runtimePlugins = [ "deepseek" ];
+          runtimePlugins = [
+            "deepseek"
+            "tokenjuice"
+          ];
           gitAuthor = {
             name = "Philipp Fleischer";
             email = "philipp@fleischer.design";
@@ -91,6 +94,13 @@
             github = "github_pat_philipp";
           };
           browser.enable = true;
+          webSearch.enable = true;
+          codeMode.enable = true;
+          toolSearch.enable = true;
+          googleWorkspace = {
+            enable = true;
+            credentialsSecret = "openclaw_google_credentials";
+          };
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -107,7 +117,10 @@
           ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
-          runtimePlugins = [ "deepseek" ];
+          runtimePlugins = [
+            "deepseek"
+            "tokenjuice"
+          ];
           gitAuthor = {
             name = "Katja Fleischer";
             email = "fleischerkatja74@yahoo.com";
@@ -118,6 +131,13 @@
             password = "openclaw_gateway_password";
           };
           browser.enable = true;
+          webSearch.enable = true;
+          codeMode.enable = true;
+          toolSearch.enable = true;
+          googleWorkspace = {
+            enable = true;
+            credentialsSecret = "openclaw_google_credentials";
+          };
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -134,7 +154,10 @@
           ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
-          runtimePlugins = [ "deepseek" ];
+          runtimePlugins = [
+            "deepseek"
+            "tokenjuice"
+          ];
           gitAuthor = {
             name = "Lilly Tobei";
             email = "lillytobei@gmail.com";
@@ -145,6 +168,13 @@
             password = "openclaw_gateway_password";
           };
           browser.enable = true;
+          webSearch.enable = true;
+          codeMode.enable = true;
+          toolSearch.enable = true;
+          googleWorkspace = {
+            enable = true;
+            credentialsSecret = "openclaw_google_credentials";
+          };
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -161,7 +191,10 @@
           ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
-          runtimePlugins = [ "deepseek" ];
+          runtimePlugins = [
+            "deepseek"
+            "tokenjuice"
+          ];
           gitAuthor = {
             name = "Kai Fleischer";
             email = "kugelblitz82@gmx.de";
@@ -172,6 +205,13 @@
             password = "openclaw_gateway_password";
           };
           browser.enable = true;
+          webSearch.enable = true;
+          codeMode.enable = true;
+          toolSearch.enable = true;
+          googleWorkspace = {
+            enable = true;
+            credentialsSecret = "openclaw_google_credentials";
+          };
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
       };

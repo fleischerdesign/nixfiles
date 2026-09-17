@@ -80,6 +80,7 @@ let
           inst.secrets.openai
           inst.secrets.password
           inst.secrets.github
+          (lib.optionalString inst.googleWorkspace.enable inst.googleWorkspace.credentialsSecret)
           (lib.optionalString inst.a2a.enable inst.a2a.tokenSecret)
         ]
         ++ lib.optionals inst.a2a.enable (lib.mapAttrsToList (_: p: p.tokenSecret) inst.a2a.peers)
@@ -111,11 +112,64 @@ let
 
       hasSecrets = secretNames != [ ];
 
-      effectiveRuntimePlugins = lib.unique (inst.plugins.runtime ++ inst.runtimePlugins);
+      effectiveRuntimePlugins = lib.unique (
+        inst.plugins.runtime
+        ++ inst.runtimePlugins
+        ++ lib.optional (inst.webSearch.enable && inst.webSearch.provider == "searxng") "searxng"
+      );
 
       unknownPlugins = lib.filter (
         id: !(builtins.hasAttr id pkgs.openclawRuntimePlugins)
       ) effectiveRuntimePlugins;
+
+      sandboxOrigin =
+        if inst.sandbox.enable then "https://${inst.sandbox.subdomain}.${inst.domain}" else null;
+
+      mcpAppsConfig = lib.optionalAttrs inst.sandbox.enable {
+        mcp.apps = {
+          sandboxPort = inst.sandbox.port;
+          sandboxOrigin = sandboxOrigin;
+        };
+      };
+
+      toolsConfig =
+        lib.optionalAttrs (inst.webSearch.enable || inst.codeMode.enable || inst.toolSearch.enable)
+          {
+            tools =
+              lib.optionalAttrs inst.webSearch.enable {
+                web.search = {
+                  enabled = true;
+                  provider = inst.webSearch.provider;
+                };
+              }
+              // lib.optionalAttrs inst.codeMode.enable {
+                codeMode = "auto";
+              }
+              // lib.optionalAttrs inst.toolSearch.enable {
+                toolSearch = {
+                  enabled = true;
+                };
+              };
+          };
+
+      searxngPluginConfig =
+        lib.optionalAttrs (inst.webSearch.enable && inst.webSearch.provider == "searxng")
+          {
+            searxng = {
+              enabled = true;
+              config = {
+                webSearch = {
+                  baseUrl = inst.webSearch.baseUrl;
+                }
+                // lib.optionalAttrs (inst.webSearch.categories != null) {
+                  categories = inst.webSearch.categories;
+                }
+                // lib.optionalAttrs (inst.webSearch.language != null) {
+                  language = inst.webSearch.language;
+                };
+              };
+            };
+          };
 
       activeMemoryConfig = lib.optionalAttrs inst.plugins.activeMemory.enable {
         "active-memory" = {
@@ -158,7 +212,12 @@ let
       pluginConfig = {
         plugins = {
           load.paths = map (id: "${pkgs.openclawRuntimePlugins.${id}}") effectiveRuntimePlugins;
-          entries = runtimePluginEntries // workboardConfig // activeMemoryConfig // extraPluginEntries;
+          entries =
+            runtimePluginEntries
+            // workboardConfig
+            // activeMemoryConfig
+            // searxngPluginConfig
+            // extraPluginEntries;
         };
       };
 
@@ -257,6 +316,8 @@ let
                   };
               };
         }
+        // toolsConfig
+        // mcpAppsConfig
         // pluginConfig
         // a2aConfig
       ) inst.settings;
@@ -512,6 +573,102 @@ let
           };
         };
 
+        webSearch = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Enable native web search for this gateway instance.";
+          };
+
+          provider = lib.mkOption {
+            type = lib.types.str;
+            default = "searxng";
+            description = "Web search provider id (e.g. searxng).";
+          };
+
+          baseUrl = lib.mkOption {
+            type = lib.types.str;
+            default = "http://127.0.0.1:8888";
+            description = "Base URL for the search engine (e.g. SearXNG instance).";
+          };
+
+          categories = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Optional comma-separated SearXNG search categories (e.g. general,science,news).";
+          };
+
+          language = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = "de-DE";
+            description = "Default language code for SearXNG results.";
+          };
+        };
+
+        sandbox = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Enable isolated MCP App and Canvas widget sandbox.";
+          };
+
+          port = lib.mkOption {
+            type = lib.types.port;
+            default = inst.port + 100;
+            description = "Internal loopback port for the sandbox HTTP listener.";
+          };
+
+          subdomain = lib.mkOption {
+            type = lib.types.str;
+            default = "sandbox.${inst.subdomain}";
+            description = "Subdomain below baseDomain for the sandbox origin (must differ from gateway origin).";
+          };
+        };
+
+        publishing = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Enable dynamic self-publishing via Unix domain sockets under *.pub.<subdomain>.<domain>.";
+          };
+
+          subdomain = lib.mkOption {
+            type = lib.types.str;
+            default = "pub.${inst.subdomain}";
+            description = "Subdomain below baseDomain for self-published sockets (e.g. pub.<user>.ai).";
+          };
+        };
+
+        googleWorkspace = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Enable Google Workspace CLI (gogcli) integration for Gmail, Calendar, Drive, and more.";
+          };
+
+          credentialsSecret = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "SOPS secret containing the Google OAuth desktop app credentials.json (client_id & client_secret).";
+          };
+        };
+
+        codeMode = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Enable Code Mode (code-driven tool orchestration via embedded quickjs-wasi).";
+          };
+        };
+
+        toolSearch = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Enable Tool Search (dynamic tool schema loading to reduce prompt context tokens).";
+          };
+        };
+
         gitAuthor = {
           name = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
@@ -705,10 +862,17 @@ in
       shell = pkgs.bashInteractive;
     };
 
-    # Collect all secrets used across all instances
-    sops.secrets = lib.genAttrs (lib.unique (
-      lib.concatMap (inst: inst._secretNames) (lib.attrValues enabledInstances)
-    )) (_: { });
+    # Allow caddy to traverse into /var/lib/openclaw for socket reverse_proxy
+    users.users.caddy.extraGroups = [ "openclaw" ];
+
+    # Collect all secrets used across all instances and grant openclaw access
+    sops.secrets =
+      lib.genAttrs
+        (lib.unique (lib.concatMap (inst: inst._secretNames) (lib.attrValues enabledInstances)))
+        (_: {
+          owner = "openclaw";
+          group = "openclaw";
+        });
 
     # Generate one environment file and one config file per instance via sops.templates
     # This ensures placeholders like openclaw_gateway_token in JSON are dynamically expanded without leaking into nix store.
@@ -755,8 +919,19 @@ in
         inst = enabledInstances.${name};
       in
       [
-        "d ${inst._stateDir} 0750 openclaw openclaw - -"
+        "d ${inst._stateDir} 0750 openclaw caddy - -"
         "d ${builtins.dirOf inst._logPath} 0750 openclaw openclaw - -"
+      ]
+      ++ lib.optionals inst.publishing.enable [
+        "d ${inst._stateDir}/run 0750 openclaw caddy - -"
+        "d ${inst._stateDir}/run/sockets 0770 openclaw caddy - -"
+      ]
+      ++ lib.optionals inst.googleWorkspace.enable [
+        "d ${inst._stateDir}/.config 0700 openclaw openclaw - -"
+        "d ${inst._stateDir}/.config/gogcli 0700 openclaw openclaw - -"
+        "d ${inst._stateDir}/.local 0700 openclaw openclaw - -"
+        "d ${inst._stateDir}/.local/share 0700 openclaw openclaw - -"
+        "d ${inst._stateDir}/.local/share/gogcli 0700 openclaw openclaw - -"
       ]
     ) (lib.attrNames enabledInstances);
 
@@ -784,6 +959,10 @@ in
               OPENCLAW_NIX_MODE = "1";
               OPENCLAW_DISABLE_PERSISTED_PLUGIN_REGISTRY = "1";
             }
+            // lib.optionalAttrs inst.publishing.enable {
+              OPENCLAW_SOCKET_DIR = "${inst._stateDir}/run/sockets";
+              OPENCLAW_PUB_DOMAIN = "${inst.publishing.subdomain}.${inst.domain}";
+            }
             // lib.optionalAttrs (inst.gitAuthor.name != null) {
               GIT_AUTHOR_NAME = inst.gitAuthor.name;
               GIT_COMMITTER_NAME = inst.gitAuthor.name;
@@ -791,7 +970,17 @@ in
             // lib.optionalAttrs (inst.gitAuthor.email != null) {
               GIT_AUTHOR_EMAIL = inst.gitAuthor.email;
               GIT_COMMITTER_EMAIL = inst.gitAuthor.email;
-            };
+            }
+            // lib.optionalAttrs inst.googleWorkspace.enable (
+              {
+                GOG_HOME = "${inst._stateDir}/.local/share/gogcli";
+                GOG_KEYRING_BACKEND = "file";
+                GOG_KEYRING_PASSWORD = builtins.hashString "sha256" "openclaw-gog-keyring-${name}";
+              }
+              // lib.optionalAttrs (inst.googleWorkspace.credentialsSecret != null) {
+                GOG_CREDENTIALS_FILE = osConfig.sops.secrets.${inst.googleWorkspace.credentialsSecret}.path;
+              }
+            );
 
             serviceConfig = {
               User = "openclaw";
@@ -812,24 +1001,60 @@ in
               pkgs.coreutils
             ]
             ++ inst.extraPackages
+            ++ lib.optional inst.googleWorkspace.enable pkgs.gogcli
             ++ lib.optional inst.browser.enable inst.browser.package;
           };
         }
       ) (lib.attrNames enabledInstances)
     );
 
-    # Register each instance into the central endpoint registry for Caddy and Firewall
+    # Register each instance and its isolated sandbox into the central endpoint registry for Caddy and Firewall
     my.endpoints = lib.listToAttrs (
-      map (
+      lib.concatMap (
         name:
         let
           inst = enabledInstances.${name};
         in
-        {
-          name = inst._endpointName;
+        [
+          {
+            name = inst._endpointName;
+            value = {
+              host = osConfig.networking.hostName;
+              port = inst.port;
+              directAccess = {
+                enable = inst.openTailscaleFirewall;
+                protocol = "tcp";
+                interface = "tailscale";
+              };
+              proxy = {
+                enable = true;
+                subdomain = inst.subdomain;
+                domain = inst.domain;
+                auth = inst.auth;
+                unauthenticatedPaths = [
+                  "/j/*"
+                  "/__openclaw__/worker*"
+                  "/.well-known/agent-card.json"
+                  "/.well-known/agent.json"
+                  "/a2a/*"
+                ];
+                machineClientsBypassAuth = true;
+              };
+              monitoring = {
+                http.enable = false;
+                tcp = {
+                  enable = true;
+                  group = "AI";
+                };
+              };
+            };
+          }
+        ]
+        ++ lib.optional inst.sandbox.enable {
+          name = "${inst._endpointName}-sandbox";
           value = {
             host = osConfig.networking.hostName;
-            port = inst.port;
+            port = inst.sandbox.port;
             directAccess = {
               enable = inst.openTailscaleFirewall;
               protocol = "tcp";
@@ -837,28 +1062,68 @@ in
             };
             proxy = {
               enable = true;
-              subdomain = inst.subdomain;
+              subdomain = inst.sandbox.subdomain;
               domain = inst.domain;
-              auth = inst.auth;
-              unauthenticatedPaths = [
-                "/j/*"
-                "/__openclaw__/worker*"
-                "/.well-known/agent-card.json"
-                "/.well-known/agent.json"
-                "/a2a/*"
-              ];
-              machineClientsBypassAuth = true;
+              auth = false;
             };
             monitoring = {
-              http.enable = false;
-              tcp = {
+              http = {
                 enable = true;
-                group = "AI";
+                group = "AI-Sandbox";
+                path = "/mcp-app-sandbox";
               };
             };
           };
         }
       ) (lib.attrNames enabledInstances)
     );
+
+    # Declarative Caddy virtual hosts for dynamic self-publishing via Unix domain sockets.
+    # When a process binds to $OPENCLAW_SOCKET_DIR/<app>.sock, Caddy automatically proxies
+    # https://<app>.pub.<subdomain>.<domain> to unix//var/lib/openclaw/instances/<name>/run/sockets/<app>.sock.
+    # Caddy requires an 'ask' permission endpoint to prevent DDoS/abuse of on_demand TLS certificate issuance.
+    # We expose an internal permission check on 127.0.0.1:18099 that verifies the incoming domain is valid.
+    services.caddy = {
+      globalConfig = ''
+        on_demand_tls {
+          ask http://127.0.0.1:18099/ask
+        }
+      '';
+
+      virtualHosts = {
+        # Internal loopback endpoint for Caddy's on_demand_tls ask query
+        "http://127.0.0.1:18099" = {
+          extraConfig = ''
+            respond /ask 200
+          '';
+        };
+      }
+      // lib.listToAttrs (
+        lib.concatMap (
+          name:
+          let
+            inst = enabledInstances.${name};
+            pubDomain = "${inst.publishing.subdomain}.${inst.domain}";
+            # In Caddy, {http.request.host.labels.N} is 0-indexed from right to left (TLD = 0).
+            # For a wildcard host like *.<pubDomain>, the app name is the leftmost label,
+            # which corresponds to the number of dots in pubDomain + 1.
+            labelIndex = toString (builtins.length (lib.splitString "." pubDomain));
+          in
+          lib.optional inst.publishing.enable {
+            name = "*.${pubDomain}";
+            value = {
+              extraConfig = ''
+                tls {
+                  on_demand
+                }
+
+                # Dynamic Unix socket routing based on the leftmost subdomain label (the app name)
+                reverse_proxy unix/${inst._stateDir}/run/sockets/{http.request.host.labels.${labelIndex}}.sock
+              '';
+            };
+          }
+        ) (lib.attrNames enabledInstances)
+      );
+    };
   };
 }

@@ -34,8 +34,8 @@ in
 
     bindAddress = lib.mkOption {
       type = lib.types.str;
-      default = "127.0.0.1";
-      description = "Address SearXNG binds to (127.0.0.1 recommended; accessed via Tailscale or Caddy).";
+      default = "0.0.0.0";
+      description = "Address SearXNG binds to (0.0.0.0 enables direct access via Tailscale and loopback; external ports are blocked by firewall).";
     };
 
     secretKeySecret = lib.mkOption {
