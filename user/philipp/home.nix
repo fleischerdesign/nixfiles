@@ -48,7 +48,7 @@
     apps = {
       openclaw = {
         displayName = "OpenClaw";
-        url = "https://ai.rls.ancoris.ovh";
+        url = "https://ai.ops.${osConfig.my.topology.domain}";
         icon = ../../media/openclaw.png;
         comment = "OpenClaw AI Gateway";
         categories = [

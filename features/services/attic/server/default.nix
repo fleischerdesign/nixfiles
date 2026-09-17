@@ -12,7 +12,11 @@ in
     enable = lib.mkEnableOption "Attic Nix binary cache server";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "cache.rls.ancoris.ovh";
+      default =
+        if config.my.features.services.caddy.baseDomain != null then
+          "cache.${config.my.features.services.caddy.baseDomain}"
+        else
+          "cache.ops.${config.my.topology.domain}";
       description = "Full domain name for atticd.";
     };
   };

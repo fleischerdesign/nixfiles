@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, config, ... }:
 {
   imports = [
     inputs.disko.nixosModules.disko
@@ -253,24 +253,24 @@
         };
       };
 
-      # Mutually peer all instances on rollins via A2A with unique per-instance tokens
+      # Mutually peer all instances on cld-ops-01 via A2A with unique per-instance tokens
       instances.philipp.a2a = {
         tokenSecret = "openclaw_a2a_token_philipp";
         peers = {
           katja = {
-            url = "https://katja.ai.rls.ancoris.ovh";
+            url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_katja";
           };
           lilly = {
-            url = "https://lilly.ai.rls.ancoris.ovh";
+            url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_lilly";
           };
           kai = {
-            url = "https://kai.ai.rls.ancoris.ovh";
+            url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_kai";
           };
           rieke = {
-            url = "https://rieke.ai.rls.ancoris.ovh";
+            url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_rieke";
           };
         };
@@ -280,19 +280,19 @@
         tokenSecret = "openclaw_a2a_token_katja";
         peers = {
           philipp = {
-            url = "https://philipp.ai.rls.ancoris.ovh";
+            url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_philipp";
           };
           lilly = {
-            url = "https://lilly.ai.rls.ancoris.ovh";
+            url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_lilly";
           };
           kai = {
-            url = "https://kai.ai.rls.ancoris.ovh";
+            url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_kai";
           };
           rieke = {
-            url = "https://rieke.ai.rls.ancoris.ovh";
+            url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_rieke";
           };
         };
@@ -302,19 +302,19 @@
         tokenSecret = "openclaw_a2a_token_lilly";
         peers = {
           philipp = {
-            url = "https://philipp.ai.rls.ancoris.ovh";
+            url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_philipp";
           };
           katja = {
-            url = "https://katja.ai.rls.ancoris.ovh";
+            url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_katja";
           };
           kai = {
-            url = "https://kai.ai.rls.ancoris.ovh";
+            url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_kai";
           };
           rieke = {
-            url = "https://rieke.ai.rls.ancoris.ovh";
+            url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_rieke";
           };
         };
@@ -324,19 +324,19 @@
         tokenSecret = "openclaw_a2a_token_kai";
         peers = {
           philipp = {
-            url = "https://philipp.ai.rls.ancoris.ovh";
+            url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_philipp";
           };
           katja = {
-            url = "https://katja.ai.rls.ancoris.ovh";
+            url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_katja";
           };
           lilly = {
-            url = "https://lilly.ai.rls.ancoris.ovh";
+            url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_lilly";
           };
           rieke = {
-            url = "https://rieke.ai.rls.ancoris.ovh";
+            url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_rieke";
           };
         };
@@ -346,28 +346,28 @@
         tokenSecret = "openclaw_a2a_token_rieke";
         peers = {
           philipp = {
-            url = "https://philipp.ai.rls.ancoris.ovh";
+            url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_philipp";
           };
           katja = {
-            url = "https://katja.ai.rls.ancoris.ovh";
+            url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_katja";
           };
           lilly = {
-            url = "https://lilly.ai.rls.ancoris.ovh";
+            url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_lilly";
           };
           kai = {
-            url = "https://kai.ai.rls.ancoris.ovh";
+            url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
             tokenSecret = "openclaw_a2a_token_kai";
           };
         };
       };
     };
 
-  # Direct alias / redirect for ai.rls.ancoris.ovh -> philipp.ai.rls.ancoris.ovh
-  services.caddy.virtualHosts."ai.rls.ancoris.ovh".extraConfig = ''
-    redir https://philipp.ai.rls.ancoris.ovh{uri} permanent
+  # Direct alias / redirect for ai.<baseDomain> -> philipp.ai.<baseDomain>
+  services.caddy.virtualHosts."ai.${config.my.features.services.caddy.baseDomain}".extraConfig = ''
+    redir https://philipp.ai.${config.my.features.services.caddy.baseDomain}{uri} permanent
   '';
 
   my.features.services.camofox.enable = true;
@@ -381,7 +381,7 @@
     enable = true;
     instances.philipp = {
       enable = true;
-      couchdb.url = "https://livesync.mky.ancoris.ovh";
+      couchdb.url = "https://livesync.edge.vyrx.de";
       couchdb.database = "obsidian-vault";
     };
   };
@@ -389,7 +389,7 @@
   my.features.services.searxng = {
     enable = true;
     port = 8888;
-    domain = "search.rls.ancoris.ovh";
+    domain = "search.${config.my.features.services.caddy.baseDomain}";
     auth = true;
     openTailscaleFirewall = true;
     enableJsonApi = true;
