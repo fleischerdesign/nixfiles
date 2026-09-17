@@ -22,25 +22,25 @@ In modernen Infrastrukturen stellen eingebettete Geräte (Wi-Fi Access Points, S
 Unabhängig davon, ob ein Zielgerät ein Multi-Core-Server mit NixOS, ein OpenWrt-Router oder ein ESP32-Microcontroller ist: Die Schnittstelle für den Administrator bleibt **vollständig polymorph und identisch** (Liskov Substitution Principle).
 
 ```
-                            ┌────────────────────────────────────────┐
-                            │    my.topology & secrets.yaml (SSOT)   │
-                            └───────────────────┬────────────────────┘
-                                                │
-                                                ▼
-                            ┌────────────────────────────────────────┐
-                            │           flake.nix / nod CLI          │
-                            │           `nod switch <target>`        │
-                            └───────┬───────────┬────────────┬───────┘
-                                    │           │            │
-            ┌───────────────────────┘           │            └───────────────────────┐
-            ▼                                   ▼                                    ▼
-┌───────────────────────┐           ┌───────────────────────┐            ┌───────────────────────┐
-│  Target: NixOS Host   │           │  Target: OpenWrt AP   │            │  Target: ESPHome MCU  │
-│  (hom-srv-01, etc.)   │           │  (hom-ap-01)          │            │  (living-room-sensor) │
-├───────────────────────┤           ├───────────────────────┤            ├───────────────────────┤
-│ Build: nixosSystem    │           │ Build: UCI Derivation │            │ Build: esphome compile│
-│ Push:  SSH + switch   │           │ Push:  SCP + reload   │            │ Push:  OTA Flash      │
-└───────────────────────┘           └───────────────────────┘            └───────────────────────┘
+                            ┌────────────────────────────────────────────────────────┐
+                            │          my.topology & secrets.yaml (SSOT)             │
+                            └───────────────────────────┬────────────────────────────┘
+                                                        │
+                                                        ▼
+                            ┌────────────────────────────────────────────────────────┐
+                            │                  flake.nix / nod CLI                   │
+                            │                  `nod switch <target>`                 │
+                            └───────┬───────────┬───────────────┬────────────┬───────┘
+                                    │           │               │            │
+            ┌───────────────────────┘           │               │            └───────────────────────┐
+            ▼                                   ▼               ▼                                    ▼
+┌───────────────────────┐   ┌───────────────────────┐   ┌───────────────────────┐    ┌───────────────────────┐
+│  Target: NixOS Host   │   │  Target: OpenWrt AP   │   │ Target: FRITZ!Box RT  │    │  Target: ESPHome MCU  │
+│  (hom-srv-01, etc.)   │   │  (hom-ap-01)          │   │ (hom-rt-01)           │    │  (living-room-sensor) │
+├───────────────────────┤   ├───────────────────────┤   ├───────────────────────┤    ├───────────────────────┤
+│ Build: nixosSystem    │   │ Build: UCI Derivation │   │ Build: TR-064 Spec    │    │ Build: esphome compile│
+│ Push:  SSH + switch   │   │ Push:  SCP + reload   │   │ Push:  SOAP/HTTPS API │    │ Push:  OTA Flash      │
+└───────────────────────┘   └───────────────────────┘   └───────────────────────┘    └───────────────────────┘
 ```
 
 1. **Single Responsibility Principle (SRP):**
@@ -142,11 +142,52 @@ in
 
 ---
 
-## 4. ESPHome Microcontroller GitOps
+## 4. FRITZ!Box Router GitOps (`hom-rt-01`) via TR-064 API
+
+Die FRITZ!Box fungiert als reiner WAN-Uplink und DSL/Glasfaser-Modem. Da auf Closed-Source-FRITZ!OS kein SSH zur Verfügung steht, nutzt der Nix-Adapter das standardisierte **AVM TR-064 Protokoll (SOAP/HTTPS via Port 49443)**.
+
+### 4.1 Host-Definition (`hosts/hom-rt-01/default.nix`)
+```nix
+# hosts/hom-rt-01/default.nix
+{ config, ... }:
+{
+  targetType = "fritzbox";
+  hostname = "hom-rt-01";
+  ipv4 = "10.10.10.1";
+  zone = "infra";
+
+  # Deklarativer Soll-Zustand (Declarative Desired State)
+  settings = {
+    dns = {
+      primary = "10.10.10.10";  # hom-srv-01 (Blocky DNS)
+      fallback = "1.1.1.1";
+    };
+    dhcp = {
+      enable = false;           # Übernimmt hom-srv-01 zentral
+    };
+    portForwardings = [ ];      # Zero Open Ports auf dem Router
+    wifi = {
+      enable = true;
+      guestEnable = false;
+    };
+  };
+}
+```
+
+### 4.2 Der Deployment-Ablauf via `nod switch hom-rt-01`:
+1. `nod` liest den deklarierten Soll-Zustand aus Nix.
+2. Das FRITZ!Box-Admin-Passwort wird sicher aus SOPS (`services/fritzbox/password`) bezogen.
+3. Ein in Nix verpacktes Python-Skript (`fritzconnection`) verbindet sich verschlüsselt mit der TR-064-Schnittstelle auf `10.10.10.1:49443`.
+4. Der Zustand wird **idempotent abgeglichen** (DNS-Server setzen, DHCP deaktivieren, Ports schließen).
+5. **Ergebnis:** Kein Login ins Web-Interface, kein manuelles Klicken, Router-Konfiguration 100% synchron mit Git.
+
+---
+
+## 5. ESPHome Microcontroller GitOps
 
 Microcontroller (ESP32, ESP8266) steuern Sensorik, LED-Stripes und Schalter im Haus. Sie werden nach demselben deklarativen Schema als first-class Compile-Targets geführt.
 
-### 4.1 Modulares Komponenten-Layout:
+### 5.1 Modulares Komponenten-Layout:
 ```
 features/services/esphome/
 ├── default.nix                   # ESPHome Dashboard (optional)
@@ -159,7 +200,7 @@ features/services/esphome/
     └── klipper-chamber-temp.yaml # Zusätzliche Bauraum-Temperatur
 ```
 
-### 4.2 Deklarative Base-Konfiguration (`common/base.yaml`):
+### 5.2 Deklarative Base-Konfiguration (`common/base.yaml`):
 ```yaml
 # features/services/esphome/common/base.yaml
 esphome:
@@ -188,7 +229,7 @@ time:
       - 10.10.10.10
 ```
 
-### 4.3 Geräte-Spezifikation (`devices/living-room-sensor.yaml`):
+### 5.3 Geräte-Spezifikation (`devices/living-room-sensor.yaml`):
 ```yaml
 # features/services/esphome/devices/living-room-sensor.yaml
 packages:
@@ -217,7 +258,7 @@ sensor:
     address: 0x76
 ```
 
-### 4.4 Deployment via `nod switch living-room-sensor`:
+### 5.4 Deployment via `nod switch living-room-sensor`:
 ```bash
 # Kompiliert das Binary hermetisch in Nix und schiebt es per OTA auf den ESP32:
 nod switch living-room-sensor
@@ -225,7 +266,7 @@ nod switch living-room-sensor
 
 ---
 
-## 5. Topologie-Integration & SSOT (`my.topology`)
+## 6. Topologie-Integration & SSOT (`my.topology`)
 
 Sämtliche Embedded Devices werden vollwertig in der Topologie-Registry [ARCHITECTURE.md](file:///etc/nixos/ARCHITECTURE.md#84-deklarative-topologie-registry--mathematisches-trust-lattice) registriert:
 
@@ -235,7 +276,8 @@ my.topology.hosts = {
   hom-srv-01 = { zone = "infra"; ipv4 = "10.10.10.10"; targetType = "nixos"; };
   hom-wrk-01 = { zone = "corp";  ipv4 = "10.10.20.10"; targetType = "nixos"; };
 
-  # Embedded Access Point (OpenWrt)
+  # Embedded Router & Access Point
+  hom-rt-01  = { zone = "infra"; ipv4 = "10.10.10.1";  targetType = "fritzbox"; };
   hom-ap-01  = { zone = "infra"; ipv4 = "10.10.10.20"; targetType = "openwrt"; mac = "00:14:D1:E2:B3:A4"; };
 };
 
@@ -248,16 +290,17 @@ my.topology.devices = {
 
 ### Automatische Kettenreaktion beim Deployment:
 1. **DHCP:** Der NixOS-Gateway-Dienst auf `hom-srv-01` erzeugt die statische DHCP-Reservierung für `hom-ap-01` und `living-room-sensor`.
-2. **DNS:** Blocky DNS generiert automatisch `hom-ap-01.lan.vyrx.de` und `living-room-sensor.lan.vyrx.de`.
+2. **DNS:** Blocky DNS generiert automatisch `hom-rt-01.lan.vyrx.de`, `hom-ap-01.lan.vyrx.de` und `living-room-sensor.lan.vyrx.de`.
 3. **Firewall:** `nftables` sperrt `living-room-sensor` in die isolierte IoT-Zone (nur Zugriff auf Home Assistant erlaubt).
 4. **Monitoring:** Prometheus Blackbox-Exporter beginnt automatisch mit ICMP-Ping-Checks auf alle Embedded-Targets.
 
 ---
 
-## 6. Zusammenfassung & Mehrwert
+## 7. Zusammenfassung & Mehrwert
 
 | Kriterium | Früher (Typisches IoT-Chaos) | nixfiles 2.0 (Agentless GitOps) |
 |---|---|---|
+| **Router-Verwaltung** | Login ins FRITZ!Box Web-UI, Formular-Klicken | **Deklarativer Soll-Zustand**, abgeglichen via TR-064 |
 | **WLAN-Verwaltung** | Login ins TP-Link Web-UI, händisches Tippen | **Deklarative UCI-Dateien**, deployt per `nod switch` |
 | **Secrets & Passwörter** | Klartext in Web-UIs oder ungesicherten YAMLs | **100% verschlüsselt in SOPS**, zur Build-Zeit injiziert |
 | **Microcontroller-OTA** | Manuelles Uploaden im ESPHome-Dashboard | **Kompiliert & deployed per Terminal-Befehl** |

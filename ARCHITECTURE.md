@@ -36,6 +36,7 @@ Schema: **`<location>-<role>-<index>`**
   - `wrk`  = Workstation Desktop
   - `nb`   = Notebook / Laptop
   - `ap`   = Access Point (OpenWrt / Wi-Fi Bridge)
+  - `rt`   = Router / WAN Gateway (AVM FRITZ!Box)
 
 ### Mapping:
 
@@ -47,6 +48,7 @@ Schema: **`<location>-<role>-<index>`**
 | **`jello`**   | **`hom-wrk-01`**  | Client | PC (Intel, NVMe, Intel GPU) | Desktop Workstation (Niri), OpenClaw Node |
 | **`yorke`**   | **`mob-nb-01`**   | Client | Laptop (AMD, NVMe) | Mobile Workstation (Niri), OpenClaw Node |
 | **`-`**       | **`hom-ap-01`**   | Embedded | TP-Link (OpenWrt) | Wi-Fi Bridge (SSIDs: VYRX, VYRX-IOT), Agentless GitOps via nod switch |
+| **`-`**       | **`hom-rt-01`**   | Embedded | AVM FRITZ!Box | Uplink Gateway / DSL-Modem, Agentless GitOps (TR-064 API) via nod switch |
 
 ---
 
