@@ -266,5 +266,20 @@
           }
         ) self.nixosConfigurations;
       };
+
+      nodTargets = {
+        cloudflare = {
+          targetHost = "api.cloudflare.com";
+          role = "cloud";
+          targetType = "agentless";
+          tags = [
+            "edge"
+            "dns"
+            "gitops"
+          ];
+          package =
+            self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package;
+        };
+      };
     };
 }
