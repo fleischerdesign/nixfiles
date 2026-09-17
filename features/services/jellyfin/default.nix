@@ -54,9 +54,24 @@ in
       UMask = lib.mkForce "0002";
     };
 
-    my.endpoints.jellyfin = {
-      host = config.networking.hostName;
-      port = 8096;
+    my.contracts.provides.jellyfin = {
+      endpoints.web = {
+        port = 8096;
+        protocol = "tcp";
+        scope = "public";
+        auth = "none";
+        subdomain = "jellyfin";
+        dashboard = {
+          show = true;
+          displayName = "Jellyfin";
+          category = "Media";
+          icon = "jellyfin";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/jellyfin" ];
+        cacheDirs = [ "/var/cache/jellyfin" ];
+      };
     };
   };
 }

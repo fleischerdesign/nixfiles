@@ -44,6 +44,22 @@ let
       && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
     ) ep.port
   ) (lib.attrValues ownEndpoints);
+
+  wireguardTcp = lib.concatMap (
+    ep:
+    lib.optional (
+      ep.directAccess.interface == "wireguard"
+      && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
+    ) ep.port
+  ) (lib.attrValues ownEndpoints);
+
+  wireguardUdp = lib.concatMap (
+    ep:
+    lib.optional (
+      ep.directAccess.interface == "wireguard"
+      && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
+    ) ep.port
+  ) (lib.attrValues ownEndpoints);
 in
 {
   options.my.endpoints = lib.mkOption {
@@ -136,11 +152,12 @@ in
             interface = lib.mkOption {
               type = lib.types.enum [
                 "all"
+                "wireguard"
                 "tailscale"
                 "local"
               ];
               default = "all";
-              description = "Network interface to bind firewall rule (all, tailscale, or local)";
+              description = "Network interface to bind firewall rule (all, wireguard, tailscale, or local)";
             };
           };
 
@@ -252,6 +269,10 @@ in
       interfaces.tailscale0 = {
         allowedTCPPorts = tailscaleTcp;
         allowedUDPPorts = tailscaleUdp;
+      };
+      interfaces.wg0 = {
+        allowedTCPPorts = wireguardTcp;
+        allowedUDPPorts = wireguardUdp;
       };
     };
 
