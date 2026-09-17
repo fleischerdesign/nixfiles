@@ -9,7 +9,10 @@ let
   cfg = config.my.features.services.monitoring.grafana;
   caddyOpt = options.my.features.services.caddy.baseDomain or null;
   caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
+    if caddyOpt != null && caddyOpt.isDefined then
+      config.my.features.services.caddy.baseDomain
+    else
+      null;
   authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
   ntfyHost = if caddyBaseDomain != null then "ntfy.${caddyBaseDomain}" else "ntfy.mky.ancoris.ovh";
 in
@@ -18,7 +21,8 @@ in
     enable = lib.mkEnableOption "Grafana Dashboard";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = if caddyBaseDomain != null then "grafana.${caddyBaseDomain}" else "grafana.mky.ancoris.ovh";
+      default =
+        if caddyBaseDomain != null then "grafana.${caddyBaseDomain}" else "grafana.mky.ancoris.ovh";
       description = "FQDN of the Grafana instance.";
     };
     ssoAuthority = lib.mkOption {
@@ -278,6 +282,19 @@ in
             }
           ];
         };
+
+        dashboards.settings.providers = [
+          {
+            name = "vyrx-system-dashboards";
+            type = "file";
+            options = {
+              path = ./dashboards;
+              foldersFromFilesStructure = true;
+            };
+            disableDeletion = false;
+            updateIntervalSeconds = 60;
+          }
+        ];
 
         datasources.settings.datasources = [
           {
