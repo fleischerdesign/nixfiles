@@ -53,7 +53,7 @@ in
 
             Restart = "always";
             # Load all variables from the .env backup
-            EnvironmentFile = config.sops.secrets.portfolio_env.path;
+            EnvironmentFile = config.sops.secrets."services/apps/portfolio_env".path;
           };
         };
 
@@ -92,7 +92,7 @@ in
         };
 
         # Secrets
-        sops.secrets.portfolio_env = {
+        sops.secrets."services/apps/portfolio_env" = {
           owner = "portfolio";
         };
       }

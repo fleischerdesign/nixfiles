@@ -29,12 +29,12 @@ in
         users.groups.sonarr = { };
 
         # SOPS Secret for API Key
-        sops.secrets.sonarr_api_key = {
+        sops.secrets."services/media/sonarr_api_key" = {
           owner = "sonarr";
         };
         sops.templates."sonarr.env" = {
           owner = "sonarr";
-          content = "SONARR__AUTH__APIKEY=${config.sops.placeholder.sonarr_api_key}";
+          content = "SONARR__AUTH__APIKEY=${config.sops.placeholder."services/media/sonarr_api_key"}";
         };
 
         # Ownership management for storage

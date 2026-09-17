@@ -18,11 +18,11 @@ in
 
   config = lib.mkIf cfg.enable {
     # Secret definition (uses defaultSopsFile from common system module)
-    sops.secrets.cloudflare_api_token = { };
+    sops.secrets."infra/cloudflare_api_token" = { };
 
     services.cloudflare-dyndns = {
       enable = true;
-      apiTokenFile = config.sops.secrets.cloudflare_api_token.path;
+      apiTokenFile = config.sops.secrets."infra/cloudflare_api_token".path;
       inherit (cfg) domains;
       # Update every 5 minutes
       frequency = "*:0/5";

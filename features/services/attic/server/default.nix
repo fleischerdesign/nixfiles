@@ -22,11 +22,11 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    sops.secrets.atticd_token_secret = { };
+    sops.secrets."infra/attic/server_token_secret" = { };
 
     sops.templates.atticd_env = {
       content = ''
-        ATTIC_SERVER_TOKEN_HS256_SECRET_BASE64=${config.sops.placeholder.atticd_token_secret}
+        ATTIC_SERVER_TOKEN_HS256_SECRET_BASE64=${config.sops.placeholder."infra/attic/server_token_secret"}
       '';
     };
 

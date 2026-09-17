@@ -29,12 +29,12 @@ in
         users.groups.radarr = { };
 
         # SOPS Secret for API Key
-        sops.secrets.radarr_api_key = {
+        sops.secrets."services/media/radarr_api_key" = {
           owner = "radarr";
         };
         sops.templates."radarr.env" = {
           owner = "radarr";
-          content = "RADARR__AUTH__APIKEY=${config.sops.placeholder.radarr_api_key}";
+          content = "RADARR__AUTH__APIKEY=${config.sops.placeholder."services/media/radarr_api_key"}";
         };
 
         # Ownership management for storage

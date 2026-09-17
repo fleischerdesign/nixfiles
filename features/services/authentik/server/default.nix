@@ -45,7 +45,7 @@ in
         Group = "authentik";
         WorkingDirectory = "/var/lib/authentik";
         # Environment
-        EnvironmentFile = config.sops.secrets.authentik_core_env.path;
+        EnvironmentFile = config.sops.secrets."services/authentik/core_env".path;
         Environment = [
           "AUTHENTIK_REDIS__HOST=127.0.0.1"
           "AUTHENTIK_REDIS__PORT=6379"
@@ -79,7 +79,7 @@ in
         User = "authentik";
         Group = "authentik";
         WorkingDirectory = "/var/lib/authentik";
-        EnvironmentFile = config.sops.secrets.authentik_core_env.path;
+        EnvironmentFile = config.sops.secrets."services/authentik/core_env".path;
         Environment = [
           "AUTHENTIK_REDIS__HOST=127.0.0.1"
           "AUTHENTIK_REDIS__PORT=6379"
@@ -118,7 +118,7 @@ in
     };
 
     # 6. Secrets
-    sops.secrets.authentik_core_env = {
+    sops.secrets."services/authentik/core_env" = {
       owner = "authentik";
     };
   };

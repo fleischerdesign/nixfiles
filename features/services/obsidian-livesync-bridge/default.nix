@@ -80,7 +80,7 @@ let
 
           passwordSecret = lib.mkOption {
             type = lib.types.str;
-            default = "couchdb_obsidian_password";
+            default = "services/storage/couchdb_obsidian_password";
             description = "SOPS secret key holding the CouchDB user password.";
           };
 

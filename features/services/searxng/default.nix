@@ -40,7 +40,7 @@ in
 
     secretKeySecret = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
-      default = "searxng_secret_key";
+      default = "services/apps/searxng_secret_key";
       description = "SOPS secret containing the 32-byte secret key for SearXNG.";
     };
 

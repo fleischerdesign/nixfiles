@@ -57,7 +57,7 @@ in
             ROCKET_ADDRESS = "127.0.0.1";
             ROCKET_PORT = 8082;
           };
-          environmentFile = config.sops.secrets.vaultwarden_env.path;
+          environmentFile = config.sops.secrets."services/apps/vaultwarden_env".path;
         };
 
         # Ensure Postgres DB exists
@@ -83,7 +83,7 @@ in
 
         # Secrets
         # Should contain SSO_CLIENT_ID and SSO_CLIENT_SECRET
-        sops.secrets.vaultwarden_env = {
+        sops.secrets."services/apps/vaultwarden_env" = {
           owner = "vaultwarden";
         };
       }

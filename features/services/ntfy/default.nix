@@ -20,19 +20,21 @@ in
 
   config = lib.mkIf cfg.enable {
     # Secret für den Token (wird von Grafana mitgenutzt)
-    sops.secrets.grafana_ntfy_token = {
+    sops.secrets."services/monitoring/grafana_ntfy_token" = {
       owner = "ntfy-sh";
       group = "grafana";
       mode = "0440"; # Nur Besitzer und Gruppe dürfen lesen
     };
-    sops.secrets.ntfy_users = {
+    sops.secrets."infra/ntfy_users" = {
       owner = "ntfy-sh";
     };
 
     # Template für ntfy env, um Token deklarativ einzubauen
     sops.templates."ntfy.env".content = ''
-      NTFY_AUTH_USERS="${config.sops.placeholder.ntfy_users}"
-      NTFY_AUTH_TOKENS="${cfg.adminUser}:${config.sops.placeholder.grafana_ntfy_token}:Grafana"
+      NTFY_AUTH_USERS="${config.sops.placeholder."infra/ntfy_users"}"
+      NTFY_AUTH_TOKENS="${cfg.adminUser}:${
+        config.sops.placeholder."services/monitoring/grafana_ntfy_token"
+      }:Grafana"
     '';
 
     services.ntfy-sh = {

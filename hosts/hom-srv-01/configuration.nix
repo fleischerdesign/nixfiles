@@ -44,12 +44,10 @@
         klipper.enable = true;
         authentik.outpost.proxy = {
           enable = true;
-          tokenSecretName = "authentik_outpost_proxy_token_strummer";
         };
         authentik.outpost.ldap = {
           enable = true;
           coreAddress = "http://${config.my.features.system.networking.topology.hosts.cld-edge-01.tailscaleIp}:9055";
-          tokenSecretName = "authentik_outpost_ldap_token_strummer";
         };
         monitoring = {
           pipeline = {
@@ -74,7 +72,6 @@
         };
         backups.restic = {
           enable = true;
-          environmentFile = "restic_env_strummer";
           paths = [
             "/var/lib"
             "/data/storage/docs"
@@ -130,7 +127,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18790;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
 
@@ -143,7 +139,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18794;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
 
@@ -156,7 +151,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18795;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
 
@@ -169,7 +163,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18796;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
 
@@ -182,7 +175,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18797;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
     };

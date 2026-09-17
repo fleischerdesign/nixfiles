@@ -33,22 +33,16 @@ in
 
   config = lib.mkIf cfg.enable {
     # 1. Load individual secrets from sops file
-    sops.secrets.mealie_smtp_password = {
-      sopsFile = ../../../secrets/secrets.yaml;
-    };
-    sops.secrets.mealie_oidc_secret = {
-      sopsFile = ../../../secrets/secrets.yaml;
-    };
-    sops.secrets.mealie_openai_key = {
-      sopsFile = ../../../secrets/secrets.yaml;
-    };
+    sops.secrets."services/apps/mealie_smtp_password" = { };
+    sops.secrets."services/apps/mealie_oidc_secret" = { };
+    sops.secrets."services/apps/mealie_openai_key" = { };
 
     # 2. Create a template file that combines them into ENV format
     sops.templates."mealie.env" = {
       content = ''
-        SMTP_PASSWORD=${config.sops.placeholder.mealie_smtp_password}
-        OIDC_CLIENT_SECRET=${config.sops.placeholder.mealie_oidc_secret}
-        OPENAI_API_KEY=${config.sops.placeholder.mealie_openai_key}
+        SMTP_PASSWORD=${config.sops.placeholder."services/apps/mealie_smtp_password"}
+        OIDC_CLIENT_SECRET=${config.sops.placeholder."services/apps/mealie_oidc_secret"}
+        OPENAI_API_KEY=${config.sops.placeholder."services/apps/mealie_openai_key"}
       '';
     };
 

@@ -48,10 +48,10 @@ in
     };
 
     # 2. SOPS Secrets
-    sops.secrets.couchdb_admin_password = {
+    sops.secrets."services/storage/couchdb_admin_password" = {
       owner = "couchdb";
     };
-    sops.secrets.couchdb_obsidian_password = {
+    sops.secrets."services/storage/couchdb_obsidian_password" = {
       owner = "couchdb";
     };
 
@@ -60,8 +60,8 @@ in
       owner = "couchdb";
       content = ''
         [admins]
-        admin = ${config.sops.placeholder.couchdb_admin_password}
-        obsidian = ${config.sops.placeholder.couchdb_obsidian_password}
+        admin = ${config.sops.placeholder."services/storage/couchdb_admin_password"}
+        obsidian = ${config.sops.placeholder."services/storage/couchdb_obsidian_password"}
       '';
     };
 

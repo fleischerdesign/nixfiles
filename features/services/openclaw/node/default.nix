@@ -233,8 +233,8 @@ let
 
         passwordSecret = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
-          default = null;
-          example = "openclaw_gateway_password";
+          default = "ai/openclaw/gateway_password";
+          example = "ai/openclaw/gateway_password";
           description = "Optional SOPS secret rendered into OPENCLAW_GATEWAY_PASSWORD.";
         };
 

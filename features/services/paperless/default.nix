@@ -29,13 +29,13 @@ in
         my.features.services.redis.enable = true;
 
         # 1. SOPS Secrets
-        sops.secrets.paperless_oidc_secret = { };
-        sops.secrets.paperless_secret_key = { };
+        sops.secrets."services/apps/paperless_oidc_secret" = { };
+        sops.secrets."services/apps/paperless_secret_key" = { };
 
         # 2. Template for the sensitive JSON Auth variable
         sops.templates."paperless.env" = {
           content = ''
-            PAPERLESS_SECRET_KEY=${config.sops.placeholder.paperless_secret_key}
+            PAPERLESS_SECRET_KEY=${config.sops.placeholder."services/apps/paperless_secret_key"}
             PAPERLESS_SOCIALACCOUNT_PROVIDERS=${
               builtins.toJSON {
                 openid_connect = {
@@ -44,7 +44,7 @@ in
                       provider_id = "authentik";
                       name = "Authentik";
                       client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
-                      secret = config.sops.placeholder.paperless_oidc_secret;
+                      secret = config.sops.placeholder."services/apps/paperless_oidc_secret";
                       settings = {
                         server_url = cfg.ssoServerUrl;
                         token_auth_method = "client_secret_basic";

@@ -92,7 +92,7 @@ in
     {
       environment.systemPackages = [ pkgs.attic-client ];
 
-      sops.secrets.attic_push_token = {
+      sops.secrets."infra/attic/client_push_token" = {
         owner = cfg.user;
         group = cfg.group;
         mode = "0400";
@@ -107,7 +107,7 @@ in
 
           [servers.nixfiles-server]
           endpoint = "${cfg.endpoint}"
-          token = "${config.sops.placeholder.attic_push_token}"
+          token = "${config.sops.placeholder."infra/attic/client_push_token"}"
         '';
       };
 
@@ -120,7 +120,7 @@ in
 
           [servers.nixfiles-server]
           endpoint = "${cfg.endpoint}"
-          token = "${config.sops.placeholder.attic_push_token}"
+          token = "${config.sops.placeholder."infra/attic/client_push_token"}"
         '';
       };
 

@@ -55,13 +55,13 @@ in
 
   config = lib.mkIf cfg.enable {
     # 1. SOPS Secrets
-    sops.secrets.newsgroup_ninja_password = {
+    sops.secrets."services/media/newsgroup_ninja_password" = {
       owner = "sabnzbd";
     };
-    sops.secrets.sabnzbd_api_key = {
+    sops.secrets."services/media/sabnzbd_api_key" = {
       owner = "sabnzbd";
     };
-    sops.secrets.sabnzbd_nzb_key = {
+    sops.secrets."services/media/sabnzbd_nzb_key" = {
       owner = "sabnzbd";
     };
 
@@ -70,12 +70,12 @@ in
       owner = "sabnzbd";
       content = ''
         [misc]
-        api_key = ${config.sops.placeholder.sabnzbd_api_key}
-        nzb_key = ${config.sops.placeholder.sabnzbd_nzb_key}
+        api_key = ${config.sops.placeholder."services/media/sabnzbd_api_key"}
+        nzb_key = ${config.sops.placeholder."services/media/sabnzbd_nzb_key"}
 
         [servers]
         [[ninja]]
-        password = ${config.sops.placeholder.newsgroup_ninja_password}
+        password = ${config.sops.placeholder."services/media/newsgroup_ninja_password"}
       '';
     };
 

@@ -88,19 +88,13 @@
             email = "philipp@fleischer.design";
           };
           secrets = {
-            deepseek = "pi/deepseek";
-            openai = "openai_api_key";
-            password = "openclaw_gateway_password";
-            github = "github_pat_philipp";
+            github = "users/philipp/github_pat";
           };
           browser.enable = true;
           webSearch.enable = true;
           codeMode.enable = true;
           toolSearch.enable = true;
-          googleWorkspace = {
-            enable = true;
-            credentialsSecret = "openclaw_google_credentials";
-          };
+          googleWorkspace.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -125,19 +119,11 @@
             name = "Katja Fleischer";
             email = "fleischerkatja74@yahoo.com";
           };
-          secrets = {
-            deepseek = "pi/deepseek";
-            openai = "openai_api_key";
-            password = "openclaw_gateway_password";
-          };
           browser.enable = true;
           webSearch.enable = true;
           codeMode.enable = true;
           toolSearch.enable = true;
-          googleWorkspace = {
-            enable = true;
-            credentialsSecret = "openclaw_google_credentials";
-          };
+          googleWorkspace.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -162,19 +148,11 @@
             name = "Lilly Tobei";
             email = "lillytobei@gmail.com";
           };
-          secrets = {
-            deepseek = "pi/deepseek";
-            openai = "openai_api_key";
-            password = "openclaw_gateway_password";
-          };
           browser.enable = true;
           webSearch.enable = true;
           codeMode.enable = true;
           toolSearch.enable = true;
-          googleWorkspace = {
-            enable = true;
-            credentialsSecret = "openclaw_google_credentials";
-          };
+          googleWorkspace.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -199,19 +177,11 @@
             name = "Kai Fleischer";
             email = "kugelblitz82@gmx.de";
           };
-          secrets = {
-            deepseek = "pi/deepseek";
-            openai = "openai_api_key";
-            password = "openclaw_gateway_password";
-          };
           browser.enable = true;
           webSearch.enable = true;
           codeMode.enable = true;
           toolSearch.enable = true;
-          googleWorkspace = {
-            enable = true;
-            credentialsSecret = "openclaw_google_credentials";
-          };
+          googleWorkspace.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
 
@@ -236,130 +206,117 @@
             name = "Rieke Fleischer";
             email = "rieke@vyrx.de";
           };
-          secrets = {
-            deepseek = "pi/deepseek";
-            openai = "openai_api_key";
-            password = "openclaw_gateway_password";
-          };
           browser.enable = true;
           webSearch.enable = true;
           codeMode.enable = true;
           toolSearch.enable = true;
-          googleWorkspace = {
-            enable = true;
-            credentialsSecret = "openclaw_google_credentials";
-          };
+          googleWorkspace.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
       };
 
       # Mutually peer all instances on cld-ops-01 via A2A with unique per-instance tokens
       instances.philipp.a2a = {
-        tokenSecret = "openclaw_a2a_token_philipp";
         peers = {
           katja = {
             url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_katja";
+            tokenSecret = "ai/openclaw/a2a/katja";
           };
           lilly = {
             url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_lilly";
+            tokenSecret = "ai/openclaw/a2a/lilly";
           };
           kai = {
             url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_kai";
+            tokenSecret = "ai/openclaw/a2a/kai";
           };
           rieke = {
             url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_rieke";
+            tokenSecret = "ai/openclaw/a2a/rieke";
           };
         };
       };
 
       instances.katja.a2a = {
-        tokenSecret = "openclaw_a2a_token_katja";
         peers = {
           philipp = {
             url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_philipp";
+            tokenSecret = "ai/openclaw/a2a/philipp";
           };
           lilly = {
             url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_lilly";
+            tokenSecret = "ai/openclaw/a2a/lilly";
           };
           kai = {
             url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_kai";
+            tokenSecret = "ai/openclaw/a2a/kai";
           };
           rieke = {
             url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_rieke";
+            tokenSecret = "ai/openclaw/a2a/rieke";
           };
         };
       };
 
       instances.lilly.a2a = {
-        tokenSecret = "openclaw_a2a_token_lilly";
         peers = {
           philipp = {
             url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_philipp";
+            tokenSecret = "ai/openclaw/a2a/philipp";
           };
           katja = {
             url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_katja";
+            tokenSecret = "ai/openclaw/a2a/katja";
           };
           kai = {
             url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_kai";
+            tokenSecret = "ai/openclaw/a2a/kai";
           };
           rieke = {
             url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_rieke";
+            tokenSecret = "ai/openclaw/a2a/rieke";
           };
         };
       };
 
       instances.kai.a2a = {
-        tokenSecret = "openclaw_a2a_token_kai";
         peers = {
           philipp = {
             url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_philipp";
+            tokenSecret = "ai/openclaw/a2a/philipp";
           };
           katja = {
             url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_katja";
+            tokenSecret = "ai/openclaw/a2a/katja";
           };
           lilly = {
             url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_lilly";
+            tokenSecret = "ai/openclaw/a2a/lilly";
           };
           rieke = {
             url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_rieke";
+            tokenSecret = "ai/openclaw/a2a/rieke";
           };
         };
       };
 
       instances.rieke.a2a = {
-        tokenSecret = "openclaw_a2a_token_rieke";
         peers = {
           philipp = {
             url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_philipp";
+            tokenSecret = "ai/openclaw/a2a/philipp";
           };
           katja = {
             url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_katja";
+            tokenSecret = "ai/openclaw/a2a/katja";
           };
           lilly = {
             url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_lilly";
+            tokenSecret = "ai/openclaw/a2a/lilly";
           };
           kai = {
             url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
-            tokenSecret = "openclaw_a2a_token_kai";
+            tokenSecret = "ai/openclaw/a2a/kai";
           };
         };
       };
@@ -372,7 +329,6 @@
 
   my.features.services.authentik.outpost.proxy = {
     enable = true;
-    tokenSecretName = "authentik_outpost_proxy_token_rollins";
   };
 
   my.features.services.obsidian-livesync-bridge = {

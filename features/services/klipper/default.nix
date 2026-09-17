@@ -108,8 +108,7 @@ in
     # Open firewall port for Moonraker (for slicers and direct LAN access)
 
     # Secrets Management for Moonraker
-    sops.secrets.moonraker_hass_token = {
-      sopsFile = ../../../secrets/secrets.yaml;
+    sops.secrets."services/home/moonraker_hass_token" = {
       owner = "klipper";
       group = "klipper";
     };
@@ -124,7 +123,7 @@ in
         address: 127.0.0.1
         port: 8123
         device: switch.sonoff_basic_ender_sonoff_basic_relay
-        token: ${config.sops.placeholder.moonraker_hass_token}
+        token: ${config.sops.placeholder."services/home/moonraker_hass_token"}
         domain: switch
         on_when_job_queued: True
         locked_while_printing: True

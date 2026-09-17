@@ -29,12 +29,12 @@ in
         users.groups.prowlarr = { };
 
         # SOPS Secret for API Key
-        sops.secrets.prowlarr_api_key = {
+        sops.secrets."services/media/prowlarr_api_key" = {
           owner = "prowlarr";
         };
         sops.templates."prowlarr.env" = {
           owner = "prowlarr";
-          content = "PROWLARR__AUTH__APIKEY=${config.sops.placeholder.prowlarr_api_key}";
+          content = "PROWLARR__AUTH__APIKEY=${config.sops.placeholder."services/media/prowlarr_api_key"}";
         };
 
         services.prowlarr = {

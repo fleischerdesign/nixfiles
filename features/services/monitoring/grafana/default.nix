@@ -40,23 +40,27 @@ in
 
   config = lib.mkIf cfg.enable {
     # SOPS Secrets for OIDC and ntfy
-    sops.secrets.grafana_oidc_client_secret = {
+    sops.secrets."services/monitoring/grafana_oidc_client_secret" = {
       owner = "grafana";
     };
-    sops.secrets.grafana_oidc_client_id = {
+    sops.secrets."services/monitoring/grafana_oidc_client_id" = {
       owner = "grafana";
     };
-    sops.secrets.grafana_ntfy_token = { }; # Definition from ntfy/default.nix
-    sops.secrets.grafana_secret_key = {
+    sops.secrets."services/monitoring/grafana_ntfy_token" = { }; # Definition from ntfy/default.nix
+    sops.secrets."services/monitoring/grafana_secret_key" = {
       owner = "grafana";
     };
 
     # Template for Grafana environment variables
     sops.templates."grafana.env".content = ''
-      GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
-      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
-      GF_SECURITY_SECRET_KEY=${config.sops.placeholder.grafana_secret_key}
-      NTFY_TOKEN=${config.sops.placeholder.grafana_ntfy_token}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${
+        config.sops.placeholder."services/monitoring/grafana_oidc_client_id"
+      }
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${
+        config.sops.placeholder."services/monitoring/grafana_oidc_client_secret"
+      }
+      GF_SECURITY_SECRET_KEY=${config.sops.placeholder."services/monitoring/grafana_secret_key"}
+      NTFY_TOKEN=${config.sops.placeholder."services/monitoring/grafana_ntfy_token"}
     '';
 
     services.grafana = {

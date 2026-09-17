@@ -95,7 +95,7 @@ in
       # Disable auto-registration, we provide the key via SOPS
       registerBouncer.enable = false;
       # Official NixOS option for the API key path
-      secrets.apiKeyPath = config.sops.secrets.crowdsec_bouncer_key.path;
+      secrets.apiKeyPath = config.sops.secrets."services/crowdsec/bouncer_key".path;
       settings = {
         api_url = "http://${masterIP}:8085/";
         # api_key_file is automatically set by the module if apiKeyPath is used
@@ -120,13 +120,13 @@ in
     };
 
     # Secrets
-    sops.secrets.crowdsec_bouncer_key = {
+    sops.secrets."services/crowdsec/bouncer_key" = {
       owner = "root";
       restartUnits = [ "crowdsec-firewall-bouncer.service" ];
     };
 
     # Nur Agents brauchen das Passwort für den Master
-    sops.secrets.crowdsec_agent_password = lib.mkIf (!isMaster) {
+    sops.secrets."services/crowdsec/agent_password" = lib.mkIf (!isMaster) {
       owner = "crowdsec";
     };
 
@@ -136,7 +136,7 @@ in
       content = ''
         url: http://${masterIP}:8085/
         login: ${config.networking.hostName}
-        password: ${config.sops.placeholder.crowdsec_agent_password}
+        password: ${config.sops.placeholder."services/crowdsec/agent_password"}
       '';
     };
   };

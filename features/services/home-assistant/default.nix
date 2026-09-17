@@ -13,7 +13,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    sops.secrets.hass_now_api_token = {
+    sops.secrets."services/home/hass_now_api_token" = {
       owner = "hass";
     };
 
@@ -24,7 +24,7 @@ in
           url: "https://fleischer.design/api/now"
           method: POST
           headers:
-            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+            Authorization: "Bearer ${config.sops.placeholder."services/home/hass_now_api_token"}"
           content_type: "application/json"
           payload: >
             {
@@ -36,7 +36,7 @@ in
           url: "https://fleischer.design/api/now"
           method: POST
           headers:
-            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+            Authorization: "Bearer ${config.sops.placeholder."services/home/hass_now_api_token"}"
           content_type: "application/json"
           payload: >
             {
@@ -48,7 +48,7 @@ in
           url: "https://fleischer.design/api/now"
           method: "POST"
           headers:
-            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+            Authorization: "Bearer ${config.sops.placeholder."services/home/hass_now_api_token"}"
           content_type: "application/json"
           payload: >
             {

@@ -648,7 +648,7 @@ let
 
           credentialsSecret = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = "ai/openclaw/google_credentials";
             description = "SOPS secret containing the Google OAuth desktop app credentials.json (client_id & client_secret).";
           };
         };
@@ -686,19 +686,19 @@ let
         secrets = {
           deepseek = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = "ai/deepseek_api_key";
             description = "SOPS secret for DEEPSEEK_API_KEY.";
           };
 
           openai = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = "ai/openai_api_key";
             description = "SOPS secret for OPENAI_API_KEY.";
           };
 
           password = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = "ai/openclaw/gateway_password";
             description = "SOPS secret for OPENCLAW_GATEWAY_PASSWORD.";
           };
 
@@ -730,7 +730,7 @@ let
 
           tokenSecret = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = "openclaw_gateway_token";
+            default = "ai/openclaw/a2a/${name}";
             description = "SOPS secret used for A2A peer authentication.";
           };
 
@@ -744,7 +744,7 @@ let
                   };
                   tokenSecret = lib.mkOption {
                     type = lib.types.nullOr lib.types.str;
-                    default = "openclaw_gateway_token";
+                    default = null;
                     description = "SOPS secret containing bearer token for this peer.";
                   };
                 };

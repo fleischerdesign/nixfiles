@@ -34,7 +34,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18790;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
     };
@@ -50,13 +49,13 @@
     provider = "deepseek";
     defaultModel = "DeepSeek-V4-Flash-Vision-Exp";
     providers = {
-      deepseek.apiKey = config.sops.placeholder."pi/deepseek";
-      openrouter.apiKey = config.sops.placeholder."pi/openrouter";
+      deepseek.apiKey = config.sops.placeholder."ai/deepseek_api_key";
+      openrouter.apiKey = config.sops.placeholder."ai/openrouter_api_key";
     };
   };
 
-  sops.secrets."pi/deepseek" = { };
-  sops.secrets."pi/openrouter" = { };
+  sops.secrets."ai/deepseek_api_key" = { };
+  sops.secrets."ai/openrouter_api_key" = { };
 
   system.stateVersion = "24.05";
 }

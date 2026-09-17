@@ -109,9 +109,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    sops.secrets.couchdb_obsidian_password = {
-      sopsFile = ../../../secrets/secrets.yaml;
-    };
+    sops.secrets."services/storage/couchdb_obsidian_password" = { };
 
     sops.templates."obsidian_livesync_data.json" = {
       mode = "0444";
@@ -120,11 +118,11 @@ in
         couchDB_URI = cfg.livesync.couchdbUrl;
         couchDB_DBNAME = cfg.livesync.databaseName;
         couchDB_USER = "obsidian";
-        couchDB_PASSWORD = config.sops.placeholder.couchdb_obsidian_password;
+        couchDB_PASSWORD = config.sops.placeholder."services/storage/couchdb_obsidian_password";
         couchdb_url = cfg.livesync.couchdbUrl;
         couchdb_dbname = cfg.livesync.databaseName;
         couchdb_user = "obsidian";
-        couchdb_password = config.sops.placeholder.couchdb_obsidian_password;
+        couchdb_password = config.sops.placeholder."services/storage/couchdb_obsidian_password";
         liveSync = true;
         syncOnSave = true;
         syncOnStart = true;

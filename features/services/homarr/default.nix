@@ -48,16 +48,16 @@ in
 
       {
         # 1. SOPS Secrets
-        sops.secrets.homarr_auth_secret = { };
-        sops.secrets.homarr_encryption_key = { };
-        sops.secrets.homarr_oidc_client_secret = { };
+        sops.secrets."services/apps/homarr_auth_secret" = { };
+        sops.secrets."services/apps/homarr_encryption_key" = { };
+        sops.secrets."services/apps/homarr_oidc_client_secret" = { };
 
         # 2. Template for environment variables based on latest Homarr docs
         sops.templates."homarr.env" = {
           content = ''
             # Security
-            AUTH_SECRET=${config.sops.placeholder.homarr_auth_secret}
-            SECRET_ENCRYPTION_KEY=${config.sops.placeholder.homarr_encryption_key}
+            AUTH_SECRET=${config.sops.placeholder."services/apps/homarr_auth_secret"}
+            SECRET_ENCRYPTION_KEY=${config.sops.placeholder."services/apps/homarr_encryption_key"}
 
             # URLs
             BASE_URL=https://${cfg.domain}
@@ -73,7 +73,7 @@ in
             AUTH_OIDC_AUTO_LOGIN=true
             AUTH_OIDC_CLIENT_NAME=Authentik
             AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
-            AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder.homarr_oidc_client_secret}
+            AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder."services/apps/homarr_oidc_client_secret"}
             AUTH_OIDC_ISSUER=${cfg.ssoAuthority}
             AUTH_OIDC_URI=${cfg.ssoAuthorizeUrl}
             AUTH_OIDC_SCOPE_OVERWRITE=openid email profile groups

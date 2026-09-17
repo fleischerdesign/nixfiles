@@ -37,13 +37,13 @@ in
       (features.requires [ "services.postgresql" ] config)
 
       {
-        sops.secrets.vikunja_oidc_secret = {
-          sopsFile = ../../../secrets/secrets.yaml;
-        };
+        sops.secrets."services/apps/vikunja_oidc_secret" = { };
 
         sops.templates."vikunja.env" = {
           content = ''
-            VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHENTIK_CLIENTSECRET=${config.sops.placeholder.vikunja_oidc_secret}
+            VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHENTIK_CLIENTSECRET=${
+              config.sops.placeholder."services/apps/vikunja_oidc_secret"
+            }
           '';
         };
 

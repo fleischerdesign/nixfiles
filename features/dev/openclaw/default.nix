@@ -40,7 +40,7 @@ in
 
       passwordSecret = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
-        default = "openclaw_gateway_password";
+        default = "ai/openclaw/gateway_password";
         description = "SOPS secret key containing the gateway auth password.";
       };
     };

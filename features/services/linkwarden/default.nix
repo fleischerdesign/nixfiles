@@ -55,7 +55,7 @@ in
             NEXT_PUBLIC_CREDENTIALS_ENABLED = "false";
           };
 
-          environmentFile = config.sops.secrets.linkwarden_env.path;
+          environmentFile = config.sops.secrets."services/apps/linkwarden_env".path;
         };
 
         # Ensure Postgres DB exists
@@ -84,7 +84,7 @@ in
         # AUTHENTIK_CLIENT_ID=...
         # AUTHENTIK_CLIENT_SECRET=...
         # NEXTAUTH_SECRET=... (random string)
-        sops.secrets.linkwarden_env = {
+        sops.secrets."services/apps/linkwarden_env" = {
           owner = "linkwarden";
         };
       }

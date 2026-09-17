@@ -18,6 +18,7 @@ in
 
     tokenSecretName = lib.mkOption {
       type = lib.types.str;
+      default = "services/authentik/ldap_token";
       description = "The name of the secret in sops containing the Authentik token.";
     };
   };

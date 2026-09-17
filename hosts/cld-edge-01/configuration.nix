@@ -35,7 +35,6 @@
   my.features.services.authentik.outpost.ldap = {
     enable = true;
     coreAddress = "http://127.0.0.1:9055";
-    tokenSecretName = "authentik_outpost_ldap_token_mackaye";
   };
 
   my.features.services.portfolio.enable = true;
@@ -45,7 +44,6 @@
   my.features.services.ntfy.enable = true;
   my.features.system.backups.restic = {
     enable = true;
-    environmentFile = "restic_env_mackaye";
   };
 
   my.features.services.openclaw.node = {
@@ -60,7 +58,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18790;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
 
@@ -73,7 +70,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18794;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
 
@@ -86,7 +82,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18795;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
 
@@ -99,7 +94,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18796;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
 
@@ -112,7 +106,6 @@
         };
         transport = "loopback-tunnel";
         tunnel.localPort = 18797;
-        passwordSecret = "openclaw_gateway_password";
         sessionHosting.enable = true;
       };
     };

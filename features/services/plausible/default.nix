@@ -42,7 +42,7 @@ in
 
           server = {
             baseUrl = "https://${cfg.domain}";
-            secretKeybaseFile = config.sops.secrets.plausible_secret_key_base.path;
+            secretKeybaseFile = config.sops.secrets."services/apps/plausible_secret_key_base".path;
             port = 8000;
             listenAddress = "127.0.0.1";
             disableRegistration = true;
@@ -81,7 +81,7 @@ in
         };
 
         # Secrets
-        sops.secrets.plausible_secret_key_base = {
+        sops.secrets."services/apps/plausible_secret_key_base" = {
           owner = "plausible";
         };
       }

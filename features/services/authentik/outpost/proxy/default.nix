@@ -12,7 +12,7 @@ in
     enable = lib.mkEnableOption "Authentik Proxy Outpost";
     tokenSecretName = lib.mkOption {
       type = lib.types.str;
-      default = "authentik_outpost_proxy_token";
+      default = "services/authentik/proxy_token";
       description = "The name of the secret in sops containing the Authentik proxy token.";
     };
     coreAddress = lib.mkOption {
