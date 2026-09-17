@@ -370,8 +370,6 @@
     redir https://philipp.ai.${config.my.features.services.caddy.baseDomain}{uri} permanent
   '';
 
-  my.features.services.camofox.enable = true;
-
   my.features.services.authentik.outpost.proxy = {
     enable = true;
     tokenSecretName = "authentik_outpost_proxy_token_rollins";
