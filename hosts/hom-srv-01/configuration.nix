@@ -63,10 +63,13 @@
         };
       };
       system = {
-        networking.tailscale = {
-          subnetRouter = {
-            enable = true;
-            routes = [ "192.168.178.0/24" ];
+        networking = {
+          gateway.enable = true;
+          tailscale = {
+            subnetRouter = {
+              enable = true;
+              routes = [ "10.10.0.0/16" ];
+            };
           };
         };
         backups.restic = {
