@@ -1,0 +1,88 @@
+version: 1
+metadata:
+  name: "vyrx-rbac-groups-and-users"
+entries:
+  # Groups
+  - model: authentik_core.group
+    id: group_infra_admins
+    identifiers:
+      name: "infra-admins"
+    attrs:
+      is_superuser: true
+      attributes:
+        description: "Cluster Administrators (Root & Global Access)"
+
+  - model: authentik_core.group
+    id: group_media_users
+    identifiers:
+      name: "media-users"
+    attrs:
+      is_superuser: false
+      attributes:
+        description: "Access to Media Streaming & Requests"
+
+  - model: authentik_core.group
+    id: group_family
+    identifiers:
+      name: "family"
+    attrs:
+      is_superuser: false
+      attributes:
+        description: "Family members with home automation & smart home access"
+
+  # Users: Philipp (Admin), Katja, Lilly, Kai, Rieke
+  - model: authentik_core.user
+    id: user_philipp
+    identifiers:
+      username: "philipp"
+    attrs:
+      name: "Philipp"
+      email: "philipp@vyrx.de"
+      groups:
+        - "!Key group_infra_admins"
+        - "!Key group_media_users"
+        - "!Key group_family"
+
+  - model: authentik_core.user
+    id: user_katja
+    identifiers:
+      username: "katja"
+    attrs:
+      name: "Katja"
+      email: "katja@vyrx.de"
+      groups:
+        - "!Key group_media_users"
+        - "!Key group_family"
+
+  - model: authentik_core.user
+    id: user_lilly
+    identifiers:
+      username: "lilly"
+    attrs:
+      name: "Lilly"
+      email: "lilly@vyrx.de"
+      groups:
+        - "!Key group_media_users"
+        - "!Key group_family"
+
+  - model: authentik_core.user
+    id: user_kai
+    identifiers:
+      username: "kai"
+    attrs:
+      name: "Kai"
+      email: "kai@vyrx.de"
+      groups:
+        - "!Key group_media_users"
+        - "!Key group_family"
+
+  - model: authentik_core.user
+    id: user_rieke
+    identifiers:
+      username: "rieke"
+    attrs:
+      name: "Rieke"
+      email: "rieke@vyrx.de"
+      groups:
+        - "!Key group_media_users"
+        - "!Key group_family"

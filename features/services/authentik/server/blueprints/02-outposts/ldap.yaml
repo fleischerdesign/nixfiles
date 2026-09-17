@@ -1,0 +1,38 @@
+version: 1
+metadata:
+  name: "vyrx-outpost-ldap"
+entries:
+  - model: authentik_core.user
+    id: sa_ldap
+    identifiers:
+      username: "ak-outpost-ldap"
+    attrs:
+      name: "Service Account LDAP Outpost"
+      type: "service_account"
+
+  - model: authentik_core.token
+    identifiers:
+      identifier: "outpost-ldap-token"
+    attrs:
+      intent: "app_password"
+      user: "!Key sa_ldap"
+      key: "!Env AUTHENTIK_OUTPOST_LDAP_TOKEN"
+
+  - model: authentik_providers_ldap.ldapprovider
+    id: provider_ldap_main
+    identifiers:
+      name: "VYRX LDAP Provider"
+    attrs:
+      base_dn: "DC=vyrx,DC=de"
+      search_group: "!Find [authentik_core.group, [name, infra-admins]]"
+
+  - model: authentik_outposts.outpost
+    identifiers:
+      name: "vyrx-ldap-outpost"
+    attrs:
+      type: "ldap"
+      service_connection: null
+      providers:
+        - "!Key provider_ldap_main"
+      config:
+        authentik_host: "https://auth.vyrx.de"

@@ -1,0 +1,26 @@
+version: 1
+metadata:
+  name: "vyrx-app-grafana"
+entries:
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider_grafana
+    identifiers:
+      name: "Grafana OIDC Provider"
+    attrs:
+      client_id: "grafana"
+      client_secret: "!Env GRAFANA_OIDC_CLIENT_SECRET"
+      authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
+      redirect_uris:
+        - "https://mon.lan.vyrx.de/login/generic_oauth"
+      sub_mode: "hashed_user_id"
+      include_claims_in_id_token: true
+
+  - model: authentik_core.application
+    identifiers:
+      slug: "grafana"
+    attrs:
+      name: "Grafana"
+      provider: "!Key provider_grafana"
+      meta_launch_url: "https://mon.lan.vyrx.de"
+      group: "Observability"
+      open_in_new_tab: true

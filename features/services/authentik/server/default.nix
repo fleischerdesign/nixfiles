@@ -14,7 +14,7 @@ in
     enable = lib.mkEnableOption "Authentik Identity Provider (Server)";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "auth.ancoris.ovh";
+      default = "auth.vyrx.de";
       description = "FQDN of the Authentik identity server.";
     };
   };
@@ -59,6 +59,7 @@ in
           "AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true"
           "AUTHENTIK_AVATARS=gravatar"
           "AUTHENTIK_EVENTS__CONTEXT_PROCESSORS__GEOIP=/var/lib/GeoIP/GeoLite2-City.mmdb"
+          "AUTHENTIK_BLUEPRINTS_DIR=${./blueprints}"
         ];
         Restart = "always";
       };
@@ -85,6 +86,7 @@ in
           "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
           "AUTHENTIK_POSTGRESQL__NAME=authentik"
           "AUTHENTIK_POSTGRESQL__USER=authentik"
+          "AUTHENTIK_BLUEPRINTS_DIR=${./blueprints}"
         ];
         Restart = "always";
       };
