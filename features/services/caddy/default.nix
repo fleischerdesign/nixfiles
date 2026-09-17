@@ -26,8 +26,17 @@ in
     services.caddy = {
       enable = true;
 
-      # Authentik Snippet
+      # Authentik & Error Handling Snippets (DESIGN.md 7)
       extraConfig = ''
+        (vyrx_errors) {
+          handle_errors {
+            rewrite * /errors/{err.status_code}.html
+            file_server {
+              root /etc/vyrx/theme
+            }
+          }
+        }
+
         (authentik) {
           # Handle outpost paths (callback, sign_out, etc) directly
           handle /outpost.goauthentik.io/* {
