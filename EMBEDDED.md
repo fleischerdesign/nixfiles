@@ -272,10 +272,10 @@ Statt DNS-Records, Proxied-Status und Edge-TLS manuell im Cloudflare-Webdashboar
 
 ### 6.1 Der Deployment-Ablauf via `nix run .#sync-cloudflare` (oder `nod switch cloudflare`):
 1. **Synthese:** Nix generiert die Soll-Zustands-Spezifikation (`cloudflare-desired-state.json`) deterministisch aus `my.topology` und `my.endpoints`:
-   - `@` $\to$ `A` `173.249.22.211` (`cld-edge-01`, `proxied: true`)
+   - `@` $\to$ `A` `173.249.22.211` (`cld-edge-01`, `proxied: false` für uneingeschränkte CrowdSec-Kernel-Bans)
    - `edge` $\to$ `A` `173.249.22.211` (`proxied: false` für direct SSH & WireGuard)
    - `ops` $\to$ `A` `37.114.55.91` (`proxied: false` für Telemetrie & WireGuard)
-   - `*` $\to$ `CNAME` `edge.vyrx.de` (`proxied: true` für Wildcard-Ingress)
+   - `*` $\to$ `CNAME` `edge.vyrx.de` (`proxied: false` für Wildcard-Ingress ohne 100MB-Proxy-Limits)
    - Edge-Settings: SSL `strict`, Min-TLS `1.3`, `always_use_https = on`
 2. **Secret-Injektion:** Das API-Token wird sicher über SOPS (`infra/cloudflare_api_token`) bezogen.
 3. **Idempotenter Abgleich:** Die Sync-Engine [`sync.py`](file:///etc/nixos/features/system/networking/cloudflare/sync.py) vergleicht Ist- und Soll-Zustand über die Cloudflare API v4 und aktualisiert atomar.

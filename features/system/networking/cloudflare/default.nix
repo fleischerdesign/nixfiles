@@ -53,15 +53,18 @@ let
     };
   };
 
-  # Synthesize default DNS records from topology and endpoints
+  # Synthesize default DNS records from topology and endpoints.
+  # Default to `proxied = false` (DNS-only) to guarantee full compatibility with
+  # CrowdSec kernel nftables firewall bouncers, Caddy ACME DNS-01 challenges,
+  # unlimited body upload sizes (Paperless), and uninterrupted WebSocket/AI streams.
   defaultRecords =
     lib.optional (edgeHost != null && edgeHost.ipv4 != null) {
       name = "@";
       type = "A";
       content = edgeHost.ipv4;
-      proxied = true;
+      proxied = false;
       ttl = 1;
-      comment = "Root Ingress -> cld-edge-01";
+      comment = "Root Ingress -> cld-edge-01 (DNS-only for CrowdSec)";
     }
     ++ lib.optional (edgeHost != null && edgeHost.ipv4 != null) {
       name = "edge";
@@ -83,9 +86,9 @@ let
       name = "*";
       type = "CNAME";
       content = "edge.${topology.domain}";
-      proxied = true;
+      proxied = false;
       ttl = 1;
-      comment = "Wildcard Ingress -> edge.vyrx.de";
+      comment = "Wildcard Ingress -> edge.vyrx.de (DNS-only)";
     };
 
   # Render desired state configuration as JSON derivation
