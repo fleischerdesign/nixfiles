@@ -73,7 +73,7 @@ in
 
       couchdbUrl = lib.mkOption {
         type = lib.types.str;
-        default = "https://livesync.mky.ancoris.ovh";
+        default = "https://livesync.edge.${config.my.topology.domain}";
         description = "CouchDB server URL for LiveSync.";
       };
 

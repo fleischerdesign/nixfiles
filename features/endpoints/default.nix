@@ -213,7 +213,7 @@ in
           canonicalDomain = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             readOnly = true;
-            description = "The fully resolved FQDN of the service (e.g. grafana.mky.ancoris.ovh or fleischer.design).";
+            description = "The fully resolved FQDN of the service (e.g. grafana.ops.vyrx.de or auth.vyrx.de).";
           };
 
           publicUrl = lib.mkOption {

@@ -74,7 +74,7 @@ in
         if caddyBaseDomain != null then
           "https://cache.${caddyBaseDomain}"
         else
-          "https://cache.rls.ancoris.ovh";
+          "https://cache.ops.${config.my.topology.domain}";
       description = "Attic cache server endpoint URL.";
     };
     autoPush = lib.mkOption {

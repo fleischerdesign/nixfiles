@@ -1,19 +1,13 @@
 {
   config,
-  options,
   lib,
   features,
   ...
 }:
 let
   cfg = config.my.features.services.paperless;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then
-      config.my.features.services.caddy.baseDomain
-    else
-      null;
-  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
 in
 {
   options.my.features.services.paperless = {

@@ -13,8 +13,9 @@ let
       config.my.features.services.caddy.baseDomain
     else
       null;
-  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
-  ntfyHost = if caddyBaseDomain != null then "ntfy.${caddyBaseDomain}" else "ntfy.mky.ancoris.ovh";
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
+  ntfyHost = "push.${topologyDomain}";
 in
 {
   options.my.features.services.monitoring.grafana = {
@@ -22,7 +23,7 @@ in
     domain = lib.mkOption {
       type = lib.types.str;
       default =
-        if caddyBaseDomain != null then "grafana.${caddyBaseDomain}" else "grafana.mky.ancoris.ovh";
+        if caddyBaseDomain != null then "grafana.${caddyBaseDomain}" else "grafana.ops.${topologyDomain}";
       description = "FQDN of the Grafana instance.";
     };
     ssoAuthority = lib.mkOption {

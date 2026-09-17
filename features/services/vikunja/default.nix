@@ -7,7 +7,7 @@
 
 let
   cfg = config.my.features.services.vikunja;
-  authHost = "auth.ancoris.ovh";
+  authHost = "auth.${config.my.topology.domain}";
 in
 {
   options.my.features.services.vikunja = {

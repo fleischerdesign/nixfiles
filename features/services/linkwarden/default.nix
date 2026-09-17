@@ -13,12 +13,16 @@ in
     enable = lib.mkEnableOption "Linkwarden";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "linkwarden.mky.ancoris.ovh";
+      default =
+        if config.my.features.services.caddy.baseDomain != null then
+          "linkwarden.${config.my.features.services.caddy.baseDomain}"
+        else
+          "linkwarden.edge.${config.my.topology.domain}";
       description = "Domain name for Linkwarden.";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/linkwarden";
+      default = "https://auth.${config.my.topology.domain}/application/o/linkwarden";
       description = "SSO Authority URL for Linkwarden.";
     };
   };

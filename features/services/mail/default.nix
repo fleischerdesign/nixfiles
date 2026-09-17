@@ -14,17 +14,17 @@ in
     enable = lib.mkEnableOption "Stalwart Mail Server";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "mail.ancoris.ovh";
+      default = "mail.${config.my.topology.domain}";
       description = "Full domain name of the mail server.";
     };
     baseDomain = lib.mkOption {
       type = lib.types.str;
-      default = "ancoris.ovh";
+      default = config.my.topology.domain;
       description = "Base domain name.";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/stalwart/";
+      default = "https://auth.${config.my.topology.domain}/application/o/stalwart/";
       description = "SSO Authority/Issuer URL.";
     };
   };

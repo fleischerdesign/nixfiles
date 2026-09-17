@@ -12,14 +12,16 @@ let
       config.my.features.services.caddy.baseDomain
     else
       null;
-  authHost = "auth.ancoris.ovh";
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
 in
 {
   options.my.features.services.mealie = {
     enable = lib.mkEnableOption "Mealie Recipe Manager";
     smtpFromEmail = lib.mkOption {
       type = lib.types.str;
-      default = if caddyBaseDomain != null then "noreply@${caddyBaseDomain}" else "noreply@ancoris.ovh";
+      default =
+        if caddyBaseDomain != null then "noreply@${caddyBaseDomain}" else "noreply@${topologyDomain}";
       description = "From address for SMTP outgoing mails.";
     };
     ssoConfigurationUrl = lib.mkOption {

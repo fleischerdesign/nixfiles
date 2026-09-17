@@ -10,15 +10,19 @@ let
   cfg = config.my.features.services.homarr;
   caddyOpt = options.my.features.services.caddy.baseDomain or null;
   caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
-  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
+    if caddyOpt != null && caddyOpt.isDefined then
+      config.my.features.services.caddy.baseDomain
+    else
+      null;
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
 in
 {
   options.my.features.services.homarr = {
     enable = lib.mkEnableOption "Homarr Dashboard";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = if caddyBaseDomain != null then caddyBaseDomain else "ancoris.ovh";
+      default = if caddyBaseDomain != null then caddyBaseDomain else topologyDomain;
       description = "Domain name for Homarr.";
     };
     ssoAuthority = lib.mkOption {

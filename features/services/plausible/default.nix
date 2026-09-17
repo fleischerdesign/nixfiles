@@ -13,7 +13,11 @@ in
     enable = lib.mkEnableOption "Plausible Analytics";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "plausible.mky.ancoris.ovh";
+      default =
+        if config.my.features.services.caddy.baseDomain != null then
+          "plausible.${config.my.features.services.caddy.baseDomain}"
+        else
+          "plausible.edge.${config.my.topology.domain}";
       description = "Domain name for Plausible instance.";
     };
   };

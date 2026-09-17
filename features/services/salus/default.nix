@@ -35,7 +35,7 @@ in
 
       issuerUrl = lib.mkOption {
         type = lib.types.str;
-        default = "https://auth.ancoris.ovh/application/o/salus/";
+        default = "https://auth.${config.my.topology.domain}/application/o/salus/";
         description = "OIDC Issuer URL for Authentik.";
       };
 

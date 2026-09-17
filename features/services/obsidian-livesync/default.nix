@@ -13,7 +13,7 @@ let
     if caddyOpt != null && caddyOpt.isDefined then
       config.my.features.services.caddy.baseDomain
     else
-      "mky.ancoris.ovh";
+      "edge.${config.my.topology.domain}";
 in
 {
   options.my.features.services.obsidian-livesync = {

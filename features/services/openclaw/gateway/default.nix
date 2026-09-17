@@ -4,7 +4,7 @@
 # configuration file, database, log file, and separate trust boundary (secrets, GitHub PAT, etc.).
 #
 # Instances are exposed via Caddy and Authentik forward-auth as:
-#   <subdomain>.<baseDomain> (e.g. philipp.ai.rls.ancoris.ovh)
+#   <subdomain>.<baseDomain> (e.g. philipp.ai.ops.vyrx.de)
 {
   lib,
   pkgs,
@@ -740,7 +740,7 @@ let
                 options = {
                   url = lib.mkOption {
                     type = lib.types.str;
-                    description = "Target peer URL (e.g. https://katja.ai.rls.ancoris.ovh).";
+                    description = "Target peer URL (e.g. https://katja.ai.ops.vyrx.de).";
                   };
                   tokenSecret = lib.mkOption {
                     type = lib.types.nullOr lib.types.str;

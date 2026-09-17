@@ -12,7 +12,7 @@ in
 
     baseDomain = lib.mkOption {
       type = lib.types.str;
-      description = "Base domain for exposed services (e.g. fls.ancoris.ovh)";
+      description = "Base domain for exposed services (e.g. srv.lan.vyrx.de, edge.vyrx.de)";
     };
 
     authentikOutpostAddress = lib.mkOption {
