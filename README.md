@@ -1,107 +1,39 @@
-# NixOS Configuration
+# NixOS Configuration (nixfiles 2.0 / VYRX Enterprise Architecture)
 
 [![CI](https://github.com/fleischerdesign/nixfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/fleischerdesign/nixfiles/actions/workflows/ci.yml)
 
-Personal NixOS + Home Manager configuration managed via [Nix Flakes](https://nixos.wiki/wiki/Flakes), spanning 5 hosts.
+Enterprise NixOS + Home Manager multi-node infrastructure managed via [Nix Flakes](https://nixos.wiki/wiki/Flakes), spanning 5 cluster hosts and embedded network hardware under the canonical domain `vyrx.de`.
 
-## Hosts
+## Cluster Inventory (RFC 1178 Enterprise Taxonomy)
 
-| Host | Role | Hardware | Purpose |
-|------|------|----------|---------|
-| `yorke` | notebook | AMD laptop | Daily driver |
-| `jello` | desktop | Intel desktop | Gaming / workstation |
-| `mackaye` | server | VPS | Central services — Authentik, Grafana, Prometheus, Loki, PostgreSQL, Redis, Plausible, Vaultwarden |
-| `strummer` | server | Intel home server | Media server — \*arr stack, Jellyfin, Home Assistant, Klipper, Paperless, Linkwarden, Homarr |
-| `rollins` | server | VPS | Binary cache — Attic server, monitoring exporters, CrowdSec agent |
+| Host | Role | Subnet / Zone | Hardware | Purpose |
+|------|------|---------------|----------|---------|
+| `hom-wrk-01` | desktop | `10.10.20.10` (`corp`) | Intel PC / NVMe / Intel GPU | Workstation — Niri + Axis Shell, Sunshine, Gaming, OpenClaw Node |
+| `mob-nb-01` | notebook | Roaming DHCP (`corp`) | AMD Laptop / NVMe | Daily Driver — Niri + Axis Shell, Codium, OpenClaw Node |
+| `cld-edge-01` | server | `173.249.22.211` (`mesh`) | Cloud VPS (QEMU, GRUB) | Ingress Hub — WireGuard Hub, Caddy Edge, Authentik SSO, ntfy (`push.vyrx.de`), DBs |
+| `cld-ops-01` | server | `37.114.55.91` (`mesh`) | Cloud VPS (QEMU, GRUB) | Observability Master — Grafana, Prometheus, Loki, OpenClaw AI Gateway (`:18789`), Attic |
+| `hom-srv-01` | server | `10.10.10.10` (`infra`) | Bare Metal (Intel, 4TB+1TB) | Core Gateway — Kea DHCP, Chrony NTP, Blocky DNS, \*arr stack, Jellyfin, Home Assistant, Klipper |
 
-## Architecture
+### Embedded Devices & Bridges
+- `hom-rt-01` (`10.10.10.1`): AVM FRITZ!Box (Layer-1/2 Uplink Modem, DHCP/DNS offloaded to `hom-srv-01`).
+- `hom-ap-01` (`10.10.10.20`): TP-Link RE330 Access Point (Layer-2 Wi-Fi bridge, SSIDs: `VYRX`, `VYRX-IOT`).
 
-### Roles
+## Architecture Highlights
 
-Roles define baseline system features. Each host imports one role:
+### 1. Service Contract Pattern & Storage Catalog (`my.contracts.provides`)
+Services are completely decoupled and host-agnostic. Modules declare their endpoints, scopes, authentication policies, and persistent storage boundaries (`stateDirs`, `dataDirs`, `cacheDirs`). Multi-consumer projections automatically synthesize Caddy virtual hosts, firewall openings, and monitoring probes.
 
-- **`pc`** — Foundation for graphical machines: PipeWire audio, Wayland, CUPS printing, SSH server, Fish shell, systemd-boot, Firmware.
-- **`desktop`** — Extends `pc` with `my.role = "desktop"`.
-- **`notebook`** — Extends `pc` with `my.role = "notebook"`.
-- **`server`** — Headless baseline: SSH server, SOPS host-key decryption, Fish shell, systemd-boot.
+### 2. Stateless Kernel-WireGuard Mesh (`10.10.100.0/24`)
+Zero external control planes (no Headscale/Tailscale lock-in). Direct peer-to-peer ChaCha20-Poly1305 tunnels between all nodes with TCP-MSS clamping and anti-hairpinning routing.
 
-User packages in `user/philipp/packages.nix` are conditional on `my.role`: desktop apps (Ghostty terminal, GIMP, Obsidian, LibreOffice, InkScape, etc.) are only installed when `role != "server"`.
+### 3. Single-NIC Gateway & RFC 1812 Router-on-a-Stick
+`hom-srv-01` acts as the single-NIC gateway for the home network, running Kea DHCPv4 (with static leases synthesized from `my.topology`), Chrony NTP, Blocky Split-Horizon DNS, and IPv4 packet forwarding.
 
-### Features
+### 4. Enterprise Identity & RBAC
+Declarative Authentik blueprints provisioning users (**Philipp**, **Katja**, **Lilly**, **Kai**, **Rieke**) and groups (`infra-admins`, `media-users`, `family`) with FIDO2/Passkey support, LDAP outposts, and OIDC integrations.
 
-Features live under `features/<category>/<name>/default.nix` and are **auto-discovered**: `lib/helper.nix` recursively scans every subdirectory for `default.nix` files and includes them as NixOS modules. No manual import needed.
-
-Each feature declares an `my.features.<path>.enable` option. Hosts activate what they need in their `configuration.nix`. Features that aren't enabled have zero effect.
-
-### Desktop: niri + Axis Shell
-
-The desktop runs **[niri](https://github.com/YaLTeR/niri)** (scrolling-tiling Wayland compositor) with **[Axis Shell](https://github.com/fleischerdesign/Axis)** as the custom desktop shell. Axis provides the launcher, lock screen, notifications, and quick settings — integrated via D-Bus. **Fish** is the terminal shell, integrated with `direnv` for automatic environment loading. **Ghostty** is the terminal emulator.
-
-### Topology
-
-`features/system/networking/topology` centralizes Tailscale IPs, local IPs, and domains for all hosts. Other features reference peers via `config.my.features.system.networking.topology.hosts.<name>` — no hardcoded IPs.
-
-### Secrets
-
-All secrets are managed via **[SOPS](https://github.com/getsops/sops)** with age encryption — encrypted to the user key, all host SSH keys, and a CI key. Secrets live in `secrets/secrets.yaml`. Each host decrypts them at build time via its own SSH host key, no manual key distribution needed.
-
-## Key Features & Services
-
-### Desktop (yorke, jello)
-- **niri** scrolling-tiling Wayland compositor with **Axis Shell**
-- **Steam** + **Sunshine** game streaming + **Bottles**
-- **Spotify** with Spicetify theming
-- **VS Codium** with declarative extensions
-- **NixVim** (Neovim configured via Nix) with LSP, Telescope, Treesitter, and German keyboard adaptations
-- **Docker** container runtime
-
-### Server / Services (mackaye)
-- **Authentik** SSO — identity provider (server + LDAP outpost)
-- **Vaultwarden** — Bitwarden-compatible password manager
-- **Plausible** — privacy-friendly web analytics
-- **Hermes Agent & WebUI** — AI agent infrastructure and web interface
-- **Grafana** + **Prometheus** + **Loki** — monitoring, metrics, and log aggregation
-- **CrowdSec** — intrusion prevention (master node)
-- **PostgreSQL** + **Redis** — shared databases and caching
-- **Caddy** — reverse proxy (mky.ancoris.ovh)
-- **CouchDB** — document database sync (Obsidian)
-- **ntfy** — push notifications
-- **Portfolio** — personal website (fleischer.design)
-
-### Server / Services (strummer)
-- **Caddy** — reverse proxy (fls.ancoris.ovh)
-- **Authentik** — proxy outpost (forward-auth) + LDAP outpost
-- **Homarr** — customizable service dashboard
-- **Linkwarden** — bookmark & webpage archiver
-- **Sonarr** + **Radarr** + **Prowlarr** + **Bazarr** + **SABnzbd** + **Jellyseerr** + **Recyclarr** — full \*arr media stack
-- **Jellyfin** — media server with Intel VAAPI hardware decoding
-- **Home Assistant** + **ESPHome** — smart home & Zigbee automation
-- **Klipper** + **Moonraker** — 3D printer management
-- **Paperless-ngx** — document management with Authentik SSO
-- **Mealie** — recipe manager
-- **Blocky** — DNS ad-blocker
-- **CrowdSec** — intrusion prevention (agent)
-- **Cloudflare DDNS** — dynamic DNS updates
-
-### Server / Services (rollins)
-- **Attic** — Nix binary cache server (cache.rls.ancoris.ovh)
-- **Caddy** — reverse proxy (rls.ancoris.ovh)
-- **CrowdSec** — intrusion prevention (agent)
-
-## Developer Tooling & Templates (`tpl`)
-
-The custom Fish function `tpl` bootstraps reproducible Nix flake development environments instantly:
-
-```bash
-tpl <template-name> [target-directory]
-# Example: tpl rust my-app
-```
-
-Available templates are dynamically queried from `github:fleischerdesign/nix-<stack>-template`:
-- **Runtimes & Systems:** `bun`, `c`, `cpp`, `deno`, `elixir`, `gleam`, `go`, `haskell`, `java`, `kotlin`, `node`, `ocaml`, `python`, `rust`, `zig`
-- **Typesetting:** `typst`
-
-Each template includes pre-configured `flake.nix` (NixOS 26.05), `.envrc` (direnv), starter code files, `.gitignore`, and `nixfmt` formatter.
+### 5. Multi-Node AI Automation Mesh
+Distributed OpenClaw agent mesh connected directly over WireGuard to the central gateway on `cld-ops-01:18789` with mutual A2A peering.
 
 ## Installation & Commands
 
@@ -109,20 +41,20 @@ Each template includes pre-configured `flake.nix` (NixOS 26.05), `.envrc` (diren
 # Clone repository
 git clone https://github.com/fleischerdesign/nixfiles && cd nixfiles
 
-# Dev shell (direnv auto-loads nixfmt, deadnix, statix, sops, etc.)
+# Dev shell (direnv auto-loads nixfmt, deadnix, statix, sops, nod, etc.)
 direnv allow
 
 # Activate pre-commit hooks
 git config core.hooksPath .githooks
 
+# Verify all hosts evaluate cleanly
+nix flake check
+
 # Build and switch locally
-sudo nixos-rebuild switch --flake .#yorke
+nixos-rebuild switch --flake .#<hostname>
 
-# Deploy to all hosts via Tailscale
-deploy .# -- --ssh-user root -i ~/.ssh/deploy-key
-
-# Update custom packages in packages/custom
-nix run .#update-custom-packages
+# Deploy declaratively across the cluster
+nod switch <hostname>
 
 # Edit secrets
 sops secrets/secrets.yaml
