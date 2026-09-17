@@ -131,26 +131,36 @@
 
       packages.${system} = pkgs.custom;
 
-      apps.${system}.update-custom-packages = {
-        type = "app";
-        program = "${
-          pkgs.writeShellApplication {
-            name = "update-custom-packages-app";
-            runtimeInputs = with pkgs; [
-              bash
-              curl
-              jq
-              nix
-              nodejs
-              coreutils
-              gnused
-              findutils
-            ];
-            text = "exec ${./lib/updaters/update-custom-packages.sh} \"$@\"";
-          }
-        }/bin/update-custom-packages-app";
-        meta = {
-          description = "Auto-update engine for custom packages in packages/custom";
+      apps.${system} = {
+        update-custom-packages = {
+          type = "app";
+          program = "${
+            pkgs.writeShellApplication {
+              name = "update-custom-packages-app";
+              runtimeInputs = with pkgs; [
+                bash
+                curl
+                jq
+                nix
+                nodejs
+                coreutils
+                gnused
+                findutils
+              ];
+              text = "exec ${./lib/updaters/update-custom-packages.sh} \"$@\"";
+            }
+          }/bin/update-custom-packages-app";
+          meta = {
+            description = "Auto-update engine for custom packages in packages/custom";
+          };
+        };
+
+        sync-cloudflare = {
+          type = "app";
+          program = "${self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package}/bin/cloudflare-sync";
+          meta = {
+            description = "Declarative Cloudflare Edge & DNS GitOps Reconciliation Tool";
+          };
         };
       };
 

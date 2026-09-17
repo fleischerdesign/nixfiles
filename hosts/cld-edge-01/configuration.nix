@@ -18,6 +18,7 @@
   my.features.services.caddy.baseDomain = "edge.vyrx.de";
 
   my.features.system.networking.tailscale.acceptRoutes = true;
+  my.features.system.networking.cloudflare.enable = true;
   my.features.system.common.geoip.enable = true;
 
   my.features.services.monitoring = {

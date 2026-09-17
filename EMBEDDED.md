@@ -266,15 +266,33 @@ nod switch living-room-sensor
 
 ---
 
-## 6. Topologie-Integration & SSOT (`my.topology`)
+## 6. Cloudflare Edge & DNS GitOps Target (`cld-dns` / `cloudflare`)
 
-Sämtliche Embedded Devices werden vollwertig in der Topologie-Registry [ARCHITECTURE.md](file:///etc/nixos/ARCHITECTURE.md#84-deklarative-topologie-registry--mathematisches-trust-lattice) registriert:
+Statt DNS-Records, Proxied-Status und Edge-TLS manuell im Cloudflare-Webdashboard zu pflegen („ClickOps-Falle“), existiert ein vollständig deklaratives Target für Cloudflare ([`features/system/networking/cloudflare`](file:///etc/nixos/features/system/networking/cloudflare/default.nix)).
+
+### 6.1 Der Deployment-Ablauf via `nix run .#sync-cloudflare` (oder `nod switch cloudflare`):
+1. **Synthese:** Nix generiert die Soll-Zustands-Spezifikation (`cloudflare-desired-state.json`) deterministisch aus `my.topology` und `my.endpoints`:
+   - `@` $\to$ `A` `173.249.22.211` (`cld-edge-01`, `proxied: true`)
+   - `edge` $\to$ `A` `173.249.22.211` (`proxied: false` für direct SSH & WireGuard)
+   - `ops` $\to$ `A` `37.114.55.91` (`proxied: false` für Telemetrie & WireGuard)
+   - `*` $\to$ `CNAME` `edge.vyrx.de` (`proxied: true` für Wildcard-Ingress)
+   - Edge-Settings: SSL `strict`, Min-TLS `1.3`, `always_use_https = on`
+2. **Secret-Injektion:** Das API-Token wird sicher über SOPS (`infra/cloudflare_api_token`) bezogen.
+3. **Idempotenter Abgleich:** Die Sync-Engine [`sync.py`](file:///etc/nixos/features/system/networking/cloudflare/sync.py) vergleicht Ist- und Soll-Zustand über die Cloudflare API v4 und aktualisiert atomar.
+4. **Automatisierung:** Auf [`cld-edge-01`](file:///etc/nixos/hosts/cld-edge-01/configuration.nix) läuft zusätzlich ein täglicher Systemd-Timer (`cloudflare-dns-sync.timer`) für kontinuierliche Drift-Erkennung.
+
+---
+
+## 7. Automatische Topologie-Projektion & Kettenreaktion
+
+Sämtliche Devices und Targets werden in der zentralen Topologie-Registry gepflegt:
 
 ```nix
 my.topology.hosts = {
   # Server & Clients (NixOS)
   hom-srv-01 = { zone = "infra"; ipv4 = "10.10.10.10"; targetType = "nixos"; };
   hom-wrk-01 = { zone = "corp";  ipv4 = "10.10.20.10"; targetType = "nixos"; };
+  cld-edge-01 = { zone = "mesh";  ipv4 = "173.249.22.211"; targetType = "nixos"; };
 
   # Embedded Router & Access Point
   hom-rt-01  = { zone = "infra"; ipv4 = "10.10.10.1";  targetType = "fritzbox"; };
@@ -290,19 +308,21 @@ my.topology.devices = {
 
 ### Automatische Kettenreaktion beim Deployment:
 1. **DHCP:** Der NixOS-Gateway-Dienst auf `hom-srv-01` erzeugt die statische DHCP-Reservierung für `hom-ap-01` und `living-room-sensor`.
-2. **DNS:** Blocky DNS generiert automatisch `hom-rt-01.lan.vyrx.de`, `hom-ap-01.lan.vyrx.de` und `living-room-sensor.lan.vyrx.de`.
-3. **Firewall:** `nftables` sperrt `living-room-sensor` in die isolierte IoT-Zone (nur Zugriff auf Home Assistant erlaubt).
-4. **Monitoring:** Prometheus Blackbox-Exporter beginnt automatisch mit ICMP-Ping-Checks auf alle Embedded-Targets.
+2. **DNS (LAN):** Blocky DNS generiert automatisch `hom-rt-01.lan.vyrx.de`, `hom-ap-01.lan.vyrx.de` und `living-room-sensor.lan.vyrx.de`.
+3. **DNS (WAN):** Cloudflare GitOps deklariert atomar alle externen Endpoints und Edge-Routing-Ziele.
+4. **Firewall:** `nftables` sperrt `living-room-sensor` in die isolierte IoT-Zone (nur Zugriff auf Home Assistant erlaubt).
+5. **Monitoring:** Prometheus Blackbox-Exporter beginnt automatisch mit ICMP-Ping-Checks auf alle Targets.
 
 ---
 
-## 7. Zusammenfassung & Mehrwert
+## 8. Zusammenfassung & Mehrwert
 
-| Kriterium | Früher (Typisches IoT-Chaos) | nixfiles 2.0 (Agentless GitOps) |
+| Kriterium | Früher (Typisches IoT- & Cloud-Chaos) | nixfiles 2.0 (Agentless GitOps) |
 |---|---|---|
 | **Router-Verwaltung** | Login ins FRITZ!Box Web-UI, Formular-Klicken | **Deklarativer Soll-Zustand**, abgeglichen via TR-064 |
 | **WLAN-Verwaltung** | Login ins TP-Link Web-UI, händisches Tippen | **Deklarative UCI-Dateien**, deployt per `nod switch` |
-| **Secrets & Passwörter** | Klartext in Web-UIs oder ungesicherten YAMLs | **100% verschlüsselt in SOPS**, zur Build-Zeit injiziert |
+| **Edge- & DNS-Verwaltung** | Manuelles Klicken im Cloudflare-Dashboard | **Deklarative DNS-Records & TLS**, Sync per Flake-App |
+| **Secrets & Passwörter** | Klartext in Web-UIs oder ungesicherten YAMLs | **100% verschlüsselt in SOPS**, zur Laufzeit injiziert |
 | **Microcontroller-OTA** | Manuelles Uploaden im ESPHome-Dashboard | **Kompiliert & deployed per Terminal-Befehl** |
-| **Tooling** | 5 verschiedene GUIs und Web-Konsolen | **Ein einziges CLI-Werkzeug:** `nod switch <target>` |
+| **Tooling** | 5 verschiedene GUIs und Web-Konsolen | **Einheitliches Interface:** `nod switch <target>` / Nix Apps |
 | **Desaster Recovery** | Hardware defekt = mühsames Neukonfigurieren | Neues Gerät anschließen $\to$ `nod switch` $\to$ betriebsbereit |
