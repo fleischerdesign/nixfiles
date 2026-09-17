@@ -9,7 +9,10 @@ let
   cfg = config.my.features.services.paperless;
   caddyOpt = options.my.features.services.caddy.baseDomain or null;
   caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
+    if caddyOpt != null && caddyOpt.isDefined then
+      config.my.features.services.caddy.baseDomain
+    else
+      null;
   authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
 in
 {
@@ -153,10 +156,30 @@ in
           ];
         };
 
-        # Register with Caddy Feature
-        my.endpoints.paperless = {
-          host = config.networking.hostName;
-          port = 28981;
+        # Register with Caddy & Firewall via Service Contract
+        my.contracts.provides.paperless = {
+          endpoints.web = {
+            port = 28981;
+            protocol = "tcp";
+            scope = "internal";
+            auth = "none";
+            subdomain = "paperless";
+            healthProbePath = "/";
+            dashboard = {
+              show = true;
+              displayName = "Paperless-ngx";
+              category = "Documents";
+              icon = "paperless";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/paperless" ];
+            dataDirs = [
+              "/data/storage/docs"
+              "/var/lib/paperless/media"
+            ];
+            cacheDirs = [ ];
+          };
         };
       }
     ]

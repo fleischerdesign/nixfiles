@@ -69,10 +69,26 @@ in
           ];
         };
 
-        # Register with Caddy Feature
-        my.endpoints.prowlarr = {
-          host = config.networking.hostName;
-          port = 9696;
+        my.contracts.provides.prowlarr = {
+          endpoints.web = {
+            port = 9696;
+            protocol = "tcp";
+            scope = "internal";
+            auth = "authentik";
+            subdomain = "prowlarr";
+            healthProbePath = "/ping";
+            dashboard = {
+              show = true;
+              displayName = "Prowlarr";
+              category = "Media";
+              icon = "prowlarr";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/prowlarr" ];
+            dataDirs = [ ];
+            cacheDirs = [ ];
+          };
         };
       }
     ]

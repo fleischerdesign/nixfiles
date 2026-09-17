@@ -98,45 +98,6 @@
         auth = true;
       };
 
-      mealie.proxy.subdomain = "mealie";
-      mealie.proxy.enable = true;
-
-      paperless.proxy.subdomain = "paperless";
-      paperless.proxy.enable = true;
-
-      prowlarr.proxy = {
-        enable = true;
-        subdomain = "prowlarr";
-        auth = true;
-      };
-
-      radarr.proxy = {
-        enable = true;
-        subdomain = "radarr";
-        auth = true;
-      };
-
-      sabnzbd.proxy = {
-        enable = true;
-        subdomain = "sabnzbd";
-        auth = true;
-      };
-
-      sonarr.proxy = {
-        enable = true;
-        subdomain = "sonarr";
-        auth = true;
-      };
-
-      jellyfin.proxy.subdomain = "jellyfin";
-      jellyfin.proxy.enable = true;
-
-      bazarr.proxy = {
-        enable = true;
-        subdomain = "bazarr";
-        auth = true;
-      };
-
       jellyseerr.proxy.subdomain = "seerr";
       jellyseerr.proxy.enable = true;
 

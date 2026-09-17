@@ -148,10 +148,27 @@ in
       UMask = lib.mkForce "0002";
     };
 
-    # Caddy Integration
-    my.endpoints.sabnzbd = {
-      host = config.networking.hostName;
-      port = 8080;
+    # Caddy & Firewall Integration via Service Contract
+    my.contracts.provides.sabnzbd = {
+      endpoints.web = {
+        port = 8080;
+        protocol = "tcp";
+        scope = "internal";
+        auth = "authentik";
+        subdomain = "sabnzbd";
+        healthProbePath = "/api?mode=version";
+        dashboard = {
+          show = true;
+          displayName = "SABnzbd";
+          category = "Media";
+          icon = "sabnzbd";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/sabnzbd" ];
+        dataDirs = [ cfg.downloadDir ];
+        cacheDirs = [ ];
+      };
     };
   };
 }

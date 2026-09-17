@@ -103,10 +103,27 @@ in
     # TODO: remove when nixpkgs fixes this upstream.
     systemd.services.mealie.environment.HOME = "/var/lib/mealie";
 
-    # Register with Caddy Feature
-    my.endpoints.mealie = {
-      host = config.networking.hostName;
-      port = 9025;
+    # Register with Caddy & Firewall via Service Contract
+    my.contracts.provides.mealie = {
+      endpoints.web = {
+        port = 9025;
+        protocol = "tcp";
+        scope = "public";
+        auth = "none";
+        subdomain = "mealie";
+        healthProbePath = "/api/app/about";
+        dashboard = {
+          show = true;
+          displayName = "Mealie";
+          category = "Home";
+          icon = "mealie";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/mealie" ];
+        dataDirs = [ ];
+        cacheDirs = [ ];
+      };
     };
   };
 }

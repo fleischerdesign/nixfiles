@@ -19,9 +19,26 @@ in
     # Ensure bazarr has access to the media files
     users.users.bazarr.extraGroups = [ "media" ];
 
-    my.endpoints.bazarr = {
-      host = config.networking.hostName;
-      port = 6767;
+    my.contracts.provides.bazarr = {
+      endpoints.web = {
+        port = 6767;
+        protocol = "tcp";
+        scope = "internal";
+        auth = "authentik";
+        subdomain = "bazarr";
+        healthProbePath = "/ping";
+        dashboard = {
+          show = true;
+          displayName = "Bazarr";
+          category = "Media";
+          icon = "bazarr";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/bazarr" ];
+        dataDirs = [ ];
+        cacheDirs = [ ];
+      };
     };
   };
 }

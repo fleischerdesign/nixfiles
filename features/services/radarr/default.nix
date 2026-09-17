@@ -78,9 +78,26 @@ in
           UMask = lib.mkForce "0002";
         };
 
-        my.endpoints.radarr = {
-          host = config.networking.hostName;
-          port = 7878;
+        my.contracts.provides.radarr = {
+          endpoints.web = {
+            port = 7878;
+            protocol = "tcp";
+            scope = "internal";
+            auth = "authentik";
+            subdomain = "radarr";
+            healthProbePath = "/ping";
+            dashboard = {
+              show = true;
+              displayName = "Radarr";
+              category = "Media";
+              icon = "radarr";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/radarr" ];
+            dataDirs = [ "/data/storage/movies" ];
+            cacheDirs = [ ];
+          };
         };
       }
     ]

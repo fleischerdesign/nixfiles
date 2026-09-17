@@ -78,9 +78,26 @@ in
           UMask = lib.mkForce "0002";
         };
 
-        my.endpoints.sonarr = {
-          host = config.networking.hostName;
-          port = 8989;
+        my.contracts.provides.sonarr = {
+          endpoints.web = {
+            port = 8989;
+            protocol = "tcp";
+            scope = "internal";
+            auth = "authentik";
+            subdomain = "sonarr";
+            healthProbePath = "/ping";
+            dashboard = {
+              show = true;
+              displayName = "Sonarr";
+              category = "Media";
+              icon = "sonarr";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/sonarr" ];
+            dataDirs = [ "/data/storage/tv" ];
+            cacheDirs = [ ];
+          };
         };
       }
     ]
