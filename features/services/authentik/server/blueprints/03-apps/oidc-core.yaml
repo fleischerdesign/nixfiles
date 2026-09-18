@@ -1,0 +1,152 @@
+version: 1
+metadata:
+  name: "vyrx-apps-oidc"
+entries:
+  # 1. Grafana
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider_grafana
+    identifiers:
+      name: "Provider for Grafana"
+    attrs:
+      client_id: "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k"
+      client_secret: "UoKku3EsVJUQaoM6SJpzBWXK8xYAbFL8xX7Hp69dQ5ZDiGSXBphK1s7uEgsQdNm9133viUb3zSR5byY15XGDgCjozf4lnUQUCpqRGmfD54j6Ue0lEIq03MrQefTNtr2x"
+      authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
+      redirect_uris:
+        - "https://grafana.ops.vyrx.de/login/generic_oauth"
+        - "https://mon.lan.vyrx.de/login/generic_oauth"
+      sub_mode: "hashed_user_id"
+      include_claims_in_id_token: true
+
+  - model: authentik_core.application
+    identifiers:
+      slug: "grafana"
+    attrs:
+      name: "Grafana"
+      provider: "!Key provider_grafana"
+      meta_launch_url: "https://grafana.ops.vyrx.de"
+      group: "Observability"
+      open_in_new_tab: true
+
+  # 2. Vaultwarden
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider_vaultwarden
+    identifiers:
+      name: "Provider for Vaultwarden"
+    attrs:
+      client_id: "IW0W9V9cLTDaMbdtXy7lGwHi55Vakio8E2tTSvsg"
+      client_secret: "HduyzJFDLGohxA0hoQ3UOcH1R5sBNe79Qqo40eCazOUvfMkHkvxMoFXhskolEHa9pvvXOUHjUlWMdw8vZiutGxCEpeMFWqiYSeLrRTL5PFcypStWEZWztjwC63td5cfz"
+      authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
+      redirect_uris:
+        - "https://vault.edge.vyrx.de/identity/connect/oidc-signin"
+        - "https://vault.vyrx.de/identity/connect/oidc-signin"
+      sub_mode: "user_username"
+      include_claims_in_id_token: true
+
+  - model: authentik_core.application
+    identifiers:
+      slug: "vaultwarden"
+    attrs:
+      name: "Vaultwarden"
+      provider: "!Key provider_vaultwarden"
+      meta_launch_url: "https://vault.edge.vyrx.de"
+      group: "Security"
+      open_in_new_tab: true
+
+  # 3. Paperless-ngx
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider_paperless
+    identifiers:
+      name: "Provider for Paperless"
+    attrs:
+      client_id: "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2"
+      client_secret: "HOZg2B6l1MFR4tSdeIjhDUCbGx073ROd6W4wX6iTOOz5fY6VqxovdiJronmh2YVFzY6gpGcstdlUZQU5SphQsr31A5Knt89LyItMz6NykhS7sgIN5V3En6vUtqpVHjiM"
+      authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
+      redirect_uris:
+        - "https://docs.srv.lan.vyrx.de/accounts/authentik/login/callback/"
+      sub_mode: "hashed_user_id"
+      include_claims_in_id_token: true
+
+  - model: authentik_core.application
+    identifiers:
+      slug: "paperless"
+    attrs:
+      name: "Paperless"
+      provider: "!Key provider_paperless"
+      meta_launch_url: "https://docs.srv.lan.vyrx.de"
+      group: "Productivity"
+      open_in_new_tab: true
+
+  # 4. Mealie
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider_mealie
+    identifiers:
+      name: "Provider for Mealie"
+    attrs:
+      client_id: "uwxlwWIofaSVKwAJTyzhzT75kUMDfoCpmlSs4M1E"
+      client_secret: "Xmp6EtX0if9tMHiTLWsGxHW3q7b9izZLNGOZOqGQZaxoOf7lSwjc8v89HDwlgBgftWk1jYyMFMkkirwAfIpMsbaGaStqY26cvq4iMJQMgQ3rPTKFC26nauW72IrFJFNb"
+      authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
+      redirect_uris:
+        - "https://mealie.srv.lan.vyrx.de/login"
+        - "https://mealie.srv.lan.vyrx.de/api/auth/callback"
+      sub_mode: "hashed_user_id"
+      include_claims_in_id_token: true
+
+  - model: authentik_core.application
+    identifiers:
+      slug: "mealie"
+    attrs:
+      name: "Mealie"
+      provider: "!Key provider_mealie"
+      meta_launch_url: "https://mealie.srv.lan.vyrx.de"
+      group: "Home"
+      open_in_new_tab: true
+
+  # 5. Vikunja
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider_vikunja
+    identifiers:
+      name: "Provider for Vikunja"
+    attrs:
+      client_id: "SqxgGKZ22SXY9KVEVZXeXyuf1M5EKguBrvpSGabH"
+      client_secret: "rJQ1FROgoxScekPi2cYqTJVjdRdFHK20yJhh6ZneBTsV7TIXPadUGeIUMQMw2AR4OjpaKRQqk1xaD3UNWuVjUs8YikexBHEQ2oc1VuBe9ORZ3dfsxS7I2wCwxzl0wxCi"
+      authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
+      redirect_uris:
+        - "https://tasks.srv.lan.vyrx.de/auth/openid/authentik"
+        - "https://vikunja.srv.lan.vyrx.de/auth/openid/authentik"
+      sub_mode: "hashed_user_id"
+      include_claims_in_id_token: true
+
+  - model: authentik_core.application
+    identifiers:
+      slug: "vikunja"
+    attrs:
+      name: "Vikunja"
+      provider: "!Key provider_vikunja"
+      meta_launch_url: "https://tasks.srv.lan.vyrx.de"
+      group: "Productivity"
+      open_in_new_tab: true
+
+  # 6. Linkwarden
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider_linkwarden
+    identifiers:
+      name: "Provider for Linkwarden"
+    attrs:
+      client_id: "TBKFgLSIeXirGSZiuCFEXFeaUX3XaYt54FGr4VtM"
+      client_secret: "B8LFg5IXRAPW3sNLxuBZUQr15zlqy1rpXmY5vIaaFz4MI9OBb5cInkNKCwuRxYMIpD4DAobSc8mhi6NykTWlEl6CpO9ddjjecepRC4pcaYcZrsY2o4zdKd3SDgAflDJO"
+      authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
+      redirect_uris:
+        - "https://links.srv.lan.vyrx.de/api/v1/auth/callback/authentik"
+        - "https://linkwarden.srv.lan.vyrx.de/api/v1/auth/callback/authentik"
+      sub_mode: "hashed_user_id"
+      include_claims_in_id_token: true
+
+  - model: authentik_core.application
+    identifiers:
+      slug: "linkwarden"
+    attrs:
+      name: "Linkwarden"
+      provider: "!Key provider_linkwarden"
+      meta_launch_url: "https://links.srv.lan.vyrx.de"
+      group: "Productivity"
+      open_in_new_tab: true

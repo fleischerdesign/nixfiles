@@ -1,0 +1,52 @@
+version: 1
+metadata:
+  name: "vyrx-outpost-proxy"
+entries:
+  - model: authentik_core.user
+    id: sa_proxy
+    identifiers:
+      username: "ak-outpost-proxy"
+    attrs:
+      name: "Service Account Proxy Outpost"
+      type: "service_account"
+
+  - model: authentik_core.token
+    identifiers:
+      identifier: "outpost-proxy-token"
+    attrs:
+      intent: "app_password"
+      user: "!Key sa_proxy"
+      key: "!Env AUTHENTIK_OUTPOST_PROXY_TOKEN"
+
+  - model: authentik_outposts.outpost
+    id: vyrx_proxy_outpost
+    identifiers:
+      name: "vyrx-proxy-outpost"
+    attrs:
+      type: "proxy"
+      service_connection: null
+      providers:
+        # Infra
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for ESPHome']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Mainsail']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Moonraker']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Klipper Cam']]"
+        # Media
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Sonarr']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Radarr']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Prowlarr']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Bazarr']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Sabnzbd']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for Jellyseerr']]"
+        # Ops & AI
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for SearXNG']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for OpenClaw Gateway']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for OpenClaw Philipp']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for OpenClaw Katja']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for OpenClaw Lilly']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for OpenClaw Kai']]"
+        - "!Find [authentik_providers_proxy.proxyprovider, [name, 'Provider for OpenClaw Rieke']]"
+      config:
+        authentik_host: "https://auth.vyrx.de"
+        authentik_host_browser: "https://auth.vyrx.de"
+        authentik_host_insecure: false
