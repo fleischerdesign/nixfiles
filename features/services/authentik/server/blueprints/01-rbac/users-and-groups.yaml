@@ -39,9 +39,9 @@ entries:
       name: "Philipp"
       email: "philipp@vyrx.de"
       groups:
-        - "!Key group_infra_admins"
-        - "!Key group_media_users"
-        - "!Key group_family"
+        - !Key group_infra_admins
+        - !Key group_media_users
+        - !Key group_family
 
   - model: authentik_core.user
     id: user_katja
@@ -51,8 +51,8 @@ entries:
       name: "Katja"
       email: "katja@vyrx.de"
       groups:
-        - "!Key group_media_users"
-        - "!Key group_family"
+        - !Key group_media_users
+        - !Key group_family
 
   - model: authentik_core.user
     id: user_lilly
@@ -62,8 +62,8 @@ entries:
       name: "Lilly"
       email: "lilly@vyrx.de"
       groups:
-        - "!Key group_media_users"
-        - "!Key group_family"
+        - !Key group_media_users
+        - !Key group_family
 
   - model: authentik_core.user
     id: user_kai
@@ -73,8 +73,8 @@ entries:
       name: "Kai"
       email: "kai@vyrx.de"
       groups:
-        - "!Key group_media_users"
-        - "!Key group_family"
+        - !Key group_media_users
+        - !Key group_family
 
   - model: authentik_core.user
     id: user_rieke
@@ -84,5 +84,5 @@ entries:
       name: "Rieke"
       email: "rieke@vyrx.de"
       groups:
-        - "!Key group_media_users"
-        - "!Key group_family"
+        - !Key group_media_users
+        - !Key group_family
