@@ -2,11 +2,6 @@ version: 1
 metadata:
   name: "vyrx-system-brand"
 entries:
-  - model: authentik_blueprints.metaapplyblueprint
-    attrs:
-      identifiers:
-        domain: "auth.vyrx.de"
-
   - model: authentik_brands.brand
     identifiers:
       domain: "auth.vyrx.de"
