@@ -89,6 +89,30 @@ let
       proxied = false;
       ttl = 1;
       comment = "Wildcard Ingress -> edge.vyrx.de (DNS-only)";
+    }
+    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
+      name = "search";
+      type = "CNAME";
+      content = "ops.${topology.domain}";
+      proxied = false;
+      ttl = 1;
+      comment = "SearXNG Metasearch -> cld-ops-01";
+    }
+    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
+      name = "ai";
+      type = "CNAME";
+      content = "ops.${topology.domain}";
+      proxied = false;
+      ttl = 1;
+      comment = "OpenClaw AI Gateway -> cld-ops-01";
+    }
+    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
+      name = "*.ai";
+      type = "CNAME";
+      content = "ops.${topology.domain}";
+      proxied = false;
+      ttl = 1;
+      comment = "OpenClaw AI Family Mesh Wildcard -> cld-ops-01";
     };
 
   # Render desired state configuration as JSON derivation

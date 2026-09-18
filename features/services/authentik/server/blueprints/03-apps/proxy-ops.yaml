@@ -9,7 +9,7 @@ entries:
       name: "Provider for SearXNG"
     attrs:
       mode: "forward_single"
-      external_host: "https://search.ops.vyrx.de"
+      external_host: "https://search.vyrx.de"
       authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
 
   - model: authentik_core.application
@@ -18,7 +18,7 @@ entries:
     attrs:
       name: "SearXNG Search"
       provider: "!Key provider_proxy_searxng"
-      meta_launch_url: "https://search.ops.vyrx.de"
+      meta_launch_url: "https://search.vyrx.de"
       group: "Observability & Tools"
       open_in_new_tab: true
 
@@ -29,7 +29,7 @@ entries:
       name: "Provider for OpenClaw Gateway"
     attrs:
       mode: "forward_single"
-      external_host: "https://ai.ops.vyrx.de"
+      external_host: "https://ai.vyrx.de"
       authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
 
   - model: authentik_core.application
@@ -38,7 +38,7 @@ entries:
     attrs:
       name: "OpenClaw AI Gateway"
       provider: "!Key provider_proxy_openclaw_root"
-      meta_launch_url: "https://ai.ops.vyrx.de"
+      meta_launch_url: "https://ai.vyrx.de"
       group: "AI & Agents"
       open_in_new_tab: true
 
@@ -49,7 +49,7 @@ entries:
       name: "Provider for OpenClaw Philipp"
     attrs:
       mode: "forward_single"
-      external_host: "https://philipp.ai.ops.vyrx.de"
+      external_host: "https://philipp.ai.vyrx.de"
       authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
 
   - model: authentik_core.application
@@ -58,7 +58,7 @@ entries:
     attrs:
       name: "OpenClaw (Moebius)"
       provider: "!Key provider_proxy_openclaw_philipp"
-      meta_launch_url: "https://philipp.ai.ops.vyrx.de"
+      meta_launch_url: "https://philipp.ai.vyrx.de"
       group: "AI & Agents"
       open_in_new_tab: true
 
@@ -69,7 +69,7 @@ entries:
       name: "Provider for OpenClaw Katja"
     attrs:
       mode: "forward_single"
-      external_host: "https://katja.ai.ops.vyrx.de"
+      external_host: "https://katja.ai.vyrx.de"
       authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
 
   - model: authentik_core.application
@@ -78,7 +78,7 @@ entries:
     attrs:
       name: "OpenClaw (Frida)"
       provider: "!Key provider_proxy_openclaw_katja"
-      meta_launch_url: "https://katja.ai.ops.vyrx.de"
+      meta_launch_url: "https://katja.ai.vyrx.de"
       group: "AI & Agents"
       open_in_new_tab: true
 
@@ -89,7 +89,7 @@ entries:
       name: "Provider for OpenClaw Lilly"
     attrs:
       mode: "forward_single"
-      external_host: "https://lilly.ai.ops.vyrx.de"
+      external_host: "https://lilly.ai.vyrx.de"
       authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
 
   - model: authentik_core.application
@@ -98,7 +98,7 @@ entries:
     attrs:
       name: "OpenClaw (Cleo)"
       provider: "!Key provider_proxy_openclaw_lilly"
-      meta_launch_url: "https://lilly.ai.ops.vyrx.de"
+      meta_launch_url: "https://lilly.ai.vyrx.de"
       group: "AI & Agents"
       open_in_new_tab: true
 
@@ -109,7 +109,7 @@ entries:
       name: "Provider for OpenClaw Kai"
     attrs:
       mode: "forward_single"
-      external_host: "https://kai.ai.ops.vyrx.de"
+      external_host: "https://kai.ai.vyrx.de"
       authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
 
   - model: authentik_core.application
@@ -118,7 +118,7 @@ entries:
     attrs:
       name: "OpenClaw (Keno)"
       provider: "!Key provider_proxy_openclaw_kai"
-      meta_launch_url: "https://kai.ai.ops.vyrx.de"
+      meta_launch_url: "https://kai.ai.vyrx.de"
       group: "AI & Agents"
       open_in_new_tab: true
 
@@ -129,7 +129,7 @@ entries:
       name: "Provider for OpenClaw Rieke"
     attrs:
       mode: "forward_single"
-      external_host: "https://rieke.ai.ops.vyrx.de"
+      external_host: "https://rieke.ai.vyrx.de"
       authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]"
 
   - model: authentik_core.application
@@ -138,6 +138,7 @@ entries:
     attrs:
       name: "OpenClaw (Rieke)"
       provider: "!Key provider_proxy_openclaw_rieke"
-      meta_launch_url: "https://rieke.ai.ops.vyrx.de"
+      meta_launch_url: "https://rieke.ai.vyrx.de"
       group: "AI & Agents"
       open_in_new_tab: true
+

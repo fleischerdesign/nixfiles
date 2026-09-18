@@ -75,8 +75,12 @@
           agentEmoji = "🌀";
           port = 18789;
           subdomain = "philipp.ai";
+          domain = config.my.topology.domain;
           auth = true;
-          adminUsers = [ "philipp@fleischer.design" ];
+          adminUsers = [
+            "philipp@vyrx.de"
+            "philipp@fleischer.design"
+          ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
           runtimePlugins = [
@@ -85,7 +89,7 @@
           ];
           gitAuthor = {
             name = "Philipp Fleischer";
-            email = "philipp@fleischer.design";
+            email = "philipp@vyrx.de";
           };
           secrets = {
             github = "users/philipp/github_pat";
@@ -104,10 +108,12 @@
           agentEmoji = "🌸";
           port = 18791;
           subdomain = "katja.ai";
+          domain = config.my.topology.domain;
           auth = true;
           adminUsers = [
+            "katja@vyrx.de"
             "fleischerkatja74@yahoo.com"
-            "philipp@fleischer.design"
+            "philipp@vyrx.de"
           ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
@@ -117,7 +123,7 @@
           ];
           gitAuthor = {
             name = "Katja Fleischer";
-            email = "fleischerkatja74@yahoo.com";
+            email = "katja@vyrx.de";
           };
           browser.enable = true;
           webSearch.enable = true;
@@ -133,10 +139,12 @@
           agentEmoji = "✨";
           port = 18792;
           subdomain = "lilly.ai";
+          domain = config.my.topology.domain;
           auth = true;
           adminUsers = [
+            "lilly@vyrx.de"
             "lillytobei@gmail.com"
-            "philipp@fleischer.design"
+            "philipp@vyrx.de"
           ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
@@ -146,7 +154,7 @@
           ];
           gitAuthor = {
             name = "Lilly Tobei";
-            email = "lillytobei@gmail.com";
+            email = "lilly@vyrx.de";
           };
           browser.enable = true;
           webSearch.enable = true;
@@ -155,17 +163,18 @@
           googleWorkspace.enable = true;
           settings.models.providers.deepseek = commonDeepseekProvider;
         };
-
         kai = {
           enable = true;
           agentName = "Keno";
           agentEmoji = "⚡";
           port = 18793;
           subdomain = "kai.ai";
+          domain = config.my.topology.domain;
           auth = true;
           adminUsers = [
+            "kai@vyrx.de"
             "kugelblitz82@gmx.de"
-            "philipp@fleischer.design"
+            "philipp@vyrx.de"
           ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
@@ -175,7 +184,7 @@
           ];
           gitAuthor = {
             name = "Kai Fleischer";
-            email = "kugelblitz82@gmx.de";
+            email = "kai@vyrx.de";
           };
           browser.enable = true;
           webSearch.enable = true;
@@ -191,10 +200,11 @@
           agentEmoji = "🌸";
           port = 18794;
           subdomain = "rieke.ai";
+          domain = config.my.topology.domain;
           auth = true;
           adminUsers = [
             "rieke@vyrx.de"
-            "philipp@fleischer.design"
+            "philipp@vyrx.de"
           ];
           defaultModel = "deepseek/deepseek-flash";
           memorySearch = "openai";
@@ -219,19 +229,19 @@
       instances.philipp.a2a = {
         peers = {
           katja = {
-            url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://katja.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/katja";
           };
           lilly = {
-            url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://lilly.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/lilly";
           };
           kai = {
-            url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://kai.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/kai";
           };
           rieke = {
-            url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://rieke.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/rieke";
           };
         };
@@ -240,19 +250,19 @@
       instances.katja.a2a = {
         peers = {
           philipp = {
-            url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://philipp.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/philipp";
           };
           lilly = {
-            url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://lilly.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/lilly";
           };
           kai = {
-            url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://kai.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/kai";
           };
           rieke = {
-            url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://rieke.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/rieke";
           };
         };
@@ -261,19 +271,19 @@
       instances.lilly.a2a = {
         peers = {
           philipp = {
-            url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://philipp.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/philipp";
           };
           katja = {
-            url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://katja.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/katja";
           };
           kai = {
-            url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://kai.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/kai";
           };
           rieke = {
-            url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://rieke.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/rieke";
           };
         };
@@ -282,19 +292,19 @@
       instances.kai.a2a = {
         peers = {
           philipp = {
-            url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://philipp.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/philipp";
           };
           katja = {
-            url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://katja.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/katja";
           };
           lilly = {
-            url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://lilly.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/lilly";
           };
           rieke = {
-            url = "https://rieke.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://rieke.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/rieke";
           };
         };
@@ -303,28 +313,28 @@
       instances.rieke.a2a = {
         peers = {
           philipp = {
-            url = "https://philipp.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://philipp.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/philipp";
           };
           katja = {
-            url = "https://katja.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://katja.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/katja";
           };
           lilly = {
-            url = "https://lilly.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://lilly.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/lilly";
           };
           kai = {
-            url = "https://kai.ai.${config.my.features.services.caddy.baseDomain}";
+            url = "https://kai.ai.${config.my.topology.domain}";
             tokenSecret = "ai/openclaw/a2a/kai";
           };
         };
       };
     };
 
-  # Direct alias / redirect for ai.<baseDomain> -> philipp.ai.<baseDomain>
-  services.caddy.virtualHosts."ai.${config.my.features.services.caddy.baseDomain}".extraConfig = ''
-    redir https://philipp.ai.${config.my.features.services.caddy.baseDomain}{uri} permanent
+  # Direct alias / redirect for ai.vyrx.de -> philipp.ai.vyrx.de
+  services.caddy.virtualHosts."ai.${config.my.topology.domain}".extraConfig = ''
+    redir https://philipp.ai.${config.my.topology.domain}{uri} permanent
   '';
 
   my.features.services.authentik.outpost.proxy = {
@@ -343,7 +353,7 @@
   my.features.services.searxng = {
     enable = true;
     port = 8888;
-    domain = "search.${config.my.features.services.caddy.baseDomain}";
+    domain = "search.${config.my.topology.domain}";
     auth = true;
     openTailscaleFirewall = true;
     enableJsonApi = true;
