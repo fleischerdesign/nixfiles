@@ -12,9 +12,12 @@ Nix-Flake-basierte Enterprise-NixOS-Konfiguration für 5 Hosts (`cld-edge-01`, `
 | `cld-ops-01` | server | `mesh` / Public (`37.114.55.91`) | VPS (QEMU, GRUB/BIOS) | Observability Master: Grafana, Prometheus, Loki, OpenClaw AI Gateway (`:18789`), Attic |
 | `hom-srv-01` | server | `infra` (`10.10.10.10`) | Bare Metal (Intel, 4TB+1TB) | Single-NIC Gateway (Kea DHCP, Chrony NTP, Blocky DNS), Media (\*arr, Jellyfin), Home Assistant, Klipper |
 
-### Embedded Devices & Hardware-Bridges
-- `hom-rt-01` (`10.10.10.1`): AVM FRITZ!Box Uplink-Modem (reine Layer-1/2 Bridge, DHCP/DNS auf `hom-srv-01` delegiert).
-- `hom-ap-01` (`10.10.10.20`): TP-Link RE330 Wi-Fi Access Point (reine Layer-2 Bridge, SSIDs `VYRX` und `VYRX-IOT`).
+### Embedded Devices, IoT-Flotte & GitOps-Targets
+- `hom-rt-01` (`10.10.10.1`): AVM FRITZ!Box Uplink-Modem (TR-064 GitOps Target `nodTargets.hom-rt-01`).
+- `hom-ap-01` (`10.10.10.20`): TP-Link RE330 Wi-Fi Access Point (`tplinkrouterc6u` GitOps Target `nodTargets.hom-ap-01`, Unified SSID `VYRX`).
+- `hom-sw-01` .. `hom-sw-08` (`10.10.30.11` .. `10.10.30.18`): Sonoff Basic ESP8266 Smart-Switches (ESPHome GitOps Targets `nodTargets.hom-sw-01` bis `hom-sw-08`).
+- `living-room-sensor` (`10.10.30.25`): ESP32 Wohnzimmer Multi-Sensor (BME280, ESPHome GitOps Target `nodTargets.living-room-sensor`).
+- `cloudflare`: Deklarative Cloudflare DNS GitOps Engine (`nodTargets.cloudflare`).
 
 ## Identitäts- & Benutzerverwaltung (RBAC)
 
