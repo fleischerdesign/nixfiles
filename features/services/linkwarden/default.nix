@@ -73,9 +73,23 @@ in
         my.endpoints.linkwarden = {
           host = config.networking.hostName;
           port = 3010;
+          displayName = "Linkwarden";
+          group = "Productivity";
           proxy = {
             enable = true;
             inherit (cfg) domain;
+          };
+          extraDomains = [
+            "links.srv.lan.${config.my.topology.domain}"
+          ];
+          auth.oidc = {
+            enable = true;
+            clientId = "TBKFgLSIeXirGSZiuCFEXFeaUX3XaYt54FGr4VtM";
+            clientSecretEnv = "AUTHENTIK_OIDC_LINKWARDEN_SECRET";
+            secretPath = "services/apps/linkwarden_env";
+            redirectPaths = [ "/api/v1/auth/callback/authentik" ];
+            subMode = "hashed_user_id";
+            includeClaimsInIdToken = true;
           };
         };
 

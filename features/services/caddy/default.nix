@@ -83,7 +83,9 @@ in
                       }
                     '';
                 in
-                if conf.proxy.auth then
+                if conf.proxy.customExtraConfig != null then
+                  conf.proxy.customExtraConfig
+                else if conf.proxy.auth then
                   ''
                     import authentik
                     ${exemptHandlers}

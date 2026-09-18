@@ -151,8 +151,17 @@ def main():
     print(f"✓ Authentik Instance Reachable (Version: {health.get('version', 'unknown')})")
 
     # Trigger blueprint synchronization via Authentik Blueprints API
+    declared_app_slugs = set()
     for bp in blueprints:
         print(f"Reconciling blueprint '{bp['name']}'...")
+        # Collect declared application slugs for orphan detection
+        entries = bp.get("content", {}).get("entries", [])
+        for entry in entries:
+            if entry.get("model") == "authentik_core.application":
+                slug = entry.get("identifiers", {}).get("slug")
+                if slug:
+                    declared_app_slugs.add(slug)
+
         res = api_request(
             args.host,
             token,
@@ -163,7 +172,26 @@ def main():
         if isinstance(res, dict) and res.get("error"):
             print(f"  Warning: Blueprint API apply returned: {res.get('detail')}")
         else:
-            print(f"  ✓ Reconciled successfully.")
+            print("  ✓ Reconciled successfully.")
+
+    # Step 3: GitOps Orphan Application Reconciliation
+    print("\nAuditing active applications for GitOps drift...")
+    remote_apps = api_request(args.host, token, "/api/v3/core/applications/?page_size=100")
+    if isinstance(remote_apps, dict) and not remote_apps.get("error") and "results" in remote_apps:
+        # We only prune applications managed by our synthetic namespaces (vyrx proxy/oidc)
+        for app in remote_apps["results"]:
+            slug = app.get("slug")
+            group = app.get("group")
+            # Filter to apps within our standard groups or generated slugs
+            if slug and slug not in declared_app_slugs:
+                # Only prune apps that match our managed groups to avoid touching core authentik internal apps
+                if group in ["Services", "Observability", "Security", "Productivity", "Home", "Applications"]:
+                    print(f"  • Found orphaned application '{slug}' (Group: {group}). Removing via GitOps...")
+                    del_res = api_request(args.host, token, f"/api/v3/core/applications/{slug}/", method="DELETE")
+                    if isinstance(del_res, dict) and del_res.get("error"):
+                        print(f"    Warning: Could not remove application '{slug}': {del_res.get('detail')}")
+                    else:
+                        print(f"    ✓ Pruned orphaned application '{slug}'.")
 
     print("\n✓ Authentik GitOps reconciliation finished successfully.")
 

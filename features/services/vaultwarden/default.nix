@@ -75,9 +75,23 @@ in
         my.endpoints.vaultwarden = {
           host = config.networking.hostName;
           port = 8082;
+          displayName = "Vaultwarden";
+          group = "Security";
           proxy = {
             enable = true;
             inherit (cfg) domain;
+          };
+          extraDomains = [
+            "vault.${topologyDomain}"
+          ];
+          auth.oidc = {
+            enable = true;
+            clientId = "IW0W9V9cLTDaMbdtXy7lGwHi55Vakio8E2tTSvsg";
+            clientSecretEnv = "AUTHENTIK_OIDC_VAULTWARDEN_SECRET";
+            secretPath = "services/apps/vaultwarden_env";
+            redirectPaths = [ "/identity/connect/oidc-signin" ];
+            subMode = "user_username";
+            includeClaimsInIdToken = true;
           };
         };
 

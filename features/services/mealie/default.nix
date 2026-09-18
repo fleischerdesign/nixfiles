@@ -105,8 +105,20 @@ in
         port = 9025;
         protocol = "tcp";
         scope = "public";
-        auth = "none";
+        auth = "oidc";
         subdomain = "mealie";
+        oidc = {
+          enable = true;
+          clientId = "uwxlwWIofaSVKwAJTyzhzT75kUMDfoCpmlSs4M1E";
+          clientSecretEnv = "AUTHENTIK_OIDC_MEALIE_SECRET";
+          secretPath = "services/apps/mealie_oidc_secret";
+          redirectPaths = [
+            "/login"
+            "/api/auth/callback"
+          ];
+          subMode = "hashed_user_id";
+          includeClaimsInIdToken = true;
+        };
         healthProbePath = "/api/app/about";
         dashboard = {
           show = true;

@@ -130,6 +130,12 @@ in
                 credential on the WebSocket handshake (device/bootstrap tokens).
               '';
             };
+
+            customExtraConfig = lib.mkOption {
+              type = lib.types.nullOr lib.types.lines;
+              default = null;
+              description = "Custom Caddyfile directives to prepend/override standard proxy configuration";
+            };
           };
 
           directAccess = {
@@ -222,6 +228,79 @@ in
             description = "Logical group / category for SSO portals and dashboards (e.g. 'Media', '3D Printing', 'AI & Agents')";
           };
 
+          extraDomains = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+            description = "Additional domains/aliases associated with this endpoint";
+          };
+
+          auth = {
+            forward = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Protect this endpoint with Authentik forward-auth outpost";
+              };
+            };
+
+            oidc = {
+              enable = lib.mkEnableOption "Expose endpoint as Authentik OIDC Application";
+
+              clientId = lib.mkOption {
+                type = lib.types.str;
+                default = submod.config._module.args.name or "app";
+                description = "OIDC Client ID";
+              };
+
+              clientSecret = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Plaintext client secret (discouraged in favor of clientSecretEnv)";
+              };
+
+              clientSecretEnv = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Environment variable name containing the client secret (e.g. AUTHENTIK_OIDC_SECRET_...)";
+              };
+
+              secretPath = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "SOPS secret path containing the client secret (e.g. 'services/apps/paperless_oidc_secret')";
+              };
+
+              redirectPaths = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = "Relative redirect callback paths (e.g. [ '/login/generic_oauth' ])";
+              };
+
+              redirectUris = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [ ];
+                description = "Explicit redirect URIs. If empty, automatically synthesized from canonicalDomain + extraDomains + redirectPaths.";
+              };
+
+              subMode = lib.mkOption {
+                type = lib.types.enum [
+                  "hashed_user_id"
+                  "user_username"
+                  "user_email"
+                  "user_upn"
+                ];
+                default = "hashed_user_id";
+                description = "Subject mode identifier mapping";
+              };
+
+              includeClaimsInIdToken = lib.mkOption {
+                type = lib.types.bool;
+                default = true;
+                description = "Whether to include user claims directly in the ID token";
+              };
+            };
+          };
+
           # Computed Read-Only Options
           canonicalDomain = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
@@ -243,6 +322,20 @@ in
         };
 
         config = {
+          proxy.auth = lib.mkDefault submod.config.auth.forward.enable;
+
+          auth.oidc.redirectUris =
+            let
+              epConfig = submod.config;
+              allDomains =
+                (lib.optional (epConfig.canonicalDomain != null) epConfig.canonicalDomain) ++ epConfig.extraDomains;
+            in
+            lib.mkDefault (
+              lib.concatMap (
+                domain: map (path: "https://${domain}${path}") epConfig.auth.oidc.redirectPaths
+              ) allDomains
+            );
+
           canonicalDomain =
             let
               epConfig = submod.config;

@@ -45,9 +45,67 @@ let
           "none"
           "authentik"
           "proxy-pass"
+          "oidc"
         ];
         default = "none";
         description = "Authentication enforcement policy";
+      };
+
+      oidc = {
+        enable = lib.mkEnableOption "Expose endpoint as Authentik OIDC Application";
+
+        clientId = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "OIDC Client ID (defaults to service name)";
+        };
+
+        clientSecretEnv = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Environment variable name containing the client secret (e.g. AUTHENTIK_OIDC_SECRET_...)";
+        };
+
+        secretPath = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "SOPS secret path containing the client secret (e.g. 'services/apps/paperless_oidc_secret')";
+        };
+
+        redirectPaths = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Relative redirect callback paths (e.g. [ '/api/auth/callback' ])";
+        };
+
+        redirectUris = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Explicit redirect URIs";
+        };
+
+        subMode = lib.mkOption {
+          type = lib.types.enum [
+            "hashed_user_id"
+            "user_username"
+            "user_email"
+            "user_upn"
+          ];
+          default = "hashed_user_id";
+          description = "Subject mode identifier mapping";
+        };
+
+        includeClaimsInIdToken = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Whether to include user claims directly in the ID token";
+        };
+      };
+
+      extraDomains = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Additional domains/aliases associated with this endpoint";
       };
 
       subdomain = lib.mkOption {
@@ -172,6 +230,24 @@ in
               auth = ep.auth == "authentik";
               websocket = ep.websocket;
               unauthenticatedPaths = ep.unauthenticatedPaths;
+            };
+            extraDomains = ep.extraDomains;
+            auth = {
+              forward.enable = ep.auth == "authentik";
+              oidc = {
+                enable = ep.auth == "oidc" || ep.oidc.enable;
+                clientId =
+                  if ep.oidc.clientId != null then
+                    ep.oidc.clientId
+                  else
+                    (if epName == "default" || epName == "web" then svcName else "${svcName}-${epName}");
+                clientSecretEnv = ep.oidc.clientSecretEnv;
+                secretPath = ep.oidc.secretPath;
+                redirectPaths = ep.oidc.redirectPaths;
+                redirectUris = lib.mkIf (ep.oidc.redirectUris != [ ]) ep.oidc.redirectUris;
+                subMode = ep.oidc.subMode;
+                includeClaimsInIdToken = ep.oidc.includeClaimsInIdToken;
+              };
             };
             displayName = ep.dashboard.displayName;
             group = ep.dashboard.category;

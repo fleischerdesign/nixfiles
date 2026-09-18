@@ -156,13 +156,25 @@ in
             port = 28981;
             protocol = "tcp";
             scope = "internal";
-            auth = "none";
+            auth = "oidc";
             subdomain = "paperless";
+            extraDomains = [
+              "docs.srv.lan.${topologyDomain}"
+            ];
+            oidc = {
+              enable = true;
+              clientId = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
+              clientSecretEnv = "AUTHENTIK_OIDC_PAPERLESS_SECRET";
+              secretPath = "services/apps/paperless_oidc_secret";
+              redirectPaths = [ "/accounts/authentik/login/callback/" ];
+              subMode = "hashed_user_id";
+              includeClaimsInIdToken = true;
+            };
             healthProbePath = "/";
             dashboard = {
               show = true;
               displayName = "Paperless-ngx";
-              category = "Documents";
+              category = "Productivity";
               icon = "paperless";
             };
           };

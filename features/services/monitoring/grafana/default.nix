@@ -326,9 +326,24 @@ in
     my.endpoints.grafana = {
       host = config.networking.hostName;
       port = 3000;
+      displayName = "Grafana";
+      group = "Observability";
       proxy = {
         enable = true;
         subdomain = "grafana";
+      };
+      extraDomains = [
+        "grafana.ops.${topologyDomain}"
+        "mon.lan.${topologyDomain}"
+      ];
+      auth.oidc = {
+        enable = true;
+        clientId = "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k";
+        clientSecretEnv = "AUTHENTIK_OIDC_GRAFANA_SECRET";
+        secretPath = "services/monitoring/grafana_oidc_client_secret";
+        redirectPaths = [ "/login/generic_oauth" ];
+        subMode = "hashed_user_id";
+        includeClaimsInIdToken = true;
       };
     };
   };

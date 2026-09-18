@@ -106,9 +106,23 @@ in
         my.endpoints.vikunja = {
           host = config.networking.hostName;
           port = 3456;
+          displayName = "Vikunja";
+          group = "Productivity";
           proxy = {
             enable = true;
             subdomain = "vikunja";
+          };
+          extraDomains = [
+            "tasks.srv.lan.${config.my.topology.domain}"
+          ];
+          auth.oidc = {
+            enable = true;
+            clientId = cfg.ssoClientId;
+            clientSecretEnv = "AUTHENTIK_OIDC_VIKUNJA_SECRET";
+            secretPath = "services/apps/vikunja_oidc_secret";
+            redirectPaths = [ "/auth/openid/authentik" ];
+            subMode = "hashed_user_id";
+            includeClaimsInIdToken = true;
           };
         };
       }

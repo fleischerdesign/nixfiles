@@ -15,14 +15,58 @@ let
       "${config.networking.hostName}" = config;
     };
 
-  authEndpoints = lib.concatMapAttrs (
-    _: host:
-    lib.filterAttrs (_: v: v.proxy.enable && v.proxy.auth && v.canonicalDomain != null) (
-      host.config.my.endpoints or { }
-    )
-  ) flakeConfigurations;
+  # Discover and safely merge all auth and OIDC endpoints across cluster hosts (Collision Guard)
+  rawAuthEndpointsList = lib.concatMap (
+    hostName:
+    let
+      hostConfig = flakeConfigurations.${hostName}.config;
+      eps = lib.filterAttrs (_: v: v.proxy.enable && v.proxy.auth && v.canonicalDomain != null) (
+        hostConfig.my.endpoints or { }
+      );
+    in
+    lib.mapAttrsToList (name: ep: { inherit hostName name ep; }) eps
+  ) (builtins.attrNames flakeConfigurations);
+
+  rawOidcEndpointsList = lib.concatMap (
+    hostName:
+    let
+      hostConfig = flakeConfigurations.${hostName}.config;
+      eps = lib.filterAttrs (
+        _: v: v.auth.oidc.enable && (v.canonicalDomain != null || v.auth.oidc.redirectUris != [ ])
+      ) (hostConfig.my.endpoints or { });
+    in
+    lib.mapAttrsToList (name: ep: { inherit hostName name ep; }) eps
+  ) (builtins.attrNames flakeConfigurations);
+
+  # Collision Guard: Assert that no two hosts declare the same OIDC endpoint name
+  duplicateOidcCheck =
+    let
+      names = map (item: item.name) rawOidcEndpointsList;
+      duplicates = lib.filter (name: (lib.count (n: n == name) names) > 1) (lib.unique names);
+    in
+    if duplicates != [ ] then
+      throw "Authentik OIDC compiler error: Duplicate OIDC endpoint name(s) across cluster: ${lib.concatStringsSep ", " duplicates}"
+    else
+      true;
+
+  oidcEndpoints =
+    assert duplicateOidcCheck;
+    builtins.listToAttrs (
+      map (item: {
+        inherit (item) name;
+        value = item.ep;
+      }) rawOidcEndpointsList
+    );
+
+  authEndpoints = builtins.listToAttrs (
+    map (item: {
+      inherit (item) name;
+      value = item.ep;
+    }) rawAuthEndpointsList
+  );
 
   sortedEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames authEndpoints);
+  sortedOidcEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames oidcEndpoints);
 
   # Declarative model-driven blueprint compiling all auth endpoints into Authentik ProxyProviders and Applications
   proxyBlueprint = {
@@ -116,15 +160,78 @@ let
       ];
   };
 
-  generatedProxyJson = pkgs.writeText "proxy-apps-generated.json" (builtins.toJSON proxyBlueprint);
+  # Declarative model-driven blueprint compiling all OIDC endpoints into Authentik OAuth2Providers and Applications
+  oidcBlueprint = {
+    version = 1;
+    metadata = {
+      name = "vyrx-apps-oidc";
+    };
+    entries = lib.concatMap (
+      name:
+      let
+        ep = oidcEndpoints.${name};
+        displayName = if ep.displayName != null then ep.displayName else name;
+        group = if ep.group != null then ep.group else "Applications";
+        safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
+        secretAttr =
+          if ep.auth.oidc.clientSecretEnv != null then
+            "!Env ${ep.auth.oidc.clientSecretEnv}"
+          else if ep.auth.oidc.clientSecret != null then
+            ep.auth.oidc.clientSecret
+          else
+            "!Env AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
+        launchUrl =
+          if ep.publicUrl != null then
+            ep.publicUrl
+          else if ep.canonicalDomain != null then
+            "https://${ep.canonicalDomain}"
+          else
+            null;
+      in
+      [
+        {
+          model = "authentik_providers_oauth2.oauth2provider";
+          id = "provider_${safeId}";
+          identifiers = {
+            name = "Provider for ${displayName}";
+          };
+          attrs = {
+            client_id = ep.auth.oidc.clientId;
+            client_secret = secretAttr;
+            authorization_flow = "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
+            redirect_uris = ep.auth.oidc.redirectUris;
+            sub_mode = ep.auth.oidc.subMode;
+            include_claims_in_id_token = ep.auth.oidc.includeClaimsInIdToken;
+          };
+        }
+        {
+          model = "authentik_core.application";
+          identifiers = {
+            slug = name;
+          };
+          attrs = {
+            name = displayName;
+            provider = "!Key provider_${safeId}";
+            meta_launch_url = launchUrl;
+            inherit group;
+            open_in_new_tab = true;
+          };
+        }
+      ]
+    ) sortedOidcEndpointNames;
+  };
 
-  # Merged blueprints directory containing static base blueprints and generated proxy applications
+  generatedProxyJson = pkgs.writeText "proxy-apps-generated.json" (builtins.toJSON proxyBlueprint);
+  generatedOidcJson = pkgs.writeText "oidc-apps-generated.json" (builtins.toJSON oidcBlueprint);
+
+  # Merged blueprints directory containing static base blueprints and generated applications
   effectiveBlueprintsDir = pkgs.runCommandLocal "authentik-blueprints" { } ''
     mkdir -p "$out"
     cp -r ${./blueprints}/* "$out/"
     chmod -R u+w "$out"
     mkdir -p "$out/03-apps"
     cp ${generatedProxyJson} "$out/03-apps/proxy-apps-generated.json"
+    cp ${generatedOidcJson} "$out/03-apps/oidc-apps-generated.json"
   '';
 
   pythonEnv = pkgs.python3.withPackages (ps: [
@@ -183,7 +290,10 @@ in
         Group = "authentik";
         WorkingDirectory = "/var/lib/authentik";
         # Environment
-        EnvironmentFile = config.sops.secrets."services/authentik/core_env".path;
+        EnvironmentFile = [
+          config.sops.secrets."services/authentik/core_env".path
+          config.sops.templates."authentik_secrets.env".path
+        ];
         Environment = [
           "AUTHENTIK_REDIS__HOST=127.0.0.1"
           "AUTHENTIK_REDIS__PORT=6379"
@@ -201,6 +311,7 @@ in
         ];
         Restart = "always";
       };
+      restartTriggers = [ cfg.blueprintsDir ];
     };
 
     # 3. Authentik Worker Service
@@ -217,7 +328,10 @@ in
         User = "authentik";
         Group = "authentik";
         WorkingDirectory = "/var/lib/authentik";
-        EnvironmentFile = config.sops.secrets."services/authentik/core_env".path;
+        EnvironmentFile = [
+          config.sops.secrets."services/authentik/core_env".path
+          config.sops.templates."authentik_secrets.env".path
+        ];
         Environment = [
           "AUTHENTIK_REDIS__HOST=127.0.0.1"
           "AUTHENTIK_REDIS__PORT=6379"
@@ -228,6 +342,7 @@ in
         ];
         Restart = "always";
       };
+      restartTriggers = [ cfg.blueprintsDir ];
     };
 
     # 4. Database Setup (Ensure DB exists)
@@ -255,9 +370,37 @@ in
       };
     };
 
-    # 6. Secrets
-    sops.secrets."services/authentik/core_env" = {
+    # 6. Secrets (Dynamic OIDC Secret Registration - Open-Closed Principle)
+    sops.secrets = lib.mkMerge [
+      {
+        "services/authentik/core_env" = {
+          owner = "authentik";
+        };
+      }
+      (lib.listToAttrs (
+        map (ep: {
+          name = ep.auth.oidc.secretPath;
+          value = { };
+        }) (lib.filter (ep: ep.auth.oidc.secretPath != null) (builtins.attrValues oidcEndpoints))
+      ))
+    ];
+
+    sops.templates."authentik_secrets.env" = {
       owner = "authentik";
+      content = lib.concatStringsSep "\n" (
+        lib.mapAttrsToList (
+          name: ep:
+          let
+            safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
+            envVar =
+              if ep.auth.oidc.clientSecretEnv != null then
+                ep.auth.oidc.clientSecretEnv
+              else
+                "AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
+          in
+          "${envVar}=${config.sops.placeholder.${ep.auth.oidc.secretPath}}"
+        ) (lib.filterAttrs (_: ep: ep.auth.oidc.secretPath != null) oidcEndpoints)
+      );
     };
   };
 }
