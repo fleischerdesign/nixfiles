@@ -48,6 +48,7 @@ let
   ) hosts;
 
   embeddedHosts = lib.filterAttrs (_: h: (h.hostType or "") == "embedded" && h.ipv4 != null) hosts;
+  iotDevices = lib.filterAttrs (_: d: d.ipv4 != null) (config.my.topology.devices or { });
 
   blackboxAddrForHost =
     hostName: if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.tailscaleIp}:9115";
@@ -263,6 +264,29 @@ in
                   group = "Embedded";
                 };
               }) embeddedHosts;
+              relabel_configs = blackboxRelabel "127.0.0.1:9115";
+            }
+          ]
+
+        ++
+
+          # Blackbox: ICMP ping for IoT fleet (hom-sw-01..08, living-room-sensor)
+          lib.optionals (iotDevices != { }) [
+            {
+              job_name = "blackbox-iot";
+              scrape_interval = "30s";
+              metrics_path = "/probe";
+              params.module = [ "icmp" ];
+              static_configs = lib.mapAttrsToList (name: dev: {
+                targets = [ dev.ipv4 ];
+                labels = {
+                  service = "${name}-icmp";
+                  host = name;
+                  probe_type = "icmp";
+                  group = "IoT";
+                  description = dev.description or name;
+                };
+              }) iotDevices;
               relabel_configs = blackboxRelabel "127.0.0.1:9115";
             }
           ];

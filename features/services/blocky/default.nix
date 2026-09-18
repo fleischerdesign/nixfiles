@@ -41,25 +41,35 @@ in
             # Subdomains werden automatisch mit aufgelöst (Blocky-Feature)
             # Heimnetz-Hosts: lokale IP (via LAN oder Subnet-Router)
             # Externe Cloud-Hosts: WireGuard-Overlay IP (IPv4 & RFC 4193 ULA IPv6)
+            # IoT-Geräte: statische IP aus my.topology.devices
             customDNS = {
-              mapping = lib.mapAttrs' (_name: host: {
-                name = host.domain;
-                value =
-                  let
-                    primaryIp =
-                      if
-                        host.localIp != null
-                        && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
-                      then
-                        host.localIp
-                      else if host.tailscaleIp != null then
-                        host.tailscaleIp
-                      else
-                        host.localIp;
-                    ipv6 = host.wireguardIpv6 or null;
-                  in
-                  if ipv6 != null then "${primaryIp},${ipv6}" else primaryIp;
-              }) config.my.features.system.networking.topology.hosts;
+              mapping =
+                (lib.mapAttrs' (_name: host: {
+                  name = host.domain;
+                  value =
+                    let
+                      primaryIp =
+                        if
+                          host.localIp != null
+                          && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
+                        then
+                          host.localIp
+                        else if host.tailscaleIp != null then
+                          host.tailscaleIp
+                        else
+                          host.localIp;
+                      ipv6 = host.wireguardIpv6 or null;
+                    in
+                    if ipv6 != null then "${primaryIp},${ipv6}" else primaryIp;
+                }) (lib.filterAttrs (_: h: h.domain != null) config.my.features.system.networking.topology.hosts))
+                // (lib.mapAttrs' (devName: dev: {
+                  name =
+                    if dev.domain != null then
+                      dev.domain
+                    else
+                      "${devName}.lan.${config.my.topology.domain or "vyrx.de"}";
+                  value = dev.ipv4;
+                }) (lib.filterAttrs (_: d: d.ipv4 != null) (config.my.topology.devices or { })));
             };
 
             # Ad-blocking configuration

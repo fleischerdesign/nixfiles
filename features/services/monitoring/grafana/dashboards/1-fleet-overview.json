@@ -86,12 +86,12 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "probe_success{job=\"blackbox-embedded\"}",
-          "legendFormat": "{{host}} (ICMP)",
+          "expr": "probe_success{job=~\"blackbox-embedded|blackbox-iot\"}",
+          "legendFormat": "{{host}}",
           "refId": "A"
         }
       ],
-      "title": "Embedded Gateways & APs",
+      "title": "Embedded & IoT Devices (ICMP)",
       "type": "stat"
     },
     {

@@ -147,6 +147,11 @@ let
         default = "";
         description = "Human-readable description of device function";
       };
+      domain = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Optional canonical FQDN for local DNS resolution";
+      };
     };
   };
 in
