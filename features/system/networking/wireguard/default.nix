@@ -104,7 +104,7 @@ in
 
     privateKeySecretName = lib.mkOption {
       type = lib.types.str;
-      default = "infra/wireguard_private_key";
+      default = "infra/wireguard/${config.networking.hostName}_private_key";
       description = "SOPS secret identifier containing the WireGuard private key";
     };
   };

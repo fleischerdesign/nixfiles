@@ -15,13 +15,15 @@
       };
       kernel.enable = lib.mkDefault true;
       fish-shell.enable = lib.mkDefault true;
-      networking.topology.enable = lib.mkDefault true;
+      networking = {
+        topology.enable = lib.mkDefault true;
+        wireguard.enable = lib.mkDefault true;
+        ssh.enable = lib.mkDefault true;
+      };
       security.enable = lib.mkDefault true;
       theme.enable = lib.mkDefault true;
     };
   };
-
-  my.features.system.networking.ssh.enable = lib.mkDefault true;
 
   # Credentials shared across hosts (consumed by pi/agents)
   sops.secrets."ai/deepseek_api_key" = lib.mkDefault { };

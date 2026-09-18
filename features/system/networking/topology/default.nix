@@ -252,6 +252,7 @@ in
         gateway = "173.249.22.1";
         wireguardIpv4 = "10.10.100.1";
         wireguardIpv6 = "fd10:1000:100::1";
+        wireguardPublicKey = "xaW5sos7b7wPXsjl4U6UqsaHl9l+Y1F013DDJ4kioEg=";
         wireguardRelay = true;
         hostType = "server";
         domain = "edge.vyrx.de";
@@ -263,6 +264,7 @@ in
         gateway = "37.114.55.1";
         wireguardIpv4 = "10.10.100.2";
         wireguardIpv6 = "fd10:1000:100::2";
+        wireguardPublicKey = "DBU0HRrBeIXZFokauPXfsYA3i7feCov154VbkAdwlTM=";
         wireguardRelay = true;
         hostType = "server";
         domain = "ops.vyrx.de";
@@ -274,6 +276,7 @@ in
         gateway = "10.10.10.1";
         wireguardIpv4 = "10.10.100.10";
         wireguardIpv6 = "fd10:1000:100::10";
+        wireguardPublicKey = "j80spw+2+Ojz51aKAytPdCZwFOc64yNOR05rAcXOESE=";
         hostType = "server";
         domain = "srv.lan.vyrx.de";
       };
@@ -284,6 +287,7 @@ in
         gateway = "10.10.10.10";
         wireguardIpv4 = "10.10.100.20";
         wireguardIpv6 = "fd10:1000:100::20";
+        wireguardPublicKey = "y9CMim/6IWIKdIztKJQh5BR7R2ygjYwCjjEvgJQSLT0=";
         hostType = "workstation";
         domain = "wrk.lan.vyrx.de";
       };
@@ -294,6 +298,7 @@ in
         gateway = null;
         wireguardIpv4 = "10.10.100.30";
         wireguardIpv6 = "fd10:1000:100::30";
+        wireguardPublicKey = "J+PERS3HY0OcfXKk4qFnJWtgLy4afh3cXX8fkuKelx0=";
         hostType = "client";
         domain = "nb.lan.vyrx.de";
       };
