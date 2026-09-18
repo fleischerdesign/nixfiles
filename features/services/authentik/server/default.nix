@@ -8,6 +8,14 @@
 let
   cfg = config.my.features.services.authentik.server;
   authentikPackage = pkgs.authentik;
+
+  pythonEnv = pkgs.python3.withPackages (ps: [
+    ps.pyyaml
+  ]);
+
+  syncScript = pkgs.writeShellScriptBin "authentik-sync" ''
+    exec ${pythonEnv}/bin/python3 ${./sync.py} --blueprints-dir ${./blueprints} "$@"
+  '';
 in
 {
   options.my.features.services.authentik.server = {
@@ -16,6 +24,12 @@ in
       type = lib.types.str;
       default = "auth.vyrx.de";
       description = "FQDN of the Authentik identity server.";
+    };
+    package = lib.mkOption {
+      type = lib.types.package;
+      default = syncScript;
+      readOnly = true;
+      description = "The compiled authentik-sync reconciliation package";
     };
   };
 

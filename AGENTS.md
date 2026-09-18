@@ -17,6 +17,7 @@ Nix-Flake-basierte Enterprise-NixOS-Konfiguration für 5 Hosts (`cld-edge-01`, `
 - `hom-ap-01` (`10.10.10.20`): TP-Link RE330 Wi-Fi Access Point (`tplinkrouterc6u` GitOps Target `nodTargets.hom-ap-01`, Unified SSID `VYRX`).
 - `hom-rly-01` .. `hom-rly-08` (`10.10.30.11` .. `10.10.30.18`): Sonoff Basic ESP8266 Inline-Relais (ESPHome GitOps Targets `nodTargets.hom-rly-01` bis `hom-rly-08`).
 - `cloudflare`: Deklarative Cloudflare DNS GitOps Engine (`nodTargets.cloudflare`).
+- `authentik`: Deklarative Authentik Blueprints & RBAC GitOps Engine (`nodTargets.authentik`).
 
 ## Identitäts- & Benutzerverwaltung (RBAC)
 

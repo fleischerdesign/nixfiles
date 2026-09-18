@@ -270,6 +270,19 @@
       };
 
       nodTargets = {
+        authentik = {
+          targetHost = "auth.vyrx.de";
+          role = "identity";
+          targetType = "agentless";
+          tags = [
+            "auth"
+            "identity"
+            "rbac"
+            "gitops"
+          ];
+          package = self.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.package;
+        };
+
         cloudflare = {
           targetHost = "api.cloudflare.com";
           role = "cloud";
