@@ -50,28 +50,32 @@ def load_blueprints(blueprints_dir):
 
     for root, _, files in sorted(os.walk(blueprints_dir)):
         for f in sorted(files):
-            if f.endswith(".yaml") or f.endswith(".yml"):
+            if f.endswith(".yaml") or f.endswith(".yml") or f.endswith(".json"):
                 path = os.path.join(root, f)
                 rel_path = os.path.relpath(path, blueprints_dir)
                 try:
-                    with open(path, "r", encoding="utf-8") as yf:
-                        docs = list(yaml.safe_load_all(yf))
-                        for idx, doc in enumerate(docs):
-                            if not isinstance(doc, dict):
-                                continue
-                            version = doc.get("version", 1)
-                            meta = doc.get("metadata", {})
-                            name = meta.get("name", rel_path)
-                            entries = doc.get("entries", [])
-                            discovered.append({
-                                "path": path,
-                                "rel_path": rel_path,
-                                "doc_index": idx,
-                                "name": name,
-                                "version": version,
-                                "entries_count": len(entries),
-                                "content": doc,
-                            })
+                    if f.endswith(".json"):
+                        with open(path, "r", encoding="utf-8") as jf:
+                            docs = [json.load(jf)]
+                    else:
+                        with open(path, "r", encoding="utf-8") as yf:
+                            docs = list(yaml.safe_load_all(yf))
+                    for idx, doc in enumerate(docs):
+                        if not isinstance(doc, dict):
+                            continue
+                        version = doc.get("version", 1)
+                        meta = doc.get("metadata", {})
+                        name = meta.get("name", rel_path)
+                        entries = doc.get("entries", [])
+                        discovered.append({
+                            "path": path,
+                            "rel_path": rel_path,
+                            "doc_index": idx,
+                            "name": name,
+                            "version": version,
+                            "entries_count": len(entries),
+                            "content": doc,
+                        })
                 except Exception as e:
                     sys.exit(f"Validation Error in blueprint {rel_path}: {e}")
 

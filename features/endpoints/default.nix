@@ -198,7 +198,8 @@ in
 
               port = lib.mkOption {
                 type = lib.types.int;
-                description = "Port to scrape Prometheus metrics from (may differ from service port)";
+                default = submod.config.port;
+                description = "Port to scrape Prometheus metrics from (defaults to service port)";
               };
 
               path = lib.mkOption {
@@ -207,6 +208,18 @@ in
                 description = "Metrics endpoint path";
               };
             };
+          };
+
+          displayName = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Human-readable display name for SSO portals and dashboards (e.g. 'Mainsail (Klipper)')";
+          };
+
+          group = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Logical group / category for SSO portals and dashboards (e.g. 'Media', '3D Printing', 'AI & Agents')";
           };
 
           # Computed Read-Only Options

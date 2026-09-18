@@ -208,6 +208,9 @@ in
         inherit (cfg) auth;
       };
 
+      displayName = "SearXNG Search";
+      group = "Observability & Tools";
+
       directAccess = {
         enable = cfg.openTailscaleFirewall;
         protocol = "tcp";

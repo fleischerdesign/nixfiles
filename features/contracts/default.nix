@@ -173,6 +173,8 @@ in
               websocket = ep.websocket;
               unauthenticatedPaths = ep.unauthenticatedPaths;
             };
+            displayName = ep.dashboard.displayName;
+            group = ep.dashboard.category;
             directAccess = {
               enable = ep.scope == "mesh" || ep.scope == "public";
               protocol = ep.protocol;

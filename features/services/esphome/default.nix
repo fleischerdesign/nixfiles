@@ -59,6 +59,8 @@ in
     my.endpoints.esphome = {
       host = config.networking.hostName;
       port = 6052;
+      displayName = "ESPHome";
+      group = "Infrastructure";
     };
 
     my.features.services.esphome.devicePackages = lib.mapAttrs (

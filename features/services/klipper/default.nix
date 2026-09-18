@@ -176,25 +176,31 @@ in
         };
       })
     ];
-    # 5. Registry entries for monitoring (Caddy is managed directly above)
+    # 5. Registry entries for monitoring and central service catalog
     my.endpoints.mainsail = {
       host = config.networking.hostName;
       port = 7125;
-      proxy.enable = false;
+      displayName = "Mainsail";
+      group = "3D Printing";
+      proxy.enable = ep.mainsail.proxy.subdomain != null;
       directAccess.enable = true;
     };
 
     my.endpoints.moonraker = {
       host = config.networking.hostName;
       port = 7125;
-      proxy.enable = false;
+      displayName = "Moonraker";
+      group = "3D Printing";
+      proxy.enable = ep.moonraker.proxy.subdomain != null;
       directAccess.enable = true;
     };
 
     my.endpoints.mainsail-cam = {
       host = config.networking.hostName;
       port = 8081;
-      proxy.enable = false;
+      displayName = "Klipper Webcam";
+      group = "3D Printing";
+      proxy.enable = ep.mainsail-cam.proxy.subdomain != null;
     };
   };
 }

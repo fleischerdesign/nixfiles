@@ -1040,6 +1040,9 @@ in
                 ];
                 machineClientsBypassAuth = true;
               };
+              displayName =
+                if inst.agentName != null then "OpenClaw (${inst.agentName})" else "OpenClaw (${name})";
+              group = "AI & Agents";
               monitoring = {
                 http.enable = false;
                 tcp = {
