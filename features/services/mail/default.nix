@@ -285,14 +285,11 @@ in
           '';
         };
 
-        services.postgresql = {
-          ensureDatabases = [ "stalwart" ];
-          ensureUsers = [
-            {
-              name = "stalwart";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.mail.postgresql.main = {
+          database = "stalwart";
+          user = "stalwart";
+          ensureDBOwnership = true;
         };
 
         my.contracts.provides.mail = {

@@ -72,8 +72,8 @@ nixos-rebuild dry-run --flake .#<host>
 │   ├── packages.nix        # Packages (server-gated: desktop-only = 22 extra packages + Ghostty)
 │   ├── opencode.nix        # programs.opencode + home.file symlinks (server-gated)
 │   └── fish.nix            # Fish-Shell, Aliase, tpl-Funktion (templates bootstrapper)
+├── contracts/                  # Modular Service Contracts: endpoints, storage, backup, telemetry, dependencies
 ├── features/
-│   ├── contracts/                  # my.contracts.provides — Entkopplung von Services, Endpoints, Storage
 │   ├── desktop/{gnome,niri}/       # Desktop Environments (mutual exclusion via assertions)
 │   ├── dev/{android,codium,containers,git,nixvim,openclaw,opencode,pi}
 │   ├── media/{gaming,spotify}/
@@ -84,7 +84,7 @@ nixos-rebuild dry-run --flake .#<host>
 │   ├── helper.nix          # Compatibility-Shim → default.nix
 │   ├── features.nix        # { requires } — Feature-Dependency-Manager (mkDefault + assertion)
 │   └── core/
-│       ├── system-builder.nix  # mkSystem: auto-discovers features + users, baut nixosSystem
+│       ├── system-builder.nix  # mkSystem: auto-discovers features, contracts + users, baut nixosSystem
 │       └── module-loader.nix   # findModules: rekursiv alle default.nix unter einem Pfad
 ├── secrets/                # SOPS-verschlüsselte secrets.yaml
 ├── .sops.yaml              # Age-Keys für cld-edge-01, cld-ops-01, hom-srv-01, hom-wrk-01, mob-nb-01, philipp, ci
@@ -107,11 +107,12 @@ base.nix                  # Alle Hosts (common, bootloader, kernel, fish-shell, 
 
 ### Feature-System & Service Contracts
 
-- **Auto-Discovery**: `lib/core/module-loader.nix` scanned `features/` rekursiv nach `default.nix`. Jedes Feature wird in **jeden** Host geladen.
+- **Auto-Discovery**: `lib/core/module-loader.nix` scanned `features/` und `contracts/` rekursiv nach `default.nix`. Jedes Feature und jeder Contract wird in **jeden** Host geladen.
 - **Gating**: Feature-Konfiguration steht hinter `lib.mkIf cfg.enable`. Ein Feature ist geladen, aber nur aktiv wenn `enable = true`.
-- **Service Contracts (`my.contracts.provides.<name>`)**:
-  Services deklarieren rein passiv und host-agnostisch ihre Schnittstellen (`endpoints`) und Persistenzbedarfe (`storage.stateDirs`, `storage.dataDirs`, `storage.cacheDirs`).
-  Projektionen nach Caddy-vHosts, Firewall-Rules und Prometheus-Scrapes erfolgen automatisch und strikt entkoppelt über `features/contracts/default.nix`.
+- **Modular Service Contracts**:
+  - `my.contracts.provides.<name>`: Services deklarieren rein passiv und host-agnostisch ihre Schnittstellen (`endpoints`), Persistenzbedarfe (`storage`), Sicherungsstrategien (`backup`) und Observability (`telemetry`).
+  - `my.contracts.consumes.<name>`: Services deklarieren nach dem Inversion-of-Control-Prinzip ihren strukturellen Bedarf (z. B. PostgreSQL-Datenbanken & User, Redis), während die Provider-Engines die Ressourcen deklarativ und entkoppelt bereitstellen.
+  - Projektionen nach Caddy-vHosts, Authentik-Blueprints (Proxy & OIDC), Firewall-Rules, Restic-Backups und Prometheus-Scrapes erfolgen automatisch und strikt entkoppelt über die Contracts.
 - **Single-NIC Gateway & RFC 1812**:
   `features/system/networking/gateway` bündelt Kea DHCPv4, Chrony NTP und IPv4 Forwarding/NAT auf `hom-srv-01`, gespeist aus `my.topology`.
 

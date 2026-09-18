@@ -62,15 +62,11 @@ in
           "IP_GEOLOCATION_DB=/var/lib/GeoIP/GeoLite2-City.mmdb"
         ];
 
-        # Ensure Postgres DB exists in the central instance
-        services.postgresql = {
-          ensureDatabases = [ "plausible" ];
-          ensureUsers = [
-            {
-              name = "plausible";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.plausible.postgresql.main = {
+          database = "plausible";
+          user = "plausible";
+          ensureDBOwnership = true;
         };
 
         # Service Contract for Caddy & Storage

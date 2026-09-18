@@ -58,15 +58,11 @@ in
           environmentFile = config.sops.secrets."services/apps/linkwarden_env".path;
         };
 
-        # Ensure Postgres DB exists
-        services.postgresql = {
-          ensureDatabases = [ "linkwarden" ];
-          ensureUsers = [
-            {
-              name = "linkwarden";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.linkwarden.postgresql.main = {
+          database = "linkwarden";
+          user = "linkwarden";
+          ensureDBOwnership = true;
         };
 
         # Service Contract for Caddy, Firewall & OIDC

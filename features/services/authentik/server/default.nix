@@ -354,15 +354,11 @@ in
       restartTriggers = [ cfg.blueprintsDir ];
     };
 
-    # 4. Database Setup (Ensure DB exists)
-    services.postgresql = {
-      ensureDatabases = [ "authentik" ];
-      ensureUsers = [
-        {
-          name = "authentik";
-          ensureDBOwnership = true;
-        }
-      ];
+    # 4. Inversion of Control: Declare PostgreSQL requirement
+    my.contracts.consumes.authentik.postgresql.main = {
+      database = "authentik";
+      user = "authentik";
+      ensureDBOwnership = true;
     };
 
     # 5. Reverse Proxy & Monitoring via Service Contract

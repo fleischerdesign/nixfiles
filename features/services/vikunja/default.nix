@@ -93,14 +93,11 @@ in
           };
         };
 
-        services.postgresql = {
-          ensureDatabases = [ "vikunja" ];
-          ensureUsers = [
-            {
-              name = "vikunja";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.vikunja.postgresql.main = {
+          database = "vikunja";
+          user = "vikunja";
+          ensureDBOwnership = true;
         };
 
         my.contracts.provides.vikunja = {

@@ -111,15 +111,11 @@ in
           };
         };
 
-        # Ensure PostgreSQL database and user exist for Paperless
-        services.postgresql = {
-          ensureDatabases = [ "paperless" ];
-          ensureUsers = [
-            {
-              name = "paperless";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.paperless.postgresql.main = {
+          database = "paperless";
+          user = "paperless";
+          ensureDBOwnership = true;
         };
 
         # Systemd overrides

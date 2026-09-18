@@ -96,14 +96,11 @@ in
         };
         users.groups.salus = { };
 
-        services.postgresql = {
-          ensureDatabases = [ "salus" ];
-          ensureUsers = [
-            {
-              name = "salus";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.salus.postgresql.main = {
+          database = "salus";
+          user = "salus";
+          ensureDBOwnership = true;
         };
 
         my.contracts.provides.salus = {
