@@ -16,7 +16,6 @@ Nix-Flake-basierte Enterprise-NixOS-Konfiguration für 5 Hosts (`cld-edge-01`, `
 - `hom-rt-01` (`10.10.10.1`): AVM FRITZ!Box Uplink-Modem (TR-064 GitOps Target `nodTargets.hom-rt-01`).
 - `hom-ap-01` (`10.10.10.20`): TP-Link RE330 Wi-Fi Access Point (`tplinkrouterc6u` GitOps Target `nodTargets.hom-ap-01`, Unified SSID `VYRX`).
 - `hom-rly-01` .. `hom-rly-08` (`10.10.30.11` .. `10.10.30.18`): Sonoff Basic ESP8266 Inline-Relais (ESPHome GitOps Targets `nodTargets.hom-rly-01` bis `hom-rly-08`).
-- `hom-sns-01` (`10.10.30.25`): ESP32 Wohnzimmer Multi-Sensor (BME280, ESPHome GitOps Target `nodTargets.hom-sns-01`).
 - `cloudflare`: Deklarative Cloudflare DNS GitOps Engine (`nodTargets.cloudflare`).
 
 ## Identitäts- & Benutzerverwaltung (RBAC)

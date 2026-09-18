@@ -321,17 +321,6 @@ in
 
     # Default IoT devices conforming to RFC 1178 Enterprise Taxonomy
     my.topology.devices = lib.mkDefault {
-      # Environmental Multi-Sensor
-      hom-sns-01 = {
-        zone = "iot";
-        ipv4 = "10.10.30.25";
-        mac = "24:6F:28:A1:B2:C3";
-        platform = "esp32";
-        board = "esp32dev";
-        description = "Wohnzimmer Multi-Sensor";
-        domain = "sns-01.iot.vyrx.de";
-      };
-
       # Enterprise Relais-Aktoren (Sonoff Basic ESP8266 Inline-Relais)
       hom-rly-01 = {
         zone = "iot";
