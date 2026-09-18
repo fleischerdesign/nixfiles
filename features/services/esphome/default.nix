@@ -63,13 +63,11 @@ in
     };
 
     my.features.services.esphome.devicePackages =
-      (lib.optionalAttrs (devices ? living-room-sensor) {
-        living-room-sensor =
-          mkDevicePackage "living-room-sensor" devices.living-room-sensor
-            livingRoom.deviceConfigYaml;
+      (lib.optionalAttrs (devices ? hom-sns-01) {
+        hom-sns-01 = mkDevicePackage "hom-sns-01" devices.hom-sns-01 livingRoom.deviceConfigYaml;
       })
       // (lib.mapAttrs (
-        swName: swSpec: mkDevicePackage swName devices.${swName} swSpec.deviceConfigYaml
-      ) (lib.filterAttrs (swName: _: devices ? ${swName}) switches));
+        rlyName: rlySpec: mkDevicePackage rlyName devices.${rlyName} rlySpec.deviceConfigYaml
+      ) (lib.filterAttrs (rlyName: _: devices ? ${rlyName}) switches));
   };
 }

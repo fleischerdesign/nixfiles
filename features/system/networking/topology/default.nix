@@ -321,84 +321,94 @@ in
 
     # Default IoT devices conforming to RFC 1178 Enterprise Taxonomy
     my.topology.devices = lib.mkDefault {
-      living-room-sensor = {
+      # Environmental Multi-Sensor
+      hom-sns-01 = {
         zone = "iot";
         ipv4 = "10.10.30.25";
         mac = "24:6F:28:A1:B2:C3";
         platform = "esp32";
         board = "esp32dev";
-        description = "Living Room Climate & Multi-Sensor";
+        description = "Wohnzimmer Multi-Sensor";
+        domain = "sns-01.iot.vyrx.de";
       };
 
-      # Enterprise Smart Switches (Sonoff Basic ESP8266)
-      hom-sw-01 = {
+      # Enterprise Relais-Aktoren (Sonoff Basic ESP8266 Inline-Relais)
+      hom-rly-01 = {
         zone = "iot";
         ipv4 = "10.10.30.11";
         mac = "8c:ce:4e:0c:d7:98";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Arbeitszimmer Schalter";
+        description = "Arbeitszimmer Relais";
+        domain = "rly-01.iot.vyrx.de";
       };
 
-      hom-sw-02 = {
+      hom-rly-02 = {
         zone = "iot";
         ipv4 = "10.10.30.12";
         mac = "70:03:9f:64:8e:b0";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Bad Schalter";
+        description = "Bad Relais";
+        domain = "rly-02.iot.vyrx.de";
       };
 
-      hom-sw-03 = {
+      hom-rly-03 = {
         zone = "iot";
         ipv4 = "10.10.30.13";
         mac = "e8:68:e7:44:b3:a1";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Ender 3D-Drucker Schalter";
+        description = "Ender 3D-Drucker Relais";
+        domain = "rly-03.iot.vyrx.de";
       };
 
-      hom-sw-04 = {
+      hom-rly-04 = {
         zone = "iot";
         ipv4 = "10.10.30.14";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Fernseher Schalter";
+        description = "Fernseher Relais";
+        domain = "rly-04.iot.vyrx.de";
       };
 
-      hom-sw-05 = {
+      hom-rly-05 = {
         zone = "iot";
         ipv4 = "10.10.30.15";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Flur Schalter";
+        description = "Flur Relais";
+        domain = "rly-05.iot.vyrx.de";
       };
 
-      hom-sw-06 = {
+      hom-rly-06 = {
         zone = "iot";
         ipv4 = "10.10.30.16";
         mac = "8c:ce:4e:0c:e1:70";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Küche Schalter";
+        description = "Küche Relais";
+        domain = "rly-06.iot.vyrx.de";
       };
 
-      hom-sw-07 = {
+      hom-rly-07 = {
         zone = "iot";
         ipv4 = "10.10.30.17";
         mac = "8c:ce:4e:0c:da:e5";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Schlafzimmer Schalter";
+        description = "Schlafzimmer Relais";
+        domain = "rly-07.iot.vyrx.de";
       };
 
-      hom-sw-08 = {
+      hom-rly-08 = {
         zone = "iot";
         ipv4 = "10.10.30.18";
         mac = "8c:ce:4e:0c:de:cb";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sofa Schalter";
+        description = "Sofa Relais";
+        domain = "rly-08.iot.vyrx.de";
       };
     };
 

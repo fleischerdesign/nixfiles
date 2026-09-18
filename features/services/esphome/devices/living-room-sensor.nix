@@ -8,7 +8,7 @@
 let
   deviceConfigYaml = pkgs.writeText "living-room-sensor.yaml" ''
     esphome:
-      name: living-room-sensor
+      name: hom-sns-01
       friendly_name: "Wohnzimmer Multi-Sensor"
 
     esp32:
