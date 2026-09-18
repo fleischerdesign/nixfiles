@@ -327,7 +327,7 @@ in
         mac = "8c:ce:4e:0c:d7:98";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sonoff Basic Arbeitszimmer";
+        description = "Arbeitszimmer Schalter";
       };
 
       hom-sw-02 = {
@@ -336,7 +336,7 @@ in
         mac = "70:03:9f:64:8e:b0";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sonoff Basic Bad";
+        description = "Bad Schalter";
       };
 
       hom-sw-03 = {
@@ -345,7 +345,7 @@ in
         mac = "e8:68:e7:44:b3:a1";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sonoff Basic Ender 3D-Drucker";
+        description = "Ender 3D-Drucker Schalter";
       };
 
       hom-sw-04 = {
@@ -353,7 +353,7 @@ in
         ipv4 = "10.10.30.14";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sonoff Basic Fernseher";
+        description = "Fernseher Schalter";
       };
 
       hom-sw-05 = {
@@ -361,7 +361,7 @@ in
         ipv4 = "10.10.30.15";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sonoff Basic Flur";
+        description = "Flur Schalter";
       };
 
       hom-sw-06 = {
@@ -370,7 +370,7 @@ in
         mac = "8c:ce:4e:0c:e1:70";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sonoff Basic Küche";
+        description = "Küche Schalter";
       };
 
       hom-sw-07 = {
@@ -379,7 +379,7 @@ in
         mac = "8c:ce:4e:0c:da:e5";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sonoff Basic Schlafzimmer";
+        description = "Schlafzimmer Schalter";
       };
 
       hom-sw-08 = {
@@ -388,7 +388,7 @@ in
         mac = "8c:ce:4e:0c:de:cb";
         platform = "esp8266";
         board = "esp01_1m";
-        description = "Sonoff Basic Sofa";
+        description = "Sofa Schalter";
       };
     };
 

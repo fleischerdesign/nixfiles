@@ -82,7 +82,7 @@ let
 
     switch:
       - platform: gpio
-        name: "${friendlyName} Relais"
+        name: "Relais"
         pin: GPIO12
         id: relay
         on_turn_off:
@@ -93,10 +93,12 @@ let
               - switch.turn_off: blue_led
 
       - platform: gpio
+        name: "Status-LED"
         id: blue_led
         pin:
           number: GPIO13
           inverted: True
+        entity_category: diagnostic
   '';
 in
 {
