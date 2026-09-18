@@ -11,6 +11,7 @@ let
   cfg = config.my.features.services.esphome;
   devices = config.my.topology.devices or { };
   livingRoom = import ./devices/living-room-sensor.nix { inherit pkgs; };
+  switches = import ./devices/switches.nix { inherit pkgs lib; };
 
   mkDevicePackage =
     name: device: yamlConfig:
@@ -61,10 +62,14 @@ in
       port = 6052;
     };
 
-    my.features.services.esphome.devicePackages = lib.optionalAttrs (devices ? living-room-sensor) {
-      living-room-sensor =
-        mkDevicePackage "living-room-sensor" devices.living-room-sensor
-          livingRoom.deviceConfigYaml;
-    };
+    my.features.services.esphome.devicePackages =
+      (lib.optionalAttrs (devices ? living-room-sensor) {
+        living-room-sensor =
+          mkDevicePackage "living-room-sensor" devices.living-room-sensor
+            livingRoom.deviceConfigYaml;
+      })
+      // (lib.mapAttrs (
+        swName: swSpec: mkDevicePackage swName devices.${swName} swSpec.deviceConfigYaml
+      ) (lib.filterAttrs (swName: _: devices ? ${swName}) switches));
   };
 }

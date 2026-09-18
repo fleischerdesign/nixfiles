@@ -309,7 +309,7 @@ in
       };
     };
 
-    # Default IoT devices
+    # Default IoT devices conforming to RFC 1178 Enterprise Taxonomy
     my.topology.devices = lib.mkDefault {
       living-room-sensor = {
         zone = "iot";
@@ -318,6 +318,77 @@ in
         platform = "esp32";
         board = "esp32dev";
         description = "Living Room Climate & Multi-Sensor";
+      };
+
+      # Enterprise Smart Switches (Sonoff Basic ESP8266)
+      hom-sw-01 = {
+        zone = "iot";
+        ipv4 = "10.10.30.11";
+        mac = "8c:ce:4e:0c:d7:98";
+        platform = "esp8266";
+        board = "esp01_1m";
+        description = "Sonoff Basic Arbeitszimmer";
+      };
+
+      hom-sw-02 = {
+        zone = "iot";
+        ipv4 = "10.10.30.12";
+        mac = "70:03:9f:64:8e:b0";
+        platform = "esp8266";
+        board = "esp01_1m";
+        description = "Sonoff Basic Bad";
+      };
+
+      hom-sw-03 = {
+        zone = "iot";
+        ipv4 = "10.10.30.13";
+        mac = "e8:68:e7:44:b3:a1";
+        platform = "esp8266";
+        board = "esp01_1m";
+        description = "Sonoff Basic Ender 3D-Drucker";
+      };
+
+      hom-sw-04 = {
+        zone = "iot";
+        ipv4 = "10.10.30.14";
+        platform = "esp8266";
+        board = "esp01_1m";
+        description = "Sonoff Basic Fernseher";
+      };
+
+      hom-sw-05 = {
+        zone = "iot";
+        ipv4 = "10.10.30.15";
+        platform = "esp8266";
+        board = "esp01_1m";
+        description = "Sonoff Basic Flur";
+      };
+
+      hom-sw-06 = {
+        zone = "iot";
+        ipv4 = "10.10.30.16";
+        mac = "8c:ce:4e:0c:e1:70";
+        platform = "esp8266";
+        board = "esp01_1m";
+        description = "Sonoff Basic Küche";
+      };
+
+      hom-sw-07 = {
+        zone = "iot";
+        ipv4 = "10.10.30.17";
+        mac = "8c:ce:4e:0c:da:e5";
+        platform = "esp8266";
+        board = "esp01_1m";
+        description = "Sonoff Basic Schlafzimmer";
+      };
+
+      hom-sw-08 = {
+        zone = "iot";
+        ipv4 = "10.10.30.18";
+        mac = "8c:ce:4e:0c:de:cb";
+        platform = "esp8266";
+        board = "esp01_1m";
+        description = "Sonoff Basic Sofa";
       };
     };
 
