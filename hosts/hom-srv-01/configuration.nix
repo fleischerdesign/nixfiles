@@ -63,6 +63,8 @@
       system = {
         networking = {
           gateway.enable = true;
+          fritzbox.enable = true;
+          tplink-ap.enable = true;
           tailscale = {
             subnetRouter = {
               enable = true;

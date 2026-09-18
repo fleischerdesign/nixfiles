@@ -280,6 +280,31 @@
           package =
             self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package;
         };
+
+        hom-rt-01 = {
+          targetHost = "10.10.10.1";
+          role = "router";
+          targetType = "agentless";
+          tags = [
+            "router"
+            "tr064"
+            "gitops"
+          ];
+          package = self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.fritzbox.package;
+        };
+
+        hom-ap-01 = {
+          targetHost = "10.10.10.20";
+          role = "embedded";
+          targetType = "agentless";
+          tags = [
+            "ap"
+            "wifi"
+            "gitops"
+          ];
+          package =
+            self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.tplink-ap.package;
+        };
       };
     };
 }

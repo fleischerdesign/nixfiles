@@ -57,88 +57,30 @@ Unabhängig davon, ob ein Zielgerät ein Multi-Core-Server mit NixOS, ein OpenWr
 
 ## 3. TP-Link RE330 Wi-Fi Access Point (`hom-ap-01`)
 
-Der TP-Link RE330 Wi-Fi Repeater/Access Point wird im Access-Point-Modus als reine Layer-2-Funkbrücke (`hom-ap-01`) in die Infrastruktur integriert (SSIDs: `VYRX`, `VYRX-IOT`). Sämtliche Netzwerkdienste (DHCP, DNS, Routing) werden zentral von `hom-srv-01` bereitgestellt.
+Der TP-Link RE330 Wi-Fi Repeater/Access Point wird im Access-Point-Modus als reine Layer-2-Funkbrücke (`hom-ap-01`) in die Infrastruktur integriert. Da auf der geschlossenen Hersteller-Firmware kein SSH oder OpenWrt zur Verfügung steht, nutzt der Nix-Treiber die verschlüsselte **TP-Link Web-API via `tplinkrouterc6u` (RSA/AES-Handshake)**.
 
-### 3.1 Host-Definition im Flake (`hosts/hom-ap-01/default.nix`)
+Gemäß Architektur-Entscheidung (Option A) strahlt der Access Point ein **einheitliches Dual-Band-WLAN (`VYRX`)** auf 2.4 GHz und 5 GHz aus, um lückenloses Band Steering und Roaming für Clients zu ermöglichen. Sämtliche Netzwerkdienste (DHCP, DNS, Routing) werden zentral von `hom-srv-01` bereitgestellt.
+
+### 3.1 Deklarative Konfiguration (`features/system/networking/tplink-ap`)
 ```nix
-# hosts/hom-ap-01/default.nix
-{ pkgs, config, ... }:
-let
-  wifiSecret = config.sops.placeholder."services/wifi/wpa3_key";
-  iotWifiSecret = config.sops.placeholder."services/wifi/iot_key";
-in
-{
-  targetType = "openwrt";
-  hostname = "hom-ap-01";
-  ipv4 = "10.10.10.20";
-  zone = "infra";
-
-  # Deklarative Generierung der OpenWrt UCI-Konfigurationsdateien
-  configFiles = {
-    # 1. Netzwerk & Bridge (Reiner Dumb-AP Modus)
-    "/etc/config/network" = pkgs.writeText "openwrt-network" ''
-      config interface 'loopback'
-          option device 'lo'
-          option proto 'static'
-          option ipaddr '127.0.0.1'
-          option netmask '255.0.0.0'
-
-      config device 'br_lan'
-          option name 'br-lan'
-          option type 'bridge'
-          list ports 'lan1'
-          list ports 'lan2'
-
-      config interface 'lan'
-          option device 'br-lan'
-          option proto 'static'
-          option ipaddr '10.10.10.20'
-          option netmask '255.255.255.0'
-          option gateway '10.10.10.10'
-          option dns '10.10.10.10'
-    '';
-
-    # 2. Drahtlosnetzwerk (SSIDs, WPA3 & Multi-BSSID)
-    "/etc/config/wireless" = pkgs.writeText "openwrt-wireless" ''
-      config wifi-device 'radio0'
-          option type 'mac80211'
-          option path 'platform/soc/...'
-          option channel '36'
-          option band '5g'
-          option htmode 'HE80'
-          option country 'DE'
-
-      # Primäres Netzwerk (CORP / Workstations)
-      config wifi-iface 'wifinet0'
-          option device 'radio0'
-          option mode 'ap'
-          option network 'lan'
-          option ssid 'VYRX'
-          option encryption 'sae'
-          option key '${wifiSecret}'
-
-      # Isoliertes IoT Netzwerk
-      config wifi-iface 'wifinet1'
-          option device 'radio0'
-          option mode 'ap'
-          option network 'lan'
-          option ssid 'VYRX-IOT'
-          option encryption 'psk2'
-          option key '${iotWifiSecret}'
-    '';
+# features/system/networking/tplink-ap/default.nix
+my.features.system.networking.tplink-ap = {
+  enable = true;
+  host = "10.10.10.20";
+  settings.wifi = {
+    ssid = "VYRX";      # Unified Dual-Band SSID (Option A)
+    enable2G = true;    # 2.4 GHz für IoT & Legacy-Clients
+    enable5G = true;    # 5 GHz für High-Throughput Workstations
   };
-
-  # Atomarer Reload-Befehl nach Dateiübertragung
-  reloadCommand = "/etc/init.d/network reload && wifi reload";
-}
+};
 ```
 
 ### 3.2 Der Deployment-Ablauf via `nod switch hom-ap-01`:
-1. `nod` liest die Host-Definition und rendert die Konfigurationsdateien via Nix.
-2. `nod` baut eine SSH-Verbindung zu `root@10.10.10.20` über das interne Management-Netz auf.
-3. Die generierten UCI-Dateien werden atomar nach `/etc/config/` kopiert.
-4. `nod` führt `reloadCommand` aus $\to$ Die neuen WLAN-Parameter sind in unter 2 Sekunden aktiv.
-5. **Ergebnis:** Kein Web-Interface, kein manuelles Klicken, 100% reproduzierbar.
+1. `nod` liest die Spezifikation und generiert das Soll-Zustands-JSON hermetisch via Nix.
+2. Das Access-Point-Passwort wird sicher aus SOPS (`services/wifi/ap_password`) bezogen.
+3. Die hermetisch paketierte Sync-Engine `tplink-ap-sync` (`packages/custom/tplinkrouterc6u`) verbindet sich verschlüsselt mit der Web-API auf `10.10.10.20`.
+4. Der Zustand wird **idempotent abgeglichen** (SSIDs prüfen, Band-Status sicherstellen).
+5. **Ergebnis:** Kein Web-UI-Klicken, kein manuelles Einrichten, 100% reproduzierbare WLAN-Umgebung aus Git.
 
 ---
 
