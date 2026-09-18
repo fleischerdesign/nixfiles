@@ -104,6 +104,51 @@ let
       };
     };
   };
+
+  # Submodule for IoT/microcontroller device definition
+  deviceSubmodule = lib.types.submodule {
+    options = {
+      zone = lib.mkOption {
+        type = lib.types.enum [
+          "infra"
+          "corp"
+          "mesh"
+          "iot"
+          "guest"
+        ];
+        default = "iot";
+        description = "Subnet zone membership of the device";
+      };
+      ipv4 = lib.mkOption {
+        type = lib.types.str;
+        description = "Static IPv4 address allocated to the device";
+      };
+      mac = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Physical MAC address for static DHCP reservation";
+      };
+      platform = lib.mkOption {
+        type = lib.types.enum [
+          "esp32"
+          "esp8266"
+          "rp2040"
+        ];
+        default = "esp32";
+        description = "Microcontroller platform architecture";
+      };
+      board = lib.mkOption {
+        type = lib.types.str;
+        default = "esp32dev";
+        description = "Hardware board definition target";
+      };
+      description = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Human-readable description of device function";
+      };
+    };
+  };
 in
 {
   options.my.topology = {
@@ -123,6 +168,12 @@ in
       type = lib.types.attrsOf hostSubmodule;
       default = { };
       description = "Full inventory of cluster nodes and infrastructure devices";
+    };
+
+    devices = lib.mkOption {
+      type = lib.types.attrsOf deviceSubmodule;
+      default = { };
+      description = "Inventory of IoT microcontrollers and peripheral smart home hardware";
     };
 
     trustedSubnets = lib.mkOption {
@@ -255,6 +306,18 @@ in
         ipv4 = "10.10.10.20";
         hostType = "embedded";
         domain = "ap.lan.vyrx.de";
+      };
+    };
+
+    # Default IoT devices
+    my.topology.devices = lib.mkDefault {
+      living-room-sensor = {
+        zone = "iot";
+        ipv4 = "10.10.30.25";
+        mac = "24:6F:28:A1:B2:C3";
+        platform = "esp32";
+        board = "esp32dev";
+        description = "Living Room Climate & Multi-Sensor";
       };
     };
 

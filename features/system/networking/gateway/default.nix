@@ -18,14 +18,19 @@ let
   corpSubnet = topology.subnets.corp or null;
   iotSubnet = topology.subnets.iot or null;
 
-  # Determine static reservations for DHCP from hosts declared in topology with MAC address
+  # Determine static reservations for DHCP from hosts and devices declared in topology with MAC address
   hostsWithMac = lib.filterAttrs (_name: h: h.mac != null && h.ipv4 != null) topology.hosts;
+  devicesWithMac = lib.filterAttrs (_name: d: d.mac != null && d.ipv4 != null) (
+    topology.devices or { }
+  );
+
+  allReservations = hostsWithMac // devicesWithMac;
 
   reservations = lib.mapAttrsToList (name: h: {
     hw-address = h.mac;
     ip-address = h.ipv4;
     hostname = name;
-  }) hostsWithMac;
+  }) allReservations;
 in
 {
   options.my.features.system.networking.gateway = {

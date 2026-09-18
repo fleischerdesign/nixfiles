@@ -305,6 +305,20 @@
           package =
             self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.tplink-ap.package;
         };
+
+        living-room-sensor = {
+          targetHost = "10.10.30.25";
+          role = "embedded";
+          targetType = "agentless";
+          tags = [
+            "esphome"
+            "sensor"
+            "iot"
+            "gitops"
+          ];
+          package =
+            self.nixosConfigurations.hom-srv-01.config.my.features.services.esphome.devicePackages.living-room-sensor;
+        };
       };
     };
 }
