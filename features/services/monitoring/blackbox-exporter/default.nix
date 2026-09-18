@@ -33,6 +33,13 @@ in
               prober = "tcp";
               timeout = "5s";
             };
+            icmp = {
+              prober = "icmp";
+              timeout = "5s";
+              icmp = {
+                preferred_ip_protocol = "ip4";
+              };
+            };
           };
         }
       );

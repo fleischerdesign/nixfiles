@@ -18,6 +18,7 @@ in
       enabledCollectors = [
         "systemd"
         "processes"
+        "wireguard"
       ];
       port = 9100;
     };

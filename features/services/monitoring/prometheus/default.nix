@@ -47,6 +47,8 @@ let
     n: h: n != ownHost && (h.hostType or "client") == "server" && h.tailscaleIp != null
   ) hosts;
 
+  embeddedHosts = lib.filterAttrs (_: h: (h.hostType or "") == "embedded" && h.ipv4 != null) hosts;
+
   blackboxAddrForHost =
     hostName: if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.tailscaleIp}:9115";
 
@@ -239,6 +241,28 @@ in
                   group = "Tailscale";
                 };
               }) otherServerHosts;
+              relabel_configs = blackboxRelabel "127.0.0.1:9115";
+            }
+          ]
+
+        ++
+
+          # Blackbox: ICMP ping for embedded infrastructure targets (hom-rt-01, hom-ap-01)
+          lib.optionals (embeddedHosts != { }) [
+            {
+              job_name = "blackbox-embedded";
+              scrape_interval = "30s";
+              metrics_path = "/probe";
+              params.module = [ "icmp" ];
+              static_configs = lib.mapAttrsToList (name: host: {
+                targets = [ host.ipv4 ];
+                labels = {
+                  service = "${name}-icmp";
+                  host = name;
+                  probe_type = "icmp";
+                  group = "Embedded";
+                };
+              }) embeddedHosts;
               relabel_configs = blackboxRelabel "127.0.0.1:9115";
             }
           ];
