@@ -59,9 +59,9 @@ in
         TZ = "Europe/Berlin";
         BASE_URL =
           let
-            d = config.my.endpoints.mealie.proxy.subdomain;
+            ep = config.my.contracts.provides.mealie.endpoints.web;
           in
-          lib.mkIf (d != null) "https://${d}.${config.my.endpoints.mealie.proxy.domain}";
+          lib.mkIf (ep.publicUrl != null) ep.publicUrl;
 
         # SMTP Configuration
         SMTP_HOST = "mail.smtp2go.com";

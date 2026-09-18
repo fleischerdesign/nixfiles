@@ -98,13 +98,23 @@ in
           ];
         };
 
-        # 5. Reverse Proxy via Caddy
-        my.endpoints.homarr = {
-          host = config.networking.hostName;
-          port = 7575;
-          proxy = {
-            enable = true;
+        # 5. Reverse Proxy & Ingress via Service Contract
+        my.contracts.provides.homarr = {
+          endpoints.web = {
+            port = 7575;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
             inherit (cfg) domain;
+            dashboard = {
+              show = true;
+              displayName = "Homarr";
+              category = "Services";
+              icon = "homarr";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/homarr" ];
           };
         };
       }

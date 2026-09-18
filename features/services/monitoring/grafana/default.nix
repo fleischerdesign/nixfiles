@@ -323,27 +323,35 @@ in
       config.sops.templates."grafana.env".path
     ];
 
-    my.endpoints.grafana = {
-      host = config.networking.hostName;
-      port = 3000;
-      displayName = "Grafana";
-      group = "Observability";
-      proxy = {
-        enable = true;
+    my.contracts.provides.grafana = {
+      endpoints.web = {
+        port = 3000;
+        protocol = "tcp";
+        scope = "public";
+        auth = "oidc";
         subdomain = "grafana";
+        extraDomains = [
+          "grafana.ops.${topologyDomain}"
+          "mon.lan.${topologyDomain}"
+        ];
+        oidc = {
+          enable = true;
+          clientId = "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k";
+          clientSecretEnv = "AUTHENTIK_OIDC_GRAFANA_SECRET";
+          secretPath = "services/monitoring/grafana_oidc_client_secret";
+          redirectPaths = [ "/login/generic_oauth" ];
+          subMode = "hashed_user_id";
+          includeClaimsInIdToken = true;
+        };
+        dashboard = {
+          show = true;
+          displayName = "Grafana";
+          category = "Observability";
+          icon = "grafana";
+        };
       };
-      extraDomains = [
-        "grafana.ops.${topologyDomain}"
-        "mon.lan.${topologyDomain}"
-      ];
-      auth.oidc = {
-        enable = true;
-        clientId = "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k";
-        clientSecretEnv = "AUTHENTIK_OIDC_GRAFANA_SECRET";
-        secretPath = "services/monitoring/grafana_oidc_client_secret";
-        redirectPaths = [ "/login/generic_oauth" ];
-        subMode = "hashed_user_id";
-        includeClaimsInIdToken = true;
+      storage = {
+        stateDirs = [ "/var/lib/grafana" ];
       };
     };
   };

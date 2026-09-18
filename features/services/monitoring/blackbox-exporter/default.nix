@@ -45,11 +45,16 @@ in
       );
     };
 
-    my.endpoints.blackbox-exporter = {
-      host = config.networking.hostName;
-      port = 9115;
-      monitoring.tcp.enable = true;
-      monitoring.tcp.group = "Infrastructure";
+    my.contracts.provides.blackbox-exporter = {
+      endpoints.web = {
+        port = 9115;
+        protocol = "tcp";
+        scope = "internal";
+        monitoring = {
+          tcp.enable = true;
+          tcp.group = "Infrastructure";
+        };
+      };
     };
   };
 }

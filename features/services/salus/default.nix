@@ -67,7 +67,7 @@ in
           // lib.optionalAttrs cfg.sso.enable {
             SALUS_OIDC_ISSUER_URL = cfg.sso.issuerUrl;
             SALUS_OIDC_CLIENT_ID = cfg.sso.clientId;
-            SALUS_OAUTH_REDIRECT_BASE = config.my.endpoints.salus.publicUrl;
+            SALUS_OAUTH_REDIRECT_BASE = config.my.contracts.provides.salus.endpoints.web.publicUrl;
           };
 
           serviceConfig = {
@@ -106,13 +106,23 @@ in
           ];
         };
 
-        my.endpoints.salus = {
-          host = config.networking.hostName;
-          port = cfg.port;
-          proxy = {
-            enable = true;
+        my.contracts.provides.salus = {
+          endpoints.web = {
+            port = cfg.port;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
             subdomain = "salus";
             websocket = true;
+            dashboard = {
+              show = true;
+              displayName = "Salus";
+              category = "Observability & Tools";
+              icon = "salus";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/salus" ];
           };
         };
       }

@@ -69,27 +69,35 @@ in
           ];
         };
 
-        # Caddy Reverse Proxy
-        my.endpoints.linkwarden = {
-          host = config.networking.hostName;
-          port = 3010;
-          displayName = "Linkwarden";
-          group = "Productivity";
-          proxy = {
-            enable = true;
+        # Service Contract for Caddy, Firewall & OIDC
+        my.contracts.provides.linkwarden = {
+          endpoints.web = {
+            port = 3010;
+            protocol = "tcp";
+            scope = "public";
+            auth = "oidc";
             inherit (cfg) domain;
+            extraDomains = [
+              "links.srv.lan.${config.my.topology.domain}"
+            ];
+            oidc = {
+              enable = true;
+              clientId = "TBKFgLSIeXirGSZiuCFEXFeaUX3XaYt54FGr4VtM";
+              clientSecretEnv = "AUTHENTIK_OIDC_LINKWARDEN_SECRET";
+              secretPath = "services/apps/linkwarden_env";
+              redirectPaths = [ "/api/v1/auth/callback/authentik" ];
+              subMode = "hashed_user_id";
+              includeClaimsInIdToken = true;
+            };
+            dashboard = {
+              show = true;
+              displayName = "Linkwarden";
+              category = "Productivity";
+              icon = "linkwarden";
+            };
           };
-          extraDomains = [
-            "links.srv.lan.${config.my.topology.domain}"
-          ];
-          auth.oidc = {
-            enable = true;
-            clientId = "TBKFgLSIeXirGSZiuCFEXFeaUX3XaYt54FGr4VtM";
-            clientSecretEnv = "AUTHENTIK_OIDC_LINKWARDEN_SECRET";
-            secretPath = "services/apps/linkwarden_env";
-            redirectPaths = [ "/api/v1/auth/callback/authentik" ];
-            subMode = "hashed_user_id";
-            includeClaimsInIdToken = true;
+          storage = {
+            stateDirs = [ "/var/lib/linkwarden" ];
           };
         };
 

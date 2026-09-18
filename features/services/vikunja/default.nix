@@ -54,9 +54,9 @@ in
           frontendScheme = "https";
           frontendHostname =
             let
-              d = config.my.endpoints.vikunja.proxy.subdomain;
+              ep = config.my.contracts.provides.vikunja.endpoints.web;
             in
-            lib.mkIf (d != null) "${d}.${config.my.endpoints.vikunja.proxy.domain}";
+            lib.mkIf (ep.canonicalDomain != null) ep.canonicalDomain;
 
           database = {
             type = "postgres";
@@ -71,9 +71,9 @@ in
             service = {
               publicurl =
                 let
-                  d = config.my.endpoints.vikunja.proxy.subdomain;
+                  ep = config.my.contracts.provides.vikunja.endpoints.web;
                 in
-                lib.mkIf (d != null) "https://${d}.${config.my.endpoints.vikunja.proxy.domain}/";
+                lib.mkIf (ep.publicUrl != null) "${ep.publicUrl}/";
               timezone = "Europe/Berlin";
               enableregistration = cfg.enableRegistration;
             };
@@ -103,26 +103,34 @@ in
           ];
         };
 
-        my.endpoints.vikunja = {
-          host = config.networking.hostName;
-          port = 3456;
-          displayName = "Vikunja";
-          group = "Productivity";
-          proxy = {
-            enable = true;
+        my.contracts.provides.vikunja = {
+          endpoints.web = {
+            port = 3456;
+            protocol = "tcp";
+            scope = "public";
+            auth = "oidc";
             subdomain = "vikunja";
+            extraDomains = [
+              "tasks.srv.lan.${config.my.topology.domain}"
+            ];
+            oidc = {
+              enable = true;
+              clientId = cfg.ssoClientId;
+              clientSecretEnv = "AUTHENTIK_OIDC_VIKUNJA_SECRET";
+              secretPath = "services/apps/vikunja_oidc_secret";
+              redirectPaths = [ "/auth/openid/authentik" ];
+              subMode = "hashed_user_id";
+              includeClaimsInIdToken = true;
+            };
+            dashboard = {
+              show = true;
+              displayName = "Vikunja";
+              category = "Productivity";
+              icon = "vikunja";
+            };
           };
-          extraDomains = [
-            "tasks.srv.lan.${config.my.topology.domain}"
-          ];
-          auth.oidc = {
-            enable = true;
-            clientId = cfg.ssoClientId;
-            clientSecretEnv = "AUTHENTIK_OIDC_VIKUNJA_SECRET";
-            secretPath = "services/apps/vikunja_oidc_secret";
-            redirectPaths = [ "/auth/openid/authentik" ];
-            subMode = "hashed_user_id";
-            includeClaimsInIdToken = true;
+          storage = {
+            stateDirs = [ "/var/lib/vikunja" ];
           };
         };
       }

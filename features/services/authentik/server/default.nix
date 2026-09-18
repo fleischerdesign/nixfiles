@@ -15,28 +15,37 @@ let
       "${config.networking.hostName}" = config;
     };
 
-  # Discover and safely merge all auth and OIDC endpoints across cluster hosts (Collision Guard)
-  rawAuthEndpointsList = lib.concatMap (
+  # Flatten all endpoint contracts across all hosts in the cluster
+  allClusterEndpointsList = lib.concatMap (
     hostName:
     let
       hostConfig = flakeConfigurations.${hostName}.config;
-      eps = lib.filterAttrs (_: v: v.proxy.enable && v.proxy.auth && v.canonicalDomain != null) (
-        hostConfig.my.endpoints or { }
-      );
+      provides = hostConfig.my.contracts.provides or { };
     in
-    lib.mapAttrsToList (name: ep: { inherit hostName name ep; }) eps
+    lib.concatLists (
+      lib.mapAttrsToList (
+        svcName: contract:
+        lib.mapAttrsToList (epName: ep: {
+          inherit hostName ep;
+          name = if epName == "default" || epName == "web" then svcName else "${svcName}-${epName}";
+        }) contract.endpoints
+      ) provides
+    )
   ) (builtins.attrNames flakeConfigurations);
 
-  rawOidcEndpointsList = lib.concatMap (
-    hostName:
-    let
-      hostConfig = flakeConfigurations.${hostName}.config;
-      eps = lib.filterAttrs (
-        _: v: v.auth.oidc.enable && (v.canonicalDomain != null || v.auth.oidc.redirectUris != [ ])
-      ) (hostConfig.my.endpoints or { });
-    in
-    lib.mapAttrsToList (name: ep: { inherit hostName name ep; }) eps
-  ) (builtins.attrNames flakeConfigurations);
+  # Filter forward-auth and OIDC endpoints
+  rawAuthEndpointsList = lib.filter (
+    item:
+    (item.ep.scope == "public" || item.ep.scope == "internal")
+    && item.ep.auth == "authentik"
+    && item.ep.canonicalDomain != null
+  ) allClusterEndpointsList;
+
+  rawOidcEndpointsList = lib.filter (
+    item:
+    (item.ep.auth == "oidc" || item.ep.oidc.enable)
+    && (item.ep.canonicalDomain != null || item.ep.oidc.redirectUris != [ ])
+  ) allClusterEndpointsList;
 
   # Collision Guard: Assert that no two hosts declare the same OIDC endpoint name
   duplicateOidcCheck =
@@ -174,10 +183,10 @@ let
         group = if ep.group != null then ep.group else "Applications";
         safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
         secretAttr =
-          if ep.auth.oidc.clientSecretEnv != null then
-            "!Env ${ep.auth.oidc.clientSecretEnv}"
-          else if ep.auth.oidc.clientSecret != null then
-            ep.auth.oidc.clientSecret
+          if ep.oidc.clientSecretEnv != null then
+            "!Env ${ep.oidc.clientSecretEnv}"
+          else if ep.oidc.clientSecret != null then
+            ep.oidc.clientSecret
           else
             "!Env AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
         launchUrl =
@@ -196,12 +205,12 @@ let
             name = "Provider for ${displayName}";
           };
           attrs = {
-            client_id = ep.auth.oidc.clientId;
+            client_id = ep.oidc.clientId;
             client_secret = secretAttr;
             authorization_flow = "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
-            redirect_uris = ep.auth.oidc.redirectUris;
-            sub_mode = ep.auth.oidc.subMode;
-            include_claims_in_id_token = ep.auth.oidc.includeClaimsInIdToken;
+            redirect_uris = ep.oidc.redirectUris;
+            sub_mode = ep.oidc.subMode;
+            include_claims_in_id_token = ep.oidc.includeClaimsInIdToken;
           };
         }
         {
@@ -356,17 +365,18 @@ in
       ];
     };
 
-    # 5. Reverse Proxy
-    my.endpoints.authentik = {
-      host = config.networking.hostName;
-      port = 9055;
-      proxy = {
-        enable = true;
+    # 5. Reverse Proxy & Monitoring via Service Contract
+    my.contracts.provides.authentik = {
+      endpoints.web = {
+        port = 9055;
+        protocol = "tcp";
+        scope = "public";
+        auth = "none";
         inherit (cfg) domain;
-      };
-      monitoring = {
-        scrape.enable = true;
-        scrape.port = 9300;
+        monitoring = {
+          scrape.enable = true;
+          scrape.port = 9300;
+        };
       };
     };
 
@@ -379,9 +389,9 @@ in
       }
       (lib.listToAttrs (
         map (ep: {
-          name = ep.auth.oidc.secretPath;
+          name = ep.oidc.secretPath;
           value = { };
-        }) (lib.filter (ep: ep.auth.oidc.secretPath != null) (builtins.attrValues oidcEndpoints))
+        }) (lib.filter (ep: ep.oidc.secretPath != null) (builtins.attrValues oidcEndpoints))
       ))
     ];
 
@@ -393,13 +403,13 @@ in
           let
             safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
             envVar =
-              if ep.auth.oidc.clientSecretEnv != null then
-                ep.auth.oidc.clientSecretEnv
+              if ep.oidc.clientSecretEnv != null then
+                ep.oidc.clientSecretEnv
               else
                 "AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
           in
-          "${envVar}=${config.sops.placeholder.${ep.auth.oidc.secretPath}}"
-        ) (lib.filterAttrs (_: ep: ep.auth.oidc.secretPath != null) oidcEndpoints)
+          "${envVar}=${config.sops.placeholder.${ep.oidc.secretPath}}"
+        ) (lib.filterAttrs (_: ep: ep.oidc.secretPath != null) oidcEndpoints)
       );
     };
   };

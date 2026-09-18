@@ -51,12 +51,19 @@ in
           };
         };
 
-        my.endpoints.obsidian-livesync = {
-          host = config.networking.hostName;
-          port = 5984;
-          proxy = {
-            enable = true;
+        my.contracts.provides.obsidian-livesync = {
+          endpoints.web = {
+            port = 5984;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
             inherit (cfg) domain;
+            dashboard = {
+              show = true;
+              displayName = "Obsidian LiveSync";
+              category = "Productivity";
+              icon = "obsidian";
+            };
           };
         };
       }

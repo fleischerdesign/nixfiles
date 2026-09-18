@@ -213,7 +213,7 @@ nod switch living-room-sensor
 Statt DNS-Records, Proxied-Status und Edge-TLS manuell im Cloudflare-Webdashboard zu pflegen („ClickOps-Falle“), existiert ein vollständig deklaratives Target für Cloudflare ([`features/system/networking/cloudflare`](file:///etc/nixos/features/system/networking/cloudflare/default.nix)).
 
 ### 6.1 Der Deployment-Ablauf via `nix run .#sync-cloudflare` (oder `nod switch cloudflare`):
-1. **Synthese:** Nix generiert die Soll-Zustands-Spezifikation (`cloudflare-desired-state.json`) deterministisch aus `my.topology` und `my.endpoints`:
+1. **Synthese:** Nix generiert die Soll-Zustands-Spezifikation (`cloudflare-desired-state.json`) deterministisch aus `my.topology` und `my.contracts.provides`:
    - `@` $\to$ `A` `173.249.22.211` (`cld-edge-01`, `proxied: false` für uneingeschränkte CrowdSec-Kernel-Bans)
    - `edge` $\to$ `A` `173.249.22.211` (`proxied: false` für direct SSH & WireGuard)
    - `ops` $\to$ `A` `37.114.55.91` (`proxied: false` für Telemetrie & WireGuard)

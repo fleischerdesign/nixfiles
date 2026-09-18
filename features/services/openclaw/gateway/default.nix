@@ -1008,29 +1008,24 @@ in
       ) (lib.attrNames enabledInstances)
     );
 
-    # Register each instance and its isolated sandbox into the central endpoint registry for Caddy and Firewall
-    my.endpoints = lib.listToAttrs (
-      lib.concatMap (
+    # Register each instance into the central service catalog for Caddy, Firewall, and Monitoring
+    my.contracts.provides = lib.listToAttrs (
+      lib.map (
         name:
         let
           inst = enabledInstances.${name};
         in
-        [
-          {
-            name = inst._endpointName;
-            value = {
-              host = osConfig.networking.hostName;
-              port = inst.port;
-              directAccess = {
-                enable = inst.openTailscaleFirewall;
+        {
+          name = inst._endpointName;
+          value = {
+            endpoints = {
+              web = {
+                port = inst.port;
                 protocol = "tcp";
-                interface = "tailscale";
-              };
-              proxy = {
-                enable = true;
+                scope = "public";
+                auth = if inst.auth then "authentik" else "none";
                 subdomain = inst.subdomain;
                 domain = inst.domain;
-                auth = inst.auth;
                 unauthenticatedPaths = [
                   "/j/*"
                   "/__openclaw__/worker*"
@@ -1039,42 +1034,51 @@ in
                   "/a2a/*"
                 ];
                 machineClientsBypassAuth = true;
+                directAccess = {
+                  enable = inst.openTailscaleFirewall;
+                  protocol = "tcp";
+                  interface = "tailscale";
+                };
+                dashboard = {
+                  show = true;
+                  displayName =
+                    if inst.agentName != null then "OpenClaw (${inst.agentName})" else "OpenClaw (${name})";
+                  category = "AI & Agents";
+                  icon = "bot";
+                };
+                monitoring = {
+                  http.enable = false;
+                  tcp = {
+                    enable = true;
+                    group = "AI";
+                  };
+                };
               };
-              displayName =
-                if inst.agentName != null then "OpenClaw (${inst.agentName})" else "OpenClaw (${name})";
-              group = "AI & Agents";
-              monitoring = {
-                http.enable = false;
-                tcp = {
-                  enable = true;
-                  group = "AI";
+            }
+            // lib.optionalAttrs inst.sandbox.enable {
+              sandbox = {
+                port = inst.sandbox.port;
+                protocol = "tcp";
+                scope = "public";
+                auth = "none";
+                subdomain = inst.sandbox.subdomain;
+                domain = inst.domain;
+                directAccess = {
+                  enable = inst.openTailscaleFirewall;
+                  protocol = "tcp";
+                  interface = "tailscale";
+                };
+                monitoring = {
+                  http = {
+                    enable = true;
+                    group = "AI-Sandbox";
+                    path = "/mcp-app-sandbox";
+                  };
                 };
               };
             };
-          }
-        ]
-        ++ lib.optional inst.sandbox.enable {
-          name = "${inst._endpointName}-sandbox";
-          value = {
-            host = osConfig.networking.hostName;
-            port = inst.sandbox.port;
-            directAccess = {
-              enable = inst.openTailscaleFirewall;
-              protocol = "tcp";
-              interface = "tailscale";
-            };
-            proxy = {
-              enable = true;
-              subdomain = inst.sandbox.subdomain;
-              domain = inst.domain;
-              auth = false;
-            };
-            monitoring = {
-              http = {
-                enable = true;
-                group = "AI-Sandbox";
-                path = "/mcp-app-sandbox";
-              };
+            storage = {
+              stateDirs = [ inst._stateDir ];
             };
           };
         }

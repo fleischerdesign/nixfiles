@@ -73,11 +73,24 @@ in
           ];
         };
 
-        # Caddy Reverse Proxy
-        my.endpoints.plausible = {
-          host = config.networking.hostName;
-          port = 8000;
-          subdomain = "plausible";
+        # Service Contract for Caddy & Storage
+        my.contracts.provides.plausible = {
+          endpoints.web = {
+            port = 8000;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
+            subdomain = "plausible";
+            dashboard = {
+              show = true;
+              displayName = "Plausible";
+              category = "Observability & Tools";
+              icon = "plausible";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/plausible" ];
+          };
         };
 
         # Secrets

@@ -106,24 +106,30 @@ in
           };
         };
 
-        my.endpoints.blocky-dns = {
-          host = config.networking.hostName;
-          port = 53;
-          directAccess = {
-            enable = true;
-            protocol = "both";
-            interface = "all";
-          };
-          monitoring.http.enable = false;
-        };
+        my.contracts.provides.blocky = {
+          endpoints = {
+            dns = {
+              port = 53;
+              protocol = "both";
+              scope = "internal";
+              directAccess = {
+                enable = true;
+                protocol = "both";
+                interface = "all";
+              };
+              monitoring.http.enable = false;
+            };
 
-        my.endpoints.blocky = {
-          host = config.networking.hostName;
-          port = 4000;
-          monitoring = {
-            http.enable = false;
-            scrape.enable = true;
-            scrape.port = 4000;
+            api = {
+              port = 4000;
+              protocol = "tcp";
+              scope = "internal";
+              monitoring = {
+                http.enable = false;
+                scrape.enable = true;
+                scrape.port = 4000;
+              };
+            };
           };
         };
       }

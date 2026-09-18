@@ -81,13 +81,23 @@ in
         };
         users.groups.portfolio = { };
 
-        # Caddy Reverse Proxy
-        my.endpoints.portfolio = {
-          host = config.networking.hostName;
-          port = 3005;
-          proxy = {
-            enable = true;
+        # Caddy Reverse Proxy & Service Contract
+        my.contracts.provides.portfolio = {
+          endpoints.web = {
+            port = 3005;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
             domain = "fleischer.design";
+            dashboard = {
+              show = true;
+              displayName = "Portfolio";
+              category = "Services";
+              icon = "globe";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/portfolio" ];
           };
         };
 

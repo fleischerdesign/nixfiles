@@ -88,33 +88,6 @@
       };
       dev.containers.enable = true;
     };
-
-    endpoints = {
-      home-assistant.proxy.subdomain = "hass";
-      home-assistant.proxy.enable = true;
-      home-assistant.directAccess.enable = true;
-
-      esphome.proxy = {
-        enable = true;
-        subdomain = "esphome";
-        auth = true;
-      };
-
-      jellyseerr.proxy.subdomain = "seerr";
-      jellyseerr.proxy.enable = true;
-
-      mainsail.proxy = {
-        subdomain = "mainsail";
-        auth = true;
-      };
-
-      moonraker.proxy = {
-        subdomain = "moonraker";
-        auth = true;
-      };
-
-      mainsail-cam.proxy.subdomain = "cam.moonraker";
-    };
   };
 
   my.features.services.openclaw.node = {

@@ -51,14 +51,19 @@ in
         }
       '';
 
-      # Generate virtualHosts from service registry (local host only)
+      # Generate virtualHosts from service contracts (local host only)
       virtualHosts =
         let
-          localServices = lib.filterAttrs (
-            _: svc: svc.host == config.networking.hostName && svc.proxy.enable && svc.canonicalDomain != null
-          ) config.my.endpoints;
+          localEndpoints = lib.concatLists (
+            lib.mapAttrsToList (
+              _svcName: contract:
+              lib.filter (ep: (ep.scope == "public" || ep.scope == "internal") && ep.canonicalDomain != null) (
+                lib.attrValues contract.endpoints
+              )
+            ) config.my.contracts.provides
+          );
 
-          mkVHost = _name: conf: {
+          mkVHost = conf: {
             name = conf.canonicalDomain;
             value = {
               extraConfig =
@@ -66,13 +71,13 @@ in
                   target = "127.0.0.1:${toString conf.port}";
 
                   exemptHandlers =
-                    lib.optionalString (conf.proxy.unauthenticatedPaths != [ ]) ''
-                      @unauthenticatedRoute path ${lib.concatStringsSep " " conf.proxy.unauthenticatedPaths}
+                    lib.optionalString (conf.unauthenticatedPaths != [ ]) ''
+                      @unauthenticatedRoute path ${lib.concatStringsSep " " conf.unauthenticatedPaths}
                       handle @unauthenticatedRoute {
                         reverse_proxy ${target}
                       }
                     ''
-                    + lib.optionalString conf.proxy.machineClientsBypassAuth ''
+                    + lib.optionalString conf.machineClientsBypassAuth ''
                       @nonBrowserWebsocket {
                         header Connection *Upgrade*
                         header Upgrade websocket
@@ -83,9 +88,9 @@ in
                       }
                     '';
                 in
-                if conf.proxy.customExtraConfig != null then
-                  conf.proxy.customExtraConfig
-                else if conf.proxy.auth then
+                if conf.customExtraConfig != null then
+                  conf.customExtraConfig
+                else if conf.auth == "authentik" then
                   ''
                     import authentik
                     ${exemptHandlers}
@@ -105,30 +110,34 @@ in
             };
           };
         in
-        lib.listToAttrs (lib.mapAttrsToList mkVHost localServices);
+        lib.listToAttrs (map mkVHost localEndpoints);
     };
 
-    my.endpoints = {
-      caddy-http = {
-        host = config.networking.hostName;
-        port = 80;
-        directAccess = {
-          enable = true;
+    my.contracts.provides.caddy = {
+      endpoints = {
+        http = {
+          port = 80;
           protocol = "tcp";
-          interface = "all";
+          scope = "public";
+          directAccess = {
+            enable = true;
+            protocol = "tcp";
+            interface = "all";
+          };
+          monitoring.http.enable = false;
         };
-        monitoring.http.enable = false;
-      };
 
-      caddy-https = {
-        host = config.networking.hostName;
-        port = 443;
-        directAccess = {
-          enable = true;
+        https = {
+          port = 443;
           protocol = "both";
-          interface = "all";
+          scope = "public";
+          directAccess = {
+            enable = true;
+            protocol = "both";
+            interface = "all";
+          };
+          monitoring.http.enable = false;
         };
-        monitoring.http.enable = false;
       };
     };
 

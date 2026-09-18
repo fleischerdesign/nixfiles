@@ -119,9 +119,28 @@ in
       };
     };
 
-    my.endpoints.home-assistant = {
-      host = config.networking.hostName;
-      port = 8123;
+    my.contracts.provides.home-assistant = {
+      endpoints.web = {
+        port = 8123;
+        protocol = "tcp";
+        scope = "internal";
+        auth = "none";
+        subdomain = "hass";
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "all";
+        };
+        dashboard = {
+          show = true;
+          displayName = "Home Assistant";
+          category = "Smart Home";
+          icon = "home-assistant";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/hass" ];
+      };
     };
   };
 }

@@ -43,10 +43,20 @@ in
       };
     };
 
-    my.endpoints.loki = {
-      host = config.networking.hostName;
-      port = 3100;
-      monitoring.http.enable = false;
+    my.contracts.provides.loki = {
+      endpoints.web = {
+        port = 3100;
+        protocol = "tcp";
+        scope = "internal";
+        monitoring = {
+          http.enable = false;
+          tcp.enable = true;
+          tcp.group = "Observability";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/loki" ];
+      };
     };
   };
 }

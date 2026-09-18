@@ -32,9 +32,23 @@ in
       "Z /var/lib/jellyseerr 0750 1000 1000 -"
     ];
 
-    my.endpoints.jellyseerr = {
-      host = config.networking.hostName;
-      port = 5055;
+    my.contracts.provides.jellyseerr = {
+      endpoints.web = {
+        port = 5055;
+        protocol = "tcp";
+        scope = "internal";
+        auth = "none";
+        subdomain = "seerr";
+        dashboard = {
+          show = true;
+          displayName = "Jellyseerr";
+          category = "Media";
+          icon = "jellyseerr";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/jellyseerr" ];
+      };
     };
   };
 }

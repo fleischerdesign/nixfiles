@@ -45,22 +45,37 @@ in
       port = 6052;
     };
 
-    my.endpoints.esphome-mdns = {
-      host = config.networking.hostName;
-      port = 5353;
-      directAccess = {
-        enable = true;
-        protocol = "udp";
-        interface = "all";
-      };
-      monitoring.http.enable = false;
-    };
+    my.contracts.provides.esphome = {
+      endpoints = {
+        web = {
+          port = 6052;
+          protocol = "tcp";
+          scope = "internal";
+          auth = "authentik";
+          subdomain = "esphome";
+          dashboard = {
+            show = true;
+            displayName = "ESPHome";
+            category = "Infrastructure";
+            icon = "chip";
+          };
+        };
 
-    my.endpoints.esphome = {
-      host = config.networking.hostName;
-      port = 6052;
-      displayName = "ESPHome";
-      group = "Infrastructure";
+        mdns = {
+          port = 5353;
+          protocol = "udp";
+          scope = "internal";
+          directAccess = {
+            enable = true;
+            protocol = "udp";
+            interface = "all";
+          };
+          monitoring.http.enable = false;
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/esphome" ];
+      };
     };
 
     my.features.services.esphome.devicePackages = lib.mapAttrs (

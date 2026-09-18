@@ -21,12 +21,20 @@ in
       appendOnly = true;
     };
 
-    my.endpoints.redis = {
-      host = config.networking.hostName;
-      port = 6379;
-      monitoring.http.enable = false;
-      monitoring.tcp.enable = true;
-      monitoring.tcp.group = "Infrastructure";
+    my.contracts.provides.redis = {
+      endpoints.server = {
+        port = 6379;
+        protocol = "tcp";
+        scope = "internal";
+        monitoring = {
+          http.enable = false;
+          tcp.enable = true;
+          tcp.group = "Infrastructure";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/redis-system" ];
+      };
     };
   };
 }

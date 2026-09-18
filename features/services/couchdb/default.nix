@@ -65,13 +65,17 @@ in
       '';
     };
 
-    # 4. Reverse Proxy via Caddy
-    my.endpoints.couchdb = {
-      host = config.networking.hostName;
-      port = 5984;
-      proxy = {
-        enable = true;
+    # 4. Service Contract for Ingress & Storage
+    my.contracts.provides.couchdb = {
+      endpoints.web = {
+        port = 5984;
+        protocol = "tcp";
+        scope = "public";
+        auth = "none";
         inherit (cfg) domain;
+      };
+      storage = {
+        stateDirs = [ "/var/lib/couchdb" ];
       };
     };
   };

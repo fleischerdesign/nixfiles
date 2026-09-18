@@ -295,12 +295,22 @@ in
           ];
         };
 
-        my.endpoints.mail = {
-          host = config.networking.hostName;
-          port = 9081;
-          proxy = {
-            enable = true;
+        my.contracts.provides.mail = {
+          endpoints.web = {
+            port = 9081;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
             inherit (cfg) domain;
+            dashboard = {
+              show = true;
+              displayName = "Stalwart Mail";
+              category = "Productivity";
+              icon = "mail";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/stalwart-mail" ];
           };
         };
 

@@ -1,6 +1,6 @@
 # features/system/networking/cloudflare/default.nix
 # Declarative Cloudflare Edge & DNS GitOps Engine (SOLID & Agentless Architecture).
-# Reconciles Cloudflare DNS records and Edge TLS settings idempotently from `my.topology` and `my.endpoints`.
+# Reconciles Cloudflare DNS records and Edge TLS settings idempotently from `my.topology` and `my.contracts.provides`.
 {
   config,
   lib,

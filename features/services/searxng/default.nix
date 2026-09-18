@@ -197,24 +197,25 @@ in
       config.services.searx.settingsPath
     ];
 
-    # Register into central service registry
-    my.endpoints.searxng = {
-      host = config.networking.hostName;
-      port = cfg.port;
-
-      proxy = {
-        enable = cfg.domain != null;
-        inherit (cfg) domain;
-        inherit (cfg) auth;
-      };
-
-      displayName = "SearXNG Search";
-      group = "Observability & Tools";
-
-      directAccess = {
-        enable = cfg.openTailscaleFirewall;
+    # Register into central service catalog
+    my.contracts.provides.searxng = {
+      endpoints.web = {
+        port = cfg.port;
         protocol = "tcp";
-        interface = "tailscale";
+        scope = if cfg.domain != null then "public" else "isolated";
+        auth = if cfg.auth then "authentik" else "none";
+        domain = if cfg.domain != null then cfg.domain else "";
+        directAccess = {
+          enable = cfg.openTailscaleFirewall;
+          protocol = "tcp";
+          interface = "tailscale";
+        };
+        dashboard = {
+          show = true;
+          displayName = "SearXNG Search";
+          category = "Observability & Tools";
+          icon = "searxng";
+        };
       };
     };
   };

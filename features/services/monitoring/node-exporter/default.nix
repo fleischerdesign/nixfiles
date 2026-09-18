@@ -23,15 +23,18 @@ in
       port = 9100;
     };
 
-    my.endpoints.node-exporter = {
-      host = config.networking.hostName;
-      port = 9100;
-      monitoring = {
-        http.enable = false;
-        tcp.enable = true;
-        tcp.group = "Infrastructure";
-        scrape.enable = true;
-        scrape.port = 9100;
+    my.contracts.provides.node-exporter = {
+      endpoints.metrics = {
+        port = 9100;
+        protocol = "tcp";
+        scope = "internal";
+        monitoring = {
+          http.enable = false;
+          tcp.enable = true;
+          tcp.group = "Infrastructure";
+          scrape.enable = true;
+          scrape.port = 9100;
+        };
       };
     };
   };

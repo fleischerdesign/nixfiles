@@ -109,13 +109,16 @@ in
     ];
     systemd.services.crowdsec-firewall-bouncer.serviceConfig.DynamicUser = lib.mkForce false;
 
-    my.endpoints.crowdsec = lib.mkIf isMaster {
-      host = config.networking.hostName;
-      port = 6060;
-      monitoring = {
-        http.enable = false;
-        scrape.enable = true;
-        scrape.port = 6060;
+    my.contracts.provides.crowdsec = lib.mkIf isMaster {
+      endpoints.web = {
+        port = 6060;
+        protocol = "tcp";
+        scope = "internal";
+        monitoring = {
+          http.enable = false;
+          scrape.enable = true;
+          scrape.port = 6060;
+        };
       };
     };
 

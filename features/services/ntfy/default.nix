@@ -55,12 +55,26 @@ in
 
     systemd.services.ntfy-sh.serviceConfig.CacheDirectory = "ntfy-sh";
 
-    my.endpoints.ntfy = {
-      host = config.networking.hostName;
-      port = 8083;
-      proxy = {
-        enable = true;
-        subdomain = "ntfy";
+    my.contracts.provides.ntfy = {
+      endpoints.web = {
+        port = 8083;
+        protocol = "tcp";
+        scope = "public";
+        auth = "none";
+        subdomain = "push";
+        extraDomains = [
+          "ntfy.${config.my.topology.domain}"
+        ];
+        dashboard = {
+          show = true;
+          displayName = "ntfy";
+          category = "Observability & Tools";
+          icon = "bell";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/ntfy-sh" ];
+        cacheDirs = [ "/var/cache/ntfy-sh" ];
       };
     };
   };

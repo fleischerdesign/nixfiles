@@ -23,6 +23,9 @@ let
       loader = moduleLoader { inherit lib; };
       featuresDir = ../../features;
       allFeatureModules = loader.findModules featuresDir;
+      contractsDir = ../../contracts;
+      allContractModules =
+        if builtins.pathExists contractsDir then loader.findModules contractsDir else [ ];
 
       finalPkgs =
         if pkgs != null then
@@ -36,9 +39,9 @@ let
       userDir = ../../user;
       discoveredUsers =
         if builtins.pathExists userDir then
-          lib.filter (
-            name: builtins.pathExists (userDir + "/${name}/metadata.nix")
-          ) (builtins.attrNames (builtins.readDir userDir))
+          lib.filter (name: builtins.pathExists (userDir + "/${name}/metadata.nix")) (
+            builtins.attrNames (builtins.readDir userDir)
+          )
         else
           [ ];
 
@@ -78,6 +81,7 @@ let
       ]
       ++ globalModules
       ++ extraModules
+      ++ allContractModules
       ++ allFeatureModules
       ++ [
         ../../hosts/${hostname}/configuration.nix

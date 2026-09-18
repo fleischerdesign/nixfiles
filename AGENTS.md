@@ -76,7 +76,6 @@ nixos-rebuild dry-run --flake .#<host>
 │   ├── contracts/                  # my.contracts.provides — Entkopplung von Services, Endpoints, Storage
 │   ├── desktop/{gnome,niri}/       # Desktop Environments (mutual exclusion via assertions)
 │   ├── dev/{android,codium,containers,git,nixvim,openclaw,opencode,pi}
-│   ├── endpoints/                  # my.endpoints — zentrale Service-Registry (abgeleitet aus contracts)
 │   ├── media/{gaming,spotify}/
 │   ├── services/{35 Features}      # arr-Stack, Monitoring, Auth, DBs, Automation, Media
 │   └── system/{15 Features}        # audio, bootloader, common, gateway, networking, security, theme, user

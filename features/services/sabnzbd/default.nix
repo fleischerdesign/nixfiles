@@ -93,10 +93,10 @@ in
           port = 8080;
           host = "0.0.0.0";
           host_whitelist = "${
-            if config.my.endpoints.sabnzbd.proxy.subdomain != null then
-              "${config.my.endpoints.sabnzbd.proxy.subdomain}.${config.my.endpoints.sabnzbd.proxy.domain}, "
-            else
-              ""
+            let
+              ep = config.my.contracts.provides.sabnzbd.endpoints.web;
+            in
+            if ep.canonicalDomain != null then "${ep.canonicalDomain}, " else ""
           }localhost, 127.0.0.1";
           inet_exposure = 4;
           download_dir = "${cfg.downloadDir}/incomplete";

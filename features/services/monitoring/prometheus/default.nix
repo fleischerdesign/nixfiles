@@ -25,30 +25,30 @@ let
     }
   ];
 
-  registriesByHost =
-    if flake != null then
-      lib.mapAttrs (_: hostCfg: hostCfg.config.my.endpoints or { }) (flake.nixosConfigurations or { })
-    else
-      { ${ownHost} = config.my.endpoints or { }; };
+  # Flatten all endpoint contracts per host across cluster
+  endpointsByHost =
+    let
+      configs = if flake != null then flake.nixosConfigurations or { } else { ${ownHost} = config; };
+    in
+    lib.mapAttrs (
+      _hostName: hostCfg:
+      let
+        provides = hostCfg.config.my.contracts.provides or { };
+      in
+      lib.concatLists (
+        lib.mapAttrsToList (
+          svcName: contract:
+          lib.mapAttrsToList (epName: ep: {
+            name = if epName == "default" || epName == "web" then svcName else "${svcName}-${epName}";
+            inherit ep;
+          }) contract.endpoints
+        ) provides
+      )
+    ) configs;
 
   hostsWithBlackbox = lib.filterAttrs (
     _: hostCfg: hostCfg.config.my.features.services.monitoring.blackbox-exporter.enable or false
-  ) (flake.nixosConfigurations or { });
-
-  allServices = lib.foldl' (acc: registry: acc // registry) { } (
-    builtins.attrValues registriesByHost
-  );
-
-  httpPublicServices = lib.filterAttrs (
-    _: svc: svc.proxy.enable && svc.monitoring.http.enable && svc.publicUrl != null
-  ) allServices;
-
-  otherServerHosts = lib.filterAttrs (
-    n: h: n != ownHost && (h.hostType or "client") == "server" && h.tailscaleIp != null
-  ) hosts;
-
-  embeddedHosts = lib.filterAttrs (_: h: (h.hostType or "") == "embedded" && h.ipv4 != null) hosts;
-  iotDevices = lib.filterAttrs (_: d: d.ipv4 != null) (config.my.topology.devices or { });
+  ) (if flake != null then (flake.nixosConfigurations or { }) else { ${ownHost} = config; });
 
   blackboxAddrForHost =
     hostName: if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.tailscaleIp}:9115";
@@ -56,11 +56,13 @@ let
   # Collect all direct Prometheus scrape targets across hosts
   allScrapeServices = lib.concatLists (
     lib.mapAttrsToList (
-      hostName: registry:
-      lib.mapAttrsToList (svcName: svc: {
-        inherit svcName hostName svc;
-      }) (lib.filterAttrs (_: svc: svc.monitoring.scrape.enable or false) registry)
-    ) registriesByHost
+      hostName: epList:
+      lib.map (item: {
+        svcName = item.name;
+        inherit hostName;
+        svc = item.ep;
+      }) (lib.filter (item: item.ep.monitoring.scrape.enable) epList)
+    ) endpointsByHost
   );
 
   # Group by service name to prevent the job-per-host anti-pattern
@@ -69,42 +71,70 @@ let
   # Collect all local HTTP Blackbox probes and group them under a single job using exporter_address relabeling
   allHttpLocalProbes = lib.concatLists (
     lib.mapAttrsToList (
-      hostName: registry:
+      hostName: epList:
       if hostsWithBlackbox ? ${hostName} then
-        lib.mapAttrsToList (svcName: svc: {
-          target = svc.localUrl + svc.monitoring.http.path;
+        lib.map (item: {
+          target = item.ep.localUrl + item.ep.monitoring.http.path;
           labels = {
-            service = svcName;
+            service = item.name;
             host = hostName;
             probe_type = "http_local";
-            group = svc.monitoring.http.group;
+            group = item.ep.monitoring.http.group;
             exporter_address = blackboxAddrForHost hostName;
           };
-        }) (lib.filterAttrs (_: svc: svc.monitoring.http.enable) registry)
+        }) (lib.filter (item: item.ep.monitoring.http.enable) epList)
       else
         [ ]
-    ) registriesByHost
+    ) endpointsByHost
   );
 
   # Collect all local TCP Blackbox probes and group them under a single job using exporter_address relabeling
   allTcpLocalProbes = lib.concatLists (
     lib.mapAttrsToList (
-      hostName: registry:
+      hostName: epList:
       if hostsWithBlackbox ? ${hostName} then
-        lib.mapAttrsToList (svcName: svc: {
-          target = "127.0.0.1:${toString svc.port}";
+        lib.map (item: {
+          target = "127.0.0.1:${toString item.ep.port}";
           labels = {
-            service = svcName;
+            service = item.name;
             host = hostName;
             probe_type = "tcp_local";
-            group = svc.monitoring.tcp.group;
+            group = item.ep.monitoring.tcp.group;
             exporter_address = blackboxAddrForHost hostName;
           };
-        }) (lib.filterAttrs (_: svc: svc.monitoring.tcp.enable) registry)
+        }) (lib.filter (item: item.ep.monitoring.tcp.enable) epList)
       else
         [ ]
-    ) registriesByHost
+    ) endpointsByHost
   );
+
+  # Public HTTP probes
+  httpPublicServices = lib.concatLists (
+    lib.mapAttrsToList (
+      hostName: epList:
+      lib.map
+        (item: {
+          inherit (item) name;
+          inherit hostName;
+          ep = item.ep;
+        })
+        (
+          lib.filter (
+            item:
+            (item.ep.scope == "public" || item.ep.scope == "internal")
+            && item.ep.monitoring.http.enable
+            && item.ep.publicUrl != null
+          ) epList
+        )
+    ) endpointsByHost
+  );
+
+  otherServerHosts = lib.filterAttrs (
+    n: h: n != ownHost && (h.hostType or "client") == "server" && h.tailscaleIp != null
+  ) hosts;
+
+  embeddedHosts = lib.filterAttrs (_: h: (h.hostType or "") == "embedded" && h.ipv4 != null) hosts;
+  iotDevices = lib.filterAttrs (_: d: d.ipv4 != null) (config.my.topology.devices or { });
 in
 {
   options.my.features.services.monitoring.prometheus = {
@@ -175,19 +205,19 @@ in
         ++
 
           # Public HTTP probes using computed registry URLs
-          lib.optionals (httpPublicServices != { }) [
+          lib.optionals (httpPublicServices != [ ]) [
             {
               job_name = "blackbox-http-public";
               scrape_interval = "1m";
               metrics_path = "/probe";
               params.module = [ "http_2xx" ];
-              static_configs = lib.mapAttrsToList (name: svc: {
-                targets = [ "${svc.publicUrl}${svc.monitoring.http.path}" ];
+              static_configs = map (item: {
+                targets = [ "${item.ep.publicUrl}${item.ep.monitoring.http.path}" ];
                 labels = {
-                  service = name;
-                  inherit (svc) host;
+                  service = item.name;
+                  host = item.hostName;
                   probe_type = "http_public";
-                  group = svc.monitoring.http.group;
+                  group = item.ep.monitoring.http.group;
                 };
               }) httpPublicServices;
               relabel_configs = blackboxRelabel "127.0.0.1:9115";
@@ -226,20 +256,19 @@ in
 
         ++
 
-          # Blackbox: Tailscale host connectivity
+          # Ping probe for servers over Tailscale mesh
           lib.optionals (otherServerHosts != { }) [
             {
-              job_name = "blackbox-tailscale";
+              job_name = "blackbox-ping-servers";
               scrape_interval = "1m";
               metrics_path = "/probe";
-              params.module = [ "tcp_connect" ];
+              params.module = [ "icmp" ];
               static_configs = lib.mapAttrsToList (name: host: {
-                targets = [ "${host.tailscaleIp}:22" ];
+                targets = [ host.tailscaleIp ];
                 labels = {
-                  service = "${name}-ssh";
-                  host = name;
-                  probe_type = "tailscale";
-                  group = "Tailscale";
+                  target_host = name;
+                  probe_type = "icmp_mesh";
+                  group = "Mesh-Hosts";
                 };
               }) otherServerHosts;
               relabel_configs = blackboxRelabel "127.0.0.1:9115";
@@ -248,20 +277,19 @@ in
 
         ++
 
-          # Blackbox: ICMP ping for embedded infrastructure targets (hom-rt-01, hom-ap-01)
+          # Probing of embedded devices (Gateway, Access Point) via ICMP
           lib.optionals (embeddedHosts != { }) [
             {
-              job_name = "blackbox-embedded";
-              scrape_interval = "30s";
+              job_name = "blackbox-icmp-embedded";
+              scrape_interval = "1m";
               metrics_path = "/probe";
               params.module = [ "icmp" ];
               static_configs = lib.mapAttrsToList (name: host: {
                 targets = [ host.ipv4 ];
                 labels = {
-                  service = "${name}-icmp";
-                  host = name;
-                  probe_type = "icmp";
-                  group = "Embedded";
+                  target_host = name;
+                  probe_type = "icmp_embedded";
+                  group = "Infrastructure";
                 };
               }) embeddedHosts;
               relabel_configs = blackboxRelabel "127.0.0.1:9115";
@@ -270,21 +298,19 @@ in
 
         ++
 
-          # Blackbox: ICMP ping for IoT fleet (hom-sw-01..08, living-room-sensor)
+          # Probing of IoT devices (Relays, Tasmota/ESPHome) via ICMP
           lib.optionals (iotDevices != { }) [
             {
-              job_name = "blackbox-iot";
-              scrape_interval = "30s";
+              job_name = "blackbox-icmp-iot";
+              scrape_interval = "1m";
               metrics_path = "/probe";
               params.module = [ "icmp" ];
               static_configs = lib.mapAttrsToList (name: dev: {
                 targets = [ dev.ipv4 ];
                 labels = {
-                  service = "${name}-icmp";
-                  host = name;
-                  probe_type = "icmp";
-                  group = "IoT";
-                  description = dev.description or name;
+                  device = name;
+                  probe_type = "icmp_iot";
+                  group = dev.group or "IoT";
                 };
               }) iotDevices;
               relabel_configs = blackboxRelabel "127.0.0.1:9115";
@@ -292,14 +318,18 @@ in
           ];
     };
 
-    my.endpoints.prometheus = {
-      host = config.networking.hostName;
-      port = 9090;
-      monitoring = {
-        tcp.enable = true;
-        tcp.group = "Infrastructure";
-        scrape.enable = true;
-        scrape.port = 9090;
+    my.contracts.provides.prometheus = {
+      endpoints.web = {
+        port = 9090;
+        protocol = "tcp";
+        scope = "internal";
+        auth = "none";
+        monitoring = {
+          tcp.enable = true;
+          tcp.group = "Infrastructure";
+          scrape.enable = true;
+          scrape.port = 9090;
+        };
       };
     };
   };
