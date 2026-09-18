@@ -233,11 +233,17 @@ let
   generatedProxyJson = pkgs.writeText "proxy-apps-generated.json" (builtins.toJSON proxyBlueprint);
   generatedOidcJson = pkgs.writeText "oidc-apps-generated.json" (builtins.toJSON oidcBlueprint);
 
-  # Merged blueprints directory containing static base blueprints and generated applications
+  # Merged blueprints directory containing upstream base blueprints, custom blueprints and generated applications
   effectiveBlueprintsDir = pkgs.runCommandLocal "authentik-blueprints" { } ''
     mkdir -p "$out"
-    cp -r ${./blueprints}/* "$out/"
+    # 1. Inherit upstream system and default blueprints (required for initial flows and setup)
+    cp -r ${authentikPackage}/blueprints/* "$out/"
     chmod -R u+w "$out"
+
+    # 2. Overlay VYRX custom blueprints
+    cp -r ${./blueprints}/* "$out/"
+
+    # 3. Inject compiled application blueprints
     mkdir -p "$out/03-apps"
     cp ${generatedProxyJson} "$out/03-apps/proxy-apps-generated.json"
     cp ${generatedOidcJson} "$out/03-apps/oidc-apps-generated.json"
