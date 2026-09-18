@@ -59,6 +59,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    vyrx-landing = {
+      url = "github:fleischerdesign/vyrx.de";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
     nod = {
       url = "github:fleischerdesign/nod/develop";
       inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";

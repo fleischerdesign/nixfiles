@@ -38,6 +38,7 @@
     coreAddress = "http://127.0.0.1:9055";
   };
 
+  my.features.services.vyrx-landing.enable = true;
   my.features.services.portfolio.enable = true;
   my.features.services.salus.enable = true;
   my.features.services.obsidian-livesync.enable = true;
