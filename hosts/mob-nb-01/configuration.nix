@@ -4,6 +4,7 @@
 }:
 {
   imports = [
+    # ./disk-config.nix  # Inactive: Enable when bootstrapping/reinstalling with Disko
     ./hardware-configuration.nix
     ./hardware-specific.nix
     ../../roles/notebook.nix

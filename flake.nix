@@ -253,7 +253,9 @@
               if envKey != "" then envKey else "~/.ssh/deploy-key";
           in
           {
-            hostname = hostConfig.config.my.features.system.networking.topology.hosts.${name}.tailscaleIp;
+            hostname =
+              hostConfig.config.my.topology.hosts.${name}.wireguardIpv4
+                or hostConfig.config.my.features.system.networking.topology.hosts.${name}.tailscaleIp;
             profiles.system = {
               user = "root";
               sshUser = "root";

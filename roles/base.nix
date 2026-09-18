@@ -30,8 +30,9 @@
   nod = {
     enable = lib.mkDefault true;
     targetHost = lib.mkDefault (
-      config.my.features.system.networking.topology.hosts.${config.networking.hostName}.tailscaleIp
-        or config.networking.hostName
+      config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4
+        or config.my.features.system.networking.topology.hosts.${config.networking.hostName}.tailscaleIp
+          or config.networking.hostName
     );
     role = lib.mkDefault config.my.role;
     tags = lib.mkDefault [ ];
