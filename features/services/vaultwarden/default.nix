@@ -1,6 +1,5 @@
 {
   config,
-  options,
   lib,
   features,
   ...
@@ -8,12 +7,6 @@
 
 let
   cfg = config.my.features.services.vaultwarden;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then
-      config.my.features.services.caddy.baseDomain
-    else
-      null;
   topologyDomain = config.my.topology.domain;
   authHost = "auth.${topologyDomain}";
 in
@@ -22,9 +15,8 @@ in
     enable = lib.mkEnableOption "Vaultwarden";
     domain = lib.mkOption {
       type = lib.types.str;
-      default =
-        if caddyBaseDomain != null then "vault.${caddyBaseDomain}" else "vault.edge.${topologyDomain}";
-      description = "Full domain name for Vaultwarden.";
+      default = "vault.${topologyDomain}";
+      description = "Full domain name for Vaultwarden (derived; Naming spec §3).";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;

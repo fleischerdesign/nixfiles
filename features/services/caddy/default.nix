@@ -10,17 +10,6 @@ in
   options.my.features.services.caddy = {
     enable = lib.mkEnableOption "Caddy Web Server";
 
-    baseDomain = lib.mkOption {
-      type = lib.types.str;
-      default =
-        let
-          hostName = config.networking.hostName;
-          hostTopo = config.my.topology.hosts.${hostName} or null;
-        in
-        if hostTopo != null && hostTopo.domain != null then hostTopo.domain else config.my.topology.domain;
-      description = "Base domain for exposed services (defaults to host topology domain, e.g. srv.lan.vyrx.de, edge.vyrx.de)";
-    };
-
     authentikOutpostAddress = lib.mkOption {
       type = lib.types.str;
       # Forward-auth terminates on the central embedded outpost of the authentik

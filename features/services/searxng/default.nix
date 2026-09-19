@@ -9,18 +9,11 @@
 #   - JSON format enabled for machine API search requests.
 {
   config,
-  options,
   lib,
   ...
 }:
 let
   cfg = config.my.features.services.searxng;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then
-      config.my.features.services.caddy.baseDomain
-    else
-      null;
 in
 {
   options.my.features.services.searxng = {
@@ -46,8 +39,8 @@ in
 
     domain = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
-      default = if caddyBaseDomain != null then "search.${caddyBaseDomain}" else null;
-      description = "Public or Tailscale domain for SearXNG.";
+      default = "search.${config.my.topology.domain}";
+      description = "Public or Tailscale domain for SearXNG (derived; Naming spec §3).";
     };
 
     auth = lib.mkOption {

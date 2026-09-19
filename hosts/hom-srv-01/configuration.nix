@@ -21,9 +21,6 @@
   my = {
     features = {
       services = {
-        caddy = {
-          baseDomain = "srv.lan.vyrx.de";
-        };
         home-assistant.enable = true;
         esphome.enable = true;
         mealie.enable = true;

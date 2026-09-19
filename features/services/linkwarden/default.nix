@@ -13,12 +13,8 @@ in
     enable = lib.mkEnableOption "Linkwarden";
     domain = lib.mkOption {
       type = lib.types.str;
-      default =
-        if config.my.features.services.caddy.baseDomain != null then
-          "linkwarden.${config.my.features.services.caddy.baseDomain}"
-        else
-          "linkwarden.edge.${config.my.topology.domain}";
-      description = "Domain name for Linkwarden.";
+      default = "linkwarden.${config.my.topology.domain}";
+      description = "Domain name for Linkwarden (derived; Naming spec §3).";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;

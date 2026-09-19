@@ -13,12 +13,8 @@ in
     enable = lib.mkEnableOption "CouchDB Server";
     domain = lib.mkOption {
       type = lib.types.str;
-      default =
-        if config.my.features.services.caddy.baseDomain != null then
-          "couchdb.${config.my.features.services.caddy.baseDomain}"
-        else
-          "couchdb.edge.${config.my.topology.domain}";
-      description = "Full domain name for CouchDB.";
+      default = "couchdb.${config.my.topology.domain}";
+      description = "Full domain name for CouchDB (derived; Naming spec §3).";
     };
   };
 

@@ -1,17 +1,10 @@
 {
   config,
-  options,
   lib,
   ...
 }:
 let
   cfg = config.my.features.services.mealie;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then
-      config.my.features.services.caddy.baseDomain
-    else
-      null;
   topologyDomain = config.my.topology.domain;
   authHost = "auth.${topologyDomain}";
 in
@@ -20,8 +13,7 @@ in
     enable = lib.mkEnableOption "Mealie Recipe Manager";
     smtpFromEmail = lib.mkOption {
       type = lib.types.str;
-      default =
-        if caddyBaseDomain != null then "noreply@${caddyBaseDomain}" else "noreply@${topologyDomain}";
+      default = if topologyDomain != null then "noreply@${topologyDomain}" else "noreply@localhost";
       description = "From address for SMTP outgoing mails.";
     };
     ssoConfigurationUrl = lib.mkOption {

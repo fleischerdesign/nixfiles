@@ -1,6 +1,5 @@
 {
   config,
-  options,
   lib,
   features,
   ...
@@ -8,12 +7,7 @@
 
 let
   cfg = config.my.features.services.obsidian-livesync;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then
-      config.my.features.services.caddy.baseDomain
-    else
-      "edge.${config.my.topology.domain}";
+  topologyDomain = config.my.topology.domain;
 in
 {
   options.my.features.services.obsidian-livesync = {
@@ -21,8 +15,8 @@ in
 
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "livesync.${caddyBaseDomain}";
-      description = "Full domain name for Obsidian LiveSync endpoint.";
+      default = "livesync.${topologyDomain}";
+      description = "Full domain name for the Obsidian LiveSync endpoint (derived; Naming spec §3).";
     };
   };
 

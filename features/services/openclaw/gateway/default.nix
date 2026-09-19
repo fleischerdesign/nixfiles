@@ -342,7 +342,7 @@ let
 
         domain = lib.mkOption {
           type = lib.types.str;
-          default = osConfig.my.features.services.caddy.baseDomain or "";
+          default = osConfig.my.topology.domain;
           description = "Base domain for reverse proxy.";
         };
 

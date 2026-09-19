@@ -1,18 +1,11 @@
 {
   config,
-  options,
   lib,
   ...
 }:
 
 let
   cfg = config.my.features.services.monitoring.grafana;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then
-      config.my.features.services.caddy.baseDomain
-    else
-      null;
   topologyDomain = config.my.topology.domain;
   authHost = "auth.${topologyDomain}";
   ntfyHost = "push.${topologyDomain}";
@@ -22,9 +15,8 @@ in
     enable = lib.mkEnableOption "Grafana Dashboard";
     domain = lib.mkOption {
       type = lib.types.str;
-      default =
-        if caddyBaseDomain != null then "grafana.${caddyBaseDomain}" else "grafana.ops.${topologyDomain}";
-      description = "FQDN of the Grafana instance.";
+      default = "grafana.${topologyDomain}";
+      description = "FQDN of the Grafana instance (derived; Naming spec §3).";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;

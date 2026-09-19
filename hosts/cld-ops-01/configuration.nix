@@ -10,8 +10,6 @@
 
   networking.hostName = "cld-ops-01";
 
-  my.features.services.caddy.baseDomain = "ops.vyrx.de";
-
   my.features.system.networking.tailscale.acceptRoutes = true;
 
   my.features.services.monitoring = {

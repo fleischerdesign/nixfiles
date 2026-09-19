@@ -14,9 +14,6 @@
 
   networking.hostName = "cld-edge-01";
 
-  # Features
-  my.features.services.caddy.baseDomain = "edge.vyrx.de";
-
   my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.networking.cloudflare.enable = true;
 
