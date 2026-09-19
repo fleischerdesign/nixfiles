@@ -64,7 +64,7 @@ let
 in
 {
   options.my.features.services.esphome = {
-    enable = lib.mkEnableOption "ESPHome Device Manager";
+    enable = lib.mkEnableOption "Declarative ESPHome device fleet (firmware + GitOps flashing)";
 
     devicePackages = lib.mkOption {
       type = lib.types.attrsOf lib.types.package;
@@ -74,10 +74,12 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    services.esphome = {
-      enable = true;
-      port = 6052;
-    };
+    # No dashboard: ESPHome removed the built-in one (the nixpkgs module still starts
+    # `esphome dashboard`, which no longer exists - so the unit died with "The built-in dashboard
+    # has been removed from ESPHome" and took every activation's exit code down with it). The
+    # fleet is managed through the CLI and the packages below, which is what this feature always
+    # used; a web UI would be a separate tool (esphome-device-builder) and can be added when it is
+    # actually wanted.
 
     # Rendered from SOPS as individual files; the sync engine assembles the secrets.yaml ESPHome
     # resolves `!secret` against, so no credential is ever embedded in the generated firmware
@@ -93,39 +95,6 @@ in
     # The flash scripts belong on the host that holds the credentials: sops-nix materializes them
     # under /run/secrets here, and this is the machine on the segment the devices live on.
     environment.systemPackages = lib.attrValues cfg.devicePackages;
-
-    my.contracts.provides.esphome = {
-      endpoints = {
-        web = {
-          port = 6052;
-          protocol = "tcp";
-          scope = "internal";
-          auth = "authentik";
-          subdomain = "esphome";
-          dashboard = {
-            show = true;
-            displayName = "ESPHome";
-            category = "Infrastructure";
-            icon = "chip";
-          };
-        };
-
-        mdns = {
-          port = 5353;
-          protocol = "udp";
-          scope = "internal";
-          directAccess = {
-            enable = true;
-            protocol = "udp";
-            interface = "all";
-          };
-          monitoring.http.enable = false;
-        };
-      };
-      storage = {
-        stateDirs = [ "/var/lib/esphome" ];
-      };
-    };
 
     my.features.services.esphome.devicePackages = lib.mapAttrs (
       name: device: mkDevicePackage name device specs.${name}
