@@ -211,6 +211,13 @@ in
         # looks exactly like a missing API permission and was misread as one. Zone discovery must
         # therefore use a public resolver, independent of the host's own DNS story.
         dnsResolver = "1.1.1.1:53";
+        # lego's own propagation check asks recursive resolvers whether the challenge TXT record is
+        # visible. Measured on this zone: the authoritative nameserver carried the value immediately
+        # while 1.1.1.1, 8.8.8.8 and 9.9.9.9 each served a different, partly stale subset - so the
+        # check can never converge, and it timed out after its full 2-minute window even with a
+        # freshly cleaned zone. What it measures is CDN cache state, not the truth; the validation
+        # that matters is the CA's own, and that queries the authoritative servers.
+        dnsPropagationCheck = false;
         # systemd credentials rather than an environment file: lego reads the token from the path
         # the variable names, so the secret never appears in a process environment.
         credentialFiles = {
