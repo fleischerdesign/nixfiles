@@ -51,6 +51,14 @@ let
       user = cfg.user;
       passwordSecret = cfg.passwordSecret;
       settings = {
+        lan = {
+          address = cfg.settings.lan.address;
+          subnetMask = cfg.settings.lan.subnetMask;
+          dhcpRange = {
+            min = cfg.settings.lan.dhcpRange.min;
+            max = cfg.settings.lan.dhcpRange.max;
+          };
+        };
         dns = {
           primary = cfg.settings.dns.primary;
           fallback = cfg.settings.dns.fallback;
@@ -110,11 +118,68 @@ in
     };
 
     settings = {
+      # The box's own LAN interface. `address` is the target; until the box has moved, the
+      # reconciler reaches it at the topology's migration address (see `host` above).
+      lan = {
+        address = lib.mkOption {
+          type = lib.types.str;
+          default = if routerHost != null && routerHost.ipv4 != null then routerHost.ipv4 else "10.10.10.1";
+          description = "Target LAN address of the FRITZ!Box (RFC 1812 uplink router)";
+        };
+
+        subnetMask = lib.mkOption {
+          type = lib.types.str;
+          default = "255.255.255.0";
+          description = "LAN subnet mask (every declared subnet is a /24)";
+        };
+
+        dhcpRange = {
+          min = lib.mkOption {
+            type = lib.types.str;
+            default =
+              let
+                net = lib.concatStringsSep "." (
+                  lib.take 3 (
+                    lib.splitString "." (
+                      if routerHost != null && routerHost.ipv4 != null then routerHost.ipv4 else "10.10.10.1"
+                    )
+                  )
+                );
+              in
+              "${net}.20";
+            description = ''
+              First address the box hands out while it still serves DHCP. It stays below Kea's
+              pool (.100-.200), so the two never overlap during the handover.
+            '';
+          };
+
+          max = lib.mkOption {
+            type = lib.types.str;
+            default =
+              let
+                net = lib.concatStringsSep "." (
+                  lib.take 3 (
+                    lib.splitString "." (
+                      if routerHost != null && routerHost.ipv4 != null then routerHost.ipv4 else "10.10.10.1"
+                    )
+                  )
+                );
+              in
+              "${net}.99";
+            description = "Last address the box hands out while it still serves DHCP";
+          };
+        };
+      };
+
       dns = {
         primary = lib.mkOption {
           type = lib.types.str;
           default = if serverHost != null && serverHost.ipv4 != null then serverHost.ipv4 else "10.10.10.10";
-          description = "Primary DNS server handed out or upstream (hom-srv-01 Blocky DNS)";
+          description = ''
+            DNS server the box should announce. NOT settable over TR-064 (this box exposes no
+            such action), so it is reported as a diff and must be set in the UI - or ignored,
+            because Kea serves DHCP (and DNS) once the cutover is done.
+          '';
         };
 
         fallback = lib.mkOption {
