@@ -260,6 +260,7 @@ Aliases are tracked as deprecation debt and reported by §7 I8.
 | I6 | Every projected record's FQDN lies inside a declared plane suffix. |
 | I7 | `scope ∈ { public, internal, mesh, isolated }` — the **existing** contract enum, unmapped (`iot` is not an endpoint scope). |
 | I8 | Aliases are enumerated in a deprecation report. |
+| I9 | A `public` endpoint with `auth = "none"` must carry an explicit `publicExempt = "<reason>"`. Publishing an unauthenticated service to the internet is a **decision**, never a default. |
 
 Read-only projections for inspection and tests: `my.contracts.projections.fqdns`,
 `…hostFqdns`, `…dnsRecords.{public,lan,vpn,iot}`, `…ingressVhosts`.
@@ -304,6 +305,32 @@ Ingress host (Cloudflare + Caddy) deploys last, so DNS/TLS never point at an uns
    exists; the `vpn` plane keeps its `fd10::/64` ULA records.
 3. **Mail zone** (`MX`, `SPF`, `DKIM`, `DMARC`, `PTR`): still needs an explicit, documented
    place in the apex before mail features grow. *(open)*
+4. **Zone membership — resolved.** `hass`, `seerr`, `mealie` and `mon` (Grafana) are **public**.
+   `ARCHITECTURE.md` §3.2 is therefore stale for `mealie`/`mon` (they belong in §3.1). Contract
+   deltas:
+
+   | Service | Current | Required | Resulting FQDN |
+   |---|---|---|---|
+   | `home-assistant` | `scope = "internal"; auth = "none"` | `scope = "public"; auth = "authentik"` (+ `unauthenticatedPaths` for the companion-app/token APIs) | `hass.vyrx.de` |
+   | `jellyseerr` | `scope = "internal"; auth = "none"` | `scope = "public"; auth = "authentik"` | `seerr.vyrx.de` |
+   | `mealie` | `scope = "public"; auth = "oidc"` | unchanged | `mealie.vyrx.de` |
+   | `grafana` | `scope = "public"; auth = "oidc"` (+ `mon.lan` alias) | unchanged; drop the `mon.lan` alias (§4) | `grafana.vyrx.de` |
+
+   **Critical:** `home-assistant` and `jellyseerr` currently pair `scope = "public"`-intent with
+   `auth = "none"`. Changing only the scope would publish both **unauthenticated** on the
+   internet. The scope and the auth must change together — this is exactly the class of mistake
+   I9 exists to prevent.
+
+   Operational caveat for `home-assistant`: the companion app and integrations authenticate with
+   long-lived tokens, not a browser SSO redirect. Authentik forward-auth must therefore be
+   combined with `unauthenticatedPaths` (and the already-configured `trusted_proxies`), or the
+   mobile app breaks. The exact path list must be taken from Home Assistant's documented
+   trusted-proxy setup, not guessed.
+
+5. **Auth exemption mechanism (new, required by I9):** `public` + `auth = "none"` stays legal
+   for self-authenticating or intentionally public endpoints (Attic's own token auth, `search`,
+   the static `portfolio` / `vyrx-landing` sites). Those must declare `publicExempt = "<reason>"`
+   so the exemption is visible in review rather than assumed.
 
 ---
 
