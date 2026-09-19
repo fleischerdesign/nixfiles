@@ -178,13 +178,14 @@ Worst case: reboot and select the previous generation in the bootloader (GRUB).
 ### 7.1 cld-edge-01 — DONE
 Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `IDENTITY.md`).
 
-### 7.2 cld-ops-01
-Public `37.114.55.91`, Tailscale `rollins` (`100.126.5.72`). **Current hostname is still `rollins`** — the deploy renames it to `cld-ops-01`. Runs observability collector, Attic server, CrowdSec agent, OpenClaw gateway, Caddy.
+### 7.2 cld-ops-01 — DONE
+Public `37.114.55.91`, Tailscale node still named `rollins` (`100.126.5.72`). Deployed 2026-09-19: hostname **`cld-ops-01`** (was `rollins`), generation `8siiv7vj…`, **0 failed units**. Runs observability collector, Attic server, CrowdSec agent, OpenClaw gateways (5), SearXNG, Caddy.
 ```bash
 nixos-rebuild switch --flake .#cld-ops-01 --target-host root@37.114.55.91
 ssh root@37.114.55.91 'hostnamectl --static; systemctl --failed'
 ```
-Verify: hostname becomes `cld-ops-01`, Prometheus/Loki/Grafana reachable, Attic responds, OpenClaw gateway up.
+Verified: `ops.vyrx.de` 200; `philipp|katja|lilly|kai|rieke.ai.vyrx.de` → 302 Authentik forward-auth; `ai.vyrx.de` → 301 → `philipp.ai.vyrx.de`; `search.vyrx.de` → 302; **wg0 up with a live handshake to `cld-edge-01` (`10.10.100.1`)**.
+Open: `cache.ops.vyrx.de` has **no DNS record** (§13 #8); orphaned `/var/lib/docker` (§13 #9).
 
 ### 7.3 hom-srv-01 — READ FIRST: §8 network cutover
 Currently **`strummer`** at `192.168.178.27` (old LAN), Tailscale `100.125.253.108`. Target: `10.10.10.10`. Runs media stack, Blocky (DNS), Kea (DHCP), Chrony, gateway/NAT, ESPhome, Home Assistant, Klipper, LDAP outpost, Tailscale subnet router (`10.10.0.0/16`).
@@ -384,6 +385,8 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 5 | Tailnet still uses legacy musician node names | Wrong host assumption | `tailscale status` before targeting (§3.3) |
 | 6 | `rm -rf /var/lib/authentik` | Authentik service CHDIR failure | Fixed via tmpfiles rule; recreate dir if manual wipe |
 | 7 | Authentik `akadmin` is the only usable break-glass account | Family accounts have no password | Log in as `akadmin`; set/`Passwort vergessen` |
+| 8 | `cache.ops.vyrx.de` (Attic) has **no Cloudflare DNS record** | Attic server api-endpoint + future client default are unreachable | Add `*.ops` CNAME → `ops.vyrx.de` to `defaultRecords`, redeploy `cld-edge-01` |
+| 9 | Legacy `/var/lib/docker` (21 GB, `camofox`) orphaned on `cld-ops-01` | Wasted disk; `camofox` is not referenced in the repo anymore | `rm -rf /var/lib/docker` once nothing needs it |
 
 ---
 
