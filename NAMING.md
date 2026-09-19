@@ -209,10 +209,24 @@ part of the design is a wildcard that encodes a **host** into a **service** name
 | `*.${service}.${domain}` | **kept**, service-declared via `extraDomains` | runtime-minted names (OpenClaw self-publishing `<app>.pub.<inst>.ai.vyrx.de`) |
 | `*.edge.${domain}`, `*.ops.${domain}` | **abolished** | these only existed because service names encoded hosts |
 
-A wildcard **certificate** (`*.${domain}`, DNS-01) is recommended for the public plane, with
-one caveat: a wildcard cert covers **one** label only, so multi-label dynamic names
-(`<app>.pub.<inst>.ai.vyrx.de`) still need their own certificate. OpenClaw already issues
-those via Caddy `on_demand_tls` (§8.1 of the code).
+A wildcard **certificate** for the public plane is **not obtainable here**, and that is a
+measurement, not an assumption: Cloudflare's own Universal SSL certificate for this zone is
+validated by TXT records at `_acme-challenge.${domain}`, which Cloudflare manages internally and
+which do not appear in the zone's API record list (verified: DNS serves them, the API does not know
+them). No third party can prove control of that name, so neither `*.${domain}` nor the apex can be
+issued to us. Per-name challenges are free and publish within seconds
+(`_acme-challenge.<name>.${domain}`, verified), so **every public name gets its own certificate,
+issued on the host that terminates it** — which is also how the rest of the industry avoids
+copying private keys between hosts (one policy, per-consumer credentials: SPIRE, Vault PKI,
+cert-manager).
+
+Consequences per plane:
+
+| Plane | Certificate |
+|---|---|
+| public | one per name, issued on the terminating host via DNS-01 (never a wildcard) |
+| internal (`.lan`, `.mesh`) | Caddy's own CA — not resolvable from the internet, so no public CA can ever validate these names. Where an internal name is only a convenience, the public name plus split horizon serves the same purpose without a second trust anchor |
+| multi-label public (`<app>.pub.<inst>.ai.${domain}`) | one per name as well; OpenClaw's dynamically minted hosts keep Caddy `on_demand_tls` (code §8.1) |
 
 ### 5.1 The public catch-all conflicts with the internal planes (verified defect)
 
