@@ -192,13 +192,10 @@ in
     # One certificate per zone, obtained by DNS-01 through Cloudflare, on every host that
     # terminates public names. The strategy is deliberately single: the certificate never depends
     # on where a name resolves, which is what makes split horizon and a public CA compatible.
-    # Explicit `tls` directives (see tlsFor above) mean Caddy never attempts its own ACME, so a
-    # name that cannot be validated from outside no longer produces endless retries.
+    # Binding this certificate to the vhosts follows in a second step: an explicit `tls`
+    # directive pointing at a file that does not exist yet can make Caddy reject its whole
+    # configuration, so the certificate is issued before anything references it.
     sops.secrets."infra/cloudflare_api_token" = lib.mkDefault { };
-
-    sops.templates."acme-cloudflare.env".content = "CF_DNS_API_TOKEN=${
-      config.sops.placeholder."infra/cloudflare_api_token"
-    }";
 
     security.acme = {
       acceptTerms = true;
@@ -207,7 +204,11 @@ in
         domain = "*.${zone}";
         extraDomainNames = [ zone ];
         dnsProvider = "cloudflare";
-        credentialsFile = config.sops.templates."acme-cloudflare.env".path;
+        # systemd credentials rather than an environment file: lego reads the token from the path
+        # the variable names, so the secret never appears in a process environment.
+        credentialFiles = {
+          CF_DNS_API_TOKEN_FILE = config.sops.secrets."infra/cloudflare_api_token".path;
+        };
         group = "caddy";
         reloadServices = [ "caddy.service" ];
       };
