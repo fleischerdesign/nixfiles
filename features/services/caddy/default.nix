@@ -270,9 +270,14 @@ in
       # hosts, each host rotates its own, and a compromise stays local (the model SPIRE, Vault PKI
       # and cert-manager follow - one policy, per-consumer credentials). The apex and wildcards are
       # absent because Cloudflare's own Universal SSL owns `_acme-challenge.${zone}`.
-      certs = lib.genAttrs publicNames (name: {
-        domain = name;
-      });
+      # The ingress declares none: its names resolve to it, so Caddy's automatic HTTPS already
+      # obtains and renews them there, and declaring them again would issue a second, redundant set.
+      # Every other host declares one certificate per public name it terminates.
+      certs = lib.mkIf (!isIngress) (
+        lib.genAttrs publicNames (name: {
+          domain = name;
+        })
+      );
     };
 
     my.contracts.provides.caddy = {
