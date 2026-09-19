@@ -243,13 +243,14 @@ in
         # looks exactly like a missing API permission and was misread as one. Zone discovery must
         # therefore use a public resolver, independent of the host's own DNS story.
         dnsResolver = "1.1.1.1:53";
-        # lego's own propagation check asks recursive resolvers whether the challenge TXT record is
-        # visible. Measured on this zone: the authoritative nameserver carried the value immediately
-        # while 1.1.1.1, 8.8.8.8 and 9.9.9.9 each served a different, partly stale subset - so the
-        # check can never converge, and it timed out after its full 2-minute window even with a
-        # freshly cleaned zone. What it measures is CDN cache state, not the truth; the validation
-        # that matters is the CA's own, and that queries the authoritative servers.
-        dnsPropagationCheck = false;
+        # lego's own propagation check waits until the challenge record is actually visible before
+        # asking the CA to validate. It must stay on: with it disabled the CA is asked within a
+        # second of the API write, sees NXDOMAIN because the record has not propagated yet, and that
+        # NXDOMAIN is then cached negatively for the zone's whole SOA minimum (1800 s here) - which
+        # makes every retry for the next half hour fail. Measured: with the check off, all four
+        # orders on hom-srv-01 failed with exactly that NXDOMAIN. It is pinned to a public resolver
+        # for the same reason the zone lookup is: these hosts resolve through Tailscale MagicDNS.
+        dnsPropagationCheck = true;
         # systemd credentials rather than an environment file: lego reads the token from the path
         # the variable names, so the secret never appears in a process environment.
         credentialFiles = {
