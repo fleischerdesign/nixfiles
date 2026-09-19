@@ -11,11 +11,6 @@ in
 {
   options.my.features.services.linkwarden = {
     enable = lib.mkEnableOption "Linkwarden";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "linkwarden.${config.my.topology.domain}";
-      description = "Domain name for Linkwarden (derived; Naming spec §3).";
-    };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
       default = "https://auth.${config.my.topology.domain}/application/o/linkwarden";
@@ -44,8 +39,8 @@ in
             NEXT_PUBLIC_AUTHENTIK_ENABLED = "true";
             AUTHENTIK_ISSUER = cfg.ssoAuthority;
             # Linkwarden specific: NEXTAUTH_URL must end with /api/v1/auth
-            NEXTAUTH_URL = "https://${cfg.domain}/api/v1/auth";
-            BASE_URL = "https://${cfg.domain}";
+            NEXTAUTH_URL = "https://${config.my.contracts.provides.linkwarden.endpoints.web.canonicalDomain}/api/v1/auth";
+            BASE_URL = "https://${config.my.contracts.provides.linkwarden.endpoints.web.canonicalDomain}";
 
             NEXT_PUBLIC_DISABLE_REGISTRATION = "true";
             NEXT_PUBLIC_CREDENTIALS_ENABLED = "false";
@@ -68,7 +63,7 @@ in
             protocol = "tcp";
             scope = "public";
             auth = "oidc";
-            inherit (cfg) domain;
+            subdomain = "linkwarden";
             extraDomains = [
               "links.lan.${config.my.topology.domain}"
             ];

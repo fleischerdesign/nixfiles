@@ -11,11 +11,6 @@ in
 {
   options.my.features.services.plausible = {
     enable = lib.mkEnableOption "Plausible Analytics";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "plausible.${config.my.topology.domain}";
-      description = "Domain name for Plausible instance (derived; Naming spec §3).";
-    };
   };
 
   config = lib.mkIf cfg.enable (
@@ -37,7 +32,7 @@ in
           enable = true;
 
           server = {
-            baseUrl = "https://${cfg.domain}";
+            baseUrl = "https://${config.my.contracts.provides.plausible.endpoints.web.canonicalDomain}";
             secretKeybaseFile = config.sops.secrets."services/apps/plausible_secret_key_base".path;
             port = 8000;
             listenAddress = "127.0.0.1";

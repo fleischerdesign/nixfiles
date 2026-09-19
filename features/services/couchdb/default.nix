@@ -11,11 +11,6 @@ in
 {
   options.my.features.services.couchdb = {
     enable = lib.mkEnableOption "CouchDB Server";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "couchdb.${config.my.topology.domain}";
-      description = "Full domain name for CouchDB (derived; Naming spec §3).";
-    };
   };
 
   config = lib.mkIf cfg.enable {

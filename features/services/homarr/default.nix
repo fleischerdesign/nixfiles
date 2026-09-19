@@ -13,11 +13,6 @@ in
 {
   options.my.features.services.homarr = {
     enable = lib.mkEnableOption "Homarr Dashboard";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "homarr.${topologyDomain}";
-      description = "Domain name for Homarr (derived; Naming spec §3).";
-    };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
       default = "https://${authHost}/application/o/homarr/";
@@ -53,8 +48,8 @@ in
             SECRET_ENCRYPTION_KEY=${config.sops.placeholder."services/apps/homarr_encryption_key"}
 
             # URLs
-            BASE_URL=https://${cfg.domain}
-            NEXTAUTH_URL=https://${cfg.domain}
+            BASE_URL=https://${config.my.contracts.provides.homarr.endpoints.web.canonicalDomain}
+            NEXTAUTH_URL=https://${config.my.contracts.provides.homarr.endpoints.web.canonicalDomain}
 
             # Redis (Using Mackaye's native redis)
             REDIS_IS_EXTERNAL=true
@@ -98,7 +93,7 @@ in
             protocol = "tcp";
             scope = "public";
             auth = "none";
-            inherit (cfg) domain;
+            subdomain = "homarr";
             dashboard = {
               show = true;
               displayName = "Homarr";

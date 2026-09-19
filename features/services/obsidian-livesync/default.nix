@@ -7,17 +7,11 @@
 
 let
   cfg = config.my.features.services.obsidian-livesync;
-  topologyDomain = config.my.topology.domain;
 in
 {
   options.my.features.services.obsidian-livesync = {
     enable = lib.mkEnableOption "Obsidian LiveSync Server (CouchDB Backend)";
 
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "livesync.${topologyDomain}";
-      description = "Full domain name for the Obsidian LiveSync endpoint (derived; Naming spec §3).";
-    };
   };
 
   config = lib.mkIf cfg.enable (
@@ -37,7 +31,7 @@ in
               enable_cors = true;
             };
             cors = {
-              origins = "app://obsidian.md,capacitor://localhost,http://localhost,https://${cfg.domain}";
+              origins = "app://obsidian.md,capacitor://localhost,http://localhost,https://${config.my.contracts.provides.obsidian-livesync.endpoints.web.canonicalDomain}";
               credentials = true;
               methods = "GET, PUT, POST, HEAD, DELETE";
               headers = "accept, authorization, content-type, origin, referer";

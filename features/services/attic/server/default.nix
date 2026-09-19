@@ -8,16 +8,10 @@ let
   cfg = config.my.features.services.attic.server;
 
   # Single source for the cache's FQDN: flat and plane-derived (Naming spec §3).
-  cacheFqdn = "cache.${config.my.topology.domain}";
 in
 {
   options.my.features.services.attic.server = {
     enable = lib.mkEnableOption "Attic Nix binary cache server";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = cacheFqdn;
-      description = "Full domain name for atticd (mirrors the `cache` contract endpoint).";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -35,8 +29,8 @@ in
       environmentFile = config.sops.templates.atticd_env.path;
       settings = {
         listen = "0.0.0.0:8080";
-        allowed-hosts = [ cfg.domain ];
-        api-endpoint = "https://${cfg.domain}/";
+        allowed-hosts = [ config.my.contracts.provides.attic.endpoints.web.canonicalDomain ];
+        api-endpoint = "https://${config.my.contracts.provides.attic.endpoints.web.canonicalDomain}/";
         chunking = {
           nar-size-threshold = 16 * 1024 * 1024;
           min-size = 256 * 1024;

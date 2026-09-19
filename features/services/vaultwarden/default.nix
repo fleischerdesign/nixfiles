@@ -13,11 +13,6 @@ in
 {
   options.my.features.services.vaultwarden = {
     enable = lib.mkEnableOption "Vaultwarden";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "vault.${topologyDomain}";
-      description = "Full domain name for Vaultwarden (derived; Naming spec §3).";
-    };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
       default = "https://${authHost}/application/o/vaultwarden/";
@@ -34,7 +29,7 @@ in
           enable = true;
           dbBackend = "postgresql";
           config = {
-            DOMAIN = "https://${cfg.domain}";
+            DOMAIN = "https://${config.my.contracts.provides.vaultwarden.endpoints.web.canonicalDomain}";
             SIGNUPS_ALLOWED = false;
 
             # OIDC / Authentik
@@ -70,7 +65,7 @@ in
             protocol = "tcp";
             scope = "public";
             auth = "oidc";
-            inherit (cfg) domain;
+            subdomain = "vault";
             extraDomains = [
               "vault.${topologyDomain}"
             ];

@@ -195,8 +195,8 @@ let
               yamlTag "!KeyOf provider_proxy_${safeId}"
             ) sortedEndpointNames;
             config = {
-              authentik_host = "https://${cfg.domain}";
-              authentik_host_browser = "https://${cfg.domain}";
+              authentik_host = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
+              authentik_host_browser = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
               authentik_host_insecure = false;
             };
           };
@@ -441,11 +441,6 @@ in
 {
   options.my.features.services.authentik.server = {
     enable = lib.mkEnableOption "Authentik Identity Provider (Server)";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "auth.vyrx.de";
-      description = "FQDN of the Authentik identity server.";
-    };
     adminEmail = lib.mkOption {
       type = lib.types.str;
       default = "philipp@vyrx.de";

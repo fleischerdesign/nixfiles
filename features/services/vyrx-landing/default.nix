@@ -13,11 +13,6 @@ in
 {
   options.my.features.services.vyrx-landing = {
     enable = lib.mkEnableOption "VYRX Enterprise Portal & Landing Page";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "vyrx.de";
-      description = "Domain name for the landing page.";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -27,7 +22,7 @@ in
         protocol = "tcp";
         scope = "public";
         auth = "none";
-        fqdn = cfg.domain;
+        subdomain = "@";
         publicExempt = "public static landing page, no user data";
         customExtraConfig = ''
           root * ${vyrxLandingPkg}

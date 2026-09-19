@@ -13,11 +13,6 @@ in
 {
   options.my.features.services.monitoring.grafana = {
     enable = lib.mkEnableOption "Grafana Dashboard";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "grafana.${topologyDomain}";
-      description = "FQDN of the Grafana instance (derived; Naming spec §3).";
-    };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
       default = "https://${authHost}/application/o";
@@ -61,8 +56,8 @@ in
         server = {
           http_addr = "127.0.0.1";
           http_port = 3000;
-          inherit (cfg) domain;
-          root_url = "https://${cfg.domain}";
+          domain = config.my.contracts.provides.grafana.endpoints.web.canonicalDomain;
+          root_url = "https://${config.my.contracts.provides.grafana.endpoints.web.canonicalDomain}";
         };
 
         security = {
