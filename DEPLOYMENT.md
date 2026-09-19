@@ -396,10 +396,46 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 12 | ~~`sandbox.<name>.ai.vyrx.de` had no listener~~ **closed.** Root cause: `mcp.apps.enabled` was never set, so OpenClaw never started its sandbox-only listener (the `port + 100` override is correct and configurable — `port + 1` would collide with the packed gateway ports). Fixed and verified: 18889–18894 listen, `/mcp-app-sandbox` is 200 through the ingress, `/` is 404 by design. | — |
 | 13 | OpenClaw gateways require the ingress in `gateway.trustedProxies`; without it every proxy-shaped request is rejected with `proxy_attribution_required` | Broken public routes | Derived from `my.topology.ingressHost` in the gateway feature; the ingress also overwrites `X-Forwarded-For/-Proto/-Host` (fix in place — do not regress either half) |
 | 11 | Naming model changed: flat public names, ingress engine, Blocky split horizon, `node` plane | Deploy order matters — DNS/TLS must exist before a name is served | Deploy `cld-edge-01` first, then `cld-ops-01`, `hom-srv-01`, clients. See `NAMING.md` §9/§12 |
+| 14 | Migration scaffolding (host `migration` block, watchdog, legacy labels) is temporary by design | Left in place the repository describes two states at once and an obsolete path onto the host stays open | Run the teardown in §14; `my.contracts.projections.migrationDebt` reports what is still temporary |
 
 ---
 
-## 14. Appendix — Files, Secrets, Commands
+## 14. Migration Scaffolding — Teardown Checklist
+
+Every transitional artifact is **deprecation debt with an expiry**. The repository must end up
+describing exactly one state (the target): scaffolding that lingers keeps an obsolete address
+and default route alive, is a second forgotten path onto the host, and will collide with the
+very networks we migrated for. `my.contracts.projections.migrationDebt` reports what is still
+temporary — a **report, never an assertion**, because an assertion would block the migration it
+is meant to clean up after.
+
+### 14.1 Gate — do not start until all of these hold
+
+- [ ] every client holds a lease from `10.10.10.0/24` (Kea leases/logs, not the FRITZ!Box)
+- [ ] the FRITZ!Box answers on `10.10.10.1` and its DHCP is off
+- [ ] `grep -rn '192\.168\.178' --include='*.nix' .` returns **no** hits (documents may keep history)
+- [ ] `ip -4 neigh` on `hom-srv-01` shows no neighbour in the old subnet
+- [ ] a stability window has passed (days, not hours) before the rollback generations are pruned
+
+### 14.2 Teardown steps (each independently reversible)
+
+| # | Change | Verification |
+|---|---|---|
+| 1 | empty `my.topology.hosts.hom-srv-01.migration` (`addresses = []`, `gateway = null`), redeploy | `ip -br a` shows only `10.10.10.10`; default route via `10.10.10.1`; Tailscale and services up |
+| 2 | remove the migration watchdog (unit + timer + file) | deploy is clean, no unit left |
+| 3 | drop the reconciler's old-address input and `hom-rt-01.migration` | a reconciler run reports "unchanged" |
+| 4 | delete the `migration` option from the topology schema once no host needs it | `nix flake check`, `nix fmt`, statix/deadnix clean |
+| 5 | remove rename leftovers one by one (e.g. `ntfy.vyrx.de`); `fleischer.design`, `*.pub.*` and `docs.lan.vyrx.de` are **intended** aliases | the alias report shrinks to the intended set |
+| 6 | remove the legacy topology shim once nothing reads it | `grep -rn 'networking\.topology' features/ roles/` |
+
+### 14.3 What stays (target state, not scaffolding)
+
+`my.topology.hosts.<h>.interface`, `my.topology.resolvers`, the router reconciler's
+LAN/DHCP/DNS/forward capability, `enableDhcp`, and the naming invariants I1–I11.
+
+---
+
+## 15. Appendix — Files, Secrets, Commands
 
 **Key files**
 - `flake.nix` — hosts, `deploy.nodes`, `nodTargets`.

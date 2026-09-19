@@ -122,6 +122,37 @@ let
     e: e.ep.scope == "public" && e.ep.auth == "none" && e.ep.publicExempt == null
   ) named;
 
+  # I11 (report, never an assertion): hosts still carrying subnet-migration addresses or the
+  # old gateway. Temporary state must be *visible*, not enforced - an assertion would block the
+  # very migration it is meant to clean up after. Mirrors the alias report (I8).
+  migrationDebt =
+    lib.mapAttrsToList
+      (
+        hostName: host:
+        let
+          m =
+            host.migration or {
+              addresses = [ ];
+              gateway = null;
+            };
+          parts = m.addresses ++ lib.optional (m.gateway != null) "gateway ${m.gateway}";
+        in
+        "${hostName}: ${lib.concatStringsSep ", " parts}"
+      )
+      (
+        lib.filterAttrs (
+          _: host:
+          let
+            m =
+              host.migration or {
+                addresses = [ ];
+                gateway = null;
+              };
+          in
+          m.addresses != [ ] || m.gateway != null
+        ) topology.hosts
+      );
+
   report =
     title: items:
     "${title}: "
@@ -143,6 +174,10 @@ in
           type = lib.types.listOf lib.types.str;
           description = "Deprecation report: legacy names still published as aliases (I8).";
         };
+        migrationDebt = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          description = "Deprecation report (I11): hosts still carrying subnet-migration addresses or an old gateway.";
+        };
       };
     };
     readOnly = true;
@@ -154,6 +189,7 @@ in
       fqdns = lib.unique fqdns;
       hostFqdns = map (hostName: "${hostName}.node.${topology.domain}") (lib.attrNames topology.hosts);
       aliases = lib.unique aliasNames;
+      migrationDebt = migrationDebt;
     };
 
     assertions = [
