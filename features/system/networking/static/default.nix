@@ -15,7 +15,7 @@
 }:
 let
   cfg = config.my.features.system.networking.static;
-  topology = config.my.features.system.networking.topology;
+  topology = config.my.topology;
   hostTopology = topology.hosts.${config.networking.hostName} or null;
 
   interface = hostTopology.interface or null;
@@ -31,8 +31,8 @@ let
       prefixLength = lib.toInt (builtins.elemAt parts 1);
     };
 
-  targetAddresses = lib.optional (hostTopology != null && hostTopology.localIp != null) {
-    address = hostTopology.localIp;
+  targetAddresses = lib.optional (hostTopology != null && hostTopology.ipv4 != null) {
+    address = hostTopology.ipv4;
     prefixLength = 24;
   };
 
@@ -72,7 +72,7 @@ let
     cfg.enable
     && hostTopology != null
     && interface != null
-    && hostTopology.localIp != null
+    && hostTopology.ipv4 != null
     && (hostTopology.gateway != null || migration.gateway != null || zoneGateway != null);
 in
 {

@@ -17,7 +17,7 @@ in
     };
     coreAddress = lib.mkOption {
       type = lib.types.str;
-      default = "http://${config.my.features.system.networking.topology.hosts.cld-edge-01.tailscaleIp}:9055";
+      default = "http://${config.my.topology.hosts.cld-edge-01.wireguardIpv4}:9055";
       description = "Internal address of the Authentik Core instance.";
     };
     browserUrl = lib.mkOption {

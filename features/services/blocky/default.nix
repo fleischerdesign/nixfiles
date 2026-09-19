@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.my.features.services.blocky;
-  topology = config.my.features.system.networking.topology;
+  topology = config.my.topology;
 
   # Fleet-wide configuration graph (`flake` is injected by lib/core/system-builder.nix).
   flakeConfigurations =
@@ -21,14 +21,13 @@ let
     if host == null then
       null
     else if
-      host.localIp != null
-      && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
+      host.ipv4 != null && (lib.hasPrefix "10.10." host.ipv4 || lib.hasPrefix "192.168." host.ipv4)
     then
-      host.localIp
-    else if host.tailscaleIp != null then
-      host.tailscaleIp
+      host.ipv4
+    else if host.wireguardIpv4 != null then
+      host.wireguardIpv4
     else
-      host.localIp;
+      host.ipv4;
 
   # Split-horizon projection (ARCHITECTURE.md §5 and §8.1): every named contract endpoint
   # resolves locally to the host that serves it - the *same* name that resolves publicly to
@@ -101,18 +100,17 @@ in
                     let
                       primaryIp =
                         if
-                          host.localIp != null
-                          && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
+                          host.ipv4 != null && (lib.hasPrefix "10.10." host.ipv4 || lib.hasPrefix "192.168." host.ipv4)
                         then
-                          host.localIp
-                        else if host.tailscaleIp != null then
-                          host.tailscaleIp
+                          host.ipv4
+                        else if host.wireguardIpv4 != null then
+                          host.wireguardIpv4
                         else
-                          host.localIp;
+                          host.ipv4;
                       ipv6 = host.wireguardIpv6 or null;
                     in
                     if ipv6 != null then "${primaryIp},${ipv6}" else primaryIp;
-                }) (lib.filterAttrs (_: h: h.domain != null) config.my.features.system.networking.topology.hosts))
+                }) (lib.filterAttrs (_: h: h.domain != null) config.my.topology.hosts))
                 // (lib.mapAttrs' (devName: dev: {
                   name =
                     if dev.domain != null then

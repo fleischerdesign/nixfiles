@@ -9,7 +9,7 @@
 
 let
   cfg = config.my.features.services.monitoring.pipeline;
-  topology = config.my.features.system.networking.topology;
+  topology = config.my.topology;
 in
 {
   options.my.features.services.monitoring.pipeline = {
@@ -63,8 +63,8 @@ in
             let
               hubTopology = topology.hosts.${cfg.hub} or null;
             in
-            if hubTopology != null && hubTopology.tailscaleIp != null then
-              hubTopology.tailscaleIp
+            if hubTopology != null && hubTopology.wireguardIpv4 != null then
+              hubTopology.wireguardIpv4
             else
               "127.0.0.1"
         );

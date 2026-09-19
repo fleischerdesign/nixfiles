@@ -6,15 +6,15 @@
 }:
 let
   cfg = config.my.features.system.networking.ssh;
-  hosts = config.my.features.system.networking.topology.hosts;
+  hosts = config.my.topology.hosts;
   ownHost = hosts.${config.networking.hostName} or null;
   listenAddresses = lib.mkIf (ownHost != null) (
-    lib.optional (ownHost.localIp != null) {
-      addr = ownHost.localIp;
+    lib.optional (ownHost.ipv4 != null) {
+      addr = ownHost.ipv4;
       port = 22;
     }
-    ++ lib.optional (ownHost.tailscaleIp != null) {
-      addr = ownHost.tailscaleIp;
+    ++ lib.optional (ownHost.wireguardIpv4 != null) {
+      addr = ownHost.wireguardIpv4;
       port = 22;
     }
     ++ lib.optional (ownHost.wireguardIpv6 != null) {

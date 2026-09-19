@@ -7,7 +7,7 @@
 
 let
   cfg = config.my.features.services.monitoring.prometheus;
-  hosts = config.my.features.system.networking.topology.hosts or { };
+  hosts = config.my.topology.hosts or { };
   ownHost = config.networking.hostName;
 
   blackboxRelabel = blackboxAddr: [
@@ -51,7 +51,8 @@ let
   ) (if flake != null then (flake.nixosConfigurations or { }) else { ${ownHost} = config; });
 
   blackboxAddrForHost =
-    hostName: if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.tailscaleIp}:9115";
+    hostName:
+    if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.wireguardIpv4}:9115";
 
   # Collect all direct Prometheus scrape targets across hosts
   allScrapeServices = lib.concatLists (
@@ -130,7 +131,7 @@ let
   );
 
   otherServerHosts = lib.filterAttrs (
-    n: h: n != ownHost && (h.hostType or "client") == "server" && h.tailscaleIp != null
+    n: h: n != ownHost && (h.hostType or "client") == "server" && h.wireguardIpv4 != null
   ) hosts;
 
   embeddedHosts = lib.filterAttrs (_: h: (h.hostType or "") == "embedded" && h.ipv4 != null) hosts;
@@ -157,7 +158,7 @@ in
                 if t.hostName == ownHost then
                   "127.0.0.1:${toString t.svc.monitoring.scrape.port}"
                 else
-                  "${hosts.${t.hostName}.tailscaleIp}:${toString t.svc.monitoring.scrape.port}"
+                  "${hosts.${t.hostName}.wireguardIpv4}:${toString t.svc.monitoring.scrape.port}"
               )
             ];
             labels = {
@@ -264,7 +265,7 @@ in
               metrics_path = "/probe";
               params.module = [ "icmp" ];
               static_configs = lib.mapAttrsToList (name: host: {
-                targets = [ host.tailscaleIp ];
+                targets = [ host.wireguardIpv4 ];
                 labels = {
                   target_host = name;
                   probe_type = "icmp_mesh";

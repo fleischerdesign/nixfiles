@@ -7,7 +7,7 @@ let
   cfg = config.my.features.services.crowdsec;
   isMaster = cfg.role == "master";
   # Use topology host definitions for IPs
-  masterIP = config.my.features.system.networking.topology.hosts.${cfg.masterHost}.tailscaleIp;
+  masterIP = config.my.topology.hosts.${cfg.masterHost}.wireguardIpv4;
 in
 {
   options.my.features.services.crowdsec = {
@@ -42,7 +42,7 @@ in
           description = "Whitelist internal LAN and Tailscale IPs";
           whitelist = {
             reason = "trusted internal network";
-            cidr = config.my.features.system.networking.topology.trustedSubnets;
+            cidr = config.my.topology.trustedSubnets;
           };
         }
       ];

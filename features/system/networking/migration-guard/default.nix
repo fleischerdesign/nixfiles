@@ -16,7 +16,7 @@
   ...
 }:
 let
-  topology = config.my.features.system.networking.topology;
+  topology = config.my.topology;
   hostTopology = topology.hosts.${config.networking.hostName} or null;
 
   migration =
