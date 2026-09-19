@@ -207,7 +207,10 @@ let
 
           identityFile = lib.mkOption {
             type = lib.types.str;
-            default = "~/.ssh/deploy-key";
+            # Deliberately NOT ~/.ssh/deploy-key: that path belongs to the fleet deploy key, and a
+            # rendered tunnel secret living there silently replaces it - after which every deploy
+            # loses root access to the whole fleet.
+            default = "~/.ssh/node-tunnel-key";
             description = "SSH private key used for the forward; `~` expands to the home of tunnel.serviceUser.";
           };
 
