@@ -7,6 +7,28 @@
 
 ---
 
+## 0. As-Built Status (2026-09-19) — supersedes older sections
+
+> Diese Sektion beschreibt den **tatsächlich implementierten** Stand. Wo sie älteren Text widerspricht, gilt diese Sektion; §5/§6 sind historisch/illustrativ.
+
+**Blueprint-Pfad (real):** `features/services/authentik/server/blueprints/`
+- `00-system/` (Brand), `01-rbac/` (Gruppen + User), `02-flows/` (Recovery, Enrollment, Remember-me, Passkey-Autofill)
+- generiert nach `03-apps/`: `proxy-apps-generated.yaml`, `oidc-apps-generated.yaml`, `ldap-outposts-generated.yaml` (Kompilierung in `server/default.nix`)
+
+**Korrekturen gegenüber der ursprünglichen Spezifikation:**
+
+1. **YAML-Tags:** Authentik kennt **kein `!Key`**, nur `!KeyOf` (sowie `!Find`, `!Env`, `!File`, `!Context`, …). Ein unbekanntes Tag bricht schon die Migration `authentik_blueprints.0001_initial` (sie parst jede Blueprint-YAML) → überall `!KeyOf`.
+2. **Generierte App-Blueprints:** Authentik entdeckt nur `*.yaml`; JSON kann keine YAML-Tags tragen → Apps werden als **getaggtes YAML** emittiert (`toBlueprintYaml`, Sentinel + `sed`). Pflichtfelder: `authorization_flow` **und** `invalidation_flow`; `redirect_uris` als Objekte `{matching_mode, url}`.
+3. **Reihenfolge:** Blueprint-Apply ist **nicht** geordnet (offizielle Doku) → Abhängigkeiten explizit via `authentik_blueprints.metaapplyblueprint` (Default-Provider-Flows, RBAC-Gruppe).
+4. **Forward-Auth:** zentraler **Embedded Outpost** des Authentik-Servers; Caddy-Ziel via `my.features.services.authentik.server.embeddedOutpostAddress` (`127.0.0.1:9055` lokal, `10.10.100.1:9055` remote). Kein eigener Proxy-Outpost/-Token mehr.
+5. **LDAP-Outposts:** **ein Outpost pro Host** mit eigenem Service-Account + Token (`intent = "api"`), Key via `!File` aus per-Host-SOPS-Secret `services/authentik/outposts/<host>-ldap-token`; Rolle mit globalen Reads (`view_user`, `view_group`, `add_event`) plus Objekt-Permissions an der **benannten Rolle** (nicht der Managed-Role); LDAP-Provider + Application; Listen `389/636`.
+6. **Bootstrap/Setup:** kein OOBE. `AUTHENTIK_BOOTSTRAP_PASSWORD` (in `services/authentik/core_env`) triggert `system/bootstrap.yaml` → legt `akadmin` an und setzt `setup = true`. `akadmin` = Break-Glass (`authentik Admins`); `infra-admins` bleibt separater Cluster-Admin.
+7. **Self-Service:** Email-Recovery (`flow_recovery` am Brand), Invitation-Enrollment, Passkey-Autofill (Conditional UI), Remember-me (`session_duration = days=7`, `remember_me_offset = days=30`). Keine erzwungenen Passwort-Policies.
+8. **Worker:** `AUTHENTIK_WORKER__THREADS=1` (verhindert den `authentik_flows_stage`-Deadlock beim frischen Bootstrap); Worker-Metrics auf `9301` (Server `9300`).
+9. **Apply-Pfad:** Änderungen gehen über das **Host-Closure** (`nixos-rebuild` bzw. `nod switch cld-edge-01`); `nodTargets.authentik` wurde entfernt. Rollout/Runbook: **`DEPLOYMENT.md`**.
+
+---
+
 ## 1. Leitphilosophie & Das GitOps-Axiom
 
 In klassischen Identitätsmanagement-Systemen (IdP) führt die Konfiguration über das Web-UI („ClickOps“) unweigerlich zu **Konfigurationsdrift** und **fehlender Disaster-Recovery-Fähigkeit**. Geht die relationale Datenbank verloren, müssen Dutzende OIDC-Clients, Rollen, Outpost-Tokens und Proxy-Weiterleitungen stundenlang händisch rekonstruiert werden.
@@ -120,10 +142,10 @@ Der Datenfluss wird umgedreht. **SOPS ist die alleinige Quelle der Wahrheit (SSO
 
 ## 5. Hierarchische Blueprint-Struktur
 
-Die Konfiguration wird unter `features/services/authentik/blueprints/` modular abgelegt:
+Die Konfiguration wird unter `features/services/authentik/server/blueprints/` modular abgelegt:
 
 ```
-features/services/authentik/blueprints/
+features/services/authentik/server/blueprints/
 ├── 00-system/
 │   ├── brand.yaml           # Titel, Design-Tokens aus DESIGN.md, Favicon
 │   └── flows-core.yaml      # Exportierte Passkey- & Invalidation-Flows
@@ -175,8 +197,8 @@ entries:
       name: "Philipp"
       email: "philipp@vyrx.de"
       groups:
-        - "!Key group_infra_admins"
-        - "!Key group_media_users"
+        - !KeyOf group_infra_admins
+        - !KeyOf group_media_users
 ```
 
 ### 6.2 OIDC Provider Beispiel: Grafana (`03-apps/monitoring.yaml`)
@@ -204,7 +226,7 @@ entries:
       slug: "grafana"
     attrs:
       name: "Grafana"
-      provider: "!Key provider_grafana"
+      provider: !KeyOf provider_grafana
       meta_launch_url: "https://mon.lan.vyrx.de"
       group: "Observability"
       open_in_new_tab: true
@@ -230,7 +252,7 @@ entries:
       slug: "sonarr"
     attrs:
       name: "Sonarr"
-      provider: "!Key provider_sonarr"
+      provider: !KeyOf provider_sonarr
       group: "Arr Stack"
 
   - model: authentik_policies_expression.expressionpolicy
@@ -243,8 +265,8 @@ entries:
 
   - model: authentik_policies.policybinding
     identifiers:
-      target: "!Key provider_sonarr"
-      policy: "!Key policy_admins_only"
+      target: !KeyOf provider_sonarr
+      policy: !KeyOf policy_admins_only
       order: 0
     attrs:
       enabled: true
@@ -269,7 +291,7 @@ entries:
       identifier: "outpost-ldap-token"
     attrs:
       intent: "app_password"
-      user: "!Key sa_ldap"
+      user: !KeyOf sa_ldap
       key: "!Env AUTHENTIK_OUTPOST_LDAP_TOKEN"
 
   - model: authentik_providers_ldap.ldapprovider
@@ -278,7 +300,7 @@ entries:
       name: "VYRX LDAP Provider"
     attrs:
       base_dn: "DC=vyrx,DC=de"
-      search_group: "!Key group_infra_admins"
+      search_group: !KeyOf group_infra_admins
 
   - model: authentik_outposts.outpost
     identifiers:
@@ -287,7 +309,7 @@ entries:
       type: "ldap"
       service_connection: null # Standalone / Managed via NixOS
       providers:
-        - "!Key provider_ldap_main"
+        - !KeyOf provider_ldap_main
       config:
         authentik_host: "https://auth.vyrx.de"
 ```
