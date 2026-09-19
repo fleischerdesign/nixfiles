@@ -223,12 +223,12 @@ in
         );
     };
 
-    # One certificate per zone, obtained by DNS-01 through Cloudflare, on every host that
-    # terminates public names. The strategy is deliberately single: the certificate never depends
-    # on where a name resolves, which is what makes split horizon and a public CA compatible.
-    # Binding this certificate to the vhosts follows in a second step: an explicit `tls`
-    # directive pointing at a file that does not exist yet can make Caddy reject its whole
-    # configuration, so the certificate is issued before anything references it.
+    # One certificate per public name, obtained by DNS-01 through Cloudflare, on the host that
+    # serves it. The strategy is deliberately single: the certificate never depends on where a name
+    # resolves, which is what makes split horizon and a public CA compatible. `certs` below and the
+    # `tls` bindings in the vhosts are both derived from one computed name list, so they cannot
+    # drift apart, and the ACME unit is retried by its own timer when a resolver's cache defeats an
+    # attempt.
     sops.secrets."infra/cloudflare_api_token" = lib.mkDefault { };
 
     security.acme = {
@@ -258,11 +258,6 @@ in
         group = "caddy";
         reloadServices = [ "caddy.service" ];
       };
-      # Two orders, never one. `*.${zone}` and the apex share the same `_acme-challenge.${zone}`
-      # record, so a single order puts two TXT values at that name at the same time; the CA then
-      # finds a value it did not expect and rejects the authorization with
-      # "Incorrect TXT record ... (and 1 more) found at _acme-challenge.<zone>" - measured here.
-      # Separate orders cannot overlap: each one finishes before the next starts.
       # One certificate per public name, issued where it is used: no key material is copied between
       # hosts, each host rotates its own, and a compromise stays local (the model SPIRE, Vault PKI
       # and cert-manager follow - one policy, per-consumer credentials). The apex and wildcards are
