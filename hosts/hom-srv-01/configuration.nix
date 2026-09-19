@@ -56,13 +56,11 @@
       };
       system = {
         networking = {
-          # TEMPORARY (cutover): the FRITZ!Box still serves DHCP on the old LAN. Kea must stay
-          # off until the box has moved and stopped handing out addresses - otherwise two DHCP
-          # servers answer on the same L2 segment and clients lease a subnet whose gateway does
-          # not exist yet. Flipped back in DEPLOYMENT.md 8.3 Step 4.
+          # The FRITZ!Box has moved to 10.10.10.1 and no longer serves DHCP, so Kea takes over
+          # now (DEPLOYMENT.md 8.3 Step 4).
           gateway = {
             enable = true;
-            enableDhcp = false;
+            enableDhcp = true;
           };
           fritzbox = {
             enable = true;

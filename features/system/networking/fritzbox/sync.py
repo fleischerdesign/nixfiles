@@ -178,20 +178,10 @@ def main():
         return
 
     # --- apply (order matters) ------------------------------------------------------------
-    # Everything that does not move the box first, the LAN address last.
+    # The box validates each argument against its CURRENT LAN subnet: a DHCP range for the new
+    # subnet is rejected (error 820) while the box still holds the old address. So the address
+    # moves first, and everything subnet-dependent is applied against the new address afterwards.
     changes = 0
-
-    want_min = lan.get("dhcpRange", {}).get("min")
-    want_max = lan.get("dhcpRange", {}).get("max")
-    if (want_min, want_max) != (current["dhcp_min"], current["dhcp_max"]) and want_min and want_max:
-        fc.call_action(LAN, "SetAddressRange", NewMinAddress=want_min, NewMaxAddress=want_max)
-        print(f"  [+] DHCP range set to {want_min} - {want_max}")
-        changes += 1
-
-    if dhcp.get("enable") != current["dhcp_enabled"]:
-        fc.call_action(LAN, "SetDHCPServerEnable", NewDHCPServerEnable=bool(dhcp.get("enable")))
-        print(f"  [+] DHCP server {'enabled' if dhcp.get('enable') else 'disabled'}")
-        changes += 1
 
     if not forwards and current_forwards:
         for f in current_forwards:
@@ -207,6 +197,11 @@ def main():
                 f"-> {f['internal_client']}:{f['internal_port']} ({f['description']})"
             )
             changes += 1
+
+    if dhcp.get("enable") != current["dhcp_enabled"]:
+        fc.call_action(LAN, "SetDHCPServerEnable", NewDHCPServerEnable=bool(dhcp.get("enable")))
+        print(f"  [+] DHCP server {'enabled' if dhcp.get('enable') else 'disabled'}")
+        changes += 1
 
     address_changed = lan.get("address") and lan["address"] != current["address"]
     if address_changed:
@@ -226,18 +221,29 @@ def main():
         except Exception as e:
             print(f"  [~] connection dropped while moving the box: {e}")
         changes += 1
-        # Verify at the new address instead of trusting the dropped connection.
+        # Continue against the new address instead of trusting the dropped connection.
         try:
-            check = FritzConnection(
+            fc = FritzConnection(
                 address=lan["address"], user=user, password=password, timeout=10
             )
-            after = read_lan(check)
+            after = read_lan(fc)
             print(f"  [✓] verified at {lan['address']}: address={after['address']}")
         except Exception as e:
-            print(f"  [!] could not verify {lan['address']} yet: {e}")
+            print(f"  [!] could not reach {lan['address']} yet: {e}")
+            print(f"  [✓] Reconciliation stopped after the address change: {changes} change(s).")
+            return
     elif lan.get("subnetMask") and lan["subnetMask"] != current["subnet_mask"]:
         fc.call_action(LAN, "SetSubnetMask", NewSubnetMask=lan["subnetMask"])
         print(f"  [+] subnet mask set to {lan['subnetMask']}")
+        changes += 1
+
+    # Only now, against the box's new (or unchanged) subnet, is the range a valid argument.
+    want_min = lan.get("dhcpRange", {}).get("min")
+    want_max = lan.get("dhcpRange", {}).get("max")
+    now = read_lan(fc)
+    if want_min and want_max and (want_min, want_max) != (now["dhcp_min"], now["dhcp_max"]):
+        fc.call_action(LAN, "SetAddressRange", NewMinAddress=want_min, NewMaxAddress=want_max)
+        print(f"  [+] DHCP range set to {want_min} - {want_max}")
         changes += 1
 
     print(f"  [✓] Reconciliation complete for {host}: {changes} change(s).")
