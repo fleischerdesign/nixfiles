@@ -178,6 +178,11 @@ Worst case: reboot and select the previous generation in the bootloader (GRUB).
 ### 7.1 cld-edge-01 — DONE
 Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `IDENTITY.md`).
 
+**Naming/ingress rollout (2026-09-19): live.** The host now runs the flat public naming, the
+cluster-wide ingress engine (vhosts + WireGuard upstreams), the `node` plane, the tunnel
+credential and no apex catch-all. Verified: switch exit **0**, no failed units, 38 Cloudflare
+records matching the projection, `auth`/`grafana`/`search`/`philipp.ai` 302, `cache`/`push` 200.
+
 ### 7.2 cld-ops-01 — DONE
 Public `37.114.55.91`, Tailscale node still named `rollins` (`100.126.5.72`). Deployed 2026-09-19: hostname **`cld-ops-01`** (was `rollins`), generation `8siiv7vj…`, **0 failed units**. Runs observability collector, Attic server, CrowdSec agent, OpenClaw gateways (5), SearXNG, Caddy.
 ```bash
@@ -387,7 +392,8 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 7 | Authentik `akadmin` is the only usable break-glass account | Family accounts have no password | Log in as `akadmin`; set/`Passwort vergessen` |
 | 8 | ~~Attic had no Cloudflare DNS record~~ **fixed.** The flat name is `cache.vyrx.de`, projected from the Attic contract endpoint; the ad-hoc `*.ops` wildcard is obsolete (#10). | — |
 | 9 | Legacy `/var/lib/docker` (21 GB, `camofox`) orphaned on `cld-ops-01` | Wasted disk; `camofox` is not referenced in the repo anymore | `rm -rf /var/lib/docker` once nothing needs it |
-| 10 | Cloudflare still holds the removed wildcards `*.ops.vyrx.de` and `*.ai.vyrx.de` | Not reproducible from git (GitOps drift) | Controlled `cloudflare-sync --prune` run **after** verification |
+| 10 | ~~Cloudflare held the removed wildcards~~ **closed.** `*.vyrx.de`, `*.ai.vyrx.de`, `*.ops.vyrx.de`, the stale `search.vyrx.de` CNAME and the wrongly created `fleischer.design.vyrx.de` were deleted; the live zone now equals the projection (38 records, internal planes absent). | — |
+| 12 | `sandbox.<name>.ai.vyrx.de` is declared `scope = public` but **nothing binds** ports 18889–18894 (`openclaw-2026.9.4` opens no sandbox listener) | Public route returns 502; the option itself calls the port an "internal loopback port" | Decide: (a) openclaw binds the sandbox on the mesh, or (b) declare `scope = "isolated"` — no name, no record, no 502 *(open)* |
 | 11 | Naming model changed: flat public names, ingress engine, Blocky split horizon, `node` plane | Deploy order matters — DNS/TLS must exist before a name is served | Deploy `cld-edge-01` first, then `cld-ops-01`, `hom-srv-01`, clients. See `NAMING.md` §9/§12 |
 
 ---
