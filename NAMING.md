@@ -1,17 +1,26 @@
 # VYRX — DNS, Host & Service Naming Specification
 
-> **Status:** Normative derivation rules. **`ARCHITECTURE.md` is the parent specification** —
-> this document only makes its naming rules explicit and machine-checkable. Where the two
-> disagree, `ARCHITECTURE.md` wins and this document is the bug.
+> **Status:** Normative derivation rules and enforcement for the naming intent declared in
+> `ARCHITECTURE.md`. The parent specification defines **what names must express**; this
+> document defines **how they are derived** and **how conformance is enforced**.
 >
-> **Companion documents:** `ARCHITECTURE.md` §1 (principles), §5 (edge ingress diagram),
-> §8.1 (contract & projection engines), `IDENTITY.md` (identity), `DEPLOYMENT.md` (rollout).
+> **Authority split (three distinct questions):**
+> * *What should a name express?* → `ARCHITECTURE.md` is authoritative (planes,
+>   service-first principle, split horizon, projection engines).
+> * *How is it derived and how is it checked?* → this document is authoritative; the parent
+>   specifies intent but neither a derivation function nor any verification.
+> * *What does the code actually do?* → neither: where the implementation contradicts
+>   `ARCHITECTURE.md`, **the implementation is the defect**, not the specification (§0.2).
+>   A documented decision is evidence of intent, not proof of correctness.
+>
+> **Companion documents:** `ARCHITECTURE.md` §1 (principles), §3 (edge diagram),
+> §5 (split horizon), §8.1 (projection engines), `IDENTITY.md`, `DEPLOYMENT.md`.
 
 ---
 
-## 0. What is already specified (and therefore not up for debate)
+## 0. Intent, implementation, and gaps
 
-Quoted verbatim from `ARCHITECTURE.md`:
+### 0.1 Specified intent (quoted from `ARCHITECTURE.md`)
 
 * **§1.1 (l. 14) — Service-First statt Host-First:**
   "Dienste besitzen feste DNS-Endpunkte (`jellyfin.vyrx.de`, `sonarr.lan.vyrx.de`).
@@ -30,11 +39,40 @@ Quoted verbatim from `ARCHITECTURE.md`:
     in Caddy-VHosts **und WireGuard-Upstreams**" — `VHosts = Π_public(ClusterContracts)`.
   * *DNS Engine (`hom-srv-01`)*: "projiziert alle internen Endpoints und
     **Split-Horizon-Rewrites** in Blocky-Hosts" — `DNSRecords = Π_dns(ClusterContracts)`.
+  * *Module neutrality:* "Feature-Module sind strikt **agnostisch** und passiv. Ein Modul
+    kennt weder seinen Zielhost, noch Routing-Details, noch die Caddy-Konfiguration."
 
-**The current implementation deviates from this.** `caddy.baseDomain` (`edge.vyrx.de` /
-`ops.vyrx.de`) turned flat service names into host-encoded ones (`push.edge.vyrx.de`,
-`grafana.edge.vyrx.de`, `cache.ops.vyrx.de`). That deviation is the drift we are undoing —
-not the specification.
+### 0.2 The implementation contradicts the specified intent (verified)
+
+| Specified intent | Actual implementation | Consequence |
+|---|---|---|
+| §1.1: services are never coupled to machine names | `caddy.baseDomain` (`edge.` / `ops.`) → `push.edge.vyrx.de`, `grafana.edge.vyrx.de`, `cache.ops.vyrx.de` | every host migration becomes a rename (DNS + vHost + OIDC redirect URI + bookmarks); observed: stale `grafana.ops.…`, orphan `mon.lan.…`, `push.edge…` vs documented `push.vyrx.de` |
+| §1.1 example `sonarr.lan.vyrx.de` | `sonarr.srv.lan.vyrx.de` | host label injected into the service name |
+| §3 example `hass.vyrx.de` | `hass.srv.lan.vyrx.de` | same |
+| §8.1: modules know neither their host nor routing | `plausible`, `linkwarden`, `vaultwarden`, `couchdb`, `obsidian-livesync` hardcode `"<svc>.edge.${domain}"` | placement knowledge leaked into service modules |
+| §8.1: Ingress Engine projects **all** `public` endpoints cluster-wide into vHosts **and WireGuard upstreams** | the DNS/Caddy projection is host-local; no ingress upstreams exist | `public` endpoints on LAN hosts produce **no** record — `jellyfin.vyrx.de` does not exist although §3 requires it |
+| §5: `jellyfin.vyrx.de` resolves locally to `10.10.10.10` | Blocky maps `host.domain` only, not service names | the specified split horizon for service names is not implemented |
+| §2: deterministic host naming | host FQDNs are hand-written (`srv`, `wrk`, `nb`, `rt`, `ap`) | no rule exists for the FQDN of a new host (`hom-srv-02` → ?) |
+
+### 0.3 Where the parent specification is **under**-specified
+
+These are the additions this document contributes. They are not restatements of
+`ARCHITECTURE.md` — the parent is silent on them, and that silence is why the drift in §0.2
+could go unnoticed:
+
+1. **Derivation functions.** The parent fixes hostnames (§2) and gives naming *examples*,
+   but defines neither a host-FQDN rule nor a service-FQDN rule. §2/§3 below are those rules.
+2. **Zone authority and publishing.** The parent names the planes and locates the DNS engine
+   on `hom-srv-01`, but never states who is authoritative for `lan`/`vpn`/`iot` or whether
+   they may be published. §1 fixes that (Blocky-only, never published).
+3. **A plane for cloud-internal services.** The parent's model has no plane for services that
+   are reachable only over the overlay and are not internet-facing (Prometheus, PostgreSQL,
+   Redis on the cloud hosts). §3 resolves them (`subdomain = null` → no name).
+4. **Enforcement.** The parent states principles but no invariants, and nothing failed when the
+   implementation violated them. §7 makes conformance a hard evaluation failure.
+5. **Bindings to the engines.** §8.1 declares the Ingress/DNS engines as intent; §5/§6 here
+   turn them into concrete record/vhost/upstream projections, including the missing
+   ingress → mesh upstream path.
 
 ---
 
