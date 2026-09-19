@@ -36,10 +36,14 @@ in
       endpoints.web = {
         port = 5055;
         protocol = "tcp";
-        # Public per NAMING.md §10.4. Jellyseerr keeps its own Jellyfin login behind
-        # Authentik; its native OIDC login is the alternative to avoid double authentication.
+        # Public per NAMING.md §10.4. Seerr authenticates with its own Jellyfin login — exactly
+        # like Home Assistant and Jellyfin — so no forward-auth layer and no double login.
+        # The image in use is an OIDC-capable fork, but its OIDC configuration contract is not
+        # environment based and is undocumented (settings-file based); wiring it declaratively
+        # is a separate follow-up, and declaring auth = "oidc" before that would be a lie.
         scope = "public";
-        auth = "authentik";
+        auth = "none";
+        publicExempt = "Seerr enforces its own Jellyfin login; an external forward-auth proxy only adds a second login";
         subdomain = "seerr";
         dashboard = {
           show = true;
