@@ -6,6 +6,57 @@
 }:
 let
   cfg = config.my.features.services.blocky;
+  topology = config.my.features.system.networking.topology;
+
+  # Fleet-wide configuration graph (`flake` is injected by lib/core/system-builder.nix).
+  flakeConfigurations =
+    config._module.specialArgs.flake.nixosConfigurations or {
+      "${config.networking.hostName}" = config;
+    };
+
+  # Address a LAN client should use to reach a host: the LAN address when the host lives in
+  # the home network, otherwise the WireGuard overlay address.
+  reachableAddress =
+    host:
+    if host == null then
+      null
+    else if
+      host.localIp != null
+      && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
+    then
+      host.localIp
+    else if host.tailscaleIp != null then
+      host.tailscaleIp
+    else
+      host.localIp;
+
+  # Split-horizon projection (ARCHITECTURE.md §5 and §8.1): every named contract endpoint
+  # resolves locally to the host that serves it - the *same* name that resolves publicly to
+  # the ingress. The internal planes (.lan/.vpn/.iot) exist only here.
+  endpointMappings = lib.listToAttrs (
+    lib.concatLists (
+      lib.mapAttrsToList (
+        hostName: hostConfig:
+        let
+          address = reachableAddress (topology.hosts.${hostName} or null);
+        in
+        lib.optionals (address != null) (
+          lib.concatLists (
+            lib.mapAttrsToList (
+              _svcName: contract:
+              lib.concatMap (
+                ep:
+                map (name: {
+                  inherit name;
+                  value = address;
+                }) (lib.optionals (ep.canonicalDomain != null) [ ep.canonicalDomain ] ++ ep.extraDomains)
+              ) (lib.attrValues contract.endpoints)
+            ) (hostConfig.config.my.contracts.provides or { })
+          )
+        )
+      ) flakeConfigurations
+    )
+  );
 in
 {
   options.my.features.services.blocky = {
@@ -69,7 +120,8 @@ in
                     else
                       "${devName}.lan.${config.my.topology.domain or "vyrx.de"}";
                   value = dev.ipv4;
-                }) (lib.filterAttrs (_: d: d.ipv4 != null) (config.my.topology.devices or { })));
+                }) (lib.filterAttrs (_: d: d.ipv4 != null) (config.my.topology.devices or { })))
+                // endpointMappings;
             };
 
             # Ad-blocking configuration
