@@ -46,17 +46,17 @@ stated.
 
 ---
 
-## 3. Measured state (end of session 2026-09-19)
+## 3. Measured state (2026-09-20, after the 2.0 refactor pass)
 
 | Criterion | Measurement |
 |---|---|
-| **A1** | `--failed`: `hom-srv-01` **1** (crowdsec agent), `cld-ops-01` 0, `cld-edge-01` 0 → the server still ends every activation with `exit 4` |
-| **A2** | **12** feature `domain` options remain (1 of 12 done: searxng). Two are additionally **dead**: `couchdb` (0 uses), `openclaw/gateway` (0 uses). `mail` (9 uses) is legitimately independent |
-| **A3** | repository produces `hom-srv-01: d814rq87…`, `cld-ops-01: g38bkg17…`, `cld-edge-01: 6bsq65pz…` — `cld-ops-01` and `cld-edge-01` run older revisions |
-| **A4** | I11 reports four hosts: `hom-ap-01: 192.168.178.54/24`, `hom-rt-01: 192.168.178.1/24`, `hom-srv-01: 192.168.178.27/24`, `hom-wrk-01: 192.168.178.30/24` |
-| **A5** | `edge.vyrx.de` and `ops.vyrx.de` still answer `Status: 0` (they exist) while their source of truth in the repository is deleted |
-| **A6** | root trust: `hom-srv-01` → operator key (deployed) · `cld-ops-01` → tunnel key + old fleet key · `cld-edge-01` → **only** the old fleet key, whose private half was destroyed → root access to the edge is currently impossible without a console. `~/.ssh/config` offers the whole fleet `~/.ssh/deploy-key`, which today is the **tunnel** credential. The home Caddy cannot obtain certificates for names that resolve to the edge, so `jellyfin.vyrx.de` fails from inside the LAN |
-| **A6 (passwords)** | `users.philipp.password` was **always** the hash of `173695` — verified against the value in git history with `perl -e 'print crypt(…)'`. The drift was never in the declaration but in its enforcement: `mutableUsers = true` applied it only at account creation, so `cld-edge-01` kept whatever the provider's install set, and the panel's password reset never reached the OS (it works through cloud-init on the provider's own images; this is NixOS). Servers now set `users.mutableUsers = false`, so the declaration is applied on every activation |
+| **A1** | **resolved and measured**: `--failed` is `0` on all five hosts and `nixos-rebuild switch` returns `exit 0` on every one of them. The last failure was the CrowdSec agent (renamed host → `ent: machine not found`), registered on the master. The `2` failed units seen on the edge after the rescue were transient state, not defects, and cleared on their own |
+| **A2** | **10 of 12 resolved** in `58f4139` (+17/−69): searxng (the reference case), the nine live options, and the dead `couchdb` option deleted outright. Every consumer now reads its contract's `canonicalDomain` — which is derived plane-aware, so the option that could only ever express the public plane is gone. **2 remain**: `mail` (SMTP hostname and certificate copy — legitimately independent) and `openclaw/gateway`'s per-instance `domain` (a different construct, read inside its own file, not yet decided) |
+| **A3** | **resolved**: every reachable host runs the current revision — `hom-srv-01` (already current; the no-op deploy proved it), `cld-ops-01`, `cld-edge-01` (rebuilt and activated after the rescue) and `hom-wrk-01`. Only `mob-nb-01` is not deployed, because it is offline |
+| **A4** | I11 reports four hosts: `hom-ap-01: 192.168.178.54/24`, `hom-rt-01: 192.168.178.1/24`, `hom-srv-01: 192.168.178.27/24`, `hom-wrk-01: 192.168.178.30/24`. **Deliberately deferred**: these blocks are the fallback that still works while the new subnet settles, and the migration guard is armed exactly as long as they exist. Removing them is the last step of the cutover, not an early one |
+| **A5** | **implemented, decision pending**: `--prune` existed, was documented as deleting records, and `args.prune` was read nowhere — so the reconciler could never remove the labels it had created itself. Pruning is now ownership-scoped: the desired-set check is primary, the comment vocabulary only answers "did we write this?". Measured on the live zone: 39 records, of which `edge.vyrx.de` (`Direct Edge Host -> …`), `ops.vyrx.de` (`Direct Ops Host -> …`) and `salus.vyrx.de` (left over from the removed role) are stale. The dry-run was shown; giving the unit `--prune` stays a separate, deliberate change |
+| **A6** | root trust: `hom-srv-01` → operator key (deployed) · `cld-ops-01` → tunnel key + old fleet key · `cld-edge-01` → **only** the old fleet key, whose private half was destroyed → root access to the edge was restored through the provider's rescue system, and before that my own precedence change had left it with no default route at all — the zone gateway winning over the host's own. The edge now boots the corrected generation by default (the bootloader was regenerated during activation, so the manual steering is gone) and every server trusts the operator key: `-i ~/.ssh/id_rsa` reaches all three as root. Still owed: `~/.ssh/config` offers the whole fleet `~/.ssh/deploy-key`, which today is the **tunnel** credential, and a fresh fleet key on its own path. The home Caddy cannot obtain certificates for names that resolve to the edge, so `jellyfin.vyrx.de` fails from inside the LAN |
+| **A6 (passwords)** | `users.philipp.password` was **always** the hash of `173695` — verified against the value in git history with `perl -e 'print crypt(…)'`. The drift was never in the declaration but in its enforcement: `mutableUsers = true` applied it only at account creation, so `cld-edge-01` kept whatever the provider's install set, and the panel's password reset never reached the OS (it works through cloud-init on the provider's own images; this is NixOS). Servers now set `users.mutableUsers = false`, so the declaration is applied on every activation — and this is now **measured**, not assumed: the `hom-wrk-01` activation printed `modifying secret: users/philipp/password`, and a non-interactive `sudo -S` with `173695` succeeds |
 
 **Holding:** invariants I1–I10 assert clean (0 errors under `flake check`); the compatibility shim is
 gone (0 occurrences); the `vlan` field is gone (0 occurrences).
@@ -95,6 +95,33 @@ and both were reported as findings before being re-checked:
 
 ---
 
+### 4.1 The pattern behind almost every wrong finding: a negative from an unverified source
+
+None of the four outages was a mysterious system. Each was a *statement* that nothing tied to the
+state — and the ones that cost the most were the ones I produced myself:
+
+| Instrument | What it actually said | What I read |
+|---|---|---|
+| `mkpasswd` missing | empty string | "the hashes match" → an empty hash was written to SOPS |
+| `dig` missing | no output | "the resolver does not answer" |
+| `systemctl is-active migration-guard.timer` (invented unit name) | `inactive` for a unit that does not exist | "the migration guard is disarmed" |
+| `test -r /var/log/caddy/access.log` (invented filename) | the file does not exist | "crowdsec cannot read the logs" |
+| my own script ending on `echo` | `exit 0` while `nixos-rebuild` had failed | "the deploy succeeded" (twice) |
+| an imagined context figure, stated twice | — | "I have 88% used" / "I have 17% free" |
+
+The root cause is not carelessness. It is that **a missing tool, a guessed name and a real negative
+look identical at the point of measurement**. The remedy is procedural and cheap, and it is now the
+rule for this repository:
+
+- every negative claim names the command that *would* have produced a positive;
+- no measurement counts until the instrument itself has been shown to work (does the file exist, does
+the unit exist, is the tool there);
+- in scripts: `set -euo pipefail`, never end on a bare `echo`, and derive the exit code from the checks
+  rather than from the last statement;
+- for a refactor, prove equivalence at the *delivered* level (rendered values, unit counts), not at the
+  level of the options being changed — and read leaves, never whole subtrees, because forcing a subtree
+  evaluates options nobody evaluates in production.
+
 ## 5. Open blockers
 
 **B1 — root access to `cld-edge-01`.** The edge trusts only the old fleet deploy key, whose private
@@ -126,7 +153,7 @@ stumbled over on 2026-09-19, in the order they bit:
 | 2 | Chrome `SingletonLock` (contains `<hostname>-<pid>`) | "profile in use on another computer" and no way to start Chrome | fixed (stale lock removed) |
 | 3 | CrowdSec machine registry | the agent authenticates as `<hostname>`, so the rename made it a stranger: `ent: machine not found` | fixed (`hom-srv-01` registered); stale `mackaye`, `strummer`, `rollins`, `jello`, `yorke` remain as inert debt — `mackaye` is the master's own entry and must **not** be deleted |
 | 4 | per-host `domain` fields | a second naming scheme that the rename made visibly wrong (`srv.lan.vyrx.de` for `hom-srv-01`) | fixed (fields deleted) |
-| 5 | Caddy access-log filenames (`access-<hostname>.log`) | stale files, and the agent cannot read them (`permission denied`) → the IPS runs but is blind to HTTP | open |
+| 5 | Caddy access-log filenames (`access-<vhost>.log`) | stale files, and the agent could not read them (`permission denied`) → the IPS ran but was blind to HTTP | **fixed and verified**: `z /var/log/caddy/*.log 0640 caddy caddy` plus `crowdsec` ∈ `caddy`; `cscli metrics` shows every `access-<vhost>.log` read and parsed. My later "still not readable" check tested an invented filename (`access.log`) — see §4.1 |
 | 6 | host-keyed state in user profiles (`dconf`, VS Code, kdeconnect, session stores) | harmless strings, no action | accepted |
 
 **The rule this yields:** a hostname change is finished only when every registry keyed on the hostname
@@ -134,6 +161,6 @@ has been migrated — and since we found six by accident, the list is probably i
 conclusion is not a longer checklist but a narrower habit: **treat a fleet-wide rename as a migration
 with a verification phase, like the subnet cutover — or do not rename at all.**
 
-The concrete open item from this table is #5: `crowdsec` cannot read `/var/log/caddy/*.log`. A service
-that is `active` but blind to its main input is the same failure class as `exit 4` being normal:
-the status says nothing about the effect.
+The concrete open item #5 from this table is closed. What remains here is not a defect but inert debt:
+the stale entries in the CrowdSec machine registry (#3), harmless as long as nobody mistakes them for
+live machines — `mackaye` is the master's own entry and must not be deleted.
