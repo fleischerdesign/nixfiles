@@ -42,8 +42,8 @@ Schema: **`<location>-<role>-<index>`**
 
 | Alter Name | Neuer Hostname | Typ | Hardware / Provider | Primäre Aufgaben |
 |---|---|---|---|---|
-| **`mackaye`** | **`cld-edge-01`** | VPS | QEMU / Public Cloud | Ingress Reverse-Proxy (Caddy), Authentik Core, CrowdSec Master, Primary DB, WireGuard Hub |
-| **`rollins`** | **`cld-ops-01`**  | VPS | QEMU / Public Cloud | Monitoring Pipeline (Prometheus/Grafana/Loki), Attic Cache, Hermes Agent, OpenClaw Gateway |
+| **`mackaye`** | **`cld-edge-01`** | VPS | QEMU / Public Cloud | Ingress Reverse-Proxy (Caddy), Authentik Core, CrowdSec Master, Primary DB, WireGuard Hub, Observability Stack (Prometheus/Grafana/Loki) |
+| **`rollins`** | **`cld-ops-01`**  | VPS | QEMU / Public Cloud | Monitoring Collector (Alloy + Exporters), Attic Cache, OpenClaw AI Gateway |
 | **`strummer`**| **`hom-srv-01`**  | Server | Bare Metal (Intel 4TB+1TB) | Storage, Arr-Stack, Jellyfin, Home-Assistant, Klipper, Subnet-Router, Blocky, Local Ingress Caddy |
 | **`jello`**   | **`hom-wrk-01`**  | Client | PC (Intel, NVMe, Intel GPU) | Desktop Workstation (Niri), OpenClaw Node |
 | **`-`**       | **`hom-ap-01`**   | Embedded | TP-Link RE330 | Wi-Fi Bridge / Access Point (Unified SSID: VYRX), Agentless GitOps (tplinkrouterc6u) via nod switch |
@@ -153,7 +153,7 @@ Ablösung des Standard-Subnetzes `192.168.178.0/24` durch das kollisionsfreie Su
 - **Redundante Dual-Hub Active-Relay Topologie:** Sowohl `cld-edge-01` (`173.249.22.211`) als auch `cld-ops-01` (`37.114.55.91`) fungieren als aktive Relay-Hubs.
   - **Site-to-Site Inter-Hub Link:** Beide Cloud-Hubs sind direkt und bidirektional miteinander gepeert.
   - **Dual-Peering aller Spokes:** Alle Spoke-Knoten (`hom-srv-01`, `hom-wrk-01`, `mob-nb-01`) unterhalten gleichzeitige, direkte Kernel-WireGuard-Tunnel zu beiden Hubs mit `persistentKeepalive = 25` für NAT-Traversal.
-  - **Longest-Prefix-Cryptokey-Routing (LPM):** Spoke-Traffic zu Observability/AI-Gateway (`10.10.100.2` / `fd10:1000:100::2`) auf `cld-ops-01` fließt direkt über den Ops-Relay-Tunnel ohne Umweg über Edge. Mesh-weites Transit-Routing für Roaming-Clients nutzt den Primary-Hub (`cld-edge-01`), welcher bei Wartung nahtlos umschaltbar ist.
+  - **Longest-Prefix-Cryptokey-Routing (LPM):** Spoke-Traffic zum AI-Gateway (`10.10.100.2` / `fd10:1000:100::2`) auf `cld-ops-01` fließt direkt über den Ops-Relay-Tunnel ohne Umweg über Edge. Mesh-weites Transit-Routing für Roaming-Clients nutzt den Primary-Hub (`cld-edge-01`), welcher bei Wartung nahtlos umschaltbar ist.
 - **Zonen-Affines Routing (Anti-Hairpinning):** Ko-lokierte Knoten im selben lokalen Subnetz (`hom-wrk-01` und `hom-srv-01`) kommunizieren direkt über ihre LAN-Interfaces (`10.10.x.x`) mit voller Switch-Line-Speed (1 Gbit/s / 2.5 Gbit/s). Die WireGuard-Relays im Cloud-Rechenzentrum werden strikt nur für standortübergreifenden Verkehr genutzt.
 - **Dual-Stack IPv4 & RFC 4193 ULA IPv6:** Neben dem IPv4-Overlay (`10.10.100.0/24`) spannt das Mesh ein rein kryptografisches IPv6-Overlay (`fd10:1000:100::/64`) auf. Jeder Host besitzt eine unveränderliche ULA (`fd10:1000:100::<host-id>`). Eliminierung von NAT-Traversal-Problemen und zukunftssichere End-to-End-Konnektivität.
 - **Kernel-Forwarding & TCP-MSS-Clamping:** Deterministische nftables/iptables-Regeln (`iptables` & `ip6tables`) klemmen MSS auf den WireGuard-Interfaces (`clamp-mss-to-pmtu`), um hängende TCP-Handshakes und Paketverlust über mobile DSL/LTE-Uplinks auszuschließen. Auf den Relay-Hubs sind `net.ipv4.ip_forward` und `net.ipv6.conf.all.forwarding` sowie Relay-Interface-Forwarding (`-A FORWARD -i wg0 -o wg0 -j ACCEPT`) aktiv.
@@ -171,9 +171,9 @@ Ablösung des Standard-Subnetzes `192.168.178.0/24` durch das kollisionsfreie Su
   - Fallback DNS: Router Gateway (`10.10.10.1`) mit Upstream Quad9/Cloudflare – garantiert ununterbrochenen Internetzugriff im Heimnetz bei Server-Wartungsarbeiten.
 
 ### 5.3 Zentrales Logging & Security-Observability
-- **Vollständiger Grafana LGTM-Stack:**
-  - **Loki:** Zentraler Log-Aggregator auf `cld-ops-01`.
-  - **Vector / Alloy Agent:** Auf allen Hosts installiert. Streamt Systemd-Journals, Caddy-Access-Logs, Arr-Stack-Events und CrowdSec-Auditlogs an Loki.
+- **Grafana / Prometheus / Loki / Alloy-Stack:**
+  - **Loki:** Zentraler Log-Aggregator auf `cld-edge-01`.
+  - **Alloy Agent:** Installiert auf `cld-edge-01`, `cld-ops-01` und `hom-srv-01` (nicht auf den Desktops). Streamt Systemd-Journals, Caddy-Access-Logs, Arr-Stack-Events und CrowdSec-Auditlogs an Loki.
   - **CrowdSec Ingress Protection:** Auf `cld-edge-01` und `cld-ops-01`. Bösartige IPs werden global gebannt; Alerts fließen in Echtzeit ins Grafana-Dashboard.
 
 ### 5.4 3-2-1 Enterprise Backup-Strategie & Disko-Modernisierung

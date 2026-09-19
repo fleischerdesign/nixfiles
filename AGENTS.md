@@ -8,8 +8,8 @@ Nix-Flake-basierte Enterprise-NixOS-Konfiguration für 5 Hosts (`cld-edge-01`, `
 |---|---|---|---|---|
 | `hom-wrk-01` | desktop | `corp` (`10.10.20.10`) | PC (Intel, NVMe, Intel GPU) | Niri-Desktop + Axis Shell, OpenClaw Node |
 | `mob-nb-01` | notebook | `corp` (Roaming) | Laptop (AMD, NVMe) | Niri-Desktop + Axis Shell, OpenClaw Node |
-| `cld-edge-01` | server | `mesh` / Public (`173.249.22.211`) | VPS (QEMU, GRUB/BIOS) | Ingress Hub: WireGuard Relay, Caddy Edge, Authentik SSO, ntfy, DBs |
-| `cld-ops-01` | server | `mesh` / Public (`37.114.55.91`) | VPS (QEMU, GRUB/BIOS) | Observability Master: Grafana, Prometheus, Loki, OpenClaw AI Gateway (`:18789`), Attic |
+| `cld-edge-01` | server | `mesh` / Public (`173.249.22.211`) | VPS (QEMU, GRUB/BIOS) | Ingress Hub: WireGuard Relay, Caddy Edge, Authentik SSO, ntfy, DBs, Observability Stack (Grafana, Prometheus, Loki) |
+| `cld-ops-01` | server | `mesh` / Public (`37.114.55.91`) | VPS (QEMU, GRUB/BIOS) | Observability Collector (Alloy, Node/Blackbox Exporter), OpenClaw AI Gateway (`:18789`), Attic Cache |
 | `hom-srv-01` | server | `infra` (`10.10.10.10`) | Bare Metal (Intel, 4TB+1TB) | Single-NIC Gateway (Kea DHCP, Chrony NTP, Blocky DNS), Media (\*arr, Jellyfin), Home Assistant, Klipper |
 
 > **Benennung (normativ):** Host-, Service- und Zonen-Namen folgen ausschließlich
