@@ -360,7 +360,9 @@ in
         # FRITZ!Box has moved to 10.10.10.1/24 and DHCP is handed over to Kea.
         migration = {
           addresses = [ "192.168.178.27/24" ];
-          gateway = "192.168.178.1";
+          # Cleared: the FRITZ!Box has moved to 10.10.10.1 and is now the ordinary uplink again.
+          # Keeping the old default route would cut the server off the moment the box moves.
+          gateway = null;
         };
       };
 

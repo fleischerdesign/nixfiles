@@ -62,7 +62,7 @@
           # segment. Flip to true together with the box move (DEPLOYMENT.md 8.3 Step 4).
           gateway = {
             enable = true;
-            enableDhcp = false;
+            enableDhcp = true;
           };
           fritzbox = {
             enable = true;
