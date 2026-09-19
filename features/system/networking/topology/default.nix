@@ -26,11 +26,6 @@ let
           "Nexthop has invalid gateway") and DHCP clients would learn a router they cannot reach.
         '';
       };
-      vlan = lib.mkOption {
-        type = lib.types.nullOr lib.types.int;
-        default = null;
-        description = "802.1Q VLAN ID (null for untagged / mesh overlay)";
-      };
       trustLevel = lib.mkOption {
         type = lib.types.enum [
           "infra"
@@ -267,46 +262,45 @@ in
   # wireguardIpv4 -> wireguardIpv4) and its hosts lacked ipv4 entirely, so a consumer filtering on
   # that field silently matched nothing.
   config = {
-    # Default subnet taxonomy as specified in ARCHITECTURE.md (RFC 1918 10.10.0.0/16 Supernet)
+    # Default subnet taxonomy as specified in ARCHITECTURE.md (RFC 1918 10.10.0.0/16 Supernet).
+    #
+    # There are no VLANs: the zones are subnets on one flat L2 behind a single NIC, separated by
+    # routing policy rather than by an 802.1Q tag. The per-subnet `vlan` field that used to sit here
+    # was read by nobody while looking like evidence of segmentation - if VLANs are ever built, the
+    # field comes back together with the code that reads it.
     my.topology.subnets = lib.mkDefault {
       infra = {
         cidr = "10.10.10.0/24";
         gateway = "10.10.10.1";
-        vlan = 10;
         trustLevel = "infra";
         description = "Core servers, managed networking, gateways, and storage";
       };
       corp = {
         cidr = "10.10.20.0/24";
         gateway = "10.10.20.1";
-        vlan = 20;
         trustLevel = "corp";
         description = "Trusted employee workstations, laptops, and administrative personal devices";
       };
       iot = {
         cidr = "10.10.30.0/24";
         gateway = "10.10.30.1";
-        vlan = 30;
         trustLevel = "iot";
         description = "Isolated microcontrollers, 3D printers, ESPHome, smart home devices";
       };
       mesh = {
         cidr = "10.10.100.0/24";
         gateway = "10.10.100.1";
-        vlan = null;
         trustLevel = "mesh";
         description = "Kernel-WireGuard ChaCha20 overlay mesh connecting cloud VPS and home nodes (IPv4)";
       };
       mesh-ipv6 = {
         cidr = "fd10:1000:100::/64";
-        vlan = null;
         trustLevel = "mesh";
         description = "Kernel-WireGuard RFC 4193 ULA overlay mesh connecting cloud VPS and home nodes (IPv6)";
       };
       guest = {
         cidr = "10.10.99.0/24";
         gateway = "10.10.99.1";
-        vlan = 99;
         trustLevel = "guest";
         description = "Isolated guest network with direct internet transit only";
       };
