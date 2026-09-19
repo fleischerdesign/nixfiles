@@ -22,6 +22,13 @@ let
       port = 22;
     }
   );
+
+  # Overlay units that assign the addresses sshd binds to. sshd binds each
+  # ListenAddress exactly once at startup and never rebinds, so it must start
+  # after these units and wait until every address exists on some interface.
+  overlayUnits =
+    lib.optional config.services.tailscale.enable "tailscaled.service"
+    ++ map (name: "wireguard-${name}.service") (lib.attrNames config.networking.wireguard.interfaces);
 in
 {
   options.my.features.system.networking.ssh = {
@@ -39,24 +46,27 @@ in
     my.features.system.networking.topology.enable = lib.mkDefault true;
 
     systemd.services.sshd = {
-      after = [
-        "network-online.target"
-      ]
-      ++ lib.optional config.services.tailscale.enable "tailscaled.service";
-      wants = [ "network-online.target" ];
+      after = [ "network-online.target" ] ++ overlayUnits;
+      wants = [ "network-online.target" ] ++ overlayUnits;
 
-      preStart =
-        lib.mkIf (config.services.tailscale.enable && ownHost != null && ownHost.tailscaleIp != null)
-          ''
-            echo "Waiting for tailscale0 to get IP ${ownHost.tailscaleIp}..."
-            for i in $(seq 1 60); do
-              if ${pkgs.iproute2}/bin/ip addr show tailscale0 2>/dev/null | ${pkgs.gnugrep}/bin/grep -qF "${ownHost.tailscaleIp}"; then
-                echo "tailscale0 has IP ${ownHost.tailscaleIp}, proceeding."
-                break
-              fi
-              sleep 1
-            done
-          '';
+      preStart = lib.mkIf (config.services.openssh.listenAddresses != [ ]) (
+        ''
+          echo "Waiting for SSH listen addresses to be assigned..."
+          for i in $(seq 1 60); do
+            missing=0
+        ''
+        + lib.concatMapStrings (a: ''
+          ${pkgs.iproute2}/bin/ip -o addr show 2>/dev/null | ${pkgs.gnugrep}/bin/grep -qF "${a.addr}/" || missing=1
+        '') config.services.openssh.listenAddresses
+        + ''
+            if [ "$missing" -eq 0 ]; then
+              echo "All SSH listen addresses are assigned."
+              break
+            fi
+            sleep 1
+          done
+        ''
+      );
     };
 
     services.openssh = {
