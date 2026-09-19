@@ -1026,6 +1026,9 @@ in
                 auth = if inst.auth then "authentik" else "none";
                 subdomain = inst.subdomain;
                 domain = inst.domain;
+                # Dynamically minted self-publishing hosts are the only names that
+                # cannot be enumerated, so the wildcard is declared here (SSOT).
+                extraDomains = lib.optional inst.publishing.enable "*.${inst.publishing.subdomain}.${inst.domain}";
                 unauthenticatedPaths = [
                   "/j/*"
                   "/__openclaw__/worker*"

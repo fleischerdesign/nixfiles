@@ -1,6 +1,8 @@
 # features/system/networking/cloudflare/default.nix
 # Declarative Cloudflare Edge & DNS GitOps Engine (SOLID & Agentless Architecture).
-# Reconciles Cloudflare DNS records and Edge TLS settings idempotently from `my.topology` and `my.contracts.provides`.
+# Reconciles Cloudflare DNS records and Edge TLS settings idempotently from the single
+# sources of truth `my.topology` (host addressing) and `my.contracts.provides`
+# (service endpoints) — service records are never hand-maintained.
 {
   config,
   lib,
@@ -11,8 +13,13 @@
 let
   cfg = config.my.features.system.networking.cloudflare;
   topology = config.my.topology;
-  edgeHost = topology.hosts.cld-edge-01 or null;
-  opsHost = topology.hosts.cld-ops-01 or null;
+
+  # Fleet-wide configuration graph. `flake` is injected as a module specialArg by
+  # lib/core/system-builder.nix; the fallback keeps this module evaluable standalone.
+  flakeConfigurations =
+    config._module.specialArgs.flake.nixosConfigurations or {
+      "${config.networking.hostName}" = config;
+    };
 
   # Submodule for a declarative DNS record
   recordSubmodule = lib.types.submodule {
@@ -53,75 +60,100 @@ let
     };
   };
 
-  # Synthesize default DNS records from topology and endpoints.
-  # Default to `proxied = false` (DNS-only) to guarantee full compatibility with
-  # CrowdSec kernel nftables firewall bouncers, Caddy ACME DNS-01 challenges,
-  # unlimited body upload sizes (Paperless), and uninterrupted WebSocket/AI streams.
-  defaultRecords =
-    lib.optional (edgeHost != null && edgeHost.ipv4 != null) {
-      name = "@";
-      type = "A";
-      content = edgeHost.ipv4;
-      proxied = false;
-      ttl = 1;
-      comment = "Root Ingress -> cld-edge-01 (DNS-only for CrowdSec)";
-    }
-    ++ lib.optional (edgeHost != null && edgeHost.ipv4 != null) {
-      name = "edge";
-      type = "A";
-      content = edgeHost.ipv4;
-      proxied = false; # Unproxied for direct SSH & WireGuard handshakes
-      ttl = 1;
-      comment = "Direct Edge Host -> cld-edge-01";
-    }
-    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
-      name = "ops";
-      type = "A";
-      content = opsHost.ipv4;
-      proxied = false; # Unproxied for direct WireGuard & Telemetry
-      ttl = 1;
-      comment = "Direct Ops Host -> cld-ops-01";
-    }
-    ++ lib.optional (edgeHost != null && edgeHost.ipv4 != null) {
-      name = "*";
-      type = "CNAME";
-      content = "edge.${topology.domain}";
-      proxied = false;
-      ttl = 1;
-      comment = "Wildcard Ingress -> edge.vyrx.de (DNS-only)";
-    }
-    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
-      name = "search";
-      type = "CNAME";
-      content = "ops.${topology.domain}";
-      proxied = false;
-      ttl = 1;
-      comment = "SearXNG Metasearch -> cld-ops-01";
-    }
-    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
-      name = "ai";
-      type = "CNAME";
-      content = "ops.${topology.domain}";
-      proxied = false;
-      ttl = 1;
-      comment = "OpenClaw AI Gateway -> cld-ops-01";
-    }
-    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
-      name = "*.ai";
-      type = "CNAME";
-      content = "ops.${topology.domain}";
-      proxied = false;
-      ttl = 1;
-      comment = "OpenClaw AI Family Mesh Wildcard -> cld-ops-01";
-    }
-    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
-      name = "*.ops";
-      type = "CNAME";
-      content = "ops.${topology.domain}";
-      proxied = false;
-      ttl = 1;
-      comment = "Ops Wildcard -> cld-ops-01 (Attic cache.ops, future *.ops vhosts)";
-    };
+  # --- SSOT projections -----------------------------------------------------
+  #
+  # DNS is *derived*, never hand-maintained:
+  #   1. ingressRecords  -> zone apex + catch-all wildcard to the declared ingress host
+  #   2. hostRecords     -> every publicly addressed host on its topology domain
+  #   3. endpointRecords -> every `public` contract endpoint on its provider host
+
+  # RFC 1918 / loopback / link-local addresses are never authoritative in public DNS.
+  isPublicIpv4 =
+    ip:
+    ip != null
+    && !(
+      lib.hasPrefix "10." ip
+      || lib.hasPrefix "192.168." ip
+      || lib.hasPrefix "127." ip
+      || lib.hasPrefix "169.254." ip
+      || builtins.match "172\\.(1[6-9]|2[0-9]|3[01])\\..*" ip != null
+    );
+
+  inZone = fqdn: fqdn != null && (fqdn == cfg.domain || lib.hasSuffix ".${cfg.domain}" fqdn);
+
+  mkRecord = comment: name: type: content: {
+    inherit
+      name
+      type
+      content
+      comment
+      ;
+    # DNS-only (proxied = false): CrowdSec nftables bouncers, ACME DNS-01,
+    # unlimited uploads and uninterrupted WebSocket/AI streams.
+    proxied = false;
+    ttl = 1;
+  };
+
+  ingressHost = topology.hosts.${cfg.ingressHost} or null;
+  ingressIsPublic =
+    ingressHost != null && ingressHost.domain != null && isPublicIpv4 ingressHost.ipv4;
+
+  ingressRecords = lib.optionals ingressIsPublic [
+    (mkRecord "Zone apex -> ${cfg.ingressHost}" "@" "A" ingressHost.ipv4)
+    (mkRecord "Wildcard ingress -> ${cfg.ingressHost}" "*" "CNAME" ingressHost.domain)
+  ];
+
+  hostRecords = lib.concatLists (
+    lib.mapAttrsToList (
+      hostName: host:
+      lib.optional (isPublicIpv4 host.ipv4 && inZone host.domain) (
+        mkRecord "Host ${hostName} (topology)" host.domain "A" host.ipv4
+      )
+    ) topology.hosts
+  );
+
+  endpointRecords = lib.concatLists (
+    lib.mapAttrsToList (
+      hostName: hostConfig:
+      let
+        host = topology.hosts.${hostName} or null;
+      in
+      lib.optionals (host != null && isPublicIpv4 host.ipv4) (
+        lib.concatLists (
+          lib.mapAttrsToList (
+            _svcName: contract:
+            lib.concatMap (
+              ep:
+              let
+                mk = mkRecord "Service ${hostName}";
+              in
+              lib.optional (ep.scope == "public" && ep.canonicalDomain != null && inZone ep.canonicalDomain) (
+                mk ep.canonicalDomain "A" host.ipv4
+              )
+              ++ lib.optionals (ep.scope == "public") (
+                map (alias: mk alias "A" host.ipv4) (lib.filter inZone ep.extraDomains)
+              )
+            ) (lib.attrValues contract.endpoints)
+          ) (hostConfig.config.my.contracts.provides or { })
+        )
+      )
+    ) flakeConfigurations
+  );
+
+  # Escape hatch for names that cannot be contract-derived (e.g. a host-level
+  # Caddy redirect alias). Keep empty whenever possible.
+  extraRecords = [ ];
+
+  # Deterministically deduplicate by (type, fqdn); `@` and the zone apex are the
+  # same name, and identical definitions collapse (first definition wins).
+  projectedRecords = lib.attrValues (
+    builtins.listToAttrs (
+      map (r: {
+        name = "${r.type}:${if r.name == cfg.domain then "@" else r.name}";
+        value = r;
+      }) (ingressRecords ++ hostRecords ++ endpointRecords ++ extraRecords)
+    )
+  );
 
   # Render desired state configuration as JSON derivation
   desiredStateJson = pkgs.writeText "cloudflare-desired-state.json" (
@@ -132,7 +164,7 @@ let
         always_use_https = if cfg.settings.alwaysUseHttps then "on" else "off";
         min_tls_version = cfg.settings.minTlsVersion;
       };
-      records = cfg.records;
+      records = cfg.effectiveRecords;
     }
   );
 
@@ -149,6 +181,12 @@ in
       type = lib.types.str;
       default = topology.domain;
       description = "Primary root zone managed in Cloudflare";
+    };
+
+    ingressHost = lib.mkOption {
+      type = lib.types.str;
+      default = "cld-edge-01";
+      description = "Topology host that terminates zone-apex and catch-all wildcard ingress traffic.";
     };
 
     apiTokenSecret = lib.mkOption {
@@ -189,8 +227,14 @@ in
 
     records = lib.mkOption {
       type = lib.types.listOf recordSubmodule;
-      default = defaultRecords;
-      description = "Declarative list of DNS records to enforce";
+      default = [ ];
+      description = "Additional DNS records appended to the topology/contract projection (escape hatch; prefer contracts).";
+    };
+
+    effectiveRecords = lib.mkOption {
+      type = lib.types.listOf recordSubmodule;
+      readOnly = true;
+      description = "The fully reconciled record set (topology/contract projection + operator extras).";
     };
 
     syncInterval = lib.mkOption {
@@ -208,6 +252,8 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    my.features.system.networking.cloudflare.effectiveRecords = projectedRecords ++ cfg.records;
+
     # Expose cloudflare-sync in system packages
     environment.systemPackages = [ cfg.package ];
 

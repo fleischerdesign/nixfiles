@@ -66,7 +66,6 @@ in
           );
 
           mkVHost = conf: {
-            name = conf.canonicalDomain;
             value = {
               extraConfig =
                 let
@@ -112,7 +111,17 @@ in
             };
           };
         in
-        lib.listToAttrs (map mkVHost localEndpoints);
+        # An endpoint answers on its canonical domain plus every alias it declares.
+        # Wildcard aliases are skipped: dynamically minted hosts own their vhost.
+        lib.listToAttrs (
+          lib.concatMap (
+            conf:
+            map (domain: {
+              name = domain;
+              inherit (mkVHost conf) value;
+            }) ([ conf.canonicalDomain ] ++ lib.filter (d: !lib.hasInfix "*" d) conf.extraDomains)
+          ) localEndpoints
+        );
     };
 
     my.contracts.provides.caddy = {

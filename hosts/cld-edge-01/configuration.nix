@@ -19,6 +19,18 @@
 
   my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.networking.cloudflare.enable = true;
+
+  # Ingress alias for the OpenClaw family mesh. The redirect itself is served by
+  # cld-ops-01 as a host-level Caddy vhost; only the record is declared here, so
+  # the DNS projection stays free of hand-maintained service wildcards.
+  my.features.system.networking.cloudflare.records = [
+    {
+      name = "ai";
+      type = "CNAME";
+      content = "ops.${config.my.topology.domain}";
+      comment = "OpenClaw family mesh alias -> cld-ops-01";
+    }
+  ];
   my.features.system.common.geoip.enable = true;
 
   my.features.services.monitoring = {
