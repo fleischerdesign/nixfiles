@@ -354,11 +354,10 @@ faster.
 | `hom-rly-01..08` | 10.10.30.11..18 | ESPHome device packages | Relay firmware/config (OTA) |
 | `cloudflare` | api.cloudflare.com | `cloudflare-sync` | DNS records |
 
-> **Known issue (verify before relying on it):** `nod switch <agentless-target>` passes the deployment action (`switch`) as an argument to the reconciler binary. The current `fritzbox/sync.py` and `tplink-ap/sync.py` use `argparse.parse_args()` and have **no positional argument**, so they may abort with `unrecognized arguments: switch`. The Authentik target had exactly this defect and was removed.
-> **Actions:** run `nod switch <target> --dry-run` first; if it errors, either
-> (a) run the reconciler directly (`fritzbox-sync`, `tplink-ap-sync` — no action arg), or
-> (b) fix the scripts to ignore/accept the action (e.g. `parse_known_args`).
-> Treat this as a **blocker to fix** before the cutover is considered "wasserdicht".
+> **Resolved 2026-09-19:** the reconcilers (`fritzbox-sync`, `tplink-ap-sync`, the ESPHome sync
+> scripts) now accept the deployment action as an optional positional argument, so
+> `nod switch <target>` works. The Authentik target had the same defect and was removed. Verify
+> `--dry-run` output before applying anything — both device reconcilers report a real diff now.
 
 ---
 
@@ -383,9 +382,67 @@ faster.
 
 Order of attempts (stop as soon as one works):
 
-1. **Public IP** (cloud hosts): `ssh -i ~/.ssh/deploy-key root@173.249.22.211` / `…@37.114.55.91`.
-2. **Tailscale**: `tailscale status` on any reachable node; `ssh root@100.x.x.x`.
+1. **User account, key-based** — always available, no password involved:
+   `ssh -i ~/.ssh/id_rsa philipp@173.249.22.211` (edge) · `…@37.114.55.91` (ops) · `…@10.10.10.10` (hom-srv-01).
+   On the home server this is root already: `ssh -i ~/.ssh/id_rsa root@10.10.10.10`.
+2. **Tailscale**: `tailscale status` on any reachable node; `ssh <user>@100.x.x.x`.
 3. **WireGuard**: `ssh root@10.10.100.x` (only if peers handshake).
+
+### 11.1 Which key does root trust? (verified 2026-09-19)
+
+| Host | root trusts | Note |
+|---|---|---|
+| `hom-srv-01` | operator key (`~/.ssh/id_rsa`, `WXfSlOz…`) | deployed after the trust anchor moved |
+| `cld-ops-01` | tunnel key (`yyJsy9XI…`) + old fleet key (`3zq1hFFw…`) | the openclaw tunnel logs in as root here by design |
+| `cld-edge-01` | **only** the old fleet key (`3zq1hFFw…`) | whose private half no longer exists → root is blocked |
+
+`~/.ssh/config` offers `~/.ssh/deploy-key` to the whole fleet. That path holds the **tunnel**
+credential today, not a deploy key — which is why root works on `cld-ops-01` (it trusts the tunnel
+key) and nowhere else by accident. This is the trap that removed root access to the edge: the path
+was never owned by one credential.
+
+### 11.2 Recovering a lost account password
+
+Needed when no key that root trusts is at hand (currently only the edge). `root` itself is not an
+option: `PermitRootLogin = prohibit-password` and no root password is declared, so root can log in
+neither over SSH nor at the console.
+
+**Path 1 — the old password (no access to the host needed).** The edge's password is whatever the
+installer applied, because `mutableUsers = true` meant the declared hash was never re-applied. That
+old hash is in git history and candidates can be checked against it without touching the VPS:
+```bash
+git show 513e176^:secrets/secrets.yaml > /tmp/old.yaml     # the state before the correction
+sops -d /tmp/old.yaml | grep -A2 '^users:'                 # shows the hash (never the password)
+# verify a candidate against that hash:
+salt=$(sops -d /tmp/old.yaml | sed -n '/password:/{s/.*\$6\$//;s/\$.*//;p}')   # for a $6$ hash
+openssl passwd -6 -salt "$salt" 'CANDIDATE'                # compare with the stored hash
+# a self-test directly on the host also works:  ssh -t philipp@173.249.22.211 'sudo -v'
+```
+
+**Path 2 — GRUB over the provider console** (fastest; verified: GRUB has no password):
+```
+# provider panel → VNC/console, reboot
+# at the GRUB menu press "e", append to the line starting with "linux":   init=/bin/sh
+# then Ctrl-X to boot
+mount -o remount,rw /
+passwd philipp          # set the intended password
+exec /sbin/init         # or: reboot -f
+```
+
+**Path 3 — provider rescue system.** Verified layout of `cld-edge-01`: `sda1` = ext4 = `/` (200 GB),
+`sda15` = vfat = `/efi` (106 MB), BIOS boot:
+```
+mount /dev/sda1 /mnt
+for d in dev proc sys; do mount --bind /$d /mnt/$d; done
+chroot /mnt /bin/sh
+passwd philipp
+exit; umount -R /mnt; reboot
+```
+
+**Afterwards, deploy the host once.** Servers declare `users.mutableUsers = false` and the secret
+store now holds the correct hash, so the password is enforced from then on and cannot drift again.
+That single activation also restores `ssh root@…` via the operator key, which unblocks the fleet key
+rotation and the fleet-wide rollout (`QUALITY.md` §5).
 4. **Wired LAN** from a static-IP client: `ssh root@10.10.10.10` (hom-srv-01), FRITZ!Box UI `http://10.10.10.1`, AP UI `http://10.10.10.20`.
 5. **Physical console** for home hardware.
 
