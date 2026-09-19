@@ -42,9 +42,6 @@
           domains = [ "srv.lan.vyrx.de" ];
         };
         klipper.enable = true;
-        authentik.outpost.proxy = {
-          enable = true;
-        };
         authentik.outpost.ldap = {
           enable = true;
           coreAddress = "http://${config.my.features.system.networking.topology.hosts.cld-edge-01.tailscaleIp}:9055";

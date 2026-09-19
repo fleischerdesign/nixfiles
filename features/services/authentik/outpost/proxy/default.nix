@@ -30,7 +30,7 @@ in
   config = lib.mkIf cfg.enable {
     # 1. Secrets Setup
     sops.secrets."${cfg.tokenSecretName}" = {
-      owner = "authentik-outpost";
+      owner = lib.mkDefault "authentik-outpost";
       # Restart service when secret changes
       restartUnits = [ "authentik-outpost-proxy.service" ];
     };
@@ -67,8 +67,8 @@ in
           "AUTHENTIK_HOST_BROWSER=${cfg.browserUrl}"
           "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
           # Listen on localhost:9000
-          "AUTHENTIK_HTTP_ADDRESS=127.0.0.1:9000"
-          "AUTHENTIK_METRICS_ADDRESS=127.0.0.1:9300"
+          "AUTHENTIK_LISTEN__HTTP=127.0.0.1:9000"
+          "AUTHENTIK_LISTEN__METRICS=127.0.0.1:9303"
         ];
 
         Restart = "always";

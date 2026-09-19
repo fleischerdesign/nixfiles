@@ -23,8 +23,10 @@ in
 
     authentikOutpostAddress = lib.mkOption {
       type = lib.types.str;
-      default = "127.0.0.1:9000";
-      description = "Local socket address of the Authentik outpost proxy.";
+      # Forward-auth terminates on the central embedded outpost of the authentik
+      # server, so every host's Caddy targets the same outpost.
+      default = config.my.features.services.authentik.server.embeddedOutpostAddress;
+      description = "Address of the Authentik outpost used for forward-auth requests.";
     };
   };
 

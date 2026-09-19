@@ -32,6 +32,7 @@ in
     systemd.tmpfiles.rules = lib.optionals config.my.features.services.authentik.server.enable [
       "d /var/lib/authentik/media 0755 root root -"
       "L+ /var/lib/authentik/media/theme.css - - - - ${themeAssets}/authentik.css"
+      "L+ /var/lib/authentik/media/logo.svg - - - - ${themeAssets}/logo.svg"
     ];
   };
 }

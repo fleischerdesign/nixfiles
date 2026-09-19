@@ -18,15 +18,23 @@ in
 
     tokenSecretName = lib.mkOption {
       type = lib.types.str;
-      default = "services/authentik/ldap_token";
-      description = "The name of the secret in sops containing the Authentik token.";
+      default = "services/authentik/outposts/${config.networking.hostName}-ldap-token";
+      description = "SOPS secret holding this host's dedicated LDAP outpost token.";
+    };
+    outpostName = lib.mkOption {
+      type = lib.types.str;
+      default = "vyrx-outpost-${config.networking.hostName}-ldap";
+      description = "Name of the Authentik LDAP outpost managed for this host.";
     };
   };
 
   config = lib.mkIf cfg.enable {
     # Secrets Setup
     sops.secrets."${cfg.tokenSecretName}" = {
-      owner = "authentik-outpost-ldap";
+      # Owned by the outpost service user by default. On the authentik server host
+      # the server feature overrides this to "authentik" so the worker can read the
+      # token through !File when applying the outpost blueprint.
+      owner = lib.mkDefault "authentik-outpost-ldap";
       restartUnits = [ "authentik-outpost-ldap.service" ];
     };
 
@@ -56,6 +64,11 @@ in
         Environment = [
           "AUTHENTIK_HOST=${cfg.coreAddress}"
           "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
+          # Bind the standard LDAP ports (the outpost binary defaults to 3389/6636).
+          "AUTHENTIK_LISTEN__LDAP=0.0.0.0:389"
+          "AUTHENTIK_LISTEN__LDAPS=0.0.0.0:636"
+          # Keep the metrics listener off the server's and other outposts' ports.
+          "AUTHENTIK_LISTEN__METRICS=127.0.0.1:9302"
         ];
 
         Restart = "always";

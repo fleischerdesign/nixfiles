@@ -9,6 +9,19 @@ let
   cfg = config.my.features.services.authentik.server;
   authentikPackage = pkgs.authentik;
 
+  # Single listener for the API *and* the embedded proxy outpost (authentik serves
+  # both on the same HTTP listener). Kept here so every projection stays in sync.
+  listenHttpPort = 9055;
+
+  # Only the trusted ingress networks may inject authentication headers.
+  trustedProxyCidrs = lib.concatStringsSep "," (
+    [
+      "127.0.0.0/8"
+      "100.64.0.0/10"
+    ]
+    ++ lib.optional (config.my.topology.subnets ? mesh) config.my.topology.subnets.mesh.cidr
+  );
+
   # Cluster-wide endpoint discovery across all hosts for forward-auth proxy services
   flakeConfigurations =
     config._module.specialArgs.flake.nixosConfigurations or {
@@ -77,14 +90,59 @@ let
   sortedEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames authEndpoints);
   sortedOidcEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames oidcEndpoints);
 
+  # Authentik blueprint references (!KeyOf, !Find, !Env, ...) are YAML-level tags.
+  # Neither builtins.toJSON nor a plain YAML emitter can express them, so tagged
+  # values carry a sentinel prefix that is converted into a real YAML tag after
+  # serialization. Blueprints must be *.yaml: authentik's discovery and the
+  # blueprint migration only scan for *.yaml files.
+  yamlTag = value: "@@YAML_TAG@@${value}";
+
+  toBlueprintYaml =
+    name: blueprint:
+    let
+      serialized = pkgs.writeText "${name}.json" (builtins.toJSON blueprint);
+    in
+    pkgs.runCommandLocal "${name}.yaml" { } ''
+      sed 's/"@@YAML_TAG@@\([^"]*\)"/\1/g' ${serialized} > "$out"
+    '';
+
+  # authentik does not guarantee any apply order across blueprints (docs:
+  # "discovery and evaluation is not guaranteed to follow any specific order").
+  # Our generated application/outpost blueprints reference objects owned by
+  # upstream default blueprints and by the RBAC blueprint, so the dependency is
+  # declared explicitly with the `metaapplyblueprint` meta model instead of
+  # relying on filesystem/discovery order.
+  metaApply = path: {
+    model = "authentik_blueprints.metaapplyblueprint";
+    attrs = {
+      identifiers = {
+        inherit path;
+      };
+    };
+  };
+
+  providerFlowDependencies = [
+    (metaApply "default/flow-default-provider-authorization-implicit-consent.yaml")
+    (metaApply "default/flow-default-provider-invalidation.yaml")
+  ];
+
+  ldapDependencies = providerFlowDependencies ++ [
+    (metaApply "01-rbac/users-and-groups.yaml")
+  ];
+
   # Declarative model-driven blueprint compiling all auth endpoints into Authentik ProxyProviders and Applications
+  # Forward-auth endpoints are served by the embedded outpost that ships with the
+  # authentik server. It authenticates with the core secret key (no managed token),
+  # so every host's Caddy can forward auth to the same server without per-host
+  # proxy outposts.
   proxyBlueprint = {
     version = 1;
     metadata = {
       name = "vyrx-apps-proxy";
     };
     entries =
-      (lib.concatMap (
+      providerFlowDependencies
+      ++ (lib.concatMap (
         name:
         let
           ep = authEndpoints.${name};
@@ -102,7 +160,8 @@ let
             attrs = {
               mode = "forward_single";
               external_host = "https://${ep.canonicalDomain}";
-              authorization_flow = "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
+              authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
+              invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
             };
           }
           {
@@ -112,7 +171,7 @@ let
             };
             attrs = {
               name = displayName;
-              provider = "!Key provider_proxy_${safeId}";
+              provider = yamlTag "!KeyOf provider_proxy_${safeId}";
               meta_launch_url = "https://${ep.canonicalDomain}";
               inherit group;
               open_in_new_tab = true;
@@ -122,42 +181,18 @@ let
       ) sortedEndpointNames)
       ++ [
         {
-          model = "authentik_core.user";
-          id = "sa_proxy";
-          identifiers = {
-            username = "ak-outpost-proxy";
-          };
-          attrs = {
-            name = "Service Account Proxy Outpost";
-            type = "service_account";
-          };
-        }
-        {
-          model = "authentik_core.token";
-          identifiers = {
-            identifier = "outpost-proxy-token";
-          };
-          attrs = {
-            intent = "app_password";
-            user = "!Key sa_proxy";
-            key = "!Env AUTHENTIK_OUTPOST_PROXY_TOKEN";
-          };
-        }
-        {
           model = "authentik_outposts.outpost";
-          id = "vyrx_proxy_outpost";
+          id = "embedded_outpost";
           identifiers = {
-            name = "vyrx-proxy-outpost";
+            name = "authentik Embedded Outpost";
           };
           attrs = {
-            type = "proxy";
-            service_connection = null;
             providers = map (
               name:
               let
                 safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
               in
-              "!Key provider_proxy_${safeId}"
+              yamlTag "!KeyOf provider_proxy_${safeId}"
             ) sortedEndpointNames;
             config = {
               authentik_host = "https://${cfg.domain}";
@@ -175,69 +210,217 @@ let
     metadata = {
       name = "vyrx-apps-oidc";
     };
-    entries = lib.concatMap (
-      name:
-      let
-        ep = oidcEndpoints.${name};
-        displayName = if ep.displayName != null then ep.displayName else name;
-        group = if ep.group != null then ep.group else "Applications";
-        safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-        secretAttr =
-          if ep.oidc.clientSecretEnv != null then
-            "!Env ${ep.oidc.clientSecretEnv}"
-          else if ep.oidc.clientSecret != null then
-            ep.oidc.clientSecret
-          else
-            "!Env AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
-        launchUrl =
-          if ep.publicUrl != null then
-            ep.publicUrl
-          else if ep.canonicalDomain != null then
-            "https://${ep.canonicalDomain}"
-          else
-            null;
-      in
-      [
+    entries =
+      providerFlowDependencies
+      ++ lib.concatMap (
+        name:
+        let
+          ep = oidcEndpoints.${name};
+          displayName = if ep.displayName != null then ep.displayName else name;
+          group = if ep.group != null then ep.group else "Applications";
+          safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
+          secretAttr =
+            if ep.oidc.clientSecretEnv != null then
+              yamlTag "!Env ${ep.oidc.clientSecretEnv}"
+            else if ep.oidc.clientSecret != null then
+              ep.oidc.clientSecret
+            else
+              yamlTag "!Env AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
+          launchUrl =
+            if ep.publicUrl != null then
+              ep.publicUrl
+            else if ep.canonicalDomain != null then
+              "https://${ep.canonicalDomain}"
+            else
+              null;
+        in
+        [
+          {
+            model = "authentik_providers_oauth2.oauth2provider";
+            id = "provider_${safeId}";
+            identifiers = {
+              name = "Provider for ${displayName}";
+            };
+            attrs = {
+              client_id = ep.oidc.clientId;
+              client_secret = secretAttr;
+              authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
+              invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
+              redirect_uris = map (uri: {
+                matching_mode = "strict";
+                url = uri;
+              }) ep.oidc.redirectUris;
+              sub_mode = ep.oidc.subMode;
+              include_claims_in_id_token = ep.oidc.includeClaimsInIdToken;
+            };
+          }
+          {
+            model = "authentik_core.application";
+            identifiers = {
+              slug = name;
+            };
+            attrs = {
+              name = displayName;
+              provider = yamlTag "!KeyOf provider_${safeId}";
+              meta_launch_url = launchUrl;
+              inherit group;
+              open_in_new_tab = true;
+            };
+          }
+        ]
+      ) sortedOidcEndpointNames;
+  };
+
+  generatedProxyBlueprint = toBlueprintYaml "proxy-apps-generated" proxyBlueprint;
+  generatedOidcBlueprint = toBlueprintYaml "oidc-apps-generated" oidcBlueprint;
+
+  # LDAP outposts are managed per host. An outpost resolves exactly one outpost from
+  # its token (first visible entry), so tokens must never be shared between hosts.
+  # Each outpost therefore gets its own service account and token, read at apply
+  # time via !File from the host's SOPS secret, which is additionally declared on
+  # this server so the file exists for the worker.
+  ldapOutposts =
+    map
+      (
+        hostName:
+        let
+          ldapCfg = flakeConfigurations.${hostName}.config.my.features.services.authentik.outpost.ldap;
+        in
         {
-          model = "authentik_providers_oauth2.oauth2provider";
-          id = "provider_${safeId}";
+          inherit hostName;
+          safeHost = builtins.replaceStrings [ "-" ] [ "_" ] hostName;
+          inherit (ldapCfg)
+            outpostName
+            tokenSecretName
+            coreAddress
+            ;
+        }
+      )
+      (
+        lib.filter (
+          hostName:
+          (flakeConfigurations.${hostName}.config.my.features.services.authentik.outpost.ldap.enable or false)
+        ) (builtins.attrNames flakeConfigurations)
+      );
+
+  ldapProviderId = "provider_ldap_main";
+
+  ldapOutpostBlueprint = {
+    version = 1;
+    metadata = {
+      name = "vyrx-outposts-ldap";
+    };
+    entries =
+      # The LDAP outpost blueprint depends on the default provider flows and on
+      # the RBAC groups, so those are applied first via meta models.
+      ldapDependencies
+      # Service account + role per host first: the role grants the global read
+      # permissions an outpost needs for users/groups/events, while the
+      # object-level permissions (provider, outpost) are attached below.
+      ++ lib.concatMap (o: [
+        {
+          model = "authentik_rbac.role";
+          id = "role_ldap_${o.safeHost}";
           identifiers = {
-            name = "Provider for ${displayName}";
+            name = "Outpost LDAP ${o.hostName}";
           };
           attrs = {
-            client_id = ep.oidc.clientId;
-            client_secret = secretAttr;
-            authorization_flow = "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
-            redirect_uris = ep.oidc.redirectUris;
-            sub_mode = ep.oidc.subMode;
-            include_claims_in_id_token = ep.oidc.includeClaimsInIdToken;
+            permissions = [
+              "authentik_core.view_user"
+              "authentik_core.view_group"
+              "authentik_events.add_event"
+            ];
           };
         }
+        {
+          model = "authentik_core.user";
+          id = "sa_ldap_${o.safeHost}";
+          identifiers = {
+            username = "ak-outpost-${o.hostName}-ldap";
+          };
+          attrs = {
+            name = "Service Account LDAP Outpost ${o.hostName}";
+            type = "service_account";
+            roles = [ (yamlTag "!KeyOf role_ldap_${o.safeHost}") ];
+          };
+        }
+      ]) ldapOutposts
+      ++ [
+        {
+          model = "authentik_providers_ldap.ldapprovider";
+          id = ldapProviderId;
+          identifiers = {
+            name = "VYRX LDAP Provider";
+          };
+          attrs = {
+            base_dn = "DC=vyrx,DC=de";
+            search_group = yamlTag "!Find [authentik_core.group, [name, infra-admins]]";
+            authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
+            invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
+          };
+          permissions = map (o: {
+            permission = "authentik_providers_ldap.view_ldapprovider";
+            role = yamlTag "!KeyOf role_ldap_${o.safeHost}";
+          }) ldapOutposts;
+        }
+        # The LDAP outpost config endpoint only exposes providers that are bound
+        # to an application, so the provider is linked here explicitly.
         {
           model = "authentik_core.application";
           identifiers = {
-            slug = name;
+            slug = "ldap";
           };
           attrs = {
-            name = displayName;
-            provider = "!Key provider_${safeId}";
-            meta_launch_url = launchUrl;
-            inherit group;
-            open_in_new_tab = true;
+            name = "LDAP Directory";
+            provider = yamlTag "!KeyOf ${ldapProviderId}";
+            open_in_new_tab = false;
           };
         }
       ]
-    ) sortedOidcEndpointNames;
+      ++ lib.concatMap (o: [
+        {
+          model = "authentik_core.token";
+          identifiers = {
+            identifier = "outpost-${o.hostName}-ldap-token";
+          };
+          attrs = {
+            intent = "api";
+            user = yamlTag "!KeyOf sa_ldap_${o.safeHost}";
+            key = yamlTag "!File ${config.sops.secrets.${o.tokenSecretName}.path}";
+          };
+        }
+        {
+          model = "authentik_outposts.outpost";
+          id = "outpost_ldap_${o.safeHost}";
+          identifiers = {
+            name = o.outpostName;
+          };
+          attrs = {
+            type = "ldap";
+            service_connection = null;
+            providers = [ (yamlTag "!KeyOf ${ldapProviderId}") ];
+            config = {
+              authentik_host = o.coreAddress;
+              authentik_host_insecure = true;
+            };
+          };
+          permissions = [
+            {
+              permission = "authentik_outposts.view_outpost";
+              role = yamlTag "!KeyOf role_ldap_${o.safeHost}";
+            }
+          ];
+        }
+      ]) ldapOutposts;
   };
 
-  generatedProxyJson = pkgs.writeText "proxy-apps-generated.json" (builtins.toJSON proxyBlueprint);
-  generatedOidcJson = pkgs.writeText "oidc-apps-generated.json" (builtins.toJSON oidcBlueprint);
+  generatedLdapOutpostBlueprint = toBlueprintYaml "ldap-outposts-generated" ldapOutpostBlueprint;
 
   # Merged blueprints directory containing upstream base blueprints, custom blueprints and generated applications
   effectiveBlueprintsDir = pkgs.runCommandLocal "authentik-blueprints" { } ''
     mkdir -p "$out"
     # 1. Inherit upstream system and default blueprints (required for initial flows and setup)
-    cp -r ${authentikPackage}/blueprints/* "$out/"
+    cp -r ${authentikPackage.src}/blueprints/* "$out/"
     chmod -R u+w "$out"
 
     # 2. Overlay VYRX custom blueprints
@@ -245,17 +428,15 @@ let
 
     # 3. Inject compiled application blueprints
     mkdir -p "$out/03-apps"
-    cp ${generatedProxyJson} "$out/03-apps/proxy-apps-generated.json"
-    cp ${generatedOidcJson} "$out/03-apps/oidc-apps-generated.json"
+    cp ${generatedProxyBlueprint} "$out/03-apps/proxy-apps-generated.yaml"
+    cp ${generatedOidcBlueprint} "$out/03-apps/oidc-apps-generated.yaml"
+    cp ${generatedLdapOutpostBlueprint} "$out/03-apps/ldap-outposts-generated.yaml"
   '';
 
-  pythonEnv = pkgs.python3.withPackages (ps: [
-    ps.pyyaml
-  ]);
-
-  syncScript = pkgs.writeShellScriptBin "authentik-sync" ''
-    exec ${pythonEnv}/bin/python3 ${./sync.py} --blueprints-dir ${effectiveBlueprintsDir} "$@"
-  '';
+  # Apply path: blueprint changes ship inside the system closure. `nod switch
+  # cld-edge-01` installs the new effectiveBlueprintsDir; the service
+  # restartTriggers pick it up and the worker discovers and applies the blueprints
+  # natively. There is intentionally no separate API push target.
 in
 {
   options.my.features.services.authentik.server = {
@@ -265,17 +446,33 @@ in
       default = "auth.vyrx.de";
       description = "FQDN of the Authentik identity server.";
     };
+    adminEmail = lib.mkOption {
+      type = lib.types.str;
+      default = "philipp@vyrx.de";
+      description = "Email address applied to the bootstrapped `akadmin` account.";
+    };
+    embeddedOutpostAddress = lib.mkOption {
+      type = lib.types.str;
+      readOnly = true;
+      default =
+        let
+          serverHosts = lib.filter (
+            hostName:
+            (flakeConfigurations.${hostName}.config.my.features.services.authentik.server.enable or false)
+          ) (builtins.attrNames flakeConfigurations);
+          serverHost = if serverHosts == [ ] then null else builtins.head serverHosts;
+        in
+        if serverHost == null || serverHost == config.networking.hostName then
+          "127.0.0.1:${toString listenHttpPort}"
+        else
+          "${config.my.topology.hosts.${serverHost}.wireguardIpv4}:${toString listenHttpPort}";
+      description = "Address of the central embedded outpost as reachable from this host.";
+    };
     blueprintsDir = lib.mkOption {
       type = lib.types.package;
       default = effectiveBlueprintsDir;
       readOnly = true;
       description = "Compiled directory of static and dynamically compiled Authentik blueprints";
-    };
-    package = lib.mkOption {
-      type = lib.types.package;
-      default = syncScript;
-      readOnly = true;
-      description = "The compiled authentik-sync reconciliation package";
     };
   };
 
@@ -289,6 +486,12 @@ in
       createHome = true;
     };
     users.groups.authentik = { };
+
+    # The service WorkingDirectory/home must survive a database wipe: createHome is
+    # only honoured on user creation, so ensure it declaratively on every activation.
+    systemd.tmpfiles.rules = [
+      "d /var/lib/authentik 0700 authentik authentik -"
+    ];
 
     # 2. Authentik Server Service
     systemd.services.authentik-server = {
@@ -315,13 +518,16 @@ in
           "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
           "AUTHENTIK_POSTGRESQL__NAME=authentik"
           "AUTHENTIK_POSTGRESQL__USER=authentik"
-          # Listen on 9055 (to avoid conflict with ClickHouse)
-          "AUTHENTIK_LISTEN__HTTP=0.0.0.0:9055"
+          # The embedded proxy outpost and the API share this listener.
+          "AUTHENTIK_LISTEN__HTTP=0.0.0.0:${toString listenHttpPort}"
           "AUTHENTIK_LISTEN__METRICS=0.0.0.0:9300"
-          "AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS=127.0.0.0/8,100.64.0.0/10"
+          "AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS=${trustedProxyCidrs}"
           "AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true"
           "AUTHENTIK_AVATARS=gravatar"
           "AUTHENTIK_EVENTS__CONTEXT_PROCESSORS__GEOIP=/var/lib/GeoIP/GeoLite2-City.mmdb"
+          # Populate the bootstrap admin on first start; the matching
+          # AUTHENTIK_BOOTSTRAP_PASSWORD_HASH lives in the core_env secret.
+          "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
           "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
         ];
         Restart = "always";
@@ -353,6 +559,19 @@ in
           "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
           "AUTHENTIK_POSTGRESQL__NAME=authentik"
           "AUTHENTIK_POSTGRESQL__USER=authentik"
+          # The worker exposes its own metrics listener; keep it off the server's
+          # scrape port (9300), otherwise the second bind fails and the worker
+          # supervisor tears the task runner down on startup.
+          "AUTHENTIK_LISTEN__METRICS=127.0.0.1:9301"
+          # Serialize blueprint application. On a fresh install authentik applies all
+          # blueprints concurrently; the upstream default flow blueprints then
+          # deadlock on authentik_flows_stage (PostgreSQL), and our application
+          # blueprints additionally apply those same flow blueprints via
+          # metaapplyblueprint. One thread removes the lock-order inversion
+          # deterministically. The documented "<2 not recommended" caveat targets
+          # throughput on scaled-out replicas; this instance is single-replica.
+          "AUTHENTIK_WORKER__THREADS=1"
+          "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
           "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
         ];
         Restart = "always";
@@ -370,7 +589,7 @@ in
     # 5. Reverse Proxy & Monitoring via Service Contract
     my.contracts.provides.authentik = {
       endpoints.web = {
-        port = 9055;
+        port = listenHttpPort;
         protocol = "tcp";
         scope = "public";
         auth = "none";
@@ -389,6 +608,16 @@ in
           owner = "authentik";
         };
       }
+      # Per-outpost LDAP tokens are declared on the server as well so the worker can
+      # read them through !File when applying the outpost blueprint.
+      (lib.listToAttrs (
+        map (o: {
+          name = o.tokenSecretName;
+          value = {
+            owner = "authentik";
+          };
+        }) ldapOutposts
+      ))
       (lib.listToAttrs (
         map (ep: {
           name = ep.oidc.secretPath;
