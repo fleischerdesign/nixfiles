@@ -37,10 +37,14 @@ in
       description = "SOPS secret containing the 32-byte secret key for SearXNG.";
     };
 
-    domain = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = "search.${config.my.topology.domain}";
-      description = "Public or Tailscale domain for SearXNG (derived; Naming spec §3).";
+    public = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Publish this service on the public ingress. It replaces the switch that the old `domain`
+        option hid: that option had a non-null default, so "a domain is set" was always true and
+        the isolated branch could never be reached.
+      '';
     };
 
     auth = lib.mkOption {
@@ -108,7 +112,9 @@ in
           port = cfg.port;
           bind_address = cfg.bindAddress;
           secret_key = "@SEARXNG_SECRET@";
-          base_url = lib.optionalString (cfg.domain != null) "https://${cfg.domain}/";
+          base_url = lib.optionalString (
+            config.my.contracts.provides.searxng.endpoints.web.canonicalDomain != null
+          ) "https://${config.my.contracts.provides.searxng.endpoints.web.canonicalDomain}/";
           image_proxy = true;
         };
 
@@ -190,12 +196,17 @@ in
       config.services.searx.settingsPath
     ];
 
-    # Register into central service catalog
+    # Register into central service catalog. The name is not declared here: the endpoint's
+    # `subdomain` plus the topology's root domain derive it, and the application reads the derived
+    # value back (one rule, one place).
     my.contracts.provides.searxng = {
       endpoints.web = {
         port = cfg.port;
         protocol = "tcp";
-        scope = if cfg.domain != null then "public" else "isolated";
+        # Whether the service is published. This used to be implicit in "a domain is set", which
+        # was always true because the domain had a default - so the isolated branch was dead code
+        # and the switch invisible.
+        scope = if cfg.public then "public" else "isolated";
         auth = if cfg.auth then "authentik" else "none";
         subdomain = "search";
         directAccess = {

@@ -351,7 +351,8 @@
   my.features.services.searxng = {
     enable = true;
     port = 8888;
-    domain = "search.${config.my.topology.domain}";
+    # No domain here: the endpoint's subdomain plus the topology's root domain already derive
+    # search.vyrx.de, which is what this line used to repeat.
     auth = true;
     openMeshFirewall = true;
     enableJsonApi = true;
