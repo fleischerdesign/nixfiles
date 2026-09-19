@@ -26,11 +26,30 @@ let
 
   allReservations = hostsWithMac // devicesWithMac;
 
-  reservations = lib.mapAttrsToList (name: h: {
-    hw-address = h.mac;
-    ip-address = h.ipv4;
-    hostname = name;
-  }) allReservations;
+  # A DHCP reservation must live inside the subnet it is attached to, otherwise Kea refuses
+  # to start ("address not within subnet") and the whole LAN loses DHCP. Every declared
+  # subnet is a /24, so membership is decided on the /24 network part; that simplification is
+  # asserted below rather than assumed.
+  netOf =
+    cidr:
+    lib.concatStringsSep "." (lib.take 3 (lib.splitString "." (lib.head (lib.splitString "/" cidr))));
+  inSubnet = cidr: ip: netOf cidr == netOf ip;
+
+  allSubnets = lib.filter (s: s != null) [
+    infraSubnet
+    corpSubnet
+    iotSubnet
+  ];
+
+  reservationsIn =
+    subnet:
+    lib.mapAttrsToList (name: h: {
+      hw-address = h.mac;
+      ip-address = h.ipv4;
+      hostname = name;
+    }) (lib.filterAttrs (_name: h: inSubnet subnet.cidr h.ipv4) allReservations);
+
+  reservations = lib.concatMap reservationsIn allSubnets;
 in
 {
   options.my.features.system.networking.gateway = {
@@ -74,6 +93,20 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Every reservation must land inside a declared subnet; one that does not would either be
+    # dropped silently or make Kea refuse to start (taking the whole LAN's DHCP down with it).
+    assertions = [
+      {
+        assertion =
+          builtins.length reservations == builtins.length (lib.mapAttrsToList (_: h: h) allReservations);
+        message = ''
+          Gateway: at least one DHCP reservation falls outside every declared subnet, so it
+          would be dropped (or make Kea refuse to start). Check the ipv4 values in
+          my.topology.hosts / my.topology.devices against my.topology.subnets.
+        '';
+      }
+    ];
+
     # 1. Kernel Layer-3 Routing & Forwarding
     boot.kernel.sysctl = lib.mkIf cfg.enableRouting {
       "net.ipv4.ip_forward" = 1;
@@ -140,7 +173,9 @@ in
                 data = cfg.uplinkGateway;
               }
             ];
-            reservations = reservations;
+            reservations = reservationsIn (
+              if infraSubnet != null then infraSubnet else (builtins.head allSubnets)
+            );
           }
           {
             id = 2;
@@ -154,6 +189,7 @@ in
                 data = cfg.dnsServer; # hom-srv-01 routes corp traffic
               }
             ];
+            reservations = if corpSubnet != null then reservationsIn corpSubnet else [ ];
           }
           {
             id = 3;
@@ -167,6 +203,7 @@ in
                 data = cfg.dnsServer; # hom-srv-01 acts as IoT gateway
               }
             ];
+            reservations = if iotSubnet != null then reservationsIn iotSubnet else [ ];
           }
         ];
       };

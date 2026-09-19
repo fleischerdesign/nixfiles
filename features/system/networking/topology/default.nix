@@ -379,6 +379,7 @@ in
       hom-ap-01 = {
         zone = "infra";
         ipv4 = "10.10.10.20";
+        mac = "7c:f1:7e:6a:b0:82"; # wired MAC: leases the declared address from Kea
         hostType = "embedded";
         domain = "ap.lan.vyrx.de";
         # TEMPORARY (subnet migration): the AP still answers on the old LAN address until it is
@@ -420,24 +421,6 @@ in
         board = "esp01_1m";
         description = "Ender 3D-Drucker Relais";
         domain = "rly-03.iot.vyrx.de";
-      };
-
-      hom-rly-04 = {
-        zone = "iot";
-        ipv4 = "10.10.30.14";
-        platform = "esp8266";
-        board = "esp01_1m";
-        description = "Fernseher Relais";
-        domain = "rly-04.iot.vyrx.de";
-      };
-
-      hom-rly-05 = {
-        zone = "iot";
-        ipv4 = "10.10.30.15";
-        platform = "esp8266";
-        board = "esp01_1m";
-        description = "Flur Relais";
-        domain = "rly-05.iot.vyrx.de";
       };
 
       hom-rly-06 = {
