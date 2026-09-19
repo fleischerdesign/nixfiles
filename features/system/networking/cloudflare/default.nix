@@ -113,6 +113,14 @@ let
       proxied = false;
       ttl = 1;
       comment = "OpenClaw AI Family Mesh Wildcard -> cld-ops-01";
+    }
+    ++ lib.optional (opsHost != null && opsHost.ipv4 != null) {
+      name = "*.ops";
+      type = "CNAME";
+      content = "ops.${topology.domain}";
+      proxied = false;
+      ttl = 1;
+      comment = "Ops Wildcard -> cld-ops-01 (Attic cache.ops, future *.ops vhosts)";
     };
 
   # Render desired state configuration as JSON derivation
