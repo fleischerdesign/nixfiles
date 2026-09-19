@@ -62,10 +62,12 @@ let
 
   # --- SSOT projections -----------------------------------------------------
   #
-  # DNS is *derived*, never hand-maintained:
-  #   1. ingressRecords  -> zone apex + catch-all wildcard to the declared ingress host
-  #   2. hostRecords     -> every publicly addressed host on its topology domain
-  #   3. endpointRecords -> every `public` contract endpoint on its provider host
+  # Public DNS is *derived*; nothing here is hand-maintained, and nothing outside the public
+  # plane is ever published (Naming spec §1, §5.1).
+  #   1. ingressRecords   -> zone apex (and, opt-in, a catch-all) on the ingress host
+  #   2. nodeRecords      -> every host as <hostname>.node.<domain> to its overlay address
+  #   3. endpointRecords  -> every `public` endpoint on its derived FQDN, ingress-terminated
+  #   4. hostAliasRecords -> legacy role labels (edge/ops); deprecation debt (Naming spec §2)
 
   # RFC 1918 / loopback / link-local addresses are never authoritative in public DNS.
   isPublicIpv4 =
@@ -95,47 +97,59 @@ let
   };
 
   ingressHost = topology.hosts.${cfg.ingressHost} or null;
-  ingressIsPublic =
-    ingressHost != null && ingressHost.domain != null && isPublicIpv4 ingressHost.ipv4;
+  ingressIsPublic = ingressHost != null && isPublicIpv4 ingressHost.ipv4;
 
-  ingressRecords = lib.optionals ingressIsPublic [
-    (mkRecord "Zone apex -> ${cfg.ingressHost}" "@" "A" ingressHost.ipv4)
-    (mkRecord "Wildcard ingress -> ${cfg.ingressHost}" "*" "CNAME" ingressHost.domain)
-  ];
+  ingressRecords = lib.optionals ingressIsPublic (
+    [ (mkRecord "Zone apex -> ${cfg.ingressHost}" "@" "A" ingressHost.ipv4) ]
+    ++ lib.optionals cfg.catchAll [
+      (mkRecord "Wildcard ingress -> ${cfg.ingressHost}" "*" "CNAME" ingressHost.domain)
+    ]
+  );
 
-  hostRecords = lib.concatLists (
+  # <hostname>.node.<domain> -> overlay address (ARCHITECTURE.md §3.3). An `A` record is the
+  # correct encoding: a CNAME may not point at an IP address.
+  nodeRecords = lib.concatLists (
     lib.mapAttrsToList (
       hostName: host:
-      lib.optional (isPublicIpv4 host.ipv4 && inZone host.domain) (
-        mkRecord "Host ${hostName} (topology)" host.domain "A" host.ipv4
+      lib.optional (host.wireguardIpv4 != null) (
+        mkRecord "Node management ${hostName}" "${hostName}.node" "A" host.wireguardIpv4
       )
     ) topology.hosts
   );
 
+  # Legacy role labels (`edge.vyrx.de`, `ops.vyrx.de`). Not part of ARCHITECTURE.md §3; kept
+  # only so the migration is non-breaking and removed in stage 4 (Naming spec §9, §11).
+  hostAliasRecords = lib.concatLists (
+    lib.mapAttrsToList (
+      hostName: host:
+      lib.optional (isPublicIpv4 host.ipv4 && inZone host.domain) (
+        mkRecord "Legacy host label ${hostName} (transitional)" host.domain "A" host.ipv4
+      )
+    ) topology.hosts
+  );
+
+  # Every `public` endpoint resolves to the *ingress*, which terminates TLS and proxies to the
+  # provider over the WireGuard mesh (ARCHITECTURE.md §8.1). The provider host does **not**
+  # need a public address -- that is the whole point of the ingress engine.
   endpointRecords = lib.concatLists (
     lib.mapAttrsToList (
       hostName: hostConfig:
-      let
-        host = topology.hosts.${hostName} or null;
-      in
-      lib.optionals (host != null && isPublicIpv4 host.ipv4) (
-        lib.concatLists (
-          lib.mapAttrsToList (
-            _svcName: contract:
-            lib.concatMap (
-              ep:
-              let
-                mk = mkRecord "Service ${hostName}";
-              in
-              lib.optional (ep.scope == "public" && ep.canonicalDomain != null && inZone ep.canonicalDomain) (
-                mk ep.canonicalDomain "A" host.ipv4
-              )
-              ++ lib.optionals (ep.scope == "public") (
-                map (alias: mk alias "A" host.ipv4) (lib.filter inZone ep.extraDomains)
-              )
-            ) (lib.attrValues contract.endpoints)
-          ) (hostConfig.config.my.contracts.provides or { })
-        )
+      lib.concatLists (
+        lib.mapAttrsToList (
+          _svcName: contract:
+          lib.concatMap (
+            ep:
+            let
+              mk = mkRecord "Service ${hostName}";
+              names =
+                lib.optionals (ep.scope == "public" && ep.canonicalDomain != null) [
+                  ep.canonicalDomain
+                ]
+                ++ lib.optionals (ep.scope == "public") (lib.filter inZone ep.extraDomains);
+            in
+            lib.optionals ingressIsPublic (map (n: mk n "A" ingressHost.ipv4) names)
+          ) (lib.attrValues contract.endpoints)
+        ) (hostConfig.config.my.contracts.provides or { })
       )
     ) flakeConfigurations
   );
@@ -151,7 +165,7 @@ let
       map (r: {
         name = "${r.type}:${if r.name == cfg.domain then "@" else r.name}";
         value = r;
-      }) (ingressRecords ++ hostRecords ++ endpointRecords ++ extraRecords)
+      }) (ingressRecords ++ nodeRecords ++ hostAliasRecords ++ endpointRecords ++ extraRecords)
     )
   );
 
@@ -186,7 +200,17 @@ in
     ingressHost = lib.mkOption {
       type = lib.types.str;
       default = "cld-edge-01";
-      description = "Topology host that terminates zone-apex and catch-all wildcard ingress traffic.";
+      description = "Topology host that terminates public ingress traffic (ARCHITECTURE.md §8.1).";
+    };
+
+    catchAll = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Publish a `*.<zone>` catch-all to the ingress. Off by default: unknown names — including
+        the internal planes — then return NXDOMAIN instead of leaking to the ingress
+        (Naming spec §5.1, option A).
+      '';
     };
 
     apiTokenSecret = lib.mkOption {
