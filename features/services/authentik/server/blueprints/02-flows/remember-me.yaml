@@ -1,0 +1,20 @@
+# Keep family users logged in. The upstream default login stage uses
+# session_duration=0 (session ends when the browser closes) and shows no
+# "remember me" option. We extend the baseline session and offer the checkbox.
+# The blueprint only sets these two attrs; the upstream blueprint keeps ownership
+# of the stage, and partial updates leave our values in place.
+version: 1
+metadata:
+  name: "vyrx-remember-me"
+entries:
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        path: default/flow-default-authentication-flow.yaml
+
+  - model: authentik_stages_user_login.userloginstage
+    identifiers:
+      name: default-authentication-login
+    attrs:
+      session_duration: "days=7"
+      remember_me_offset: "days=30"

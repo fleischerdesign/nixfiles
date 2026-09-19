@@ -1,0 +1,19 @@
+# Passkey-first login (WebAuthn conditional UI).
+# Attaching an authenticator validation stage to the identification stage lets
+# browsers offer passkey autofill on the login page. The default authentication
+# flow already skips the MFA stage for `auth_webauthn_pwl`, so a passkey is a
+# complete first factor. Users without a passkey see the normal password form.
+version: 1
+metadata:
+  name: "vyrx-passkey-autofill"
+entries:
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        path: default/flow-default-authentication-flow.yaml
+
+  - model: authentik_stages_identification.identificationstage
+    identifiers:
+      name: default-authentication-identification
+    attrs:
+      webauthn_stage: !Find [authentik_stages_authenticator_validate.authenticatorvalidatestage, [name, default-authentication-mfa-validation]]

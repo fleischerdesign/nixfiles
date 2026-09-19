@@ -1,0 +1,166 @@
+# Invitation-based enrolment for new VYRX users.
+# An administrator creates an invitation (Directory -> Invitations) that points at
+# this flow; the invited person chooses their own username, password and email, is
+# added to the baseline `media-users` group, and is logged in immediately.
+# Existing users without credentials can instead use the recovery flow
+# ("Passwort vergessen"), which sets the initial password for an existing account.
+version: 1
+metadata:
+  name: "vyrx-enrollment"
+entries:
+  # The baseline group must exist before it can be referenced below.
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        path: 01-rbac/users-and-groups.yaml
+
+  - model: authentik_flows.flow
+    id: flow
+    identifiers:
+      slug: vyrx-enrollment
+    attrs:
+      name: "VYRX Enrollment"
+      title: "Willkommen bei VYRX"
+      designation: enrollment
+      authentication: require_unauthenticated
+
+  - model: authentik_stages_invitation.invitationstage
+    id: invitation-stage
+    identifiers:
+      name: vyrx-enrollment-invitation
+    attrs:
+      continue_flow_without_invitation: false
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-username
+    identifiers:
+      name: vyrx-enrollment-field-username
+    attrs:
+      field_key: username
+      label: "Benutzername"
+      type: username
+      required: true
+      placeholder: "Benutzername"
+      placeholder_expression: false
+      order: 0
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-password
+    identifiers:
+      name: vyrx-enrollment-field-password
+    attrs:
+      field_key: password
+      label: "Passwort"
+      type: password
+      required: true
+      placeholder: "Passwort"
+      placeholder_expression: false
+      order: 1
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-password-repeat
+    identifiers:
+      name: vyrx-enrollment-field-password-repeat
+    attrs:
+      field_key: password_repeat
+      label: "Passwort (wiederholen)"
+      type: password
+      required: true
+      placeholder: "Passwort (wiederholen)"
+      placeholder_expression: false
+      order: 2
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-name
+    identifiers:
+      name: vyrx-enrollment-field-name
+    attrs:
+      field_key: name
+      label: "Name"
+      type: text
+      required: true
+      placeholder: "Name"
+      placeholder_expression: false
+      order: 0
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-email
+    identifiers:
+      name: vyrx-enrollment-field-email
+    attrs:
+      field_key: email
+      label: "E-Mail"
+      type: email
+      required: true
+      placeholder: "E-Mail"
+      placeholder_expression: false
+      order: 1
+
+  - model: authentik_stages_prompt.promptstage
+    id: prompt-stage-credentials
+    identifiers:
+      name: vyrx-enrollment-prompt-credentials
+    attrs:
+      fields:
+        - !KeyOf prompt-field-username
+        - !KeyOf prompt-field-password
+        - !KeyOf prompt-field-password-repeat
+
+  - model: authentik_stages_prompt.promptstage
+    id: prompt-stage-details
+    identifiers:
+      name: vyrx-enrollment-prompt-details
+    attrs:
+      fields:
+        - !KeyOf prompt-field-name
+        - !KeyOf prompt-field-email
+
+  - model: authentik_stages_user_write.userwritestage
+    id: user-write
+    identifiers:
+      name: vyrx-enrollment-user-write
+    attrs:
+      user_creation_mode: always_create
+      user_type: internal
+      create_users_group: !Find [authentik_core.group, [name, media-users]]
+
+  - model: authentik_stages_user_login.userloginstage
+    id: user-login
+    identifiers:
+      name: vyrx-enrollment-user-login
+    attrs:
+      session_duration: "days=7"
+      remember_me_offset: "days=30"
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf invitation-stage
+      order: 5
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: true
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf prompt-stage-credentials
+      order: 10
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf prompt-stage-details
+      order: 15
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf user-write
+      order: 20
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf user-login
+      order: 100

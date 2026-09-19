@@ -1,0 +1,144 @@
+# VYRX self-service password recovery.
+# Unauthenticated users prove mailbox ownership through a token sent by the email
+# stage (which reuses the global SMTP settings) and then choose a new password.
+# The flow is bound to the brand as `flow_recovery`, which renders the
+# "forgot password" link on the login page.
+version: 1
+metadata:
+  name: "vyrx-recovery"
+entries:
+  - model: authentik_flows.flow
+    id: flow
+    identifiers:
+      slug: default-recovery-flow
+    attrs:
+      name: "VYRX Password Recovery"
+      title: "Passwort zurücksetzen"
+      designation: recovery
+      authentication: require_unauthenticated
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-password
+    identifiers:
+      name: vyrx-recovery-field-password
+    attrs:
+      field_key: password
+      label: "Passwort"
+      type: password
+      required: true
+      placeholder: "Passwort"
+      placeholder_expression: false
+      order: 0
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-password-repeat
+    identifiers:
+      name: vyrx-recovery-field-password-repeat
+    attrs:
+      field_key: password_repeat
+      label: "Passwort (wiederholen)"
+      type: password
+      required: true
+      placeholder: "Passwort (wiederholen)"
+      placeholder_expression: false
+      order: 1
+
+  - model: authentik_stages_email.emailstage
+    id: recovery-email
+    identifiers:
+      name: vyrx-recovery-email
+    attrs:
+      use_global_settings: true
+      # The stage uses the global SMTP transport but its own sender/subject, so a
+      # verified SMTP2GO sender is required here.
+      from_address: "noreply@ancoris.ovh"
+      subject: "VYRX – Passwort zurücksetzen"
+      template: email/password_reset.html
+      activate_user_on_success: true
+      token_expiry: "minutes=30"
+      recovery_max_attempts: 5
+      recovery_cache_timeout: "minutes=5"
+
+  - model: authentik_stages_identification.identificationstage
+    id: identification
+    identifiers:
+      name: vyrx-recovery-identification
+    attrs:
+      user_fields:
+        - email
+        - username
+
+  - model: authentik_stages_user_write.userwritestage
+    id: user-write
+    identifiers:
+      name: vyrx-recovery-user-write
+    attrs:
+      user_creation_mode: never_create
+
+  - model: authentik_stages_user_login.userloginstage
+    id: user-login
+    identifiers:
+      name: vyrx-recovery-user-login
+    attrs:
+      session_duration: "days=7"
+      remember_me_offset: "days=30"
+
+  - model: authentik_stages_prompt.promptstage
+    id: prompt-stage-password
+    identifiers:
+      name: vyrx-recovery-password
+    attrs:
+      fields:
+        - !KeyOf prompt-field-password
+        - !KeyOf prompt-field-password-repeat
+      validation_policies: []
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf identification
+      order: 10
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: true
+      invalid_response_action: retry
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf recovery-email
+      order: 20
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: true
+      invalid_response_action: retry
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf prompt-stage-password
+      order: 30
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      invalid_response_action: retry
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf user-write
+      order: 40
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      invalid_response_action: retry
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf user-login
+      order: 100
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      invalid_response_action: retry
