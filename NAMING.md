@@ -52,7 +52,8 @@
 | §8.1: modules know neither their host nor routing | `plausible`, `linkwarden`, `vaultwarden`, `couchdb`, `obsidian-livesync` hardcode `"<svc>.edge.${domain}"` | placement knowledge leaked into service modules |
 | §8.1: Ingress Engine projects **all** `public` endpoints cluster-wide into vHosts **and WireGuard upstreams** | the DNS/Caddy projection is host-local; no ingress upstreams exist | `public` endpoints on LAN hosts produce **no** record — `jellyfin.vyrx.de` does not exist although §3 requires it |
 | §5: `jellyfin.vyrx.de` resolves locally to `10.10.10.10` | Blocky maps `host.domain` only, not service names | the specified split horizon for service names is not implemented |
-| §2: deterministic host naming | host FQDNs are hand-written (`srv`, `wrk`, `nb`, `rt`, `ap`) | no rule exists for the FQDN of a new host (`hom-srv-02` → ?) |
+| §2: deterministic host naming | host FQDNs hand-written (`edge`, `ops`, `srv`, `wrk`, `nb`, `rt`, `ap`) | the documented node plane `*.node.vyrx.de` (§3.3) is not implemented at all |
+| §3.1 marks `seerr`, `hass` public; §3.2 marks `mealie`, `mon` internal | contracts evaluate to `jellyseerr=internal`, `home-assistant=internal`, `mealie=public`, `grafana=public` (+ orphan `mon.lan` extraDomain) | **4 of the 11 documented zone members are classified the other way round** — zone membership is not actually driven by §3 |
 
 ### 0.3 Where the parent specification is **under**-specified
 
@@ -84,6 +85,7 @@ could go unnoticed:
 | lan | `"internal"` | `lan.vyrx.de` | Blocky (split DNS) | **no** | home LAN |
 | vpn | `"mesh"` | `vpn.vyrx.de` | Blocky + our overlay DNS | **no** | WireGuard mesh |
 | iot | — *(device inventory, not an endpoint scope)* | `iot.vyrx.de` | Blocky | **no** | IoT segment |
+| node | — *(host plane, from `my.topology.hosts`)* | `node.vyrx.de` | Cloudflare | **yes** | CNAME → overlay (VPN) address; SSH/admin only (§2) |
 | isolated | `"isolated"` | — | — | no | direct address/port only |
 
 The `scope` enum is the **existing** contract enum (`contracts/endpoints/default.nix`):
@@ -103,26 +105,33 @@ Rules:
 
 ## 2. Host names
 
-Hostnames follow the documented RFC 1178 taxonomy `<location>-<role>-<index>`
-(`ARCHITECTURE.md` §2). The host FQDN is **derived**, never hand-invented:
+`ARCHITECTURE.md` §3.3 specifies the host plane:
+
+> **§3.3 Node Management: `*.node.vyrx.de`** — "Feste CNAMEs auf die jeweiligen VPN-IPs für
+> SSH- und Administrationszugriffe: `cld-edge-01.node.vyrx.de`, `cld-ops-01.node.vyrx.de`,
+> `hom-srv-01.node.vyrx.de`, etc."
+
+Therefore:
 
 ```
-hostFqdn(host) = "${hostname}.${planeSuffixOf(host)}"      # cld-edge-01.vyrx.de
-                                                          # hom-srv-01.lan.vyrx.de
-                                                          # mob-nb-01.vpn.vyrx.de
+hostFqdn(host) = "${hostname}.node.${domain}"      # cld-edge-01.node.vyrx.de
+                                                   # hom-srv-01.node.vyrx.de
+record         = CNAME -> host's overlay (VPN) address
 ```
 
-The short labels `edge` / `ops` used throughout the docs, `nod` and `DEPLOYMENT.md` are
-declared exactly once, as aliases of the derived name:
+Consequences:
 
-```nix
-my.topology.hosts.cld-edge-01.aliases = [ "edge" ];
-my.topology.hosts.cld-ops-01.aliases  = [ "ops"  ];
-```
-
-Rationale: a new host is one inventory entry, and collisions are structurally impossible
-because RFC 1178 hostnames are already unique. Hand-written `domain` values
-(`srv`, `wrk`, `nb`, `rt`, `ap`) contradict the taxonomy and do not scale.
+* Host FQDNs are **derived from the RFC 1178 hostname** (`ARCHITECTURE.md` §2) and live in a
+  dedicated plane: a new host needs one inventory entry and collisions are structurally
+  impossible.
+* `node` names target the **overlay address** on purpose (admin access from anywhere over the
+  mesh). They are published but unreachable without a mesh route — which is why they are
+  exempt from I4.
+* The hand-written, host-encoded `domain` values (`srv`, `wrk`, `nb`, `rt`, `ap`) and the
+  labels `edge` / `ops` are **not part of §3**. `edge` / `ops` are load-bearing today (they
+  are the `caddy.baseDomain` of the ingress hosts and appear throughout the docs) but are
+  undeclared drift: they should either become aliases of the node name or be dropped once
+  service names are flat (§3).
 
 ---
 
@@ -310,5 +319,5 @@ claims:
 | G3 | **No formal grammar.** No charset/length rules (LDH, 63-octet label, 253-octet name), no statement about non-DNS-safe subdomains already in use (`cam.moonraker`, `*.pub.*`), case, or trailing dot. | Add a grammar section + a name validator used by I1/I2. |
 | G4 | **No operational DNS policy.** No TTL strategy per plane, no PTR/reverse-zone policy (relevant for mail), no DNSSEC statement. | Add a TTL/PTR/DNSSEC policy section. |
 | G5 | **Migration has no verification gates.** §9 lists stages but not how completion is proven. | Add per-stage acceptance checks (record/vhost/redirect diffs, consumer greps). |
-| G6 | **Host FQDN derivation is a proposal, not a derivation of existing intent.** `cld-edge-01.vyrx.de` does not exist today; the parent spec defines host *names* only. | Mark as an explicit decision, or drop it and keep `edge`/`ops` as declared host names. |
+| G6 | ~~Host-FQDN rule missing~~ **retracted — my error.** `ARCHITECTURE.md` §3.3 *does* specify it (`*.node.vyrx.de`, CNAME to the overlay address); §2 above invented `<hostname>.<plane>` instead. | §2 now follows §3.3; still open: whether the undeclared `edge`/`ops` labels become aliases or are dropped. |
 | G7 | **`mesh` vs `vpn` naming mismatch.** The contract enum says `mesh`, the zone diagram says `vpn`. Both are now mapped, but the mismatch should be resolved deliberately. | Decide: rename the enum to `vpn`, or the zone to `.mesh`. |
