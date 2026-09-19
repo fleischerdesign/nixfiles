@@ -93,11 +93,15 @@ in
             # Externe Cloud-Hosts: WireGuard-Overlay IP (IPv4 & RFC 4193 ULA IPv6)
             # IoT-Geräte: statische IP aus my.topology.devices
             customDNS = {
+              # Names come from the naming engine, which owns the node plane (<name>.node.<domain>).
+              # The per-record domain field that used to feed this was a second, contradictory
+              # scheme: it called hom-srv-01 "srv.lan.vyrx.de".
               mapping =
-                (lib.mapAttrs' (_name: host: {
-                  name = host.domain;
-                  value =
+                (lib.mapAttrs'
+                  (
+                    hostName: fqdn:
                     let
+                      host = topology.hosts.${hostName};
                       primaryIp =
                         if
                           host.ipv4 != null && (lib.hasPrefix "10.10." host.ipv4 || lib.hasPrefix "192.168." host.ipv4)
@@ -109,16 +113,29 @@ in
                           host.ipv4;
                       ipv6 = host.wireguardIpv6 or null;
                     in
-                    if ipv6 != null then "${primaryIp},${ipv6}" else primaryIp;
-                }) (lib.filterAttrs (_: h: h.domain != null) config.my.topology.hosts))
-                // (lib.mapAttrs' (devName: dev: {
-                  name =
-                    if dev.domain != null then
-                      dev.domain
-                    else
-                      "${devName}.lan.${config.my.topology.domain or "vyrx.de"}";
-                  value = dev.ipv4;
-                }) (lib.filterAttrs (_: d: d.ipv4 != null) (config.my.topology.devices or { })))
+                    lib.nameValuePair fqdn (if ipv6 != null then "${primaryIp},${ipv6}" else primaryIp)
+                  )
+                  (
+                    lib.filterAttrs (
+                      hostName: _:
+                      let
+                        host = topology.hosts.${hostName};
+                      in
+                      host.ipv4 != null || host.wireguardIpv4 != null
+                    ) config.my.contracts.projections.hostFqdnOf
+                  )
+                )
+                // (lib.mapAttrs'
+                  (devName: fqdn: {
+                    name = fqdn;
+                    value = topology.devices.${devName}.ipv4;
+                  })
+                  (
+                    lib.filterAttrs (
+                      devName: _: topology.devices.${devName}.ipv4 != null
+                    ) config.my.contracts.projections.deviceFqdnOf
+                  )
+                )
                 // endpointMappings;
             };
 

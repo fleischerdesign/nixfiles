@@ -529,7 +529,7 @@ let
 
         autoApproveCidrs = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          default = osConfig.my.features.system.networking.topology.trustedSubnets or [ ];
+          default = osConfig.my.topology.trustedSubnets or [ ];
           description = "CIDR ranges from which node pairings are auto-approved.";
         };
 

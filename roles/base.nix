@@ -16,7 +16,6 @@
       kernel.enable = lib.mkDefault true;
       fish-shell.enable = lib.mkDefault true;
       networking = {
-        topology.enable = lib.mkDefault true;
         wireguard.enable = lib.mkDefault true;
         ssh.enable = lib.mkDefault true;
       };
@@ -33,7 +32,7 @@
     enable = lib.mkDefault true;
     targetHost = lib.mkDefault (
       config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4
-        or config.my.features.system.networking.topology.hosts.${config.networking.hostName}.tailscaleIp
+        or config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4
           or config.networking.hostName
     );
     role = lib.mkDefault config.my.role;

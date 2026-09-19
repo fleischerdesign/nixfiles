@@ -142,11 +142,6 @@ let
         default = "server";
         description = "Classification of the node";
       };
-      domain = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "Primary canonical domain or node FQDN";
-      };
       mac = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
@@ -196,11 +191,6 @@ let
         type = lib.types.str;
         default = "";
         description = "Human-readable description of device function";
-      };
-      domain = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "Optional canonical FQDN for local DNS resolution";
       };
     };
   };
@@ -272,21 +262,10 @@ in
     };
   };
 
-  # Compatibility shim for legacy options during migration phase
-  options.my.features.system.networking.topology = {
-    enable = lib.mkEnableOption "Legacy topology module compatibility shim";
-    hosts = lib.mkOption {
-      type = lib.types.attrs;
-      default = { };
-      description = "Shim pointing to my.topology.hosts";
-    };
-    trustedSubnets = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ ];
-      description = "Shim pointing to my.topology.trustedSubnets";
-    };
-  };
-
+  # Everything reads my.topology directly. The compatibility shim that mirrored it under
+  # The legacy compatibility shim is gone: it renamed fields (ipv4 -> localIp,
+  # wireguardIpv4 -> wireguardIpv4) and its hosts lacked ipv4 entirely, so a consumer filtering on
+  # that field silently matched nothing.
   config = {
     # Default subnet taxonomy as specified in ARCHITECTURE.md (RFC 1918 10.10.0.0/16 Supernet)
     my.topology.subnets = lib.mkDefault {
@@ -345,7 +324,6 @@ in
         wireguardPublicKey = "xaW5sos7b7wPXsjl4U6UqsaHl9l+Y1F013DDJ4kioEg=";
         wireguardRelay = true;
         hostType = "server";
-        domain = "edge.vyrx.de";
       };
 
       cld-ops-01 = {
@@ -358,7 +336,6 @@ in
         wireguardPublicKey = "DBU0HRrBeIXZFokauPXfsYA3i7feCov154VbkAdwlTM=";
         wireguardRelay = true;
         hostType = "server";
-        domain = "ops.vyrx.de";
       };
 
       hom-srv-01 = {
@@ -373,7 +350,6 @@ in
         wireguardIpv6 = "fd10:1000:100::10";
         wireguardPublicKey = "j80spw+2+Ojz51aKAytPdCZwFOc64yNOR05rAcXOESE=";
         hostType = "server";
-        domain = "srv.lan.vyrx.de";
         # TEMPORARY (subnet migration): stay reachable on the old network until the
         # FRITZ!Box has moved to 10.10.10.1/24 and DHCP is handed over to Kea.
         migration = {
@@ -395,7 +371,6 @@ in
         wireguardIpv6 = "fd10:1000:100::20";
         wireguardPublicKey = "y9CMim/6IWIKdIztKJQh5BR7R2ygjYwCjjEvgJQSLT0=";
         hostType = "workstation";
-        domain = "wrk.lan.vyrx.de";
         # TEMPORARY (subnet migration): the old address stays until the new configuration has
         # proven itself, and it is what keeps this host reachable if the switch goes wrong.
         migration = {
@@ -411,7 +386,6 @@ in
         wireguardIpv6 = "fd10:1000:100::30";
         wireguardPublicKey = "J+PERS3HY0OcfXKk4qFnJWtgLy4afh3cXX8fkuKelx0=";
         hostType = "client";
-        domain = "nb.lan.vyrx.de";
       };
 
       # Embedded targets as specified in EMBEDDED.md
@@ -419,7 +393,6 @@ in
         zone = "infra";
         ipv4 = "10.10.10.1";
         hostType = "embedded";
-        domain = "rt.lan.vyrx.de";
         # TEMPORARY (subnet migration): the box still answers on the old LAN address until it
         # is re-addressed. Reported by I11 and removed at teardown (DEPLOYMENT §14).
         migration = {
@@ -432,7 +405,6 @@ in
         ipv4 = "10.10.10.20";
         mac = "7c:f1:7e:6a:b0:82"; # wired MAC: leases the declared address from Kea
         hostType = "embedded";
-        domain = "ap.lan.vyrx.de";
         # TEMPORARY (subnet migration): the AP still answers on the old LAN address until it is
         # re-addressed. Reported by I11 and removed at teardown (DEPLOYMENT §14).
         migration = {
@@ -452,7 +424,6 @@ in
         platform = "esp8266";
         board = "esp01_1m";
         description = "Arbeitszimmer Relais";
-        domain = "rly-01.iot.vyrx.de";
       };
 
       hom-rly-02 = {
@@ -462,7 +433,6 @@ in
         platform = "esp8266";
         board = "esp01_1m";
         description = "Bad Relais";
-        domain = "rly-02.iot.vyrx.de";
       };
 
       hom-rly-03 = {
@@ -472,7 +442,6 @@ in
         platform = "esp8266";
         board = "esp01_1m";
         description = "Ender 3D-Drucker Relais";
-        domain = "rly-03.iot.vyrx.de";
       };
 
       hom-rly-06 = {
@@ -482,7 +451,6 @@ in
         platform = "esp8266";
         board = "esp01_1m";
         description = "Küche Relais";
-        domain = "rly-06.iot.vyrx.de";
       };
 
       hom-rly-07 = {
@@ -492,7 +460,6 @@ in
         platform = "esp8266";
         board = "esp01_1m";
         description = "Schlafzimmer Relais";
-        domain = "rly-07.iot.vyrx.de";
       };
 
       hom-rly-08 = {
@@ -502,7 +469,6 @@ in
         platform = "esp8266";
         board = "esp01_1m";
         description = "Sofa Relais";
-        domain = "rly-08.iot.vyrx.de";
       };
     };
 
@@ -512,20 +478,5 @@ in
         lib.filterAttrs (_: s: s.trustLevel != "guest" && s.trustLevel != "iot") cfg.subnets
       )
     );
-
-    # Populate legacy shim
-    my.features.system.networking.topology.hosts = lib.mkDefault (
-      lib.mapAttrs (_name: h: {
-        tailscaleIp = h.wireguardIpv4; # Point legacy references to wireguard IP during transition
-        wireguardIpv6 = h.wireguardIpv6;
-        localIp = h.ipv4;
-        domain = h.domain;
-        interface = h.interface;
-        migration = h.migration;
-        hostType = if h.hostType == "workstation" || h.hostType == "client" then "client" else "server";
-        gateway = h.gateway;
-      }) cfg.hosts
-    );
-    my.features.system.networking.topology.trustedSubnets = lib.mkDefault cfg.trustedSubnets;
   };
 }

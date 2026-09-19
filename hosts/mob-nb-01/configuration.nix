@@ -30,7 +30,7 @@
         enable = true;
         displayName = "mob-nb-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18789;
         };
         transport = "loopback-tunnel";

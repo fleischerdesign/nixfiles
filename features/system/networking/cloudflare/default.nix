@@ -67,7 +67,9 @@ let
   #   1. ingressRecords   -> zone apex (and, opt-in, a catch-all) on the ingress host
   #   2. nodeRecords      -> every host as <hostname>.node.<domain> to its overlay address
   #   3. endpointRecords  -> every `public` endpoint on its derived FQDN, ingress-terminated
-  #   4. hostAliasRecords -> legacy role labels (edge/ops); deprecation debt (Naming spec §2)
+  # The transitional legacy role labels (`edge.vyrx.de`, `ops.vyrx.de`) are gone with their
+  # source: the per-host domain field carried a second naming scheme next to the normative
+  # `node` plane, and it did not even contain the host name it claimed to label.
 
   # RFC 1918 / loopback / link-local addresses are never authoritative in public DNS.
   isPublicIpv4 =
@@ -117,17 +119,6 @@ let
     ) topology.hosts
   );
 
-  # Legacy role labels (`edge.vyrx.de`, `ops.vyrx.de`). Not part of ARCHITECTURE.md §3; kept
-  # only so the migration is non-breaking and removed in stage 4 (Naming spec §9, §11).
-  hostAliasRecords = lib.concatLists (
-    lib.mapAttrsToList (
-      hostName: host:
-      lib.optional (isPublicIpv4 host.ipv4 && inZone host.domain) (
-        mkRecord "Legacy host label ${hostName} (transitional)" host.domain "A" host.ipv4
-      )
-    ) topology.hosts
-  );
-
   # Every `public` endpoint resolves to the *ingress*, which terminates TLS and proxies to the
   # provider over the WireGuard mesh (ARCHITECTURE.md §8.1). The provider host does **not**
   # need a public address -- that is the whole point of the ingress engine.
@@ -165,7 +156,7 @@ let
       map (r: {
         name = "${r.type}:${if r.name == cfg.domain then "@" else r.name}";
         value = r;
-      }) (ingressRecords ++ nodeRecords ++ hostAliasRecords ++ endpointRecords ++ extraRecords)
+      }) (ingressRecords ++ nodeRecords ++ endpointRecords ++ extraRecords)
     )
   );
 

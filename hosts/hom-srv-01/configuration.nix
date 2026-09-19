@@ -41,7 +41,7 @@
         klipper.enable = true;
         authentik.outpost.ldap = {
           enable = true;
-          coreAddress = "http://${config.my.features.system.networking.topology.hosts.cld-edge-01.tailscaleIp}:9055";
+          coreAddress = "http://${config.my.topology.hosts.cld-edge-01.wireguardIpv4}:9055";
         };
         monitoring = {
           pipeline = {
@@ -103,7 +103,7 @@
         enable = true;
         displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18789;
         };
         transport = "loopback-tunnel";
@@ -115,7 +115,7 @@
         enable = true;
         displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18791;
         };
         transport = "loopback-tunnel";
@@ -127,7 +127,7 @@
         enable = true;
         displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18792;
         };
         transport = "loopback-tunnel";
@@ -139,7 +139,7 @@
         enable = true;
         displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18793;
         };
         transport = "loopback-tunnel";
@@ -151,7 +151,7 @@
         enable = true;
         displayName = "hom-srv-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18794;
         };
         transport = "loopback-tunnel";

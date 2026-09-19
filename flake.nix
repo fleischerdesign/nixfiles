@@ -255,7 +255,7 @@
           {
             hostname =
               hostConfig.config.my.topology.hosts.${name}.wireguardIpv4
-                or hostConfig.config.my.features.system.networking.topology.hosts.${name}.tailscaleIp;
+                or hostConfig.config.my.topology.hosts.${name}.wireguardIpv4;
             profiles.system = {
               user = "root";
               sshUser = "root";

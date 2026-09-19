@@ -63,7 +63,7 @@
         enable = true;
         displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18789;
         };
         transport = "loopback-tunnel";
@@ -75,7 +75,7 @@
         enable = true;
         displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18791;
         };
         transport = "loopback-tunnel";
@@ -87,7 +87,7 @@
         enable = true;
         displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18792;
         };
         transport = "loopback-tunnel";
@@ -99,7 +99,7 @@
         enable = true;
         displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18793;
         };
         transport = "loopback-tunnel";
@@ -111,7 +111,7 @@
         enable = true;
         displayName = "cld-edge-01";
         gateway = {
-          host = config.my.features.system.networking.topology.hosts.cld-ops-01.tailscaleIp;
+          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18794;
         };
         transport = "loopback-tunnel";

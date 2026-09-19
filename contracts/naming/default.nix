@@ -17,6 +17,13 @@
 let
   topology = config.my.topology;
 
+  # One rule, one place: everything that is a node lives in the host plane, <name>.node.<domain>.
+  # Consumers read the mappings, so they never pair two lists by position.
+  hostFqdnOf = lib.genAttrs (lib.attrNames topology.hosts) (name: "${name}.node.${topology.domain}");
+  deviceFqdnOf = lib.genAttrs (lib.attrNames (topology.devices or { })) (
+    name: "${name}.node.${topology.domain}"
+  );
+
   flakeConfigurations =
     config._module.specialArgs.flake.nixosConfigurations or {
       "${config.networking.hostName}" = config;
@@ -170,6 +177,17 @@ in
           type = lib.types.listOf lib.types.str;
           description = "Every host FQDN of the `node` plane (ARCHITECTURE.md §3.3).";
         };
+        hostFqdnOf = lib.mkOption {
+          type = lib.types.attrsOf lib.types.str;
+          description = ''
+            Host name -> FQDN of the `node` plane. A mapping so consumers do not have to pair two
+            lists by position, which is how a naming scheme drifts.
+          '';
+        };
+        deviceFqdnOf = lib.mkOption {
+          type = lib.types.attrsOf lib.types.str;
+          description = "Device name -> FQDN of the `node` plane (microcontrollers are nodes too).";
+        };
         aliases = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           description = "Deprecation report: legacy names still published as aliases (I8).";
@@ -187,7 +205,8 @@ in
   config = {
     my.contracts.projections = {
       fqdns = lib.unique fqdns;
-      hostFqdns = map (hostName: "${hostName}.node.${topology.domain}") (lib.attrNames topology.hosts);
+      inherit hostFqdnOf deviceFqdnOf;
+      hostFqdns = lib.attrValues hostFqdnOf;
       aliases = lib.unique aliasNames;
       migrationDebt = migrationDebt;
     };
