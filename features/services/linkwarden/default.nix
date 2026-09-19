@@ -70,7 +70,7 @@ in
             auth = "oidc";
             inherit (cfg) domain;
             extraDomains = [
-              "links.srv.lan.${config.my.topology.domain}"
+              "links.lan.${config.my.topology.domain}"
             ];
             oidc = {
               enable = true;

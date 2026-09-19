@@ -108,7 +108,7 @@ in
             auth = "oidc";
             subdomain = "vikunja";
             extraDomains = [
-              "tasks.srv.lan.${config.my.topology.domain}"
+              "tasks.lan.${config.my.topology.domain}"
             ];
             oidc = {
               enable = true;

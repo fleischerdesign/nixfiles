@@ -343,7 +343,7 @@
     enable = true;
     instances.philipp = {
       enable = true;
-      couchdb.url = "https://livesync.edge.vyrx.de";
+      couchdb.url = "https://livesync.vyrx.de";
       couchdb.database = "obsidian-vault";
     };
   };

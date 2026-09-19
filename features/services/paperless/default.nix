@@ -155,7 +155,7 @@ in
             auth = "oidc";
             subdomain = "paperless";
             extraDomains = [
-              "docs.srv.lan.${topologyDomain}"
+              "docs.lan.${topologyDomain}"
             ];
             oidc = {
               enable = true;
