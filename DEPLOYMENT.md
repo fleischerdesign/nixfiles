@@ -538,6 +538,16 @@ is meant to clean up after.
 - [ ] `ip -4 neigh` on `hom-srv-01` shows no neighbour in the old subnet
 - [ ] a stability window has passed (days, not hours) before the rollback generations are pruned
 
+**Measured 2026-09-20 — the gate is not met, which is why every scaffold is still in place:**
+
+| Gate | Measured |
+|---|---|
+| no `192.168.178` in `.nix` | three hits remain: the transitional Tailscale policy-routing block (`features/system/networking/tailscale`, by design), a hardcoded scanner address in `features/services/paperless` (`IP = "192.168.178.109"` for the `node-hp-scan-to` container), and one `example` string in the topology schema |
+| no old-subnet neighbour on `hom-srv-01` | **11** neighbours in `192.168.178.0/24`; `enp2s0` still carries `192.168.178.27/24`, so the old L2 segment and the FRITZ!Box are still reachable |
+| stability window | hours, not days |
+
+The scanner is not a bug to patch but an **unmigrated device**: it still lives on the old subnet, so its address stays correct until the device moves, and it belongs in `my.topology.devices` (like the relays) instead of as a literal inside a container definition — then one line moves it and the dependency is visible to the gate.
+
 ### 14.2 Teardown steps (each independently reversible)
 
 | # | Change | Verification |
