@@ -16,6 +16,16 @@ let
         type = lib.types.str;
         description = "Network CIDR block (e.g. 10.10.10.0/24)";
       };
+      gateway = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "10.10.20.1";
+        description = ''
+          Address of the router *inside* this subnet. It has to live in the zone: a gateway in a
+          different subnet cannot be used as a default route at all (the kernel rejects it with
+          "Nexthop has invalid gateway") and DHCP clients would learn a router they cannot reach.
+        '';
+      };
       vlan = lib.mkOption {
         type = lib.types.nullOr lib.types.int;
         default = null;
@@ -282,24 +292,28 @@ in
     my.topology.subnets = lib.mkDefault {
       infra = {
         cidr = "10.10.10.0/24";
+        gateway = "10.10.10.1";
         vlan = 10;
         trustLevel = "infra";
         description = "Core servers, managed networking, gateways, and storage";
       };
       corp = {
         cidr = "10.10.20.0/24";
+        gateway = "10.10.20.1";
         vlan = 20;
         trustLevel = "corp";
         description = "Trusted employee workstations, laptops, and administrative personal devices";
       };
       iot = {
         cidr = "10.10.30.0/24";
+        gateway = "10.10.30.1";
         vlan = 30;
         trustLevel = "iot";
         description = "Isolated microcontrollers, 3D printers, ESPHome, smart home devices";
       };
       mesh = {
         cidr = "10.10.100.0/24";
+        gateway = "10.10.100.1";
         vlan = null;
         trustLevel = "mesh";
         description = "Kernel-WireGuard ChaCha20 overlay mesh connecting cloud VPS and home nodes (IPv4)";
@@ -312,6 +326,7 @@ in
       };
       guest = {
         cidr = "10.10.99.0/24";
+        gateway = "10.10.99.1";
         vlan = 99;
         trustLevel = "guest";
         description = "Isolated guest network with direct internet transit only";

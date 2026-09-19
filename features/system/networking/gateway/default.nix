@@ -73,6 +73,19 @@ in
       description = "Primary DNS server handed out via DHCP (typically hom-srv-01 Blocky instance)";
     };
 
+    routedZones = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "corp"
+        "iot"
+      ];
+      description = ''
+        Zones this host routes between. Each one contributes the router address declared for it by
+        `my.topology.subnets.<zone>.gateway`: an address inside that zone, added to the interface
+        and handed out as the DHCP router. A gateway outside its subnet cannot be used at all.
+      '';
+    };
+
     enableRouting = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -116,6 +129,31 @@ in
     };
 
     # 2. Firewall: Allow DHCP (67/udp), NTP (123/udp), and DNS (53/udp+tcp) locally
+    # 2b. A routed zone's gateway has to live inside that zone, so this host carries one address
+    # per routed zone (the topology declares which one).
+    networking.interfaces.${cfg.interface}.ipv4.addresses = lib.concatMap (
+      zone:
+      let
+        subnet = topology.subnets.${zone};
+      in
+      lib.optional (subnet.gateway or null != null) {
+        address = subnet.gateway;
+        prefixLength = lib.toInt (builtins.elemAt (lib.splitString "/" subnet.cidr) 1);
+      }
+    ) cfg.routedZones;
+
+    # 2c. Transit for the routed zones. Without this the kernel drops the packets in FORWARD even
+    # though ip_forward and the NAT rule are in place. Zones the trust model marks untrusted
+    # (iot, guest) stay excluded, which is the point of having them.
+    networking.firewall.extraForwardRules = lib.concatMapStrings (
+      zone:
+      let
+        subnet = topology.subnets.${zone};
+        trusted = subnet.trustLevel != "iot" && subnet.trustLevel != "guest";
+      in
+      lib.optionalString (trusted && subnet.gateway != null) "ip saddr ${subnet.cidr} accept\n"
+    ) cfg.routedZones;
+
     networking.firewall = {
       allowedUDPPorts = lib.flatten [
         (lib.optional cfg.enableDhcp 67)
@@ -160,6 +198,8 @@ in
           }
         ];
 
+        # Each zone gets its own router address (inside that zone). The infra zone is served by
+        # the uplink itself, the others by this host.
         subnet4 = [
           {
             id = 1;
@@ -186,7 +226,8 @@ in
             option-data = [
               {
                 name = "routers";
-                data = cfg.dnsServer; # hom-srv-01 routes corp traffic
+                data =
+                  if topology.subnets.corp.gateway != null then topology.subnets.corp.gateway else cfg.dnsServer;
               }
             ];
             reservations = if corpSubnet != null then reservationsIn corpSubnet else [ ];
@@ -200,7 +241,7 @@ in
             option-data = [
               {
                 name = "routers";
-                data = cfg.dnsServer; # hom-srv-01 acts as IoT gateway
+                data = if topology.subnets.iot.gateway != null then topology.subnets.iot.gateway else cfg.dnsServer;
               }
             ];
             reservations = if iotSubnet != null then reservationsIn iotSubnet else [ ];

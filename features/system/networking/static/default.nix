@@ -46,9 +46,23 @@ let
       hostTopology.migration;
 
   # While migrating, the old gateway must stay in charge - the new one may not exist yet.
+  # Afterwards the gateway of the host's zone wins: it lives inside that subnet, so it is the only
+  # one a client can actually install. The per-host field stays as an override for hosts whose
+  # uplink is not a zone gateway (a cloud VPS behind its provider's router).
+  # The shim does not carry the zone, so it is read from the real topology - the zone's own
+  # gateway is the only one that lives inside the subnet and can therefore be installed.
+  zoneGateway =
+    if hostTopology == null then
+      null
+    else
+      (config.my.topology.subnets.${config.my.topology.hosts.${config.networking.hostName}.zone} or { })
+      .gateway or null;
+
   gateway =
     if migration.gateway != null then
       migration.gateway
+    else if zoneGateway != null then
+      zoneGateway
     else if hostTopology != null then
       hostTopology.gateway
     else
@@ -59,7 +73,7 @@ let
     && hostTopology != null
     && interface != null
     && hostTopology.localIp != null
-    && (hostTopology.gateway != null || migration.gateway != null);
+    && (hostTopology.gateway != null || migration.gateway != null || zoneGateway != null);
 in
 {
   options.my.features.system.networking.static = {
