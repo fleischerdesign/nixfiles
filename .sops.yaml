@@ -9,6 +9,19 @@ keys:
   - &ci age19hdr3x7538f0w26dtj877srt7fg804hmhaktr053r9kme9veqv5q8d7w7g
 
 creation_rules:
+  # Node-to-gateway tunnel key: encrypted to the hosts and the operator, deliberately NOT to
+  # the `ci` age key. A compromised CI identity must not be able to obtain root SSH to the
+  # whole fleet. Sops uses the first matching rule, so this must stay above the generic one.
+  - path_regex: secrets/node-tunnel\.yaml$
+    key_groups:
+      - pgp: []
+        age:
+          - *philipp
+          - *hom-srv-01
+          - *cld-edge-01
+          - *cld-ops-01
+          - *hom-wrk-01
+          - *mob-nb-01
   - path_regex: secrets/.*\.yaml$
     key_groups:
       - pgp: []

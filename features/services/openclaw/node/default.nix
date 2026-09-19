@@ -213,7 +213,7 @@ let
 
           privateKeySecret = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = osConfig.my.features.services.openclaw.node.tunnelPrivateKeySecret;
             example = "openclaw_node_ssh_key";
             description = ''
               SOPS secret holding the SSH private key for the forward. When set, it is
@@ -398,6 +398,25 @@ in
       enable = lib.mkEnableOption "allow openclaw to test and switch system configurations (nix trusted-user, sudoers for nod and nixos-rebuild)";
     };
 
+    # Node -> gateway loopback-tunnel credential, declared once instead of per host: every
+    # host that runs a tunnelled node renders this secret automatically, and the gateway
+    # feature authorizes the matching public key on the gateway side only
+    # (my.features.services.openclaw.gateway.trustedNodeKeys).
+    tunnelPrivateKeySecret = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "infra/node_tunnel_key";
+      description = "SOPS secret holding the private key used by loopback tunnels.";
+    };
+
+    tunnelPrivateKeySopsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = ../../../../secrets/node-tunnel.yaml;
+      description = ''
+        SOPS file containing the tunnel private key. Kept separate from the main secret store
+        so it is never encrypted to the CI age key (see .sops.yaml).
+      '';
+    };
+
     instances = lib.mkOption {
       type = lib.types.attrsOf (lib.types.submodule instanceSubmodule);
       default = { };
@@ -446,6 +465,7 @@ in
               path = inst._identityFile;
               owner = inst.tunnel.serviceUser;
               mode = "0400";
+              sopsFile = osConfig.my.features.services.openclaw.node.tunnelPrivateKeySopsFile;
             };
           })
         ]
@@ -537,6 +557,22 @@ in
     ]
     ++ map (name: "d ${enabledInstances.${name}._stateDir} 0700 openclaw openclaw - -") (
       lib.attrNames enabledInstances
+    )
+    # sops-nix can only render the tunnel key if its parent directory exists.
+    ++ lib.unique (
+      map
+        (
+          name:
+          let
+            inst = enabledInstances.${name};
+          in
+          "d ${builtins.dirOf inst._identityFile} 0700 ${inst.tunnel.serviceUser} users - -"
+        )
+        (
+          builtins.filter (name: enabledInstances.${name}.tunnel.privateKeySecret != null) (
+            lib.attrNames enabledInstances
+          )
+        )
     );
 
     systemd.services = lib.listToAttrs (

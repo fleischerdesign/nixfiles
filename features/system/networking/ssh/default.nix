@@ -36,6 +36,7 @@ in
     deployKeys = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
+        # Fleet deploy key (deploy-rs, nod, manual nixos-rebuild).
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAUtA5kA9lDxzQjtgfMDKC+RLOaqSuUWF1gSaO8tjGCR deploy-rs"
       ];
       description = "Authorized SSH public keys for root deploy-rs access.";

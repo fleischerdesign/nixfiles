@@ -830,6 +830,17 @@ in
   options.my.features.services.openclaw.gateway = {
     enable = lib.mkEnableOption "OpenClaw multi-tenant gateway service";
 
+    # A gateway is the SSH *server* end of the node loopback tunnels: it authorizes the node
+    # keys for root. The node side renders the matching private key (see the node feature's
+    # tunnelPrivateKeySecret), so exactly one side owns each half of the credential.
+    trustedNodeKeys = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBIIoWHt6VqxvAOIXkZXZdNiNzoQ32a2PoEvjM3oaDEj openclaw-node-tunnel"
+      ];
+      description = "SSH public keys allowed to open node tunnels on this gateway.";
+    };
+
     instances = lib.mkOption {
       type = lib.types.attrsOf (lib.types.submodule instanceSubmodule);
       default = { };
@@ -838,6 +849,10 @@ in
   };
 
   config = lib.mkIf (cfg.enable && enabledInstances != { }) {
+    # Authorize the node tunnel keys. List options merge, so this adds to the fleet deploy
+    # keys set by the ssh feature without replacing them.
+    users.users.root.openssh.authorizedKeys.keys = cfg.trustedNodeKeys;
+
     # Validate plugins on all enabled instances
     assertions = lib.concatMap (
       name:
