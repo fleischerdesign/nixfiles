@@ -5,7 +5,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 
@@ -13,10 +12,17 @@ let
   cfg = config.my.features.system.networking.gateway;
   topology = config.my.topology;
 
-  # Subnet definitions from topology
-  infraSubnet = topology.subnets.infra or null;
-  corpSubnet = topology.subnets.corp or null;
-  iotSubnet = topology.subnets.iot or null;
+  # Zones this host serves DHCP for, derived from the topology: the zone that holds the uplink (its
+  # router is the uplink itself) plus the zones this host routes. Trust levels do not belong here -
+  # they govern forwarding and NAT, not addressing, and the isolated iot zone still gets its
+  # reservations. Adding a zone therefore needs no change in this file.
+  uplinkZone = lib.findFirst (
+    zone: (topology.subnets.${zone}.gateway or null) == cfg.uplinkGateway
+  ) null (lib.attrNames topology.subnets);
+
+  dhcpSubnets = map (zone: topology.subnets.${zone}) (
+    lib.unique (lib.optional (uplinkZone != null) uplinkZone ++ cfg.routedZones)
+  );
 
   # Determine static reservations for DHCP from hosts and devices declared in topology with MAC address
   hostsWithMac = lib.filterAttrs (_name: h: h.mac != null && h.ipv4 != null) topology.hosts;
@@ -35,11 +41,8 @@ let
     lib.concatStringsSep "." (lib.take 3 (lib.splitString "." (lib.head (lib.splitString "/" cidr))));
   inSubnet = cidr: ip: netOf cidr == netOf ip;
 
-  allSubnets = lib.filter (s: s != null) [
-    infraSubnet
-    corpSubnet
-    iotSubnet
-  ];
+  # The pool a zone hands out: its own .100 to .200.
+  poolIn = subnet: "${netOf subnet.cidr}.100 - ${netOf subnet.cidr}.200";
 
   reservationsIn =
     subnet:
@@ -49,7 +52,7 @@ let
       hostname = name;
     }) (lib.filterAttrs (_name: h: inSubnet subnet.cidr h.ipv4) allReservations);
 
-  reservations = lib.concatMap reservationsIn allSubnets;
+  reservations = lib.concatMap reservationsIn dhcpSubnets;
 in
 {
   options.my.features.system.networking.gateway = {
@@ -118,6 +121,13 @@ in
           my.topology.hosts / my.topology.devices against my.topology.subnets.
         '';
       }
+      {
+        assertion = builtins.all (subnet: subnet.gateway != null) dhcpSubnets;
+        message = ''
+          Gateway: a zone served by DHCP declares no gateway, so its clients would receive no
+          router. Set my.topology.subnets.<zone>.gateway - it has to live inside that zone.
+        '';
+      }
     ];
 
     # 1. Kernel Layer-3 Routing & Forwarding
@@ -159,10 +169,25 @@ in
         (lib.optional cfg.enableDhcp 67)
         (lib.optional cfg.enableNtp 123)
       ];
-      extraCommands = lib.optionalString cfg.enableRouting ''
-        # NAT masquerade for outbound traffic leaving via the uplink interface
-        ${pkgs.iptables}/bin/iptables -t nat -A POSTROUTING -o ${cfg.interface} -j MASQUERADE || true
-      '';
+    };
+
+    # Masquerade (and permit forwarding for) the trusted zones that route through this host.
+    # Declared through the nat module: it flushes and rebuilds its chains on every firewall reload,
+    # so this describes state instead of accumulating rules - the previous extraCommand appended
+    # another identical MASQUERADE on every activation.
+    #
+    # `internalIPs` is what actually generates the rules. With an empty list the module emits
+    # nothing at all, which is how a refactor that looked clean silently removed the NAT for the
+    # whole house. Only zones the trust model allows to reach the uplink are listed; iot and guest
+    # stay isolated.
+    networking.nat = lib.mkIf cfg.enableRouting {
+      enable = true;
+      externalInterface = cfg.interface;
+      internalIPs = map (zone: topology.subnets.${zone}.cidr) (
+        lib.filter (
+          zone: topology.subnets.${zone}.trustLevel != "iot" && topology.subnets.${zone}.trustLevel != "guest"
+        ) cfg.routedZones
+      );
     };
 
     # 3. Declarative DHCP Server (Kea DHCPv4)
@@ -198,55 +223,23 @@ in
           }
         ];
 
-        # Each zone gets its own router address (inside that zone). The infra zone is served by
-        # the uplink itself, the others by this host.
-        subnet4 = [
-          {
-            id = 1;
-            subnet = if infraSubnet != null then infraSubnet.cidr else "10.10.10.0/24";
-            pools = [
-              { pool = "10.10.10.100 - 10.10.10.200"; }
-            ];
-            option-data = [
-              {
-                name = "routers";
-                data = cfg.uplinkGateway;
-              }
-            ];
-            reservations = reservationsIn (
-              if infraSubnet != null then infraSubnet else (builtins.head allSubnets)
-            );
-          }
-          {
-            id = 2;
-            subnet = if corpSubnet != null then corpSubnet.cidr else "10.10.20.0/24";
-            pools = [
-              { pool = "10.10.20.100 - 10.10.20.200"; }
-            ];
-            option-data = [
-              {
-                name = "routers";
-                data =
-                  if topology.subnets.corp.gateway != null then topology.subnets.corp.gateway else cfg.dnsServer;
-              }
-            ];
-            reservations = if corpSubnet != null then reservationsIn corpSubnet else [ ];
-          }
-          {
-            id = 3;
-            subnet = if iotSubnet != null then iotSubnet.cidr else "10.10.30.0/24";
-            pools = [
-              { pool = "10.10.30.100 - 10.10.30.200"; }
-            ];
-            option-data = [
-              {
-                name = "routers";
-                data = if topology.subnets.iot.gateway != null then topology.subnets.iot.gateway else cfg.dnsServer;
-              }
-            ];
-            reservations = if iotSubnet != null then reservationsIn iotSubnet else [ ];
-          }
-        ];
+        # One subnet per served zone, derived from the topology: the zone's CIDR, a pool taken from
+        # that CIDR, the zone's own router (which by construction lives inside it) and the
+        # reservations that fall into it.
+        subnet4 = lib.imap0 (index: subnet: {
+          id = index + 1;
+          subnet = subnet.cidr;
+          pools = [
+            { pool = poolIn subnet; }
+          ];
+          option-data = [
+            {
+              name = "routers";
+              data = subnet.gateway;
+            }
+          ];
+          reservations = reservationsIn subnet;
+        }) dhcpSubnets;
       };
     };
 

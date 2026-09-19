@@ -364,7 +364,10 @@ in
       hom-srv-01 = {
         zone = "infra";
         ipv4 = "10.10.10.10";
-        gateway = "10.10.10.1";
+        # No per-host gateway: `subnets.infra.gateway` is the single declaration for this zone. The
+        # field survives only as the override for hosts whose uplink is not a zone gateway at all -
+        # the VPS hosts, which sit behind their provider's router.
+        gateway = null;
         interface = "enp2s0";
         wireguardIpv4 = "10.10.100.10";
         wireguardIpv6 = "fd10:1000:100::10";
