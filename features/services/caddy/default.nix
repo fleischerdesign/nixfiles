@@ -204,6 +204,13 @@ in
         domain = "*.${zone}";
         extraDomainNames = [ zone ];
         dnsProvider = "cloudflare";
+        # lego determines the zone by asking a resolver for the SOA record. The system resolver on
+        # these hosts is Tailscale MagicDNS (and Blocky on the LAN), neither of which is
+        # authoritative for the public zone: asked for `vyrx.de` they answer "has no SOA record",
+        # lego then walks up to the bare TLD `de.` and reports "zone could not be found" - which
+        # looks exactly like a missing API permission and was misread as one. Zone discovery must
+        # therefore use a public resolver, independent of the host's own DNS story.
+        dnsResolver = "1.1.1.1:53";
         # systemd credentials rather than an environment file: lego reads the token from the path
         # the variable names, so the secret never appears in a process environment.
         credentialFiles = {
