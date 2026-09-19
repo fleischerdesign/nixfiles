@@ -4,7 +4,7 @@
 # configuration file, database, log file, and separate trust boundary (secrets, GitHub PAT, etc.).
 #
 # Instances are exposed via Caddy and Authentik forward-auth as:
-#   <subdomain>.<baseDomain> (e.g. philipp.ai.ops.vyrx.de)
+#   https://<subdomain>.<domain> (e.g. https://philipp.ai.vyrx.de)
 {
   lib,
   pkgs,
