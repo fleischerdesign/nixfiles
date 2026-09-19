@@ -175,6 +175,22 @@ in
                   '';
             };
           };
+          # The certificate is selected by the name being served, because a wildcard certificate
+          # covers exactly one label: `grafana.vyrx.de` is covered, `links.lan.vyrx.de` is not, and
+          # the apex has its own certificate because sharing one order with the wildcard makes the
+          # two challenges collide on the same `_acme-challenge` record. Everything the wildcard
+          # cannot cover lives on the internal or mesh plane, which no public CA can validate, so it
+          # is served by Caddy's own CA.
+          coveredByWildcard =
+            domain: lib.hasSuffix ".${zone}" domain && !lib.hasInfix "." (lib.removeSuffix ".${zone}" domain);
+          tlsFor =
+            domain:
+            if domain == zone then
+              "tls /var/lib/acme/${zone}-apex/fullchain.pem /var/lib/acme/${zone}-apex/key.pem\n"
+            else if coveredByWildcard domain then
+              "tls /var/lib/acme/${zone}-wildcard/fullchain.pem /var/lib/acme/${zone}-wildcard/key.pem\n"
+            else
+              "tls internal\n";
         in
         # An endpoint answers on its canonical domain plus every alias it declares.
         # Wildcard aliases are skipped: dynamically minted hosts own their vhost.
@@ -183,7 +199,9 @@ in
             conf:
             map (domain: {
               name = domain;
-              inherit (mkVHost conf) value;
+              value = (mkVHost conf).value // {
+                extraConfig = tlsFor domain + (mkVHost conf).value.extraConfig;
+              };
             }) ([ conf.canonicalDomain ] ++ lib.filter (d: !lib.hasInfix "*" d) conf.extraDomains)
           ) (localEndpoints ++ remoteEndpoints)
         );
@@ -199,10 +217,8 @@ in
 
     security.acme = {
       acceptTerms = true;
-      defaults.email = config.my.user.email;
-      certs."${zone}" = {
-        domain = "*.${zone}";
-        extraDomainNames = [ zone ];
+      defaults = {
+        email = config.my.user.email;
         dnsProvider = "cloudflare";
         # lego determines the zone by asking a resolver for the SOA record. The system resolver on
         # these hosts is Tailscale MagicDNS (and Blocky on the LAN), neither of which is
@@ -225,6 +241,17 @@ in
         };
         group = "caddy";
         reloadServices = [ "caddy.service" ];
+      };
+      # Two orders, never one. `*.${zone}` and the apex share the same `_acme-challenge.${zone}`
+      # record, so a single order puts two TXT values at that name at the same time; the CA then
+      # finds a value it did not expect and rejects the authorization with
+      # "Incorrect TXT record ... (and 1 more) found at _acme-challenge.<zone>" - measured here.
+      # Separate orders cannot overlap: each one finishes before the next starts.
+      certs."${zone}-wildcard" = {
+        domain = "*.${zone}";
+      };
+      certs."${zone}-apex" = {
+        domain = zone;
       };
     };
 
