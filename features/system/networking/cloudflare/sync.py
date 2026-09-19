@@ -232,10 +232,19 @@ def main():
     # run manages, and it carries a comment from this engine's own vocabulary. Everything
     # else - ACME DNS-01 records, manual entries, other tooling - is left alone.
     owned_prefixes = (
+        # Comments this engine writes today (every mkRecord call in default.nix).
         "Zone apex -> ",
         "Wildcard ingress -> ",
         "Node management ",
         "Service ",
+        # Comments earlier revisions of this engine wrote. Without them the records the
+        # engine itself created under the retired `edge.`/`ops.` labels could never be
+        # removed, which is the whole reason this flag exists. The desired-set check is
+        # the primary filter; this list only decides whether a stale record is ours.
+        "Direct Edge Host -> ",
+        "Direct Ops Host -> ",
+        "Root Ingress -> ",
+        "OpenClaw AI Gateway -> ",
         "Managed by VYRX GitOps",
     )
     stale = [
@@ -255,7 +264,10 @@ def main():
                     f"/zones/{zone_id}/dns_records/{r['id']}",
                     method="DELETE",
                 )
-            pruned += 1
+                # Only a real deletion counts as pruned; a dry run must not report one.
+                # Reporting a deletion that did not happen is the exact failure mode this
+                # flag was written to remove.
+                pruned += 1
         else:
             print(
                 f"  [ ] Stale {r['type']} {r['name']} ({r.get('comment')!r})"
