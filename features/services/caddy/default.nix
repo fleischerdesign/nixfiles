@@ -5,6 +5,9 @@
 }:
 let
   cfg = config.my.features.services.caddy;
+  # The zone decides the certificate strategy (see tlsFor below): the wildcard certificate is
+  # obtained once per zone, and internal-plane names can never be covered by it.
+  zone = config.my.topology.domain;
 in
 {
   options.my.features.services.caddy = {
@@ -184,6 +187,30 @@ in
             }) ([ conf.canonicalDomain ] ++ lib.filter (d: !lib.hasInfix "*" d) conf.extraDomains)
           ) (localEndpoints ++ remoteEndpoints)
         );
+    };
+
+    # One certificate per zone, obtained by DNS-01 through Cloudflare, on every host that
+    # terminates public names. The strategy is deliberately single: the certificate never depends
+    # on where a name resolves, which is what makes split horizon and a public CA compatible.
+    # Explicit `tls` directives (see tlsFor above) mean Caddy never attempts its own ACME, so a
+    # name that cannot be validated from outside no longer produces endless retries.
+    sops.secrets."infra/cloudflare_api_token" = lib.mkDefault { };
+
+    sops.templates."acme-cloudflare.env".content = "CF_DNS_API_TOKEN=${
+      config.sops.placeholder."infra/cloudflare_api_token"
+    }";
+
+    security.acme = {
+      acceptTerms = true;
+      defaults.email = config.my.user.email;
+      certs."${zone}" = {
+        domain = "*.${zone}";
+        extraDomainNames = [ zone ];
+        dnsProvider = "cloudflare";
+        credentialsFile = config.sops.templates."acme-cloudflare.env".path;
+        group = "caddy";
+        reloadServices = [ "caddy.service" ];
+      };
     };
 
     my.contracts.provides.caddy = {
