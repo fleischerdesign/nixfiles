@@ -305,6 +305,26 @@ Ingress host (Cloudflare + Caddy) deploys last, so DNS/TLS never point at an uns
    exists; the `vpn` plane keeps its `fd10::/64` ULA records.
 3. **Mail zone** (`MX`, `SPF`, `DKIM`, `DMARC`, `PTR`): still needs an explicit, documented
    place in the apex before mail features grow. *(open)*
+
+---
+
+## 12. Implementation status
+
+Verified against the running evaluation (`nix flake check`, fleet-wide):
+
+| Rule | Implementation |
+|---|---|
+| §2 host plane | `nodeRecords` in the Cloudflare feature project `<hostname>.node.<domain>` → overlay address. |
+| §3 service plane | `contracts/endpoints` derives `canonicalDomain` from `scope` + `subdomain` (`public`→apex, `internal`→`.lan`, `mesh`→`.vpn`, no subdomain/`isolated`→no name). `endpoint.domain` and `caddy.baseDomain` are removed from the naming path; the latter no longer exists. |
+| §4 split horizon | Blocky projects every named endpoint fleet-wide to the address a LAN client should use; `.lan`/`.vpn`/`.iot` exist only there. |
+| §5 wildcards | One opt-in apex catch-all (`catchAll`, default **off**), plus service-declared dynamic wildcards. Host-encoded service wildcards are gone. |
+| §5.1 catch-all conflict | Resolved as option **A**: the catch-all is disabled, so internal planes return NXDOMAIN instead of being absorbed. |
+| §6/§8.1 ingress engine | The ingress host publishes every fleet-wide `public` endpoint and proxies to the provider over the LAN/overlay (verified: `jellyfin.vyrx.de → 10.10.10.10:8096`, `cache.vyrx.de → 10.10.100.2:8080` with `flush_interval -1`, `hass.vyrx.de` with forward-auth). `my.topology.ingressHost` is the single SSOT. |
+| §7 invariants | I1–I4, I9 enforced as assertions; I8 exposed as `my.contracts.projections.aliases`. |
+| §8 API delta | Done, except that the `scope` enum is unchanged (mapped, not renamed — see G7). |
+| §10.4 decisions | `hass`, `seerr`, `mealie`, `grafana` are public; `hass`/`seerr` moved behind Authentik forward-auth in the same change. |
+
+Not yet deployed: all of the above is repository state and evaluation-verified only.
 4. **Zone membership — resolved.** `hass`, `seerr`, `mealie` and `mon` (Grafana) are **public**.
    `ARCHITECTURE.md` §3.2 is therefore stale for `mealie`/`mon` (they belong in §3.1). Contract
    deltas:
@@ -341,8 +361,8 @@ claims:
 
 | # | Gap | Needed to close it |
 |---|---|---|
-| G1 | **Unenforced.** The invariants (§7) exist as prose only; nothing fails today when they are violated — which is exactly how the §0.2 drift happened. | Implement I1–I8 in report mode, then as assertions, plus a `nix flake check` test. |
-| G2 | **DRY violation.** The naming scheme is restated in `ARCHITECTURE.md`, `AGENTS.md`, `DESIGN.md`, `DEPLOYMENT.md`, `IDENTITY.md`, `README.md`, `PROVISIONING.md` and here — eight places that can drift apart, and §0.1 quotes the parent verbatim instead of referencing it. | One normative source (`NAMING.md`); the other documents reference it and drop their restatements. |
+| G1 | ~~Unenforced~~ **closed.** I1–I4 and I9 are hard assertions in `contracts/naming/default.nix`, evaluated fleet-wide on every host: `nix flake check` now fails cluster-wide on any violation. I9 immediately surfaced 14 pre-existing unauthenticated public endpoints, which are now declared with a reason. | I5–I8 remain reports (I8 is `my.contracts.projections.aliases`). |
+| G2 | **Partially closed.** `NAMING.md` is the normative derivation, `ARCHITECTURE.md` §3.1 defers to `my.contracts.projections.fqdns`, and `caddy.baseDomain` / `endpoints.<n>.domain` are gone from the naming path. | Still open: `AGENTS.md`, `DESIGN.md`, `DEPLOYMENT.md`, `README.md`, `PROVISIONING.md` restate service names and must point at `NAMING.md` instead. |
 | G3 | **No formal grammar.** No charset/length rules (LDH, 63-octet label, 253-octet name), no statement about non-DNS-safe subdomains already in use (`cam.moonraker`, `*.pub.*`), case, or trailing dot. | Add a grammar section + a name validator used by I1/I2. |
 | G4 | **No operational DNS policy.** No TTL strategy per plane, no PTR/reverse-zone policy (relevant for mail), no DNSSEC statement. | Add a TTL/PTR/DNSSEC policy section. |
 | G5 | **Migration has no verification gates.** §9 lists stages but not how completion is proven. | Add per-stage acceptance checks (record/vhost/redirect diffs, consumer greps). |

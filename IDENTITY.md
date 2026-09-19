@@ -216,7 +216,7 @@ entries:
       client_secret: "!Env GRAFANA_OIDC_CLIENT_SECRET"
       authorization_flow: "!Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]"
       redirect_uris:
-        - "https://mon.lan.vyrx.de/login/generic_oauth"
+        - "https://grafana.vyrx.de/login/generic_oauth"
       sub_mode: "hashed_user_id"
       include_claims_in_id_token: true
       signing_key: "!Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]"
@@ -227,7 +227,7 @@ entries:
     attrs:
       name: "Grafana"
       provider: !KeyOf provider_grafana
-      meta_launch_url: "https://mon.lan.vyrx.de"
+      meta_launch_url: "https://grafana.vyrx.de"
       group: "Observability"
       open_in_new_tab: true
 ```

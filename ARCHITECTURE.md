@@ -74,21 +74,31 @@ Alle Services werden unter der Hauptdomain **`vyrx.de`** strukturiert.
 ```
 
 ### 3.1 Public Zone: `*.vyrx.de`
-Geroutet über `cld-edge-01` (Caddy) mit Cloudflare DNS-01 ACME Wildcard-Zertifikat. Authentifizierung via Authentik Proxy/Forward-Auth und CrowdSec Ingress Protection:
+Geroutet über `cld-edge-01` (Caddy) mit Cloudflare DNS-01 ACME Wildcard-Zertifikat. Authentifizierung via Authentik Proxy/Forward-Auth und CrowdSec Ingress Protection. Alle öffentlichen Namen liegen **flach am Apex** — der ausliefernde Host ist niemals Teil des Namens:
 - `auth.vyrx.de` ➔ Authentik SSO Portal & IDP (Passkeys / WebAuthn)
 - `jellyfin.vyrx.de` ➔ Jellyfin Media Streaming (gesichert, geroutet via VPN zu `hom-srv-01`)
 - `seerr.vyrx.de` ➔ Jellyseerr Media Requests
+- `hass.vyrx.de` ➔ Home Assistant Dashboard (Split-Horizon, s. §5)
+- `mealie.vyrx.de` ➔ Mealie Rezeptverwaltung
+- `grafana.vyrx.de` ➔ Grafana / Alertmanager
 - `cache.vyrx.de` ➔ Attic Nix Binary Cache (geroutet zu `cld-ops-01`)
-- `hass.vyrx.de` ➔ Home Assistant Dashboard
+- `search.vyrx.de` ➔ SearXNG Metasearch
 - `push.vyrx.de` ➔ Zentrale Push-Benachrichtigungen (ntfy.sh Server)
+- `couchdb.vyrx.de` / `livesync.vyrx.de` ➔ Obsidian LiveSync
+- `<name>.ai.vyrx.de` ➔ OpenClaw-Gateways (`philipp.ai`, `katja.ai`, …)
+
+> **Normativ:** Die vollständige, maschinell erzeugte Liste ist `my.contracts.projections.fqdns`;
+> die Ableitungsregeln stehen in `NAMING.md`. Diese Aufzählung ist illustrativ.
 
 ### 3.2 Internal Zone: `*.lan.vyrx.de` / `*.vpn.vyrx.de`
-Ausschließlich aus dem Heimnetzwerk (`10.10.0.0/16`) oder über das Mesh-VPN erreichbar:
+Ausschließlich aus dem Heimnetzwerk (`10.10.0.0/16`) oder über das Mesh-VPN erreichbar. Diese Zonen existieren **nur** im lokalen Resolver (Blocky) und werden **niemals** in Cloudflare veröffentlicht:
 - `sonarr.lan.vyrx.de` / `radarr.lan.vyrx.de` / `prowlarr.lan.vyrx.de`
 - `sabnzbd.lan.vyrx.de` / `bazarr.lan.vyrx.de`
-- `paperless.lan.vyrx.de` / `mealie.lan.vyrx.de`
-- `klipper.lan.vyrx.de` (Mainsail & Moonraker)
-- `mon.lan.vyrx.de` (Grafana / Alertmanager)
+- `paperless.lan.vyrx.de`
+- `mainsail.lan.vyrx.de` / `moonraker.lan.vyrx.de` / `cam.moonraker.lan.vyrx.de` (Klipper)
+
+> `mealie` und `mon` (Grafana) sind **public** (§3.1) — die frühere Einordnung unter `.lan` war
+> veraltet. `mon.lan.vyrx.de` wird durch den Split-Horizon von `grafana.vyrx.de` ersetzt.
 
 ### 3.3 Node Management: `*.node.vyrx.de`
 Feste CNAMEs auf die jeweiligen VPN-IPs für SSH- und Administrationszugriffe:
