@@ -109,12 +109,17 @@ def main():
         router = TplinkRE330Router(endpoint, password, username=user, timeout=10)
         router.authorize()
         try:
-            status = router.get_status()
-            firmware = router.get_firmware()
-            print(
-                f"  [✓] Connected: Model={firmware.model} "
-                f"HW={firmware.hardware_version} SW={firmware.software_version}"
-            )
+            # The firmware banner is informational only. Some RE330 firmwares do not expose
+            # software_version, and a missing banner must never abort a reconciliation.
+            try:
+                firmware = router.get_firmware()
+                print(
+                    f"  [✓] Connected: Model={getattr(firmware, 'model', 'unknown')} "
+                    f"HW={getattr(firmware, 'hardware_version', 'unknown')} "
+                    f"SW={getattr(firmware, 'software_version', 'unknown')}"
+                )
+            except Exception as e:
+                print(f"  [~] Connected, firmware info unavailable: {e}")
         finally:
             router.logout()
     except Exception as e:

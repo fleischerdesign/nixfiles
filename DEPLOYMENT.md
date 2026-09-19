@@ -398,6 +398,7 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 11 | Naming model changed: flat public names, ingress engine, Blocky split horizon, `node` plane | Deploy order matters — DNS/TLS must exist before a name is served | Deploy `cld-edge-01` first, then `cld-ops-01`, `hom-srv-01`, clients. See `NAMING.md` §9/§12 |
 | 14 | Migration scaffolding (host `migration` block, watchdog, legacy labels) is temporary by design | Left in place the repository describes two states at once and an obsolete path onto the host stays open | Run the teardown in §14; `my.contracts.projections.migrationDebt` reports what is still temporary |
 | 15 | Running the FRITZ!Box reconciler in **apply** mode **is** P3 | It disables the box DHCP and hands out DNS `10.10.10.10`, which only exists after P1 (hom-srv-01 deployed). Applied too early it breaks DHCP/DNS for the whole LAN | Never apply before P1. Verify read-only with `…fritzbox.package/bin/fritzbox-sync --dry-run` (needs a TR-064 user: FRITZ!OS ≥ 7.24 rejects the password-only login, `dslf-config` is gone) |
+| 16 | Applying the `tplink-ap` reconciler **unifies the SSIDs to `VYRX`** (2.4 + 5 GHz) and needs the AP at its target address | Wi-Fi clients reconnect / lose a separate SSID | AP last (P5). Verify read-only with `…tplink-ap.package/bin/tplink-ap-sync --dry-run`; both reconcilers are dry-run-verified against the live devices |
 
 ---
 
