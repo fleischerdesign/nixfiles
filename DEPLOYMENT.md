@@ -591,3 +591,12 @@ ssh root@<addr> 'nixos-rebuild --rollback switch'   # manual rollback
 ```
 
 **Change history of this runbook:** created during the initial 2.0 rollout (cld-edge-01 first). Keep it updated as hosts are migrated.
+
+### 13.1 A benign non-zero deploy exit
+
+`nixos-rebuild switch` can end with `exit 4` while the system is fully activated. Observed twice,
+both times with the line "Reload failed for Caddy." followed by a second attempt and "Reloaded
+Caddy.": systemd reports the first, failed reload, while `switch-to-configuration` carries that
+failure forward as its exit status. The configuration is live — verify with
+`systemctl is-active caddy` and `journalctl -u caddy | grep 'Reloaded Caddy'` before treating the
+exit code as a failure. Do not "fix" the exit code by suppressing it; read the reload outcome.
