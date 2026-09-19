@@ -14,6 +14,14 @@ let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.openclaw.gateway;
 
+  # The public ingress (Caddy + Authentik forward-auth) is the only legitimate proxy in front
+  # of a gateway, so its overlay address is the only non-loopback entry allowed in
+  # gateway.trustedProxies. Derived from the topology, so a new ingress host needs no edit
+  # here (ARCHITECTURE.md §8.1). OpenClaw validates the source address of proxy-shaped traffic
+  # and rejects untrusted ones with `proxy_attribution_required`.
+  ingressProxyAddress =
+    (osConfig.my.topology.hosts.${osConfig.my.topology.ingressHost} or { }).wireguardIpv4 or null;
+
   # Standard baseline toolchain available to OpenClaw execution environments
   defaultBasePackages = [
     pkgs.nix
@@ -127,6 +135,9 @@ let
 
       mcpAppsConfig = lib.optionalAttrs inst.sandbox.enable {
         mcp.apps = {
+          # Required: without this switch OpenClaw never starts the sandbox listener, so the
+          # public sandbox origin would answer 502 (verified live).
+          enabled = true;
           sandboxPort = inst.sandbox.port;
           sandboxOrigin = sandboxOrigin;
         };
@@ -235,7 +246,8 @@ let
             trustedProxies = [
               "127.0.0.1"
               "::1"
-            ];
+            ]
+            ++ lib.optional (ingressProxyAddress != null) ingressProxyAddress;
             auth = {
               mode = "trusted-proxy";
               identityScopes = lib.genAttrs inst.adminUsers (_: [ "operator.admin" ]);

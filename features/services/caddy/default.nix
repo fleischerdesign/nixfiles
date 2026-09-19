@@ -121,15 +121,23 @@ in
                 let
                   target = conf.target or "127.0.0.1:${toString conf.port}";
 
+                  # Always overwrite (never append) the forwarded client chain. Untrusted clients
+                  # must not be able to spoof X-Forwarded-* towards downstream trusted-proxy
+                  # consumers such as the OpenClaw gateway, which attributes clients from these
+                  # headers (openclaw trusted-proxy security checklist).
                   proxy =
-                    "reverse_proxy ${target}"
-                    + lib.optionalString (conf.proxyOptions != "") " {\n${conf.proxyOptions}\n}";
+                    "reverse_proxy ${target} {\n"
+                    + "  header_up X-Forwarded-For {http.request.remote.host}\n"
+                    + "  header_up X-Forwarded-Proto {http.request.scheme}\n"
+                    + "  header_up X-Forwarded-Host {http.request.host}\n"
+                    + lib.optionalString (conf.proxyOptions != "") "${conf.proxyOptions}\n"
+                    + "}";
 
                   exemptHandlers =
                     lib.optionalString (conf.unauthenticatedPaths != [ ]) ''
                       @unauthenticatedRoute path ${lib.concatStringsSep " " conf.unauthenticatedPaths}
                       handle @unauthenticatedRoute {
-                        reverse_proxy ${target}
+                        ${proxy}
                       }
                     ''
                     + lib.optionalString conf.machineClientsBypassAuth ''
@@ -139,7 +147,7 @@ in
                         not header Origin *
                       }
                       handle @nonBrowserWebsocket {
-                        reverse_proxy ${target}
+                        ${proxy}
                       }
                     '';
                 in
