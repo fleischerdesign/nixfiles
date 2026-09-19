@@ -397,6 +397,7 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 13 | OpenClaw gateways require the ingress in `gateway.trustedProxies`; without it every proxy-shaped request is rejected with `proxy_attribution_required` | Broken public routes | Derived from `my.topology.ingressHost` in the gateway feature; the ingress also overwrites `X-Forwarded-For/-Proto/-Host` (fix in place — do not regress either half) |
 | 11 | Naming model changed: flat public names, ingress engine, Blocky split horizon, `node` plane | Deploy order matters — DNS/TLS must exist before a name is served | Deploy `cld-edge-01` first, then `cld-ops-01`, `hom-srv-01`, clients. See `NAMING.md` §9/§12 |
 | 14 | Migration scaffolding (host `migration` block, watchdog, legacy labels) is temporary by design | Left in place the repository describes two states at once and an obsolete path onto the host stays open | Run the teardown in §14; `my.contracts.projections.migrationDebt` reports what is still temporary |
+| 15 | Running the FRITZ!Box reconciler in **apply** mode **is** P3 | It disables the box DHCP and hands out DNS `10.10.10.10`, which only exists after P1 (hom-srv-01 deployed). Applied too early it breaks DHCP/DNS for the whole LAN | Never apply before P1. Verify read-only with `…fritzbox.package/bin/fritzbox-sync --dry-run` (needs a TR-064 user: FRITZ!OS ≥ 7.24 rejects the password-only login, `dslf-config` is gone) |
 
 ---
 
