@@ -342,7 +342,7 @@ let
         else if submod.config.scope == "internal" then
           "lan."
         else if submod.config.scope == "mesh" then
-          "vpn."
+          "mesh."
         else
           null;
 

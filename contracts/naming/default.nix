@@ -88,7 +88,7 @@ let
     e:
     e.ep.fqdn != null
     && (
-      lib.hasInfix ".lan." e.ep.fqdn || lib.hasInfix ".vpn." e.ep.fqdn || lib.hasInfix ".iot." e.ep.fqdn
+      lib.hasInfix ".lan." e.ep.fqdn || lib.hasInfix ".mesh." e.ep.fqdn || lib.hasInfix ".iot." e.ep.fqdn
     )
   ) named;
 

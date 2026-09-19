@@ -237,6 +237,10 @@ Um unbefugtes Triggern von Benachrichtigungen zu verhindern, wird ntfy mit einer
 | `ci` | GitHub Actions / Hermes | Dev (`philipp`) | Normal (Builds) |
 
 ### 7.2 Deklarative Konfiguration:
+
+> **Kanonische Quelle:** Der Auszug unten spiegelt `features/services/ntfy/default.nix`.
+> Namen folgen [`NAMING.md`](NAMING.md) — hier `push.vyrx.de` (flach, Ingress-terminiert).
+
 ```nix
 services.ntfy-sh.settings = {
   base-url = "https://push.vyrx.de";

@@ -10,13 +10,18 @@ Enterprise NixOS + Home Manager multi-node infrastructure managed via [Nix Flake
 |------|------|---------------|----------|---------|
 | `hom-wrk-01` | desktop | `10.10.20.10` (`corp`) | Intel PC / NVMe / Intel GPU | Workstation — Niri + Axis Shell, Sunshine, Gaming, OpenClaw Node |
 | `mob-nb-01` | notebook | Roaming DHCP (`corp`) | AMD Laptop / NVMe | Daily Driver — Niri + Axis Shell, Codium, OpenClaw Node |
-| `cld-edge-01` | server | `173.249.22.211` (`mesh`) | Cloud VPS (QEMU, GRUB) | Ingress Hub — WireGuard Hub, Caddy Edge, Authentik SSO, ntfy (`push.vyrx.de`), DBs |
+| `cld-edge-01` | server | `173.249.22.211` (`mesh`) | Cloud VPS (QEMU, GRUB) | Ingress Hub — WireGuard Hub, Caddy Edge, Authentik SSO, ntfy, DBs |
 | `cld-ops-01` | server | `37.114.55.91` (`mesh`) | Cloud VPS (QEMU, GRUB) | Observability Master — Grafana, Prometheus, Loki, OpenClaw AI Gateway (`:18789`), Attic |
 | `hom-srv-01` | server | `10.10.10.10` (`infra`) | Bare Metal (Intel, 4TB+1TB) | Core Gateway — Kea DHCP, Chrony NTP, Blocky DNS, \*arr stack, Jellyfin, Home Assistant, Klipper |
 
 ### Embedded Devices & Bridges
 - `hom-rt-01` (`10.10.10.1`): AVM FRITZ!Box (Layer-1/2 Uplink Modem, DHCP/DNS offloaded to `hom-srv-01`).
 - `hom-ap-01` (`10.10.10.20`): TP-Link RE330 Access Point (Layer-2 Wi-Fi bridge, SSIDs: `VYRX`, `VYRX-IOT`).
+
+> **Naming:** host, service and zone names are specified normatively in [`NAMING.md`](NAMING.md)
+> and derived — never maintained by hand. Public services are flat (`<service>.vyrx.de`),
+> internal planes are `.lan` / `.mesh` / `.iot`, hosts live in the `node` plane
+> (`<hostname>.node.vyrx.de`). The machine-generated list is `my.contracts.projections.fqdns`.
 
 ## Architecture Highlights
 

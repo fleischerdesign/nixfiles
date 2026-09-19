@@ -8,9 +8,15 @@ Nix-Flake-basierte Enterprise-NixOS-Konfiguration für 5 Hosts (`cld-edge-01`, `
 |---|---|---|---|---|
 | `hom-wrk-01` | desktop | `corp` (`10.10.20.10`) | PC (Intel, NVMe, Intel GPU) | Niri-Desktop + Axis Shell, OpenClaw Node |
 | `mob-nb-01` | notebook | `corp` (Roaming) | Laptop (AMD, NVMe) | Niri-Desktop + Axis Shell, OpenClaw Node |
-| `cld-edge-01` | server | `mesh` / Public (`173.249.22.211`) | VPS (QEMU, GRUB/BIOS) | Ingress Hub: WireGuard Relay, Caddy Edge, Authentik SSO, ntfy (`push.vyrx.de`), DBs |
+| `cld-edge-01` | server | `mesh` / Public (`173.249.22.211`) | VPS (QEMU, GRUB/BIOS) | Ingress Hub: WireGuard Relay, Caddy Edge, Authentik SSO, ntfy, DBs |
 | `cld-ops-01` | server | `mesh` / Public (`37.114.55.91`) | VPS (QEMU, GRUB/BIOS) | Observability Master: Grafana, Prometheus, Loki, OpenClaw AI Gateway (`:18789`), Attic |
 | `hom-srv-01` | server | `infra` (`10.10.10.10`) | Bare Metal (Intel, 4TB+1TB) | Single-NIC Gateway (Kea DHCP, Chrony NTP, Blocky DNS), Media (\*arr, Jellyfin), Home Assistant, Klipper |
+
+> **Benennung (normativ):** Host-, Service- und Zonen-Namen folgen ausschließlich
+> [`NAMING.md`](NAMING.md) und werden **abgeleitet**, nicht gepflegt. Öffentliche Services sind
+> flach (`<service>.vyrx.de`), interne Ebenen liegen unter `.lan` / `.mesh` / `.iot`, Hosts im
+> `node`-Plane (`<hostname>.node.vyrx.de`). Die maschinelle Liste ist
+> `my.contracts.projections.fqdns`; `ARCHITECTURE.md` §3 nennt nur Beispiele.
 
 ### Embedded Devices, IoT-Flotte & GitOps-Targets
 - `hom-rt-01` (`10.10.10.1`): AVM FRITZ!Box Uplink-Modem (TR-064 GitOps Target `nodTargets.hom-rt-01`).

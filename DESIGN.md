@@ -4,6 +4,8 @@
 > **Aesthetic:** Modern Industrial Minimalist / High-End Developer Tooling (Linear / Vercel / Raycast style)  
 > **Scope:** Authentik SSO Gateway, Caddy Error Pages, Internal Dashboards & Web Services  
 > **Domain:** `vyrx.de`
+>
+> **Naming:** siehe [`NAMING.md`](NAMING.md) — normativ, abgeleitet, nie handgepflegt.
 
 ---
 

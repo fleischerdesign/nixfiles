@@ -125,19 +125,14 @@ in
         protocol = "tcp";
         # Public per NAMING.md §10.4 (decision recorded). Scope and auth must move together.
         scope = "public";
-        auth = "authentik";
-        machineClientsBypassAuth = true;
+        # Home Assistant enforces its own authentication. Its official documentation
+        # (integrations/http, Reverse proxies) defines the trusted-proxy settings but NO set of
+        # paths an external SSO proxy may bypass, and a forward-auth layer in front of HA breaks
+        # the companion app and the WebSocket API. Direct exposure with HA's own auth is the
+        # documented path; the trusted_proxies/use_x_forwarded_for settings are set above.
+        auth = "none";
+        publicExempt = "Home Assistant enforces its own authentication (documented for direct internet exposure); an external forward-auth proxy breaks the companion app and the WebSocket API";
         subdomain = "hass";
-        # The companion app and integrations authenticate with long-lived tokens rather than
-        # a browser SSO redirect. VERIFY this list against Home Assistant's trusted-proxy
-        # documentation before deploying - do not treat it as authoritative.
-        unauthenticatedPaths = [
-          "/api/*"
-          "/auth/*"
-          "/local/*"
-          "/frontend_latest/*"
-          "/static/*"
-        ];
         directAccess = {
           enable = true;
           protocol = "tcp";

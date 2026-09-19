@@ -66,7 +66,7 @@ Alle Services werden unter der Hauptdomain **`vyrx.de`** strukturiert.
                     ▼                                 ▼
          Öffentliche Dienste                   Interne Zonen (Zero-Trust)
          • auth.vyrx.de                        • *.lan.vyrx.de (LAN / On-Prem)
-         • jellyfin.vyrx.de                    • *.vpn.vyrx.de (Mesh VPN)
+         • jellyfin.vyrx.de                    • *.mesh.vyrx.de (Mesh VPN)
          • seerr.vyrx.de                       • *.node.vyrx.de (Host Direct Access)
          • cache.vyrx.de
          • hass.vyrx.de
@@ -90,7 +90,7 @@ Geroutet über `cld-edge-01` (Caddy) mit Cloudflare DNS-01 ACME Wildcard-Zertifi
 > **Normativ:** Die vollständige, maschinell erzeugte Liste ist `my.contracts.projections.fqdns`;
 > die Ableitungsregeln stehen in `NAMING.md`. Diese Aufzählung ist illustrativ.
 
-### 3.2 Internal Zone: `*.lan.vyrx.de` / `*.vpn.vyrx.de`
+### 3.2 Internal Zone: `*.lan.vyrx.de` / `*.mesh.vyrx.de`
 Ausschließlich aus dem Heimnetzwerk (`10.10.0.0/16`) oder über das Mesh-VPN erreichbar. Diese Zonen existieren **nur** im lokalen Resolver (Blocky) und werden **niemals** in Cloudflare veröffentlicht:
 - `sonarr.lan.vyrx.de` / `radarr.lan.vyrx.de` / `prowlarr.lan.vyrx.de`
 - `sabnzbd.lan.vyrx.de` / `bazarr.lan.vyrx.de`

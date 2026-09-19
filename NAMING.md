@@ -26,7 +26,7 @@
   "Dienste besitzen feste DNS-Endpunkte (`jellyfin.vyrx.de`, `sonarr.lan.vyrx.de`).
   Sie sind **niemals an physische Rechnernamen gekoppelt**."
 * **§3 (l. 69) — zone diagram:** public names (`jellyfin.vyrx.de`) and a mesh namespace
-  `*.vpn.vyrx.de (Mesh VPN)`.
+  `*.mesh.vyrx.de (Mesh VPN)`.
 * **§3 (l. 79):** "`jellyfin.vyrx.de` ➔ Jellyfin Media Streaming (**gesichert, geroutet via
   VPN zu `hom-srv-01`**)."
 * **§3 (l. 89):** "`paperless.lan.vyrx.de` / `mealie.lan.vyrx.de`" — internal services live
@@ -64,7 +64,7 @@ could go unnoticed:
 1. **Derivation functions.** The parent fixes hostnames (§2) and gives naming *examples*,
    but defines neither a host-FQDN rule nor a service-FQDN rule. §2/§3 below are those rules.
 2. **Zone authority and publishing.** The parent names the planes and locates the DNS engine
-   on `hom-srv-01`, but never states who is authoritative for `lan`/`vpn`/`iot` or whether
+   on `hom-srv-01`, but never states who is authoritative for `lan`/`mesh`/`iot` or whether
    they may be published. §1 fixes that (Blocky-only, never published).
 3. **A plane for cloud-internal services.** The parent's model has no plane for services that
    are reachable only over the overlay and are not internet-facing (Prometheus, PostgreSQL,
@@ -83,7 +83,7 @@ could go unnoticed:
 |---|---|---|---|---|---|
 | public | `"public"` | `vyrx.de` (apex) | Cloudflare | **yes** | ingress host (reverse proxy) |
 | lan | `"internal"` | `lan.vyrx.de` | Blocky (split DNS) | **no** | home LAN |
-| vpn | `"mesh"` | `vpn.vyrx.de` | Blocky + our overlay DNS | **no** | WireGuard mesh |
+| mesh | `"mesh"` | `mesh.vyrx.de` | Blocky + our overlay DNS | **no** | WireGuard mesh |
 | iot | — *(device inventory, not an endpoint scope)* | `iot.vyrx.de` | Blocky | **no** | IoT segment |
 | node | — *(host plane, from `my.topology.hosts`)* | `node.vyrx.de` | Cloudflare | **yes** | CNAME → overlay (VPN) address; SSH/admin only (§2) |
 | isolated | `"isolated"` | — | — | no | direct address/port only |
@@ -97,9 +97,9 @@ IoT names come from the device inventory (`my.topology.devices[].domain`, e.g.
 Rules:
 
 * The suffix is the **only** thing that encodes visibility. It never encodes a host.
-* `lan`/`vpn`/`iot` exist **only** in Blocky and must never be published (§5.1).
-* `vpn` is **our** overlay namespace. Tailscale is transitional and will be removed; the
-  `vpn` plane is authoritative in our own DNS — **no MagicDNS dependency**.
+* `lan`/`mesh`/`iot` exist **only** in Blocky and must never be published (§5.1).
+* `mesh` is **our** overlay namespace. Tailscale is transitional and will be removed; the
+  `mesh` plane is authoritative in our own DNS — **no MagicDNS dependency**.
 
 ---
 
@@ -152,7 +152,7 @@ fqdn(endpoint) =
 |---|---|
 | `"public"` | *(none — apex)* |
 | `"internal"` | `lan.` |
-| `"mesh"` | `vpn.` |
+| `"mesh"` | `mesh.` |
 | `"isolated"` | — (no name) |
 
 `endpoint.domain` and `my.features.services.caddy.baseDomain` are **removed from the naming
@@ -186,7 +186,7 @@ ingress shares the L2 segment, otherwise the mesh address).
 
 ## 4. Split horizon (one name, two answers)
 
-| Resolver | `public` name | `lan` / `vpn` / `iot` name |
+| Resolver | `public` name | `lan` / `mesh` / `iot` name |
 |---|---|---|
 | Cloudflare | ingress public IPv4 | *(NXDOMAIN — not published)* |
 | Blocky (local) | provider LAN/overlay IPv4 (split-horizon rewrite) | provider address in that plane |
@@ -199,13 +199,13 @@ as `mon.lan.vyrx.de` / `grafana.ops.vyrx.de`.
 
 ## 5. Wildcards
 
-Wildcards are **part of the design** (see the documented `*.vpn.vyrx.de`). What is *not*
+Wildcards are **part of the design** (see the documented `*.mesh.vyrx.de`). What is *not*
 part of the design is a wildcard that encodes a **host** into a **service** namespace.
 
 | Wildcard | Status | Purpose |
 |---|---|---|
 | `*.${domain}` → ingress | **kept** (exactly one) | catch-all for the public plane; never shadows a projected name |
-| `*.vpn.${domain}` | **kept** (documented) | overlay namespace |
+| `*.mesh.${domain}` | **kept** (documented) | overlay namespace |
 | `*.${service}.${domain}` | **kept**, service-declared via `extraDomains` | runtime-minted names (OpenClaw self-publishing `<app>.pub.<inst>.ai.vyrx.de`) |
 | `*.edge.${domain}`, `*.ops.${domain}` | **abolished** | these only existed because service names encoded hosts |
 
@@ -218,7 +218,7 @@ those via Caddy `on_demand_tls` (§8.1 of the code).
 
 RFC 4592 resolves wildcards by *closest encloser*, so an apex wildcard `*.${domain}` absorbs
 names that merely look like they belong to an internal plane. **Verified live** (Cloudflare
-DoH): `foo.lan.vyrx.de`, `bar.vpn.vyrx.de` and `x.iot.vyrx.de` **all resolve to the ingress**.
+DoH): `foo.lan.vyrx.de`, `bar.mesh.vyrx.de` and `x.iot.vyrx.de` **all resolve to the ingress**.
 The internal planes are therefore *not* isolated today, and the obvious-looking claim
 "internal planes return NXDOMAIN publicly" is empirically false.
 
@@ -227,7 +227,7 @@ Exactly one of these must be chosen before I4/I5 can be enforced:
 * **A — explicit public names, no catch-all.** Publish only intended public names;
 everything else is NXDOMAIN. Maximum isolation, at the cost of a new service needing a
 record before it is reachable.
-* **B — keep the catch-all, delegate the internal planes.** Create `lan`/`vpn`/`iot` NS
+* **B — keep the catch-all, delegate the internal planes.** Create `lan`/`mesh`/`iot` NS
 records pointing at the internal resolver so the planes *fail closed* (SERVFAIL) instead of
 leaking to the ingress.
 
@@ -255,7 +255,7 @@ Aliases are tracked as deprecation debt and reported by §7 I8.
 | I1 | Host FQDNs are unique and derived from unique RFC 1178 hostnames. |
 | I2 | No two endpoints derive the same FQDN; no alias collides with a canonical name. |
 | I3 | A `public` endpoint's provider is reachable from the ingress (LAN or mesh address present). **Not** "provider has a public address" — see §3.1. |
-| I4 | The Cloudflare record set contains only `public`-plane names (no `lan.`/`vpn.`/`iot.` suffix). |
+| I4 | The Cloudflare record set contains only `public`-plane names (no `lan.`/`mesh.`/`iot.` suffix). |
 | I5 | The Cloudflare record set contains at most one `*` catch-all, pointing at the ingress, and it must not absorb the internal planes (§5.1). |
 | I6 | Every projected record's FQDN lies inside a declared plane suffix. |
 | I7 | `scope ∈ { public, internal, mesh, isolated }` — the **existing** contract enum, unmapped (`iot` is not an endpoint scope). |
@@ -263,7 +263,7 @@ Aliases are tracked as deprecation debt and reported by §7 I8.
 | I9 | A `public` endpoint with `auth = "none"` must carry an explicit `publicExempt = "<reason>"`. Publishing an unauthenticated service to the internet is a **decision**, never a default. |
 
 Read-only projections for inspection and tests: `my.contracts.projections.fqdns`,
-`…hostFqdns`, `…dnsRecords.{public,lan,vpn,iot}`, `…ingressVhosts`.
+`…hostFqdns`, `…dnsRecords.{public,lan,mesh,iot}`, `…ingressVhosts`.
 
 ---
 
@@ -297,12 +297,12 @@ Ingress host (Cloudflare + Caddy) deploys last, so DNS/TLS never point at an uns
 
 ## 10. Decisions
 
-1. **Overlay naming:** `vpn.vyrx.de` is authoritative in our own DNS. **Tailscale is
+1. **Overlay naming:** `mesh.vyrx.de` is authoritative in our own DNS. **Tailscale is
    transitional and will be removed** — no MagicDNS dependency. *(resolved)*
 2. **Public IPv6:** resolved factually — neither `cld-edge-01` nor `cld-ops-01` announces a
    global unicast IPv6 prefix (verified: only `tailscale0` ULA `fd7a::/…` and `wg0` ULA
    `fd10:1000:100::/64`). **No `AAAA` records in the public plane** until a provider prefix
-   exists; the `vpn` plane keeps its `fd10::/64` ULA records.
+   exists; the `mesh` plane keeps its `fd10::/64` ULA records.
 3. **Mail zone** (`MX`, `SPF`, `DKIM`, `DMARC`, `PTR`): still needs an explicit, documented
    place in the apex before mail features grow. *(open)*
 
@@ -315,13 +315,13 @@ Verified against the running evaluation (`nix flake check`, fleet-wide):
 | Rule | Implementation |
 |---|---|
 | §2 host plane | `nodeRecords` in the Cloudflare feature project `<hostname>.node.<domain>` → overlay address. |
-| §3 service plane | `contracts/endpoints` derives `canonicalDomain` from `scope` + `subdomain` (`public`→apex, `internal`→`.lan`, `mesh`→`.vpn`, no subdomain/`isolated`→no name). `endpoint.domain` and `caddy.baseDomain` are removed from the naming path; the latter no longer exists. |
-| §4 split horizon | Blocky projects every named endpoint fleet-wide to the address a LAN client should use; `.lan`/`.vpn`/`.iot` exist only there. |
+| §3 service plane | `contracts/endpoints` derives `canonicalDomain` from `scope` + `subdomain` (`public`→apex, `internal`→`.lan`, `mesh`→`.mesh`, no subdomain/`isolated`→no name). `endpoint.domain` and `caddy.baseDomain` are removed from the naming path; the latter no longer exists. |
+| §4 split horizon | Blocky projects every named endpoint fleet-wide to the address a LAN client should use; `.lan`/`.mesh`/`.iot` exist only there. |
 | §5 wildcards | One opt-in apex catch-all (`catchAll`, default **off**), plus service-declared dynamic wildcards. Host-encoded service wildcards are gone. |
 | §5.1 catch-all conflict | Resolved as option **A**: the catch-all is disabled, so internal planes return NXDOMAIN instead of being absorbed. |
 | §6/§8.1 ingress engine | The ingress host publishes every fleet-wide `public` endpoint and proxies to the provider over the LAN/overlay (verified: `jellyfin.vyrx.de → 10.10.10.10:8096`, `cache.vyrx.de → 10.10.100.2:8080` with `flush_interval -1`, `hass.vyrx.de` with forward-auth). `my.topology.ingressHost` is the single SSOT. |
 | §7 invariants | I1–I4, I9 enforced as assertions; I8 exposed as `my.contracts.projections.aliases`. |
-| §8 API delta | Done, except that the `scope` enum is unchanged (mapped, not renamed — see G7). |
+| §8 API delta | Done, except that the `scope` enum is unchanged (mapped, not renamed — the overlay plane is spelled `mesh`, see §1). |
 | §10.4 decisions | `hass`, `seerr`, `mealie`, `grafana` are public; `hass`/`seerr` moved behind Authentik forward-auth in the same change. |
 
 Not yet deployed: all of the above is repository state and evaluation-verified only.
@@ -367,4 +367,4 @@ claims:
 | G4 | **No operational DNS policy.** No TTL strategy per plane, no PTR/reverse-zone policy (relevant for mail), no DNSSEC statement. | Add a TTL/PTR/DNSSEC policy section. |
 | G5 | **Migration has no verification gates.** §9 lists stages but not how completion is proven. | Add per-stage acceptance checks (record/vhost/redirect diffs, consumer greps). |
 | G6 | ~~Host-FQDN rule missing~~ **retracted — my error.** `ARCHITECTURE.md` §3.3 *does* specify it (`*.node.vyrx.de`, CNAME to the overlay address); §2 above invented `<hostname>.<plane>` instead. | §2 now follows §3.3; still open: whether the undeclared `edge`/`ops` labels become aliases or are dropped. |
-| G7 | **`mesh` vs `vpn` naming mismatch.** The contract enum says `mesh`, the zone diagram says `vpn`. Both are now mapped, but the mismatch should be resolved deliberately. | Decide: rename the enum to `vpn`, or the zone to `.mesh`. |
+| G7 | ~~overlay plane naming~~ **closed.** The overlay plane is **`mesh`** (`.mesh.vyrx.de`), matching the contract enum value. `ARCHITECTURE.md` §3 and this document were updated; the enum is unchanged. | — |

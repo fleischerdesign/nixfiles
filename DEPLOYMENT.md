@@ -385,8 +385,10 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 5 | Tailnet still uses legacy musician node names | Wrong host assumption | `tailscale status` before targeting (§3.3) |
 | 6 | `rm -rf /var/lib/authentik` | Authentik service CHDIR failure | Fixed via tmpfiles rule; recreate dir if manual wipe |
 | 7 | Authentik `akadmin` is the only usable break-glass account | Family accounts have no password | Log in as `akadmin`; set/`Passwort vergessen` |
-| 8 | `cache.ops.vyrx.de` (Attic) has **no Cloudflare DNS record** | Attic server api-endpoint + future client default are unreachable | Add `*.ops` CNAME → `ops.vyrx.de` to `defaultRecords`, redeploy `cld-edge-01` |
+| 8 | ~~Attic had no Cloudflare DNS record~~ **fixed.** The flat name is `cache.vyrx.de`, projected from the Attic contract endpoint; the ad-hoc `*.ops` wildcard is obsolete (#10). | — |
 | 9 | Legacy `/var/lib/docker` (21 GB, `camofox`) orphaned on `cld-ops-01` | Wasted disk; `camofox` is not referenced in the repo anymore | `rm -rf /var/lib/docker` once nothing needs it |
+| 10 | Cloudflare still holds the removed wildcards `*.ops.vyrx.de` and `*.ai.vyrx.de` | Not reproducible from git (GitOps drift) | Controlled `cloudflare-sync --prune` run **after** verification |
+| 11 | Naming model changed: flat public names, ingress engine, Blocky split horizon, `node` plane | Deploy order matters — DNS/TLS must exist before a name is served | Deploy `cld-edge-01` first, then `cld-ops-01`, `hom-srv-01`, clients. See `NAMING.md` §9/§12 |
 
 ---
 
