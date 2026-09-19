@@ -110,3 +110,30 @@ master, which is also blocked on B1.
 
 Both are the same blocker: without root on the edge, neither the fleet key nor the fleet-wide rollout
 in A3 can be closed.
+
+---
+
+## 6. The rename problem — six registries, one cause
+
+Renaming the hosts (`strummer` → `hom-srv-01`, `jello` → `hom-wrk-01`, `mackaye` → `cld-edge-01`,
+`rollins` → `cld-ops-01`, `yorke` → `mob-nb-01`) was treated as a configuration change. It was a
+state migration, and every system that keys on the hostname had to be migrated with it. The ones we
+stumbled over on 2026-09-19, in the order they bit:
+
+| # | Registry | Symptom | State |
+|---|---|---|---|
+| 1 | `sshd` `listenAddresses` | the migration address was never bound → deploy locked itself out of the host | fixed |
+| 2 | Chrome `SingletonLock` (contains `<hostname>-<pid>`) | "profile in use on another computer" and no way to start Chrome | fixed (stale lock removed) |
+| 3 | CrowdSec machine registry | the agent authenticates as `<hostname>`, so the rename made it a stranger: `ent: machine not found` | fixed (`hom-srv-01` registered); stale `mackaye`, `strummer`, `rollins`, `jello`, `yorke` remain as inert debt — `mackaye` is the master's own entry and must **not** be deleted |
+| 4 | per-host `domain` fields | a second naming scheme that the rename made visibly wrong (`srv.lan.vyrx.de` for `hom-srv-01`) | fixed (fields deleted) |
+| 5 | Caddy access-log filenames (`access-<hostname>.log`) | stale files, and the agent cannot read them (`permission denied`) → the IPS runs but is blind to HTTP | open |
+| 6 | host-keyed state in user profiles (`dconf`, VS Code, kdeconnect, session stores) | harmless strings, no action | accepted |
+
+**The rule this yields:** a hostname change is finished only when every registry keyed on the hostname
+has been migrated — and since we found six by accident, the list is probably incomplete. The systemic
+conclusion is not a longer checklist but a narrower habit: **treat a fleet-wide rename as a migration
+with a verification phase, like the subnet cutover — or do not rename at all.**
+
+The concrete open item from this table is #5: `crowdsec` cannot read `/var/log/caddy/*.log`. A service
+that is `active` but blind to its main input is the same failure class as `exit 4` being normal:
+the status says nothing about the effect.
