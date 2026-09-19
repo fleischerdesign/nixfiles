@@ -384,12 +384,20 @@ in
       hom-wrk-01 = {
         zone = "corp";
         ipv4 = "10.10.20.10";
-        gateway = "10.10.10.10";
+        # No per-host gateway: the zone's gateway (10.10.20.1) is the one that lives inside the
+        # subnet and is therefore the only one that can be installed as a default route.
+        gateway = null;
+        interface = "enp0s31f6";
         wireguardIpv4 = "10.10.100.20";
         wireguardIpv6 = "fd10:1000:100::20";
         wireguardPublicKey = "y9CMim/6IWIKdIztKJQh5BR7R2ygjYwCjjEvgJQSLT0=";
         hostType = "workstation";
         domain = "wrk.lan.vyrx.de";
+        # TEMPORARY (subnet migration): the old address stays until the new configuration has
+        # proven itself, and it is what keeps this host reachable if the switch goes wrong.
+        migration = {
+          addresses = [ "192.168.178.30/24" ];
+        };
       };
 
       mob-nb-01 = {
