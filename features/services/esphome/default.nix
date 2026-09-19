@@ -90,6 +90,10 @@ in
       ]
     ) (_: { });
 
+    # The flash scripts belong on the host that holds the credentials: sops-nix materializes them
+    # under /run/secrets here, and this is the machine on the segment the devices live on.
+    environment.systemPackages = lib.attrValues cfg.devicePackages;
+
     my.contracts.provides.esphome = {
       endpoints = {
         web = {
