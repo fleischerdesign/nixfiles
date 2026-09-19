@@ -85,6 +85,9 @@ def read_forwards(fc, limit=64):
             break
         forwards.append(
             {
+                # AVM reports unmatched entries as 0.0.0.0 and requires exactly that value back
+                # on delete; sending an empty string fails with UPnP error 714.
+                "remote_host": entry.get("NewRemoteHost") or "0.0.0.0",
                 "external_port": entry.get("NewExternalPort"),
                 "protocol": entry.get("NewProtocol"),
                 "internal_client": entry.get("NewInternalClient"),
@@ -185,13 +188,17 @@ def main():
 
     if not forwards and current_forwards:
         for f in current_forwards:
-            fc.call_action(
-                WAN,
-                "DeletePortMapping",
-                NewRemoteHost="",
-                NewExternalPort=f["external_port"],
-                NewProtocol=f["protocol"],
-            )
+            try:
+                fc.call_action(
+                    WAN,
+                    "DeletePortMapping",
+                    NewRemoteHost=f["remote_host"],
+                    NewExternalPort=f["external_port"],
+                    NewProtocol=f["protocol"],
+                )
+            except Exception as e:
+                print(f"  [!] could not remove {f['protocol']}/{f['external_port']}: {e}")
+                continue
             print(
                 f"  [+] removed port forwarding {f['protocol']}/{f['external_port']} "
                 f"-> {f['internal_client']}:{f['internal_port']} ({f['description']})"
