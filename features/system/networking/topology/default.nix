@@ -62,6 +62,35 @@ let
         default = null;
         description = "Default gateway IPv4 address";
       };
+
+      interface = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "enp2s0";
+        description = ''
+          Primary network interface of the host. Single source of truth for every module that
+          has to address, bind or trust an interface (static addressing, gateway, ssh).
+        '';
+      };
+
+      # TEMPORARY migration aid. Keeps a host reachable on the OLD network while the LAN is
+      # being re-addressed, so a cutover can never lock us out. Must be emptied (addresses)
+      # and nulled (gateway) once the migration is complete.
+      migration = {
+        addresses = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          example = [ "192.168.178.27/24" ];
+          description = "Additional addresses (CIDR) kept during a subnet migration.";
+        };
+
+        gateway = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "192.168.178.1";
+          description = "Default gateway to use while migrating (the old uplink).";
+        };
+      };
       wireguardIpv4 = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
@@ -172,6 +201,19 @@ in
       description = "Topology host that terminates public ingress traffic.";
     };
 
+    resolvers = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "10.10.10.10"
+        "10.10.10.1"
+      ];
+      description = ''
+        Authoritative resolvers handed to hosts and DHCP clients: the local Blocky instance
+        first (it owns the split horizon), the uplink router as fallback. Never public
+        resolvers - they would bypass split horizon and the internal zones.
+      '';
+    };
+
     subnets = lib.mkOption {
       type = lib.types.attrsOf subnetSubmodule;
       default = { };
@@ -259,6 +301,7 @@ in
         zone = "mesh";
         ipv4 = "173.249.22.211";
         gateway = "173.249.22.1";
+        interface = "eth0";
         wireguardIpv4 = "10.10.100.1";
         wireguardIpv6 = "fd10:1000:100::1";
         wireguardPublicKey = "xaW5sos7b7wPXsjl4U6UqsaHl9l+Y1F013DDJ4kioEg=";
@@ -271,6 +314,7 @@ in
         zone = "mesh";
         ipv4 = "37.114.55.91";
         gateway = "37.114.55.1";
+        interface = "eth0";
         wireguardIpv4 = "10.10.100.2";
         wireguardIpv6 = "fd10:1000:100::2";
         wireguardPublicKey = "DBU0HRrBeIXZFokauPXfsYA3i7feCov154VbkAdwlTM=";
@@ -283,11 +327,18 @@ in
         zone = "infra";
         ipv4 = "10.10.10.10";
         gateway = "10.10.10.1";
+        interface = "enp2s0";
         wireguardIpv4 = "10.10.100.10";
         wireguardIpv6 = "fd10:1000:100::10";
         wireguardPublicKey = "j80spw+2+Ojz51aKAytPdCZwFOc64yNOR05rAcXOESE=";
         hostType = "server";
         domain = "srv.lan.vyrx.de";
+        # TEMPORARY (subnet migration): stay reachable on the old network until the
+        # FRITZ!Box has moved to 10.10.10.1/24 and DHCP is handed over to Kea.
+        migration = {
+          addresses = [ "192.168.178.27/24" ];
+          gateway = "192.168.178.1";
+        };
       };
 
       hom-wrk-01 = {
@@ -424,6 +475,8 @@ in
         wireguardIpv6 = h.wireguardIpv6;
         localIp = h.ipv4;
         domain = h.domain;
+        interface = h.interface;
+        migration = h.migration;
         hostType = if h.hostType == "workstation" || h.hostType == "client" then "client" else "server";
         gateway = h.gateway;
       }) cfg.hosts
