@@ -5,9 +5,53 @@
 }:
 let
   cfg = config.my.features.services.caddy;
-  # The zone decides the certificate strategy (see tlsFor below): the wildcard certificate is
-  # obtained once per zone, and internal-plane names can never be covered by it.
-  zone = config.my.topology.domain;
+
+  # Every public name this host terminates - its own endpoints, plus every host's when it runs the
+  # ingress - computed once and used both for the certificate declarations and for the `tls`
+  # bindings, so the two cannot drift apart.
+  #
+  # No wildcard and no apex: Cloudflare's own Universal SSL certificate for this zone is validated by
+  # TXT records at `_acme-challenge.<zone>`, managed internally and invisible to the zone API
+  # (measured: DNS serves them, the API does not know them). No third party can prove control of
+  # that name, so `*.${zone}` and `${zone}` cannot be issued by us - while per-name challenges are
+  # free and publish correctly (measured: `_acme-challenge.<name>.<zone>` appears in the zone within
+  # three seconds of lego presenting it).
+  flakeConfigurations =
+    config._module.specialArgs.flake.nixosConfigurations or {
+      "${config.networking.hostName}" = config;
+    };
+  isIngress = config.networking.hostName == config.my.topology.ingressHost;
+  overlayAddress =
+    host:
+    if host == null then
+      null
+    else if host.wireguardIpv4 != null then
+      host.wireguardIpv4
+    else
+      host.ipv4;
+  publicEndpoints =
+    lib.concatMap (
+      contract:
+      lib.filter (ep: ep.scope == "public" && ep.canonicalDomain != null) (
+        lib.attrValues contract.endpoints
+      )
+    ) (lib.attrValues (config.my.contracts.provides or { }))
+    ++ lib.optionals isIngress (
+      lib.concatLists (
+        lib.mapAttrsToList (
+          hostName: hostConfig:
+          lib.optionals (hostName != config.networking.hostName) (
+            lib.concatMap (
+              contract:
+              lib.filter (ep: ep.scope == "public" && ep.canonicalDomain != null) (
+                lib.attrValues contract.endpoints
+              )
+            ) (lib.attrValues (hostConfig.config.my.contracts.provides or { }))
+          )
+        ) flakeConfigurations
+      )
+    );
+  publicNames = lib.unique (map (ep: ep.canonicalDomain) publicEndpoints);
 in
 {
   options.my.features.services.caddy = {
@@ -56,31 +100,6 @@ in
               )
             ) config.my.contracts.provides
           );
-
-          # --- Ingress engine (ARCHITECTURE.md §8.1) --------------------------------
-          # The declared ingress host publishes every `public` endpoint of the whole fleet,
-          # not only its own, and proxies it to the provider over the LAN/overlay. That is
-          # what lets jellyfin/hass/seerr/mealie be public without a public provider address.
-          isIngress = config.networking.hostName == config.my.topology.ingressHost;
-
-          # The ingress reaches every provider over the mesh overlay. A provider's LAN address
-          # (10.10.10.x / 10.10.20.x / 10.10.30.x) is not routed from the edge, so proxying to it
-          # dies with "dial tcp ...: i/o timeout" - the service answers 502 and the ACME challenge
-          # never completes, so it never even gets a certificate. `wireguardIpv4` carries the
-          # overlay address (the shim maps it to the host's WireGuard IPv4) and must win.
-          overlayAddress =
-            host:
-            if host == null then
-              null
-            else if host.wireguardIpv4 != null then
-              host.wireguardIpv4
-            else
-              host.ipv4;
-
-          flakeConfigurations =
-            config._module.specialArgs.flake.nixosConfigurations or {
-              "${config.networking.hostName}" = config;
-            };
 
           remoteEndpoints =
             if !isIngress then
@@ -175,18 +194,13 @@ in
                   '';
             };
           };
-          # The certificate is selected by the name being served, because a wildcard certificate
-          # covers exactly one label: `grafana.vyrx.de` is covered, `links.lan.vyrx.de` is not, and
-          # the apex is covered by the same certificate, because
-          # two challenges collide on the same `_acme-challenge` record. Everything the wildcard
-          # cannot cover lives on the internal or mesh plane, which no public CA can validate, so it
-          # is served by Caddy's own CA.
-          coveredByWildcard =
-            domain: lib.hasSuffix ".${zone}" domain && !lib.hasInfix "." (lib.removeSuffix ".${zone}" domain);
+          # The certificate is chosen by the name being served: every public name this host
+          # terminates has its own certificate issued here, and internal-plane names - which no
+          # public CA can validate - are served by Caddy's own CA.
           tlsFor =
             domain:
-            if coveredByWildcard domain || domain == zone then
-              "tls /var/lib/acme/${zone}/fullchain.pem /var/lib/acme/${zone}/key.pem\n"
+            if lib.elem domain publicNames then
+              "tls /var/lib/acme/${domain}/fullchain.pem /var/lib/acme/${domain}/key.pem\n"
             else if
               lib.hasInfix ".lan." domain || lib.hasInfix ".mesh." domain || lib.hasInfix ".iot." domain
             then
@@ -249,16 +263,13 @@ in
       # finds a value it did not expect and rejects the authorization with
       # "Incorrect TXT record ... (and 1 more) found at _acme-challenge.<zone>" - measured here.
       # Separate orders cannot overlap: each one finishes before the next starts.
-      # One order for both names. `*.${zone}` and the apex share the same `_acme-challenge.${zone}`
-      # record, which is exactly why they belong in one certificate: two certificates would be
-      # ordered concurrently by systemd, and each would delete the other's TXT record while it was
-      # being validated - measured: the apex succeeded and the wildcard then failed with
-      # "Incorrect TXT record ... (and 1 more) found at _acme-challenge.<zone>". One order presents
-      # both values in a single RRset and never races a second unit.
-      certs."${zone}" = {
-        domain = "*.${zone}";
-        extraDomainNames = [ zone ];
-      };
+      # One certificate per public name, issued where it is used: no key material is copied between
+      # hosts, each host rotates its own, and a compromise stays local (the model SPIRE, Vault PKI
+      # and cert-manager follow - one policy, per-consumer credentials). The apex and wildcards are
+      # absent because Cloudflare's own Universal SSL owns `_acme-challenge.${zone}`.
+      certs = lib.genAttrs publicNames (name: {
+        domain = name;
+      });
     };
 
     my.contracts.provides.caddy = {
