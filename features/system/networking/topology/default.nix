@@ -369,6 +369,11 @@ in
         ipv4 = "10.10.10.1";
         hostType = "embedded";
         domain = "rt.lan.vyrx.de";
+        # TEMPORARY (subnet migration): the box still answers on the old LAN address until it
+        # is re-addressed. Reported by I11 and removed at teardown (DEPLOYMENT §14).
+        migration = {
+          addresses = [ "192.168.178.1/24" ];
+        };
       };
 
       hom-ap-01 = {

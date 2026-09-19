@@ -57,7 +57,12 @@
       system = {
         networking = {
           gateway.enable = true;
-          fritzbox.enable = true;
+          fritzbox = {
+            enable = true;
+            # TR-064 needs a dedicated FRITZ!Box user from FRITZ!OS 7.24 on; the password-only
+            # UI login no longer works over the API (the old dslf-config shortcut is gone).
+            user = "fritz1498";
+          };
           tplink-ap.enable = true;
           tailscale = {
             subnetRouter = {
