@@ -46,11 +46,12 @@ let
       hostTopology.migration;
 
   # While migrating, the old gateway must stay in charge - the new one may not exist yet.
-  # Afterwards the gateway of the host's zone wins: it lives inside that subnet, so it is the only
-  # one a client can actually install. The per-host field stays as an override for hosts whose
-  # uplink is not a zone gateway (a cloud VPS behind its provider's router).
-  # The shim does not carry the zone, so it is read from the real topology - the zone's own
-  # gateway is the only one that lives inside the subnet and can therefore be installed.
+  #
+  # Then the host's own declaration wins, and the zone gateway is only a fallback. The order is not
+  # cosmetic: a VPS declares its provider's router (a public address) while its zone is `mesh`, whose
+  # gateway is the mesh address - so letting the zone win handed the edge a default route via itself
+  # and took it off the network. A zone gateway is the right default for a host that has no uplink of
+  # its own, never an override for one that does.
   zoneGateway =
     if hostTopology == null then
       null
@@ -61,12 +62,10 @@ let
   gateway =
     if migration.gateway != null then
       migration.gateway
-    else if zoneGateway != null then
-      zoneGateway
-    else if hostTopology != null then
+    else if hostTopology != null && hostTopology.gateway != null then
       hostTopology.gateway
     else
-      null;
+      zoneGateway;
 
   active =
     cfg.enable
