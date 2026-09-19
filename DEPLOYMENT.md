@@ -93,7 +93,7 @@ Tailnet owner `butchersmudda@`. Tailscale node names are the **legacy musician n
 | Transitional (now) | **Tailscale** (`root@100.x.x.x`) |
 | Target (after rollout) | **WireGuard** (`root@10.10.100.x`) |
 
-### 4.2 Why `nod switch` fails today
+### 4.2 Why `nod switch` / `deploy` fail today (both target the WG IP)
 
 The flake `deploy.nodes.<host>.hostname` is computed as:
 
@@ -110,6 +110,11 @@ The topology "legacy shim" sets `tailscaleIp = h.wireguardIpv4`, so **both resol
   nixos-rebuild switch --flake .#<host> --target-host root@<public-ip|tailscale-ip|lan-ip>
   ```
 - **B:** fix `deploy.nodes.<host>.hostname` to prefer the public IP (cloud) / Tailscale MagicDNS (`<host>.<tailnet>.ts.net`) and keep WG as a later switch.
+- **C (auto-rollback, if wanted):** `deploy-rs` with an explicit `--hostname` override, since the CLI is not installed locally:
+  ```bash
+  nix run github:serokell/deploy-rs -- .#<host> --hostname <public-ip|tailscale-ip>
+  ```
+  `deploy` has `autoRollback = true` in the flake; `nixos-rebuild` does **not**, so keep out-of-band access (VPS console) ready.
 
 `nod switch <host> --dry-run` and `nod plan <host>` are safe and still useful for planning.
 
