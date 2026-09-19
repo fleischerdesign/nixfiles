@@ -41,7 +41,8 @@ answers is what the repository declares.
 
 **A6 — Every credential has one owner and one path.** A fresh fleet key with its own path,
 `~/.ssh/config` no longer pointed at a service credential, LAN certificates valid, one password per
-identity across the fleet.
+identity across the fleet — and the declaration of that password actually enforced, not merely
+stated.
 
 ---
 
@@ -55,6 +56,7 @@ identity across the fleet.
 | **A4** | I11 reports four hosts: `hom-ap-01: 192.168.178.54/24`, `hom-rt-01: 192.168.178.1/24`, `hom-srv-01: 192.168.178.27/24`, `hom-wrk-01: 192.168.178.30/24` |
 | **A5** | `edge.vyrx.de` and `ops.vyrx.de` still answer `Status: 0` (they exist) while their source of truth in the repository is deleted |
 | **A6** | root trust: `hom-srv-01` → operator key (deployed) · `cld-ops-01` → tunnel key + old fleet key · `cld-edge-01` → **only** the old fleet key, whose private half was destroyed → root access to the edge is currently impossible without a console. `~/.ssh/config` offers the whole fleet `~/.ssh/deploy-key`, which today is the **tunnel** credential. The home Caddy cannot obtain certificates for names that resolve to the edge, so `jellyfin.vyrx.de` fails from inside the LAN |
+| **A6 (passwords)** | `users.philipp.password` was **always** the hash of `173695` — verified against the value in git history with `perl -e 'print crypt(…)'`. The drift was never in the declaration but in its enforcement: `mutableUsers = true` applied it only at account creation, so `cld-edge-01` kept whatever the provider's install set, and the panel's password reset never reached the OS (it works through cloud-init on the provider's own images; this is NixOS). Servers now set `users.mutableUsers = false`, so the declaration is applied on every activation |
 
 **Holding:** invariants I1–I10 assert clean (0 errors under `flake check`); the compatibility shim is
 gone (0 occurrences); the `vlan` field is gone (0 occurrences).
@@ -77,6 +79,19 @@ dropped before the new path was proven) and the NAT rule (`networking.nat` emits
 `internalIPs`, and the working rule was deleted anyway). Both were caught by a check that already
 existed — and misread. The lesson is not "be careful", it is "prove the replacement produces the same
 state, and read your own evidence twice".
+
+Two further failures that evening were of the same kind, in the *diagnosis* rather than the change,
+and both were reported as findings before being re-checked:
+
+- **A broken tool produced a verdict.** `mkpasswd` did not exist in the environment, so the variable
+  it was supposed to fill stayed empty, and the comparison `[ "$NEW" = "$CHECK" ]` was true because
+  both sides were empty. That "mismatch" was written up as a credential drift. The drift was real,
+  but its cause was not where the broken test pointed. **Rule: a check that cannot fail loudly is not
+  a check.** Compare against a non-empty expectation, and treat an empty result as failure.
+- **An accidental empty secret.** The same missing tool wrote an *empty* value into the SOPS store,
+  which with `mutableUsers = false` would have locked every account out. It was caught in the same
+  turn and restored from git. **Rule: never write a derived secret without a read-back verification,
+  and never turn on enforcement in the same change that produces the value it enforces.**
 
 ---
 
