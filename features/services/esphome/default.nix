@@ -55,7 +55,7 @@ let
       exec ${pkgs.python3}/bin/python3 ${./sync.py} \
         --config "${(mkSonoff (spec // { inherit wifiNetworks; })).deviceConfigYaml}" \
         --name "${name}" \
-        --mac "${device.mac}" \
+        --device "${device.ipv4}" \
         --secret-dir "/run/secrets/${secretPath name}" \
         --wifi-psk-file "/run/secrets/services/wifi/psk" \
         --legacy-wifi-psk-file "/run/secrets/services/wifi/legacy_psk" \

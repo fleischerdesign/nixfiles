@@ -10,14 +10,12 @@ Credentials are never passed in on the command line and never stored: ESPHome re
 one in a private temporary directory, uses it, and deletes it. The compiled firmware therefore
 carries the secrets, but the build host only holds them for the duration of a flash.
 
-The device address is discovered rather than declared: the firmware takes its lease from DHCP,
-and the reservation for its MAC is what pins it down. Asking the network where that MAC is keeps
-the address in exactly one place.
+The device address is the reservation for its MAC in the topology: the firmware takes its lease
+from DHCP and that reservation is what pins the address down. During the LAN migration the device
+is still on the old subnet, so the address is passed explicitly for the first flash.
 """
 
 import argparse
-import concurrent.futures
-import ipaddress
 import os
 import re
 import shutil
@@ -113,8 +111,12 @@ def main():
     parser = argparse.ArgumentParser(description="VYRX ESPHome Declarative GitOps Sync Engine")
     parser.add_argument("--config", required=True, help="Rendered ESPHome YAML (read-only)")
     parser.add_argument("--name", required=True, help="Device name")
-    parser.add_argument("--device", help="Explicit device address (skips MAC discovery)")
-    parser.add_argument("--mac", help="Device MAC address, used to discover its current address")
+    parser.add_argument(
+        "--device",
+        required=True,
+        help="Address to flash: the reservation from my.topology.devices, or the device's current "
+        "old-subnet address for the first flash during the migration",
+    )
     parser.add_argument("--secret-dir", help="Directory holding this device's SOPS secrets")
     parser.add_argument(
         "--wifi-psk-file", help="File holding the current WLAN pre-shared key"
@@ -168,22 +170,8 @@ def main():
             sys.exit(1)
         print("  [✓] Configuration is valid.")
 
-        # 3. Resolve the address: explicit, or by asking the network where the MAC is. A dry-run
-        # reports it but does not require it - proving the configuration is the point there.
         address = args.device
-        if not address and args.mac:
-            print(f"  [*] Looking for {args.mac} on the local segment...")
-            address = find_by_mac(args.mac)
-        if not address:
-            if args.dry_run:
-                print("  [!] Not on the local segment right now; a flash would need it present.")
-                print("  [✓] Dry-run complete. Nothing flashed.")
-                return
-            sys.exit(
-                f"Error: device '{args.name}' not found"
-                + (f" (MAC {args.mac})" if args.mac else " (no address and no MAC given)")
-            )
-        print(f"  [✓] Device is at {address}")
+        print(f"  [✓] Target address: {address}")
 
         if args.dry_run:
             print(f"  [✓] Dry-run complete. Nothing flashed to {address}.")
