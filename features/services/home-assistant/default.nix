@@ -123,9 +123,21 @@ in
       endpoints.web = {
         port = 8123;
         protocol = "tcp";
-        scope = "internal";
-        auth = "none";
+        # Public per NAMING.md §10.4 (decision recorded). Scope and auth must move together.
+        scope = "public";
+        auth = "authentik";
+        machineClientsBypassAuth = true;
         subdomain = "hass";
+        # The companion app and integrations authenticate with long-lived tokens rather than
+        # a browser SSO redirect. VERIFY this list against Home Assistant's trusted-proxy
+        # documentation before deploying - do not treat it as authoritative.
+        unauthenticatedPaths = [
+          "/api/*"
+          "/auth/*"
+          "/local/*"
+          "/frontend_latest/*"
+          "/static/*"
+        ];
         directAccess = {
           enable = true;
           protocol = "tcp";

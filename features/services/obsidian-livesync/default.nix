@@ -57,7 +57,7 @@ in
             protocol = "tcp";
             scope = "public";
             auth = "none";
-            inherit (cfg) domain;
+            subdomain = "livesync";
             dashboard = {
               show = true;
               displayName = "Obsidian LiveSync";

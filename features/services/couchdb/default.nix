@@ -72,7 +72,7 @@ in
         protocol = "tcp";
         scope = "public";
         auth = "none";
-        inherit (cfg) domain;
+        subdomain = "couchdb";
       };
       storage = {
         stateDirs = [ "/var/lib/couchdb" ];

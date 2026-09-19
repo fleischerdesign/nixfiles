@@ -330,10 +330,10 @@ in
         scope = "public";
         auth = "oidc";
         subdomain = "grafana";
-        extraDomains = [
-          "grafana.ops.${topologyDomain}"
-          "mon.lan.${topologyDomain}"
-        ];
+        extraDomains = [ ];
+        # The legacy aliases `grafana.ops.…` and `mon.lan.…` were removed: they encoded a
+        # host and a plane into a service name (Naming spec §0.2). Any OIDC redirect URI or
+        # bookmark that still uses them must be updated in the same change.
         oidc = {
           enable = true;
           clientId = "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k";

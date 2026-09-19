@@ -27,7 +27,7 @@ in
         protocol = "tcp";
         scope = "public";
         auth = "none";
-        domain = cfg.domain;
+        fqdn = cfg.domain;
         customExtraConfig = ''
           root * ${vyrxLandingPkg}
           file_server

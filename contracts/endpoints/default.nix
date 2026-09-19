@@ -110,19 +110,30 @@ let
 
       domain = lib.mkOption {
         type = lib.types.str;
-        default =
-          let
-            hostName = config.networking.hostName;
-            hostTopo = config.my.topology.hosts.${hostName} or null;
-            caddyBase = config.my.features.services.caddy.baseDomain or null;
-          in
-          if caddyBase != null && caddyBase != "" then
-            caddyBase
-          else if hostTopo != null && hostTopo.domain != null then
-            hostTopo.domain
-          else
-            config.my.topology.domain;
-        description = "Domain name for reverse proxy exposure (defaults to Caddy base domain or topology domain)";
+        default = config.my.topology.domain;
+        description = "Apex zone for derived names. Naming never depends on the serving host.";
+      };
+
+      fqdn = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "vyrx.de";
+        description = ''
+          Explicit FQDN override (escape hatch). Only for names that cannot follow the plane
+          scheme: the zone apex, or a foreign domain.
+        '';
+      };
+
+      aliases = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Legacy names published as aliases during a rename window.";
+      };
+
+      publicExempt = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Reason a public endpoint may run with auth = \"none\" (invariant I9).";
       };
 
       subdomain = lib.mkOption {
@@ -285,6 +296,12 @@ let
       };
 
       # Computed Read-Only Options
+      planeSuffix = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        readOnly = true;
+        description = "DNS suffix contributed by the exposure scope (null = no name).";
+      };
+
       canonicalDomain = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         readOnly = true;
@@ -305,15 +322,27 @@ let
     };
 
     config = {
-      canonicalDomain =
-        if submod.config.scope == "isolated" then
-          null
-        else if submod.config.subdomain != null && submod.config.subdomain != "" then
-          "${submod.config.subdomain}.${submod.config.domain}"
-        else if submod.config.domain != null && submod.config.domain != "" then
-          submod.config.domain
+      planeSuffix =
+        if submod.config.scope == "public" then
+          ""
+        else if submod.config.scope == "internal" then
+          "lan."
+        else if submod.config.scope == "mesh" then
+          "vpn."
         else
           null;
+
+      canonicalDomain =
+        if submod.config.fqdn != null then
+          submod.config.fqdn
+        else if submod.config.planeSuffix == null then
+          null
+        else if submod.config.subdomain == null || submod.config.subdomain == "" then
+          null
+        else if submod.config.subdomain == "@" then
+          submod.config.domain
+        else
+          "${submod.config.subdomain}.${submod.config.planeSuffix}${submod.config.domain}";
 
       publicUrl =
         if submod.config.canonicalDomain != null then "https://${submod.config.canonicalDomain}" else null;

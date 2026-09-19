@@ -2,7 +2,6 @@
 # Attic binary cache client configuration with optional background auto-push service.
 {
   config,
-  options,
   lib,
   pkgs,
   ...
@@ -62,19 +61,7 @@ in
     };
     endpoint = lib.mkOption {
       type = lib.types.str;
-      default =
-        let
-          caddyOpt = options.my.features.services.caddy.baseDomain or null;
-          caddyBaseDomain =
-            if caddyOpt != null && caddyOpt.isDefined then
-              config.my.features.services.caddy.baseDomain
-            else
-              null;
-        in
-        if caddyBaseDomain != null then
-          "https://cache.${caddyBaseDomain}"
-        else
-          "https://cache.ops.${config.my.topology.domain}";
+      default = "https://cache.${config.my.topology.domain}";
       description = "Attic cache server endpoint URL.";
     };
     autoPush = lib.mkOption {

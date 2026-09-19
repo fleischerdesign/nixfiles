@@ -36,8 +36,10 @@ in
       endpoints.web = {
         port = 5055;
         protocol = "tcp";
-        scope = "internal";
-        auth = "none";
+        # Public per NAMING.md §10.4. Jellyseerr keeps its own Jellyfin login behind
+        # Authentik; its native OIDC login is the alternative to avoid double authentication.
+        scope = "public";
+        auth = "authentik";
         subdomain = "seerr";
         dashboard = {
           show = true;

@@ -7,21 +7,15 @@
 let
   cfg = config.my.features.services.attic.server;
 
-  # Single source for the cache's reverse-proxy domain: the host's Caddy base
-  # domain when present, otherwise the observability host's domain.
-  caddyBaseDomain = config.my.features.services.caddy.baseDomain;
-  baseDomain =
-    if caddyBaseDomain != null && caddyBaseDomain != "" then
-      caddyBaseDomain
-    else
-      "ops.${config.my.topology.domain}";
+  # Single source for the cache's FQDN: flat and plane-derived (Naming spec §3).
+  cacheFqdn = "cache.${config.my.topology.domain}";
 in
 {
   options.my.features.services.attic.server = {
     enable = lib.mkEnableOption "Attic Nix binary cache server";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "cache.${baseDomain}";
+      default = cacheFqdn;
       description = "Full domain name for atticd (mirrors the `cache` contract endpoint).";
     };
   };
@@ -72,7 +66,6 @@ in
       scope = "public";
       auth = "none";
       subdomain = "cache";
-      domain = baseDomain;
       customExtraConfig = ''
         reverse_proxy 127.0.0.1:8080 {
           flush_interval -1

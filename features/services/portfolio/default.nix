@@ -88,7 +88,7 @@ in
             protocol = "tcp";
             scope = "public";
             auth = "none";
-            domain = "fleischer.design";
+            fqdn = "fleischer.design";
             dashboard = {
               show = true;
               displayName = "Portfolio";

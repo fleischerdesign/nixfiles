@@ -204,7 +204,7 @@ in
         protocol = "tcp";
         scope = if cfg.domain != null then "public" else "isolated";
         auth = if cfg.auth then "authentik" else "none";
-        domain = if cfg.domain != null then cfg.domain else "";
+        subdomain = "search";
         directAccess = {
           enable = cfg.openTailscaleFirewall;
           protocol = "tcp";

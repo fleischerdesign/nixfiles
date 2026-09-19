@@ -593,7 +593,7 @@ in
         protocol = "tcp";
         scope = "public";
         auth = "none";
-        inherit (cfg) domain;
+        subdomain = "auth";
         monitoring = {
           scrape.enable = true;
           scrape.port = 9300;
