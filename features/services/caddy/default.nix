@@ -199,7 +199,14 @@ in
           # public CA can validate - are served by Caddy's own CA.
           tlsFor =
             domain:
-            if lib.elem domain publicNames then
+            if isIngress then
+              # The ingress is where public names resolve, so Caddy's automatic HTTPS (HTTP-01)
+              # already works there and is the right challenge for it. Only a host that cannot be
+              # reached for validation - because split horizon sends the name elsewhere - needs a
+              # certificate obtained by DNS-01 instead. Each terminator uses the challenge it can
+              # satisfy; none of them copies key material from another.
+              ""
+            else if lib.elem domain publicNames then
               "tls /var/lib/acme/${domain}/fullchain.pem /var/lib/acme/${domain}/key.pem\n"
             else if
               lib.hasInfix ".lan." domain || lib.hasInfix ".mesh." domain || lib.hasInfix ".iot." domain
