@@ -45,6 +45,12 @@ in
         auth = "none";
         publicExempt = "Seerr enforces its own Jellyfin login; an external forward-auth proxy only adds a second login";
         subdomain = "seerr";
+        # Ingress reaches this over the WireGuard mesh (invariant I10).
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "wireguard";
+        };
         dashboard = {
           show = true;
           displayName = "Jellyseerr";

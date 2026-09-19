@@ -41,7 +41,7 @@ in
     services.mealie = {
       enable = true;
       port = 9025;
-      listenAddress = "127.0.0.1";
+      listenAddress = "0.0.0.0";
 
       # 3. Point Mealie to the generated template file
       credentialsFile = config.sops.templates."mealie.env".path;
@@ -99,6 +99,12 @@ in
         scope = "public";
         auth = "oidc";
         subdomain = "mealie";
+        # Ingress reaches this over the WireGuard mesh (invariant I10).
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "wireguard";
+        };
         oidc = {
           enable = true;
           clientId = "uwxlwWIofaSVKwAJTyzhzT75kUMDfoCpmlSs4M1E";

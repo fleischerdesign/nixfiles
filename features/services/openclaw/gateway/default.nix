@@ -521,10 +521,10 @@ let
           description = "CIDR ranges from which node pairings are auto-approved.";
         };
 
-        openTailscaleFirewall = lib.mkOption {
+        openMeshFirewall = lib.mkOption {
           type = lib.types.bool;
           default = true;
-          description = "Open instance port on Tailscale firewall interface.";
+          description = "Open the instance port on the WireGuard mesh interface so the ingress can reach it.";
         };
 
         browser = {
@@ -1053,9 +1053,9 @@ in
                 ];
                 machineClientsBypassAuth = true;
                 directAccess = {
-                  enable = inst.openTailscaleFirewall;
+                  enable = inst.openMeshFirewall;
                   protocol = "tcp";
-                  interface = "tailscale";
+                  interface = "wireguard";
                 };
                 dashboard = {
                   show = true;
@@ -1083,9 +1083,9 @@ in
                 subdomain = inst.sandbox.subdomain;
                 domain = inst.domain;
                 directAccess = {
-                  enable = inst.openTailscaleFirewall;
+                  enable = inst.openMeshFirewall;
                   protocol = "tcp";
-                  interface = "tailscale";
+                  interface = "wireguard";
                 };
                 monitoring = {
                   http = {

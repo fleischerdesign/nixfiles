@@ -353,7 +353,7 @@
     port = 8888;
     domain = "search.${config.my.topology.domain}";
     auth = true;
-    openTailscaleFirewall = true;
+    openMeshFirewall = true;
     enableJsonApi = true;
   };
 

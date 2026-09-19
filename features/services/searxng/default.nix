@@ -49,7 +49,7 @@ in
       description = "Protect web UI behind Authentik forward-auth.";
     };
 
-    openTailscaleFirewall = lib.mkOption {
+    openMeshFirewall = lib.mkOption {
       type = lib.types.bool;
       default = true;
       description = "Allow direct access to SearXNG port over Tailscale interface.";
@@ -199,9 +199,9 @@ in
         auth = if cfg.auth then "authentik" else "none";
         subdomain = "search";
         directAccess = {
-          enable = cfg.openTailscaleFirewall;
+          enable = cfg.openMeshFirewall;
           protocol = "tcp";
-          interface = "tailscale";
+          interface = "wireguard";
         };
         dashboard = {
           show = true;

@@ -34,7 +34,7 @@ in
       mode = "monolithic";
       environmentFile = config.sops.templates.atticd_env.path;
       settings = {
-        listen = "127.0.0.1:8080";
+        listen = "0.0.0.0:8080";
         allowed-hosts = [ cfg.domain ];
         api-endpoint = "https://${cfg.domain}/";
         chunking = {
@@ -67,6 +67,13 @@ in
       auth = "none";
       subdomain = "cache";
       publicExempt = "bearer-token authentication of its own; nix substituters cannot perform a browser SSO redirect";
+      # The ingress terminates TLS and proxies over the WireGuard mesh (Naming spec §5, invariant
+      # I10), so the listener must be reachable there; the firewall confines it to wg0.
+      directAccess = {
+        enable = true;
+        protocol = "tcp";
+        interface = "wireguard";
+      };
       # Streaming binary cache: do not buffer. Declared as a proxy option (not as raw
       # Caddyfile) so the upstream target stays projected onto the ingress (Naming spec §0.3).
       proxyOptions = "flush_interval -1";

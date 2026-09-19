@@ -62,6 +62,12 @@ in
         auth = "none";
         subdomain = "jellyfin";
         publicExempt = "enforces its own user authentication; Jellyfin clients cannot perform a browser SSO redirect";
+        # Ingress reaches this over the WireGuard mesh (invariant I10).
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "wireguard";
+        };
         dashboard = {
           show = true;
           displayName = "Jellyfin";

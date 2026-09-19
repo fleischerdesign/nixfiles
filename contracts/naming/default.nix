@@ -102,6 +102,21 @@ let
     && !(e.ep.fqdn == topology.domain || lib.hasSuffix ".${topology.domain}" e.ep.fqdn)
   ) named;
 
+  # I10 - the ingress terminates TLS and proxies to a remote public endpoint *directly over the
+  # mesh* (ARCHITECTURE.md §8.1, "WireGuard-Upstreams"), so such an endpoint must be declared
+  # reachable there: listen on a non-loopback address and open the port on the wireguard
+  # interface. Without this the ingress answers 502 (observed live for cache.vyrx.de while
+  # atticd still bound 127.0.0.1).
+  ingressUnreachable = builtins.filter (
+    e:
+    e.ep.scope == "public"
+    && e.hostName != topology.ingressHost
+    && !(
+      e.ep.directAccess.enable
+      && (e.ep.directAccess.interface == "wireguard" || e.ep.directAccess.interface == "all")
+    )
+  ) named;
+
   # I9 - publishing an unauthenticated service is a decision, not a default.
   unauthenticatedPublic = builtins.filter (
     e: e.ep.scope == "public" && e.ep.auth == "none" && e.ep.publicExempt == null
@@ -165,6 +180,10 @@ in
       {
         assertion = outOfZoneOverrides == [ ];
         message = report "Naming I6: explicit fqdn outside the managed zone" outOfZoneOverrides;
+      }
+      {
+        assertion = ingressUnreachable == [ ];
+        message = report "Naming I10: public endpoint on a remote host that the ingress cannot reach" ingressUnreachable;
       }
       {
         assertion = unauthenticatedPublic == [ ];
