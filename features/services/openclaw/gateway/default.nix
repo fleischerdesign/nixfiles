@@ -1064,6 +1064,7 @@ in
                 protocol = "tcp";
                 scope = "public";
                 auth = "none";
+                publicExempt = "sandbox surface guarded by the gateway token - REVIEW whether it must be public";
                 subdomain = inst.sandbox.subdomain;
                 domain = inst.domain;
                 directAccess = {

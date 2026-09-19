@@ -28,6 +28,7 @@ in
         scope = "public";
         auth = "none";
         fqdn = cfg.domain;
+        publicExempt = "public static landing page, no user data";
         customExtraConfig = ''
           root * ${vyrxLandingPkg}
           file_server

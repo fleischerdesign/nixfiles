@@ -52,6 +52,7 @@ in
             scope = "public";
             auth = "none";
             subdomain = "livesync";
+            publicExempt = "delegates authentication to CouchDB; LiveSync clients cannot perform a browser SSO redirect";
             dashboard = {
               show = true;
               displayName = "Obsidian LiveSync";

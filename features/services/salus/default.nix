@@ -110,6 +110,7 @@ in
             scope = "public";
             auth = "none";
             subdomain = "salus";
+            publicExempt = "authenticates via its own Authentik OIDC application";
             websocket = true;
             dashboard = {
               show = true;

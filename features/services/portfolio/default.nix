@@ -89,6 +89,7 @@ in
             scope = "public";
             auth = "none";
             fqdn = "fleischer.design";
+            publicExempt = "public static site, no user data";
             dashboard = {
               show = true;
               displayName = "Portfolio";

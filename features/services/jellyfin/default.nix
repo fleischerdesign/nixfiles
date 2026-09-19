@@ -61,6 +61,7 @@ in
         scope = "public";
         auth = "none";
         subdomain = "jellyfin";
+        publicExempt = "enforces its own user authentication; Jellyfin clients cannot perform a browser SSO redirect";
         dashboard = {
           show = true;
           displayName = "Jellyfin";

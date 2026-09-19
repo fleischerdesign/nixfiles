@@ -594,6 +594,7 @@ in
         scope = "public";
         auth = "none";
         subdomain = "auth";
+        publicExempt = "identity provider - it cannot sit behind its own forward-auth";
         monitoring = {
           scrape.enable = true;
           scrape.port = 9300;

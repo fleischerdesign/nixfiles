@@ -69,6 +69,7 @@ in
         scope = "public";
         auth = "none";
         subdomain = "couchdb";
+        publicExempt = "enforces its own authentication; LiveSync clients cannot perform a browser SSO redirect";
       };
       storage = {
         stateDirs = [ "/var/lib/couchdb" ];

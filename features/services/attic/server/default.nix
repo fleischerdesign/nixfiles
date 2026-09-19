@@ -66,6 +66,7 @@ in
       scope = "public";
       auth = "none";
       subdomain = "cache";
+      publicExempt = "bearer-token authentication of its own; nix substituters cannot perform a browser SSO redirect";
       # Streaming binary cache: do not buffer. Declared as a proxy option (not as raw
       # Caddyfile) so the upstream target stays projected onto the ingress (Naming spec §0.3).
       proxyOptions = "flush_interval -1";
