@@ -39,7 +39,10 @@
     tags = lib.mkDefault [ ];
     ssh = {
       user = lib.mkDefault "root";
-      identityFile = lib.mkDefault "~/.ssh/deploy-key";
+      # The fleet deploy key, not ~/.ssh/deploy-key: that path is a symlink to the node tunnel
+      # secret, a service credential whose lifetime belongs to the tunnel feature. Pointing the
+      # deployment tooling at it made a service secret the fleet's root credential.
+      identityFile = lib.mkDefault "~/.ssh/nixfiles-deploy-key";
     };
     healthChecks = {
       enable = lib.mkDefault true;

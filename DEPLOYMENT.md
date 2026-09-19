@@ -388,28 +388,37 @@ Order of attempts (stop as soon as one works):
 2. **Tailscale**: `tailscale status` on any reachable node; `ssh <user>@100.x.x.x`.
 3. **WireGuard**: `ssh root@10.10.100.x` (only if peers handshake).
 
-### 11.1 Which key does root trust? (verified 2026-09-19)
+### 11.1 Which key does root trust? (verified 2026-09-20)
 
 | Host | root trusts | Note |
 |---|---|---|
-| `hom-srv-01` | operator key (`~/.ssh/id_rsa`, `WXfSlOz…`) | deployed after the trust anchor moved |
-| `cld-ops-01` | tunnel key (`yyJsy9XI…`) + old fleet key (`3zq1hFFw…`) | the openclaw tunnel logs in as root here by design |
-| `cld-edge-01` | **only** the old fleet key (`3zq1hFFw…`) | whose private half no longer exists → root is blocked |
+| `hom-srv-01` | operator key (`WXfSlOz…`) + fleet key (`EduFlyo…`) | both verified by logging in as root |
+| `cld-ops-01` | operator key + fleet key | the openclaw tunnel additionally logs in as root here, by design |
+| `cld-edge-01` | operator key + fleet key | restored through the provider's rescue system; the old fleet key (`3zq1hFFw…`) is gone for good |
+| `hom-wrk-01` | operator key + fleet key | local switch |
 
-`~/.ssh/config` offers `~/.ssh/deploy-key` to the whole fleet. That path holds the **tunnel**
-credential today, not a deploy key — which is why root works on `cld-ops-01` (it trusts the tunnel
-key) and nowhere else by accident. This is the trap that removed root access to the edge: the path
-was never owned by one credential.
+The **fleet deploy key** is `~/.ssh/nixfiles-deploy-key`, fingerprint
+`SHA256:EduFlyoHwWJx3avw46lQsLksum5R0scm6z27OeqBeO4`, generated 2026-09-20 and authorised through
+`my.features.system.networking.ssh.deployKeys` on every host. `~/.ssh/config`, `nod`'s
+`identityFile` (`roles/base.nix`) and `deploy-rs`'s `-i` argument (`flake.nix`) all use it.
+
+`~/.ssh/deploy-key` still points at the node tunnel secret
+(`/run/secrets.d/2/infra/node_tunnel_key`) and must **not** be used to address the fleet. That path
+is what destroyed the previous fleet key: a service credential rendered by a feature also granted
+root on every host, and the feature's lifecycle overwrote it. The operator key stays authorised
+everywhere as a fallback, and `~/.ssh/config` deliberately sets no `IdentitiesOnly`, so a mistake
+here cannot lock the fleet out.
 
 ### 11.2 Recovering a lost account password
 
-Needed when no key that root trusts is at hand (currently only the edge). `root` itself is not an
-option: `PermitRootLogin = prohibit-password` and no root password is declared, so root can log in
-neither over SSH nor at the console.
+Needed when the declared hash and the host disagree, or when a password is not the intended one.
+`root` itself is not an option: `PermitRootLogin = prohibit-password` and no root password is
+declared, so root can log in neither over SSH nor at the console.
 
-**Path 1 — the old password (no access to the host needed).** The edge's password is whatever the
-installer applied, because `mutableUsers = true` meant the declared hash was never re-applied. That
-old hash is in git history and candidates can be checked against it without touching the VPS:
+**Path 1 — the old password (no access to the host needed).** The password a host actually has is the
+declared one, because servers set `users.mutableUsers = false` and re-apply it on every activation,
+verified on `hom-wrk-01`. Candidates can be checked against a hash from history
+without touching the VPS:
 ```bash
 git show 513e176^:secrets/secrets.yaml > /tmp/old.yaml     # the state before the correction
 sops -d /tmp/old.yaml | grep -A2 '^users:'                 # shows the hash (never the password)
@@ -438,6 +447,10 @@ chroot /mnt /bin/sh
 passwd philipp
 exit; umount -R /mnt; reboot
 ```
+
+**After any manual password change, fix the declaration too.** With `mutableUsers = false` the next
+activation writes the declared hash back, so a password set by hand on the host survives only until
+the next deploy. The declaration in SOPS is the source of truth; the host is a copy of it.
 
 **Afterwards, deploy the host once.** Servers declare `users.mutableUsers = false` and the secret
 store now holds the correct hash, so the password is enforced from then on and cannot drift again.

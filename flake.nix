@@ -250,7 +250,9 @@
               let
                 envKey = builtins.getEnv "DEPLOY_KEY";
               in
-              if envKey != "" then envKey else "~/.ssh/deploy-key";
+              # Fallback is the fleet deploy key. ~/.ssh/deploy-key is the node tunnel secret and
+              # must not be the credential that addresses the fleet.
+              if envKey != "" then envKey else "~/.ssh/nixfiles-deploy-key";
           in
           {
             hostname =

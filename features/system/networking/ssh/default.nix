@@ -49,6 +49,13 @@ in
         # trust anchor nobody can use, but which still grants root if it ever resurfaces, is a
         # liability rather than a safety net. A fresh fleet key is generated in the rotation.
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+bSErYniJev/+/UxsilaoxHGYW8oVpd3pYMQuuGStw fleis@Yorke"
+        # Fleet deploy key (generated 2026-09-20, lives at ~/.ssh/nixfiles-deploy-key). It separates
+        # two things that were conflated: the credential that *addresses the fleet* and the node
+        # tunnel secret rendered from /run/secrets, whose lifetime belongs to a feature. Until now
+        # ~/.ssh/config pointed every host at the tunnel key, so a service secret was the fleet's
+        # root credential - which is how the previous fleet key was destroyed.
+        # Fingerprint: SHA256:EduFlyoHwWJx3avw46lQsLksum5R0scm6z27OeqBeO4
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGuk66em/pg6jVlG2U6dTLFeQCOWjEzlyGGEWGvSM0hI nixfiles-deploy@vyrx-2.0"
       ];
       description = "Authorized SSH public keys for root deploy-rs access.";
     };
