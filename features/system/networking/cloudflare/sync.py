@@ -81,7 +81,9 @@ def main():
     parser.add_argument(
         "--prune",
         action="store_true",
-        help="Delete unmanaged A/AAAA/CNAME records",
+        help="Delete records inside the managed zone that this engine owns and the spec no "
+        "longer describes. Records created by anything else (ACME DNS-01, manual entries, "
+        "other tooling) are never touched.",
     )
     args = parser.parse_args()
 
@@ -225,9 +227,44 @@ def main():
             else:
                 unchanged += 1
 
+    # 5. Prune stale records (opt-in, ownership-scoped). A record is deleted only if all
+    # three conditions hold: it is absent from the desired set, it lies inside the zone this
+    # run manages, and it carries a comment from this engine's own vocabulary. Everything
+    # else - ACME DNS-01 records, manual entries, other tooling - is left alone.
+    owned_prefixes = (
+        "Zone apex -> ",
+        "Wildcard ingress -> ",
+        "Node management ",
+        "Service ",
+        "Managed by VYRX GitOps",
+    )
+    stale = [
+        r
+        for (name, type_), r in existing_by_key.items()
+        if (name, type_) not in desired_keys
+        and (name == domain or name.endswith("." + domain))
+        and str(r.get("comment") or "").startswith(owned_prefixes)
+    ]
+    pruned = 0
+    for r in stale:
+        if args.prune:
+            print(f"  [-] Delete {r['type']} {r['name']} (stale; {r.get('comment')!r})")
+            if not args.dry_run:
+                api_request(
+                    token,
+                    f"/zones/{zone_id}/dns_records/{r['id']}",
+                    method="DELETE",
+                )
+            pruned += 1
+        else:
+            print(
+                f"  [ ] Stale {r['type']} {r['name']} ({r.get('comment')!r})"
+                " -- re-run with --prune to delete"
+            )
+
     print(
         f"==> DNS Sync Complete: {created} created, {updated} updated,"
-        f" {unchanged} unchanged."
+        f" {unchanged} unchanged, {len(stale)} stale, {pruned} deleted."
     )
 
 
