@@ -9,22 +9,56 @@
 
 let
   cfg = config.my.features.services.esphome;
-  devices = config.my.topology.devices or { };
-  switches = import ./devices/switches.nix { inherit pkgs lib; };
+  topology = config.my.topology;
+  specs = import ./devices/switches.nix;
+  mkSonoff = import ./templates/sonoff-basic.nix { inherit pkgs lib; };
+
+  # The device stores both the fleet WLAN and, while the migration is in progress, the old name
+  # the access point still radiates. That is what lets the relays be flashed *before* the AP is
+  # renamed without locking anything out (DEPLOYMENT.md 8.6).
+  legacySsid = topology.hosts.hom-ap-01.migration.ssid or null;
+  wifiNetworks = [
+    {
+      ssid = topology.wifi.ssid;
+      secret = "wifi_psk";
+    }
+  ]
+  ++ lib.optional (legacySsid != null) {
+    ssid = legacySsid;
+    secret = "wifi_psk_legacy";
+  };
+
+  # Only devices the topology can pin down: its MAC reservation is what gives the firmware a
+  # stable address, and the address is what discovery needs.
+  managed = lib.filterAttrs (name: device: device.mac != null && specs ? ${name}) topology.devices;
+
+  # Where sops-nix materializes each device's credentials on this host.
+  secretPath = name: "esphome/devices/${name}";
+  deviceSecrets = lib.flatten (
+    lib.mapAttrsToList (name: _: [
+      "${secretPath name}/api_key"
+      "${secretPath name}/ota_password"
+      "${secretPath name}/ap_password"
+    ]) managed
+  );
 
   mkDevicePackage =
-    name: device: yamlConfig:
+    name: device: spec:
     pkgs.writeShellScriptBin "esphome-sync-${name}" ''
       export PATH="${
         lib.makeBinPath [
           pkgs.esphome
+          pkgs.iproute2
           pkgs.iputils
         ]
       }:$PATH"
       exec ${pkgs.python3}/bin/python3 ${./sync.py} \
-        --config "${yamlConfig}" \
-        --device "${device.ipv4}" \
+        --config "${(mkSonoff (spec // { inherit wifiNetworks; })).deviceConfigYaml}" \
         --name "${name}" \
+        --mac "${device.mac}" \
+        --secret-dir "/run/secrets/${secretPath name}" \
+        --wifi-psk-file "/run/secrets/services/wifi/psk" \
+        --legacy-wifi-psk-file "/run/secrets/services/wifi/legacy_psk" \
         "$@"
     '';
 in
@@ -44,6 +78,17 @@ in
       enable = true;
       port = 6052;
     };
+
+    # Rendered from SOPS as individual files; the sync engine assembles the secrets.yaml ESPHome
+    # resolves `!secret` against, so no credential is ever embedded in the generated firmware
+    # configuration or written into the Nix store.
+    sops.secrets = lib.genAttrs (
+      deviceSecrets
+      ++ [
+        "services/wifi/psk"
+        "services/wifi/legacy_psk"
+      ]
+    ) (_: { });
 
     my.contracts.provides.esphome = {
       endpoints = {
@@ -79,7 +124,7 @@ in
     };
 
     my.features.services.esphome.devicePackages = lib.mapAttrs (
-      rlyName: rlySpec: mkDevicePackage rlyName devices.${rlyName} rlySpec.deviceConfigYaml
-    ) (lib.filterAttrs (rlyName: _: devices ? ${rlyName}) switches);
+      name: device: mkDevicePackage name device specs.${name}
+    ) managed;
   };
 }

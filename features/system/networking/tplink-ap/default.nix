@@ -78,8 +78,13 @@ in
       wifi = {
         ssid = lib.mkOption {
           type = lib.types.str;
-          default = "VYRX";
-          description = "Unified Dual-Band SSID broadcasted across 2.4 GHz and 5 GHz (Option A)";
+          default = config.my.topology.wifi.ssid;
+          defaultText = lib.literalExpression "config.my.topology.wifi.ssid";
+          description = ''
+            Unified Dual-Band SSID broadcasted across 2.4 GHz and 5 GHz (Option A). Defaults to
+            the topology's fleet WLAN name, which the microcontrollers also store - one source,
+            so the AP and the IoT fleet cannot drift apart.
+          '';
         };
 
         enable2G = lib.mkOption {

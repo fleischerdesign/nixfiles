@@ -1,28 +1,32 @@
 # features/services/esphome/templates/sonoff-basic.nix
-# Reusable, declarative Nix specification for Sonoff Basic (ESP8266 / esp01_1m) switches.
-# Implements complete hardware abstraction, captive portal fallback, and Home Assistant native API.
+# Reusable, declarative specification for Sonoff Basic (ESP8266 / esp01_1m) inline relays.
+#
+# The device owns no network identity of its own: it takes its address from DHCP, and the
+# reservation for its MAC in `my.topology.devices` is the single source for what that address
+# is. A hardcoded `manual_ip` here would duplicate that reservation.
+#
+# Every credential is referenced as an ESPHome `!secret`, never embedded. The names below are
+# resolved from a `secrets.yaml` that the sync engine renders at flash time from SOPS, so no
+# secret ever reaches the Nix store or the repository.
 { pkgs, lib, ... }:
 
 {
   name,
   friendlyName,
-  ipv4,
   buttonPin ? 1,
   buttonTrigger ? "on_state",
-  apiEncryptionKey ? null,
-  otaPassword ? null,
-  apSsid ? null,
-  apPassword ? null,
-  wifiSsid ? "VYRX",
-  wifiPassword ? null,
-  gateway ? "10.10.10.10",
-  subnet ? "255.255.255.0",
-  dns1 ? "10.10.10.10",
+  # [ { ssid = "..."; secret = "wifi_psk"; } ] - several networks, tried in order. Holding both
+  # the current and the future SSID is what makes renaming the access point a non-event.
+  wifiNetworks,
 }:
 
 let
-  actualApSsid = if apSsid != null then apSsid else name;
-  actualApPassword = if apPassword != null then apPassword else "vyrx-setup-fallback";
+  # Deliberately a plain (non-indented) string: a nested `''` block would strip its own
+  # indentation, and interpolated text is inserted verbatim - so the columns below are the
+  # columns in the generated file (items under `networks:`, credentials one level deeper).
+  networkList = lib.concatMapStrings (
+    n: "    - ssid: \"${n.ssid}\"\n      password: !secret ${n.secret}\n"
+  ) wifiNetworks;
 
   configContent = ''
     esphome:
@@ -34,31 +38,20 @@ let
 
     logger:
 
-    ${lib.optionalString (apiEncryptionKey != null) ''
-      api:
-        encryption:
-          key: "${apiEncryptionKey}"
-    ''}
-    ${lib.optionalString (apiEncryptionKey == null) ''
-      api:
-    ''}
+    api:
+      encryption:
+        key: !secret api_key
 
     ota:
       - platform: esphome
-        ${lib.optionalString (otaPassword != null) ''password: "${otaPassword}"''}
+        password: !secret ota_password
 
     wifi:
-      ssid: "${wifiSsid}"
-      ${lib.optionalString (wifiPassword != null) ''password: "${wifiPassword}"''}
-      manual_ip:
-        static_ip: ${ipv4}
-        gateway: ${gateway}
-        subnet: ${subnet}
-        dns1: ${dns1}
-
+      networks:
+    ${networkList}
       ap:
-        ssid: "${actualApSsid}"
-        password: "${actualApPassword}"
+        ssid: "${name}-fallback"
+        password: !secret fallback_ap_password
 
     captive_portal:
 

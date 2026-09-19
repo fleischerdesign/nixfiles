@@ -90,6 +90,17 @@ let
           example = "192.168.178.1";
           description = "Default gateway to use while migrating (the old uplink).";
         };
+
+        ssid = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "Ancoris";
+          description = ''
+            WLAN name this device still radiates/joins under its old identity. Devices that must
+            stay reachable across the rename store both this and the fleet SSID, so the rename
+            locks nothing out.
+          '';
+        };
       };
       wireguardIpv4 = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
@@ -230,6 +241,18 @@ in
       type = lib.types.attrsOf deviceSubmodule;
       default = { };
       description = "Inventory of IoT microcontrollers and peripheral smart home hardware";
+    };
+
+    wifi = {
+      ssid = lib.mkOption {
+        type = lib.types.str;
+        default = "VYRX";
+        description = ''
+          Fleet-wide WLAN name. The single source of truth: the access point radiates it and the
+          microcontrollers store it, so the two cannot drift apart. A transitional old name lives
+          in the device's `migration.ssid` and disappears at teardown.
+        '';
+      };
     };
 
     trustedSubnets = lib.mkOption {
@@ -386,6 +409,7 @@ in
         # re-addressed. Reported by I11 and removed at teardown (DEPLOYMENT §14).
         migration = {
           addresses = [ "192.168.178.54/24" ];
+          ssid = "Ancoris";
         };
       };
     };
