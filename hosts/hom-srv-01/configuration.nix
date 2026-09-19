@@ -56,11 +56,13 @@
       };
       system = {
         networking = {
-          # The FRITZ!Box has moved to 10.10.10.1 and no longer serves DHCP, so Kea takes over
-          # now (DEPLOYMENT.md 8.3 Step 4).
+          # TEMPORARY (cutover): the FRITZ!Box still serves DHCP on the old LAN - it rejected the
+          # TR-064 address move (UPnP 402, argument format still to be determined), so it has not
+          # moved yet. Kea must stay off until it has, or two DHCP servers answer on one L2
+          # segment. Flip to true together with the box move (DEPLOYMENT.md 8.3 Step 4).
           gateway = {
             enable = true;
-            enableDhcp = true;
+            enableDhcp = false;
           };
           fritzbox = {
             enable = true;
