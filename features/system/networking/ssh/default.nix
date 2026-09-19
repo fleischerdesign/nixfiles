@@ -21,6 +21,14 @@ let
       addr = ownHost.wireguardIpv6;
       port = 22;
     }
+    # Transitional addresses. Without these, sshd drops the old LAN address the moment it
+    # restarts - and a deploy that runs over that address locks itself out, which is precisely
+    # what the migration block exists to prevent. Removing `migration.addresses` at teardown
+    # drops them again automatically.
+    ++ map (cidr: {
+      addr = lib.head (lib.splitString "/" cidr);
+      port = 22;
+    }) (ownHost.migration.addresses or [ ])
   );
 
   # Overlay units that assign the addresses sshd binds to. sshd binds each
