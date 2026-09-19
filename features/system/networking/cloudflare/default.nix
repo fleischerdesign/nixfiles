@@ -199,8 +199,8 @@ in
 
     ingressHost = lib.mkOption {
       type = lib.types.str;
-      default = "cld-edge-01";
-      description = "Topology host that terminates public ingress traffic (ARCHITECTURE.md §8.1).";
+      default = topology.ingressHost;
+      description = "Topology host that terminates public ingress traffic (defaults to my.topology.ingressHost).";
     };
 
     catchAll = lib.mkOption {

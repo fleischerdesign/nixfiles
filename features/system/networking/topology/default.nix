@@ -163,6 +163,15 @@ in
       description = "Primary root domain for all cluster services and DNS zones";
     };
 
+    # Single source of truth for the public ingress host. The Caddy ingress engine and the
+    # Cloudflare DNS projection both read this, so ingress responsibility is declared once
+    # (ARCHITECTURE.md §8.1).
+    ingressHost = lib.mkOption {
+      type = lib.types.str;
+      default = "cld-edge-01";
+      description = "Topology host that terminates public ingress traffic.";
+    };
+
     subnets = lib.mkOption {
       type = lib.types.attrsOf subnetSubmodule;
       default = { };

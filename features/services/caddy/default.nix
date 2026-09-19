@@ -65,11 +65,76 @@ in
             ) config.my.contracts.provides
           );
 
+          # --- Ingress engine (ARCHITECTURE.md §8.1) --------------------------------
+          # The declared ingress host publishes every `public` endpoint of the whole fleet,
+          # not only its own, and proxies it to the provider over the LAN/overlay. That is
+          # what lets jellyfin/hass/seerr/mealie be public without a public provider address.
+          isIngress = config.networking.hostName == config.my.topology.ingressHost;
+
+          overlayAddress =
+            host:
+            if host == null then
+              null
+            else if
+              host.localIp != null
+              && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
+            then
+              host.localIp
+            else if host.tailscaleIp != null then
+              host.tailscaleIp
+            else
+              host.localIp;
+
+          flakeConfigurations =
+            config._module.specialArgs.flake.nixosConfigurations or {
+              "${config.networking.hostName}" = config;
+            };
+
+          remoteEndpoints =
+            if !isIngress then
+              [ ]
+            else
+              lib.concatLists (
+                lib.mapAttrsToList (
+                  hostName: hostConfig:
+                  let
+                    address = overlayAddress (config.my.features.system.networking.topology.hosts.${hostName} or null);
+                  in
+                  lib.optionals (hostName != config.networking.hostName && address != null) (
+                    lib.concatLists (
+                      lib.mapAttrsToList (
+                        _svcName: contract:
+                        lib.concatMap (
+                          ep:
+                          lib.optional (ep.scope == "public" && ep.canonicalDomain != null) {
+                            inherit (ep)
+                              canonicalDomain
+                              extraDomains
+                              port
+                              auth
+                              unauthenticatedPaths
+                              machineClientsBypassAuth
+                              customExtraConfig
+                              proxyOptions
+                              ;
+                            target = "${address}:${toString ep.port}";
+                          }
+                        ) (lib.attrValues contract.endpoints)
+                      ) (hostConfig.config.my.contracts.provides or { })
+                    )
+                  )
+                ) flakeConfigurations
+              );
+
           mkVHost = conf: {
             value = {
               extraConfig =
                 let
-                  target = "127.0.0.1:${toString conf.port}";
+                  target = conf.target or "127.0.0.1:${toString conf.port}";
+
+                  proxy =
+                    "reverse_proxy ${target}"
+                    + lib.optionalString (conf.proxyOptions != "") " {\n${conf.proxyOptions}\n}";
 
                   exemptHandlers =
                     lib.optionalString (conf.unauthenticatedPaths != [ ]) ''
@@ -101,12 +166,12 @@ in
                         copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
                         trusted_proxies private_ranges
                       }
-                      reverse_proxy ${target}
+                      ${proxy}
                     }
                   ''
                 else
                   ''
-                    reverse_proxy ${target}
+                    ${proxy}
                   '';
             };
           };
@@ -120,7 +185,7 @@ in
               name = domain;
               inherit (mkVHost conf) value;
             }) ([ conf.canonicalDomain ] ++ lib.filter (d: !lib.hasInfix "*" d) conf.extraDomains)
-          ) localEndpoints
+          ) (localEndpoints ++ remoteEndpoints)
         );
     };
 

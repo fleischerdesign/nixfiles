@@ -169,7 +169,21 @@ let
       customExtraConfig = lib.mkOption {
         type = lib.types.nullOr lib.types.lines;
         default = null;
-        description = "Custom Caddyfile directives to prepend/override standard proxy configuration";
+        description = ''
+          Fully custom Caddyfile directives that replace the generated proxy block. Prefer
+          `proxyOptions`: this option ignores the projected upstream target and therefore
+          cannot be used by the ingress engine.
+        '';
+      };
+
+      proxyOptions = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = ''
+          Extra directives placed inside the generated `reverse_proxy` block, e.g.
+          `flush_interval -1` for streaming. Applied on every host that serves the endpoint,
+          including the ingress, so the upstream target stays projected.
+        '';
       };
 
       directAccess = {

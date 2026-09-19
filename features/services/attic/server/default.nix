@@ -66,11 +66,9 @@ in
       scope = "public";
       auth = "none";
       subdomain = "cache";
-      customExtraConfig = ''
-        reverse_proxy 127.0.0.1:8080 {
-          flush_interval -1
-        }
-      '';
+      # Streaming binary cache: do not buffer. Declared as a proxy option (not as raw
+      # Caddyfile) so the upstream target stays projected onto the ingress (Naming spec §0.3).
+      proxyOptions = "flush_interval -1";
     };
   };
 }
