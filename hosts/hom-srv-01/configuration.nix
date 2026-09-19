@@ -56,7 +56,14 @@
       };
       system = {
         networking = {
-          gateway.enable = true;
+          # TEMPORARY (cutover): the FRITZ!Box still serves DHCP on the old LAN. Kea must stay
+          # off until the box has moved and stopped handing out addresses - otherwise two DHCP
+          # servers answer on the same L2 segment and clients lease a subnet whose gateway does
+          # not exist yet. Flipped back in DEPLOYMENT.md 8.3 Step 4.
+          gateway = {
+            enable = true;
+            enableDhcp = false;
+          };
           fritzbox = {
             enable = true;
             # TR-064 needs a dedicated FRITZ!Box user from FRITZ!OS 7.24 on; the password-only
