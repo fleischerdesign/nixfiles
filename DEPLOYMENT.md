@@ -52,6 +52,8 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | `hom-ap-01` | TP-Link RE330 AP | infra | `10.10.10.20` | – | – | `ap.lan.vyrx.de` |
 | `hom-rly-01..08` | Sonoff relais (ESPHome) | iot | `10.10.30.11..18` | – | – | `rly-0X.iot.vyrx.de` |
 
+> **Target vs. reality:** this table lists the **2.0 target identity**. As of 2026-09-19 only `cld-edge-01` actually runs 2.0; the other hosts still have legacy hostnames and live on the old `192.168.178.0/24` LAN. See §3.3.
+
 ### 3.2 Subnets (`my.topology.subnets`)
 
 | Zone | CIDR | VLAN | Trust | Notes |
@@ -63,19 +65,21 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | `mesh-ipv6` | `fd10:1000:100::/64` | – | mesh | WireGuard overlay (RFC 4193 ULA). |
 | `guest` | `10.10.99.0/24` | 99 | guest | Internet-only. |
 
-### 3.3 Tailnet (transitional)
+### 3.3 Tailnet (transitional) — VERIFIED 2026-09-19
 
-Tailnet owner `butchersmudda@`. **Node names are still the legacy musician names:**
+Tailnet owner `butchersmudda@`. Tailscale node names are the **legacy musician names** and do **not** match the 2.0 hostnames yet. Verified by SSH (`hostname` / `ip addr`):
 
-| Tailnet node | Tailscale IP | Maps to (assumed) | State |
-|---|---|---|---|
-| `mackaye` | `100.120.39.68` | `cld-edge-01` | online |
-| `rollins` | `100.126.5.72` | `cld-ops-01` | online (direct `37.114.55.91`) |
-| `strummer` | `100.125.253.108` | `hom-wrk-01` | online |
-| `yorke` | `100.107.168.30` | `hom-srv-01`? | offline |
-| `jello` | `100.88.135.75` | `mob-nb-01`? | offline |
+| Tailnet node | Tailscale IP | Actual `hostname` | Current address | 2.0 identity | State |
+|---|---|---|---|---|---|
+| `mackaye` | `100.120.39.68` | `cld-edge-01` | `173.249.22.211`, wg `10.10.100.1` | `cld-edge-01` — **migrated** | online |
+| `rollins` | `100.126.5.72` | **`rollins`** (legacy) | `37.114.55.91` | `cld-ops-01` — not migrated | online |
+| `strummer` | `100.125.253.108` | **`strummer`** (legacy) | `192.168.178.27` (old LAN) | `hom-srv-01` — not migrated | online |
+| `jello` | `100.88.135.75` | **`jello`** (legacy, desktop) | `192.168.178.30` (old LAN) | admin workstation / `hom-wrk-01` — not migrated | online |
+| `yorke` | `100.107.168.30` | unknown | – | likely `mob-nb-01` | offline (≥21h) |
+| `m2007j3sg` | `100.79.228.38` | – | – | Android phone | online |
 
-Verify before relying on the mapping: `ssh root@173.249.22.211 tailscale status`.
+**Only `cld-edge-01` runs 2.0 today.** Every other host still runs the legacy configuration (legacy hostname, old `192.168.178.0/24` home LAN). Always confirm before targeting:
+`ssh root@173.249.22.211 tailscale status`
 
 ---
 
@@ -170,33 +174,45 @@ Worst case: reboot and select the previous generation in the bootloader (GRUB).
 Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `IDENTITY.md`).
 
 ### 7.2 cld-ops-01
-Public `37.114.55.91`, Tailscale `rollins` (`100.126.5.72`). Runs observability collector, Attic server, CrowdSec agent, OpenClaw gateway, Caddy.
+Public `37.114.55.91`, Tailscale `rollins` (`100.126.5.72`). **Current hostname is still `rollins`** — the deploy renames it to `cld-ops-01`. Runs observability collector, Attic server, CrowdSec agent, OpenClaw gateway, Caddy.
 ```bash
 nixos-rebuild switch --flake .#cld-ops-01 --target-host root@37.114.55.91
-ssh root@37.114.55.91 'systemctl --failed'
+ssh root@37.114.55.91 'hostnamectl --static; systemctl --failed'
 ```
-Verify: Prometheus/Loki/Grafana reachable, Attic responds, OpenClaw gateway up.
+Verify: hostname becomes `cld-ops-01`, Prometheus/Loki/Grafana reachable, Attic responds, OpenClaw gateway up.
 
 ### 7.3 hom-srv-01 — READ FIRST: §8 network cutover
-LAN `10.10.10.10`. Runs media stack, Blocky (DNS), Kea (DHCP), Chrony, gateway/NAT, ESPhome, Home Assistant, Klipper, LDAP outpost, Tailscale subnet router (`10.10.0.0/16`).
-Deploy over LAN (`root@10.10.10.10`) or Tailscale.
+Currently **`strummer`** at `192.168.178.27` (old LAN), Tailscale `100.125.253.108`. Target: `10.10.10.10`. Runs media stack, Blocky (DNS), Kea (DHCP), Chrony, gateway/NAT, ESPhome, Home Assistant, Klipper, LDAP outpost, Tailscale subnet router (`10.10.0.0/16`).
+Reach it today via Tailscale (`root@100.125.253.108`); `10.10.10.10` does not exist until the re-IP (§8.0).
 **Do not enable Kea DHCP before disabling FRITZ!Box DHCP (§8).**
 
 ### 7.4 hom-wrk-01
-LAN `10.10.20.10`, Tailscale `strummer`. Desktop (Niri/Axis). Deploy over LAN/Tailscale; **verify graphically** (login, Wayland, Home Manager) — not automatable.
+Currently **`jello`** at `192.168.178.30` (old LAN, desktop), Tailscale `100.88.135.75`. Target: `10.10.20.10`. Deploy via LAN/Tailscale; **verify graphically** (login, Wayland, Home Manager) — not automatable.
 
 ### 7.5 mob-nb-01
-Roaming. Deploy when online (home LAN or Tailscale). Verify WireGuard roaming.
+Roaming; likely the offline Tailscale node `yorke` (`100.107.168.30`). Deploy when online. Verify WireGuard roaming.
 
 ---
 
 ## 8. Network Cutover — FRITZ!Box ↔ hom-srv-01 (critical)
 
+### 8.0 Precondition — the home LAN is still on the OLD subnet
+
+**Verified 2026-09-19:** the home LAN is still `192.168.178.0/24`; the FRITZ!Box is at `192.168.178.1` (HTTP 200); `hom-srv-01` (`strummer`) is `192.168.178.27`; the workstation (`jello`) is `192.168.178.30`. The 2.0 target is `10.10.10.0/24` with the FRITZ!Box at `10.10.10.1`.
+
+This means the cutover is **not only a DHCP/DNS handoff — it is a full LAN re-IP**, including the FRITZ!Box. The declarative FRITZ!Box engine manages only **DNS / DHCP toggle / port forwards** — *not* the LAN IP. Moving the FRITZ!Box from `192.168.178.1` to `10.10.10.1/24` is therefore a **manual, high-risk step and an open design/execution item**; decide and document it before executing.
+
+Conservative outline (to be agreed before execution):
+1. Prepare a client that can hold a static IP in the **new** subnet (`10.10.10.x/24`) — this is the anchor during the re-IP.
+2. Re-IP the FRITZ!Box LAN to `10.10.10.1/24` (DHCP still on) in the maintenance window; reconnect the anchor client and confirm WAN + management.
+3. Bring up `hom-srv-01` as `10.10.10.10` and follow §8.3 for the DHCP/DNS handoff.
+4. **Rollback:** set the FRITZ!Box LAN back to `192.168.178.1/24`; the anchor client keeps working.
+
 ### 8.1 Current state (before cutover)
 
 | Function | Provider |
 |---|---|
-| WAN uplink / modem | FRITZ!Box `10.10.10.1` |
+| WAN uplink / modem | FRITZ!Box `192.168.178.1` (target `10.10.10.1`) |
 | DHCP (all LAN subnets) | FRITZ!Box |
 | DNS (handed to clients) | FRITZ!Box |
 | Routing infra → WAN | FRITZ!Box |
