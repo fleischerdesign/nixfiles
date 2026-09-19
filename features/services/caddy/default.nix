@@ -60,15 +60,15 @@ in
           # what lets jellyfin/hass/seerr/mealie be public without a public provider address.
           isIngress = config.networking.hostName == config.my.topology.ingressHost;
 
+          # The ingress reaches every provider over the mesh overlay. A provider's LAN address
+          # (10.10.10.x / 10.10.20.x / 10.10.30.x) is not routed from the edge, so proxying to it
+          # dies with "dial tcp ...: i/o timeout" - the service answers 502 and the ACME challenge
+          # never completes, so it never even gets a certificate. `tailscaleIp` carries the
+          # overlay address (the shim maps it to the host's WireGuard IPv4) and must win.
           overlayAddress =
             host:
             if host == null then
               null
-            else if
-              host.localIp != null
-              && (lib.hasPrefix "10.10." host.localIp || lib.hasPrefix "192.168." host.localIp)
-            then
-              host.localIp
             else if host.tailscaleIp != null then
               host.tailscaleIp
             else
