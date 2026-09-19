@@ -177,7 +177,7 @@ in
           };
           # The certificate is selected by the name being served, because a wildcard certificate
           # covers exactly one label: `grafana.vyrx.de` is covered, `links.lan.vyrx.de` is not, and
-          # the apex has its own certificate because sharing one order with the wildcard makes the
+          # the apex is covered by the same certificate, because
           # two challenges collide on the same `_acme-challenge` record. Everything the wildcard
           # cannot cover lives on the internal or mesh plane, which no public CA can validate, so it
           # is served by Caddy's own CA.
@@ -185,12 +185,14 @@ in
             domain: lib.hasSuffix ".${zone}" domain && !lib.hasInfix "." (lib.removeSuffix ".${zone}" domain);
           tlsFor =
             domain:
-            if domain == zone then
-              "tls /var/lib/acme/${zone}-apex/fullchain.pem /var/lib/acme/${zone}-apex/key.pem\n"
-            else if coveredByWildcard domain then
-              "tls /var/lib/acme/${zone}-wildcard/fullchain.pem /var/lib/acme/${zone}-wildcard/key.pem\n"
+            if coveredByWildcard domain || domain == zone then
+              "tls /var/lib/acme/${zone}/fullchain.pem /var/lib/acme/${zone}/key.pem\n"
+            else if
+              lib.hasInfix ".lan." domain || lib.hasInfix ".mesh." domain || lib.hasInfix ".iot." domain
+            then
+              "tls internal\n"
             else
-              "tls internal\n";
+              "";
         in
         # An endpoint answers on its canonical domain plus every alias it declares.
         # Wildcard aliases are skipped: dynamically minted hosts own their vhost.
@@ -247,11 +249,15 @@ in
       # finds a value it did not expect and rejects the authorization with
       # "Incorrect TXT record ... (and 1 more) found at _acme-challenge.<zone>" - measured here.
       # Separate orders cannot overlap: each one finishes before the next starts.
-      certs."${zone}-wildcard" = {
+      # One order for both names. `*.${zone}` and the apex share the same `_acme-challenge.${zone}`
+      # record, which is exactly why they belong in one certificate: two certificates would be
+      # ordered concurrently by systemd, and each would delete the other's TXT record while it was
+      # being validated - measured: the apex succeeded and the wildcard then failed with
+      # "Incorrect TXT record ... (and 1 more) found at _acme-challenge.<zone>". One order presents
+      # both values in a single RRset and never races a second unit.
+      certs."${zone}" = {
         domain = "*.${zone}";
-      };
-      certs."${zone}-apex" = {
-        domain = zone;
+        extraDomainNames = [ zone ];
       };
     };
 
