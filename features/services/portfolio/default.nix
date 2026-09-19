@@ -88,7 +88,10 @@ in
             protocol = "tcp";
             scope = "public";
             auth = "none";
-            fqdn = "fleischer.design";
+            subdomain = "portfolio";
+            # Served by this host's Caddy, but its DNS lives in the fleischer.design zone and is
+            # therefore NOT managed by the vyrx.de Cloudflare engine (in-zone filtering skips it).
+            extraDomains = [ "fleischer.design" ];
             publicExempt = "public static site, no user data";
             dashboard = {
               show = true;

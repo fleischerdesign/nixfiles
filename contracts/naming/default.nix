@@ -92,6 +92,16 @@ let
     )
   ) named;
 
+  # I6 - an explicit fqdn override must stay inside the managed zone. The Cloudflare engine can
+  # only manage the apex zone: a foreign domain is sent as a *relative* name and silently
+  # created as <domain>.<zone> (observed live: `fleischer.design` became
+  # `fleischer.design.vyrx.de`). Foreign zones are served by Caddy and resolved elsewhere.
+  outOfZoneOverrides = builtins.filter (
+    e:
+    e.ep.fqdn != null
+    && !(e.ep.fqdn == topology.domain || lib.hasSuffix ".${topology.domain}" e.ep.fqdn)
+  ) named;
+
   # I9 - publishing an unauthenticated service is a decision, not a default.
   unauthenticatedPublic = builtins.filter (
     e: e.ep.scope == "public" && e.ep.auth == "none" && e.ep.publicExempt == null
@@ -151,6 +161,10 @@ in
       {
         assertion = internalPlaneOverrides == [ ];
         message = report "Naming I4: explicit fqdn inside an internal plane" internalPlaneOverrides;
+      }
+      {
+        assertion = outOfZoneOverrides == [ ];
+        message = report "Naming I6: explicit fqdn outside the managed zone" outOfZoneOverrides;
       }
       {
         assertion = unauthenticatedPublic == [ ];
