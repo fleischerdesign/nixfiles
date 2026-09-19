@@ -54,11 +54,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    salus = {
-      url = "github:fleischerdesign/salus/develop";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
     vyrx-landing = {
       url = "github:fleischerdesign/vyrx.de";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
