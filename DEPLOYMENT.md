@@ -258,13 +258,28 @@ ssh root@10.10.10.10 'systemctl status blocky chrony; dig +short @10.10.10.10 vy
 `dig @10.10.10.10` must resolve. If not, stop and fix Blocky.
 
 **Step 3 — Reconcile the FRITZ!Box.**
-This sets DNS to `10.10.10.10`, **disables FRITZ!Box DHCP**, and applies declarative port forwards.
+The reconciler is implemented (`features/system/networking/fritzbox/sync.py`); `nod` still fails (§4.2),
+so run the built binary directly — `--dry-run` prints a real per-item diff:
 ```bash
-# agentless reconciler (see §9 for the action-arg caveat — verify first!)
-nod switch hom-rt-01 --dry-run     # preview
-nod switch hom-rt-01               # apply (or run fritzbox-sync directly, §9)
+P=$(nix build --no-link --print-out-paths .#nixosConfigurations.hom-srv-01.config.my.features.system.networking.fritzbox.package)
+$P/bin/fritzbox-sync --dry-run     # read-only preview
+$P/bin/fritzbox-sync              # apply
 ```
-Verify: FRITZ!Box UI reachable at `http://10.10.10.1`; a static-IP client still resolves DNS via `10.10.10.10`.
+It manages the **LAN address / subnet mask** (`SetIPInterface`), the **DHCP range**
+(`SetAddressRange`) and **DHCP on/off** (`SetDHCPServerEnable`), and removes **port forwardings**
+(the declared target is Zero Open Ports).
+
+Two things it cannot do, both verified on the device:
+- **The DHCP-announced DNS cannot be set over TR-064** (`LANHostConfigManagement:1` exposes no
+  such action, and no other of its 46 services does either). Set `10.10.10.10` in the box UI, or
+  ignore it — once Kea serves DHCP the box no longer announces DNS at all.
+- **The LAN address change is a hard cutover** (see §8.6).
+
+**Before applying, confirm this diff:** the box currently forwards **TCP/80 and TCP/443 to
+`192.168.178.27`** (legacy bypass of the edge ingress). The reconciler will **delete** them —
+intended, but it is an externally visible security change.
+
+Verify: FRITZ!Box UI reachable at `http://10.10.10.1`; a client still resolves via `10.10.10.10`.
 
 **Step 4 — Bring Kea up.**
 Revert the temporary change (`gateway.enableDhcp = true`) and redeploy hom-srv-01.
@@ -288,10 +303,43 @@ Force a client to re-lease (`dhclient -r && dhclient` or reconnect). It must rec
 
 ### 8.5 AP cutover (TP-Link RE330, `hom-ap-01` / `10.10.10.20`)
 
-`tplink-ap-sync` reconciles **SSID (`VYRX`), 2.4 GHz and 5 GHz enable**. Changing the SSID **drops all Wi-Fi clients** until they reconnect.
-- Management is over **wired** LAN (`10.10.10.20`) — keep wired access.
+**The reconciler cannot change the SSID.** The library exposes only `set_wifi(wifi, enable)` for
+the RE330 — it toggles a band and nothing else (`ssid`/`psk` setters exist for other models, not
+this one). `tplink-ap-sync` therefore owns **band enablement** and reports the SSID as a diff.
+
+Renaming `Ancoris` → `VYRX` is a **one-time UI action** on the AP (done while someone is home),
+and it must happen **before** the FRITZ!Box moves (§8.6): afterwards the AP still bridges Wi-Fi to
+LAN, but its management address is on the dead old subnet until it re-leases.
+- Management is over **wired** LAN — keep wired access.
 - If the AP becomes unreachable: physical reset button, rejoin, re-run the reconcile.
-- Do this **after** §8.3 so DHCP/DNS are stable for reconnecting clients.
+- Renaming drops every Wi-Fi client once; they reconnect to the same AP, so it self-heals.
+
+### 8.6 The one unavoidable disruption — and the correct phase order
+
+Moving the box's LAN address invalidates every existing lease: clients still hold
+`192.168.178.x/24` with gateway `192.168.178.1`, which no longer exists. Same-subnet traffic
+(a legacy-address host such as `hom-srv-01`, see `migration.addresses`) keeps working, but
+**gateway and internet do not** until each client renews. There is no way around one renewal per
+device (the box cannot serve two subnets); it is a single disruption, not a recurring one:
+
+| Step | Effect on clients |
+|---|---|
+| Box moves to `10.10.10.1`, still serving DHCP with range `10.10.10.20-.99` | one lease renewal, then gateway/DNS are correct again |
+| Kea takes over DHCP (box DHCP off) | **none** — same subnet, same gateway, same DNS |
+
+Practical mitigation: announce it, do it when the house is quiet, and toggle Wi-Fi on any device
+that clings to its old lease. A short lease time on the box (UI setting) makes renewals come
+faster.
+
+**Corrected order** (the device layer must be handled while the old subnet still routes):
+
+1. **Relays first** (§P6): flash with **both** SSIDs (`VYRX` + `Ancoris`) while they are still
+   reachable on `192.168.178.x`. Keep them on **DHCP** in this first flash — a static `10.10.30.x`
+   address would make them unreachable until Kea serves the `iot` subnet; move them to static
+   addresses only after the cutover.
+2. **Then the AP rename** (one click, §8.5) — the relays already follow both SSIDs, so nothing
+   is locked out.
+3. **Then the box** (Step 3) and **Kea** (Step 4).
 
 ---
 
