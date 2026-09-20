@@ -675,13 +675,13 @@ let
             # `if not plan.bindings and not self.allow_empty_flows`. Measured in the core's log while the
             # bind failed: `f(exec): Flow is empty`, `flow_slug: ldap-authorization-flow`. The stock
             # A flow with no stages raises EmptyFlowException (measured: f(exec): Flow is empty for this
-            # flow), so the authorization flow needs one stage. A consent stage is wrong here: the explicit
-            # consent flow uses mode 'expiring', which requires an interactive answer a service account
-            # cannot give, and 'implicit_consent' is not a valid choice at all - it made the whole blueprint
-            # fail with EntryInvalidError and stopped every later entry, the stage binding included.
-            # The dummy stage does nothing and needs no interaction, which is what a bind needs.
-            model = "authentik_stages_dummy_dummystage";
-            id = "stage_ldap_authz_dummy";
+            # flow), so the authorization flow needs one stage, and the docs list the stages the LDAP
+            # provider supports: identification, password, authenticator validation, user logout, user
+            # login and deny. Dummy is not among them, and a consent stage is wrong - the explicit-consent
+            # flow uses mode 'expiring', which needs an interactive answer a service account cannot give.
+            # User login is supported and needs no interaction.
+            model = "authentik_stages_user_login.userloginstage";
+            id = "stage_ldap_authz_login";
             identifiers = {
               name = "Authorize LDAP consumer";
             };
@@ -691,7 +691,7 @@ let
             model = "authentik_flows.flowstagebinding";
             identifiers = {
               target = yamlTag "!KeyOf flow_ldap_authz";
-              stage = yamlTag "!KeyOf stage_ldap_authz_dummy";
+              stage = yamlTag "!KeyOf stage_ldap_authz_login";
               order = 0;
             };
             attrs = { };
