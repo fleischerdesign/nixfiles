@@ -418,7 +418,13 @@ let
               # What the documentation prescribes as an object permission on the provider. Without it a
               # bind account may search only itself - the trap a search account falls into: the bind
               # succeeds and then returns nothing.
-              permission = "authentik_providers_ldap.search_full_ldap_directory";
+              # The exact codename, read from the database rather than from the documentation's label:
+              # the LDAP provider's permissions are add/change/delete_ldapprovider, view_ldapprovider and
+              # `search_full_directory` - not `search_full_ldap_directory`, which is the label the docs
+              # use and which made every apply of this blueprint fail silently (the instance goes to
+              # `error`, the provider loses its configuration, and the outpost that serves it binds
+              # nothing).
+              permission = "authentik_providers_ldap.search_full_directory";
               role = yamlTag "!KeyOf role_ldap_consumer_${builtins.replaceStrings [ "-" ] [ "_" ] name}";
             }) sortedLdapEndpointNames;
         }
