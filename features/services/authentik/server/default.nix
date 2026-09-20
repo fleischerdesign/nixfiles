@@ -392,6 +392,11 @@ let
           };
           attrs = {
             base_dn = "DC=vyrx,DC=de";
+            # Code-based MFA is meaningless for a bind account: a service account has no authenticator,
+            # and the documentation is explicit that enabling this makes the bind demand one - a
+            # password-only bind is then rejected, which is what `Invalid credentials (49)` looked like
+            # here while the token in the database demonstrably held the same value as the secret.
+            mfa_support = false;
             # No `search_group` and no other access restriction here, for two reasons, both
             # measured: the field does not exist on this version's LDAP provider
             # (authentik_providers_ldap_ldapprovider carries search_mode, bind_mode and the id
