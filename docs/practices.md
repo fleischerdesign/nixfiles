@@ -248,7 +248,7 @@ in A3 can be closed.
 
 ---
 
-## 6. Directory work - six findings, each one measured late
+## 6. Directory work - ten findings, each one measured late
 
 Making Jellyfin authenticate against the Authentik directory took a night and produced six generalisable
 findings. They are recorded because every one of them cost hours and none of them is specific to LDAP.
@@ -330,7 +330,28 @@ file stays in the database. Removal has to be declared, as a tombstone that may 
 `absent` on a missing object is a no-op. Deleting a flow cascades to its stage bindings, so one entry replaces
 several.
 
-### 6.9 The apply trigger, and how this repository closes it
+### 6.9 Order across blueprints is declared, not retried
+
+A deploy failed because two blueprints reference each other across files: the provider carries an object
+permission for the consumer's role, and a different file creates that role. The task log named it exactly -
+`KeyOf: failed to find entry with id of sa_ldap_consumer_jellyfin and a model instance` - while the file
+itself was correct: the entry, the reference and a passing `validate()` were all there. The cause was the
+sequence, and the second run of the same unit succeeded, which is the kind of "fix" that hides a defect.
+
+The documentation is explicit twice over. Discovery and evaluation across files "is not guaranteed to follow
+any specific order", and "if you have dependencies between blueprints, you should use meta models to make
+sure that objects are created in the correct order". The meta model is
+`authentik_blueprints.metaapplyblueprint`, and its identifiers are "key-value attributes used to match the
+blueprint instance": the `path` of a file-based blueprint, or the `name` of a generated one. Both forms exist
+here, and `required` defaults to true, so naming the wrong one fails the whole blueprint rather than the
+dependency alone.
+
+A retrying apply was written first and then removed. It worked, and that was the problem: a broken dependency
+would have been papered over on the second pass instead of failing a deploy. Declaring the dependency costs
+one entry, and the deploy is green in a single pass - which is now the measurement that says the declaration
+is right.
+
+### 6.10 The apply trigger, and how this repository closes it
 
 Upstream re-reads a blueprint file every 60 minutes and watches the directory for modification events. In
 this repository the directory is an immutable store path that a deploy replaces wholesale, so no file is ever
