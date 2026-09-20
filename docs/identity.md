@@ -298,7 +298,8 @@ This is the inventory that closes the third row. Every row here has been measure
 - **A new consumer's SOPS secret is added by hand.** The endpoint contract derives the path; if the key is
   missing, `sops-install-secrets` fails the deploy loudly rather than starting with an empty credential.
 - **A fresh install must create authentik's two unmanaged bootstrap tables** (`authentik_install_id`,
-  `authentik_version_history`) before the first migration; authentik's own startup does this. The fresh-database
-  acceptance test reproduced the install by seeding them.
+  `authentik_version_history`) before the first migration. authentik's own `server`/`worker` entrypoint (the
+  Go binaries) does this on startup; the fresh-database acceptance test drove `ak migrate` plus a shell
+  directly and therefore seeded them itself. No repository action follows from this.
 
 
