@@ -354,12 +354,14 @@ let
           };
           attrs = {
             base_dn = "DC=vyrx,DC=de";
-            # Deliberately no `search_group`: it would restrict the directory for *every*
-            # consumer, and there is one provider for the whole fleet. Who may use a service
-            # is that service's decision - it declares `my.contracts.consumes.<name>.ldap` and
-            # renders its own filter from it. A provider that encoded one consumer's policy
-            # would silently become the policy of all of them.
-            search_group = null;
+            # No `search_group` and no other access restriction here, for two reasons, both
+            # measured: the field does not exist on this version's LDAP provider
+            # (authentik_providers_ldap_ldapprovider carries search_mode, bind_mode and the id
+            # ranges - no search_group), so the value that used to stand here was silently
+            # ignored; and if it did exist it would restrict the directory for *every*
+            # consumer, while there is one provider for the whole fleet. Who may use a service
+            # is that service's decision: it declares `my.contracts.consumes.<name>.ldap` and
+            # renders its own filter from it.
             authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
             invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
           };
