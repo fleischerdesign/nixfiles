@@ -21,8 +21,14 @@ let
     # The LDAP application carries no binding, which is what makes it open to every user
     # (AppAccessWithoutBindings, default True); a single binding denies everyone it does not name.
     applicationsWithoutBindings = [ "ldap" ];
-    # The flow the outpost executes runs before any account is authenticated, so a binding cannot match.
-    flowsWithoutBindings = [ "ldap-authentication-flow" ];
+    # The flow the outpost executes runs before any account is authenticated, and the shared provider
+    # authorization flow runs for every provider login. A user-scoped binding on either denies everyone
+    # it does not name; the 2026-09-20 orphan is why the provider flows are checked too (practices.md §6.5).
+    flowsWithoutBindings = [
+      "ldap-authentication-flow"
+      "default-provider-authorization-implicit-consent"
+      "default-provider-authorization-explicit-consent"
+    ];
     # The shape of that flow: identification (which carries the password stage), password, and user login.
     flowStageBindings = {
       ldap-authentication-flow = 3;
@@ -174,6 +180,21 @@ let
     (metaApply "default/flow-default-provider-invalidation.yaml")
   ];
 
+  # The 2026-09-20 authorization-flow experiment left two user-scoped policy bindings on the shared
+  # provider authorization flow, and a blueprint does not delete an object that merely vanishes from a
+  # file (practices.md §6.8). A binding on that flow is evaluated for every provider login; with
+  # `policy_engine_mode = any` one non-matching user binding answers false and the flow reports
+  # "Flow does not apply to current user" - measured 2026-09-20: `philipp` denied, only `ak-ldap-jellyfin`
+  # passed (practices.md §6.5). The target is the base model because `PolicyBinding.target_id` is the
+  # `pbm_uuid`, not the flow's own `flow_uuid`. Two copies because the experiment created two identical
+  # rows and an `absent` entry deletes one match; the invariant fails the deploy if any remains.
+  orphanedAuthorizationFlowBinding = blueprintLib.absent {
+    model = blueprintLib.models.policyBinding;
+    identifiers.target =
+      blueprintLib.refs.byField blueprintLib.models.policyBindingModel "flow__slug"
+        "default-provider-authorization-implicit-consent";
+  };
+
   # The LDAP outpost blueprint depends on the default provider flows, on the RBAC groups, and on the consumer
   # blueprint: it carries an object permission for each consumer's role, and those roles are created by
   # `vyrx-ldap-consumers`. Declared as a dependency rather than hoped for, because authentik guarantees no
@@ -192,6 +213,7 @@ let
     name = "vyrx-apps-proxy";
     entries =
       providerFlowDependencies
+      ++ (lib.replicate 2 orphanedAuthorizationFlowBinding)
       ++ (lib.concatMap (
         name:
         let

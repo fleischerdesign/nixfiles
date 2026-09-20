@@ -46,6 +46,10 @@ let
     ldapProvider = "authentik_providers_ldap.ldapprovider";
     outpost = "authentik_outposts.outpost";
     policyBinding = "authentik_policies.policybinding";
+    # The base the binding points at. A Flow has two identities - its own `flow_uuid` and the
+    # `PolicyBindingModel.pbm_uuid` a PolicyBinding's `target` is keyed on - so a tombstone has to
+    # reference the base model, never the flow itself.
+    policyBindingModel = "authentik_policies.policybindingmodel";
   };
 
   refs = {
