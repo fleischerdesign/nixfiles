@@ -253,6 +253,25 @@ serve (TLS alert `internal error`, no certificate), which is why a mistyped publ
 this would mean un-mapping the apex and losing internal resolution for `${domain}` itself, so it
 stays - and is recorded here so the spec and the behaviour agree.
 
+**Zones are addressing and policy, not a boundary (measured).** On one flat L2 every zone's subnet
+shares the broadcast domain, so devices in different zones reach each other directly and never pass
+the gateway - the firewall governs what is *routed*, not what is adjacent. A zone therefore decides:
+which DHCP options a device receives (router, DNS, NTP), which names resolve for it, and which
+firewall rules apply to its traffic that leaves the segment. It does not isolate. Real isolation for
+the untrusted plane needs its own L2 - VLANs or a second segment - and the cutover documents that
+as the open decision rather than implying a boundary that does not exist.
+
+**Which zone a device lands in is declared, not incidental (implemented 2026-09-20).** Kea
+receives several subnets on one interface and picks by criterion: before this change it simply took
+the first matching subnet in configuration order, so devices declared `infra` or `iot` were handed
+corp addresses and their own reservations were never reached - a silent mismatch between inventory
+and wire. Each
+served zone is now a Kea client class matched on the MAC addresses its inventory entries declare,
+its subnet accepts only that class, and exactly one subnet - `defaultZone`, default `corp` - stays
+unrestricted for clients the inventory does not name. The order of the subnet list no longer has any
+effect; adding a device is one inventory line (`zone`, `mac`, `ipv4`), which simultaneously feeds its
+DHCP class, its reservation, its DNS name and its firewall treatment.
+
 RFC 4592 resolves wildcards by *closest encloser*, so an apex wildcard `*.${domain}` absorbs
 names that merely look like they belong to an internal plane. **Verified live** (Cloudflare
 DoH): `foo.lan.vyrx.de`, `bar.mesh.vyrx.de` and `x.iot.vyrx.de` **all resolve to the ingress**.

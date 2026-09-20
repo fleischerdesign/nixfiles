@@ -20,9 +20,12 @@ let
     zone: (topology.subnets.${zone}.gateway or null) == cfg.uplinkGateway
   ) null (lib.attrNames topology.subnets);
 
-  dhcpSubnets = map (zone: topology.subnets.${zone}) (
-    lib.unique (lib.optional (uplinkZone != null) uplinkZone ++ cfg.routedZones)
-  );
+  dhcpZones = lib.unique (lib.optional (uplinkZone != null) uplinkZone ++ cfg.routedZones);
+
+  dhcpSubnets = map (zone: {
+    inherit zone;
+    config = topology.subnets.${zone};
+  }) servedZones;
 
   # Determine static reservations for DHCP from hosts and devices declared in topology with MAC address
   hostsWithMac = lib.filterAttrs (_name: h: h.mac != null && h.ipv4 != null) topology.hosts;
@@ -52,7 +55,37 @@ let
       hostname = name;
     }) (lib.filterAttrs (_name: h: inSubnet subnet.cidr h.ipv4) allReservations);
 
-  reservations = lib.concatMap reservationsIn dhcpSubnets;
+  reservations = lib.concatMap (entry: reservationsIn entry.config) dhcpSubnets;
+
+  # --- Zone selection, by declaration rather than by list order ------------------------------
+  # Kea receives several subnets on one interface. Without a further criterion it takes the first
+  # matching subnet in the order they appear, which made the zone of a device depend on the order of
+  # this list instead of on its inventory entry: devices declared `infra` or `iot` were handed corp
+  # addresses, and the reservations configured inside their own subnets were never reached. Each
+  # served zone therefore becomes a client class matched on the MAC addresses its inventory entries
+  # declare, and its subnet accepts only that class.
+  macMatch =
+    h:
+    "substring(hexstring(pkt4.mac,''),0,12) == '${
+      lib.toLower (lib.replaceStrings [ ":" ] [ "" ] h.mac)
+    }'";
+
+  membersOfZone = zone: lib.filter (h: h.zone == zone) (lib.attrValues allReservations);
+
+  # Only zones with at least one inventarised device are served, plus the default zone. Kea's
+  # expression language has no literal that never matches (measured: `false` is rejected with
+  # "Invalid character: f"), so an empty zone is handled by not serving it: serving it would make its
+  # subnet a second pool that any client can reach - the opposite of what the zone declares.
+  servedZones = lib.filter (zone: zone == cfg.defaultZone || membersOfZone zone != [ ]) dhcpZones;
+
+  unservedZones = lib.subtractLists servedZones dhcpZones;
+
+  # The default zone is by definition the one without a class; every other served zone has at least
+  # one member (see servedZones), so every test here is non-empty - Kea rejects an empty expression.
+  zoneClasses = map (zone: {
+    inherit zone;
+    test = lib.concatMapStringsSep " or " (h: "(${macMatch h})") (membersOfZone zone);
+  }) (lib.filter (zone: zone != cfg.defaultZone) servedZones);
 in
 {
   options.my.features.system.networking.gateway = {
@@ -101,6 +134,18 @@ in
       description = "Enable declarative Kea DHCPv4 server";
     };
 
+    defaultZone = lib.mkOption {
+      type = lib.types.str;
+      default = "corp";
+      description = ''
+        Zone that receives clients whose MAC the inventory does not declare: the only subnet Kea
+        offers without a client class. Every other served zone is matched by MAC, so a declared
+        device always lands in the zone its inventory entry names. Named explicitly instead of
+        letting the order of the subnet list decide, which is what happened before - and it hid the
+        fact that the declarations were not being honoured.
+      '';
+    };
+
     enableNtp = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -122,13 +167,33 @@ in
         '';
       }
       {
-        assertion = builtins.all (subnet: subnet.gateway != null) dhcpSubnets;
+        assertion = builtins.all (entry: entry.config.gateway != null) dhcpSubnets;
         message = ''
           Gateway: a zone served by DHCP declares no gateway, so its clients would receive no
           router. Set my.topology.subnets.<zone>.gateway - it has to live inside that zone.
         '';
       }
+      {
+        # Two inventory entries with the same MAC would pull one client into two classes, and
+        # nothing would say which zone won.
+        assertion =
+          builtins.length (lib.attrValues allReservations)
+          == builtins.length (lib.unique (map (h: lib.toLower h.mac) (lib.attrValues allReservations)));
+        message = "Gateway: two entries in my.topology declare the same MAC address; every device must be inventarised exactly once.";
+      }
+      {
+        # Without the default zone being served, an undeclared client would receive no lease at all.
+        assertion = lib.elem cfg.defaultZone dhcpZones;
+        message = "Gateway: defaultZone '${cfg.defaultZone}' is not among the zones served by DHCP (uplinkZone plus routedZones), so undeclared clients would get no address.";
+      }
     ];
+
+    # A zone that is routed but has no inventarised device is not served (see servedZones). That is
+    # reported rather than asserted: it is a statement about the config being thinner than intended,
+    # not a state that must block a deployment.
+    warnings = lib.optional (cfg.enableDhcp && unservedZones != [ ]) (
+      "Gateway: ${toString (builtins.length unservedZones)} routed zone(s) have no inventarised device and are therefore not served by DHCP: ${lib.concatStringsSep ", " unservedZones}. Undeclared clients receive addresses from the default zone '${cfg.defaultZone}'."
+    );
 
     # 1. Kernel Layer-3 Routing & Forwarding
     boot.kernel.sysctl = lib.mkIf cfg.enableRouting {
@@ -223,23 +288,35 @@ in
           }
         ];
 
+        # Zones decide addressing through client classes, not through the order of this list: a
+        # subnet that names a class is offered only to members of that class, and the default zone's
+        # subnet names none - it is the single pool an undeclared client can reach.
+        client-classes = map (class: {
+          name = class.zone;
+          test = class.test;
+        }) zoneClasses;
+
         # One subnet per served zone, derived from the topology: the zone's CIDR, a pool taken from
-        # that CIDR, the zone's own router (which by construction lives inside it) and the
-        # reservations that fall into it.
-        subnet4 = lib.imap0 (index: subnet: {
-          id = index + 1;
-          subnet = subnet.cidr;
-          pools = [
-            { pool = poolIn subnet; }
-          ];
-          option-data = [
-            {
-              name = "routers";
-              data = subnet.gateway;
-            }
-          ];
-          reservations = reservationsIn subnet;
-        }) dhcpSubnets;
+        # that CIDR, the zone's own router (which by construction lives inside it), the reservations
+        # that fall into it, and the class that limits it to its own devices.
+        subnet4 = lib.imap0 (
+          index: entry:
+          {
+            id = index + 1;
+            subnet = entry.config.cidr;
+            pools = [
+              { pool = poolIn entry.config; }
+            ];
+            option-data = [
+              {
+                name = "routers";
+                data = entry.config.gateway;
+              }
+            ];
+            reservations = reservationsIn entry.config;
+          }
+          // lib.optionalAttrs (entry.zone != cfg.defaultZone) { client-class = entry.zone; }
+        ) dhcpSubnets;
       };
     };
 
