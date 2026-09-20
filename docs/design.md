@@ -1,30 +1,28 @@
-# VYRX Design System & Visual Identity Specification
+# Design system
 
-> **Status:** Specification & Implementation Guide  
-> **Aesthetic:** Modern Industrial Minimalist / High-End Developer Tooling (Linear / Vercel / Raycast style)  
-> **Scope:** Authentik SSO Gateway, Caddy Error Pages, Internal Dashboards & Web Services  
-> **Domain:** `vyrx.de`
->
-> **Naming:** siehe [`naming.md`](naming.md) — normativ, abgeleitet, nie handgepflegt.
+> **Aesthetic:** modern industrial minimalist - the register of high-end developer tooling
+> **Scope:** the Authentik portal, Caddy's error pages, internal dashboards
+> **Naming:** see [naming.md](naming.md) - normative, derived, never maintained by hand.
 
----
+## 1. Principles
 
-## 1. Leitphilosophie & Design-Prinzipien
+The design system defines a calm, functional surface for every service under `vyrx.de`: typographic
+precision, a reduced hierarchy, and no decoration for its own sake - no sci-fi tropes, no
+pseudo-technical ornament.
 
-Das **VYRX Design System** definiert eine ruhige, hochmoderne und funktionale Benutzeroberfläche für alle Dienste unter `vyrx.de`. Der Fokus liegt auf kompromissloser typografischer Präzision, reduzierter visueller Hierarchie und erstklassiger Usability – ohne verspielte Sci-Fi-Tropen, pseudotechnische Deko-Header oder visuelles Rauschen.
+1. **Functional minimalism.** Every visual element has a job. Clear contrast, quiet surfaces,
+   deliberate space.
+2. **One type scale.** Modern sans-serif (`Geist Sans`, `Inter`) for forms and navigation. Monospace
+   (`Geist Mono`, `JetBrains Mono`) only for machine-readable values: addresses, ports, hashes,
+   latencies. Using monospace for prose would defeat the distinction it exists to make.
+3. **Subtle depth, honest edges.** Neutral zinc and slate tones, precise `1px` borders
+   (`rgba(255, 255, 255, 0.08)`), matte shadows. No neon.
+4. **Passkey first.** Biometric authentication is the primary path, not an alternative standing next to
+   a password field.
+5. **Errors worth reading.** Status and error pages carry the structured diagnostics that modern cloud
+   platforms show - what failed, what it was reaching for, which node tried - instead of a generic box.
 
-### Kernprinzipien:
-1. **Funktionaler Minimalismus:** Jedes visuelle Element hat eine Aufgabe. Klare Kontraste, ruhige Flächen und durchdachte Weißräume (bzw. Dunkelräume).
-2. **Präzise typografische Skala:** Primär moderne Sans-Serif-Typografie (`Geist Sans` oder `Inter`) für Formulare und Navigation. Monospace (`Geist Mono`, `JetBrains Mono`) ausschließlich für reale technische Daten (IPs, Ports, Hashes, Latenzen).
-3. **Subtile Tiefe & Kantenkontrast:** Neutrale Zink-/Schiefer-Farbtöne mit präzisen `1px`-Bordern (`rgba(255, 255, 255, 0.08)`). Keine übertriebenen Neon-Effekte, sondern feine, matte Weichzeichner.
-4. **Passkey-First UX:** Biometrische Authentifizierung (FIDO2 / WebAuthn) steht als primärer Interaktionspfad im Zentrum. Schnörkellos und schnell.
-5. **Ernsthafte Fehler-Diagnostik:** Status- und Fehlerseiten liefern dem Administrator echte, strukturierte Diagnosedaten nach Vorbild moderner Cloud-Plattformen (Cloudflare, Vercel), statt generischer Fehlerboxen.
-
----
-
-## 2. Design Tokens (Farbsystem & CSS-Variablen)
-
-Das Farbsystem basiert auf neutralen Grau- und Schwarzwerten mit einem dezenten, hochwertigen Akzentton.
+## 2. Tokens
 
 ```css
 :root {
@@ -62,37 +60,24 @@ Das Farbsystem basiert auf neutralen Grau- und Schwarzwerten mit einem dezenten,
 }
 ```
 
----
+## 3. Typography
 
-## 3. Typografie
+| | Stack | Used for |
+|---|---|---|
+| UI and body | `Geist Sans`, `Inter`, `-apple-system`, `BlinkMacSystemFont`, `sans-serif` | forms, navigation, prose |
+| Code and telemetry | `Geist Mono`, `JetBrains Mono`, `ui-monospace`, `monospace` | addresses, ports, timestamps, request IDs |
 
-* **UI & Body:** `Geist Sans`, `Inter`, `-apple-system`, `BlinkMacSystemFont`, `sans-serif`
-  * Saubere Glyphen, hervorragende Lesbarkeit auf hochauflösenden Displays, neutraler Charakter.
-* **Code & Telemetrie:** `Geist Mono`, `JetBrains Mono`, `ui-monospace`, `monospace`
-  * Ausschließlich für maschinenlesbare Parameter (IP-Adressen, Ports, Timestamps, Request-IDs).
+## 4. The Authentik portal (`auth.vyrx.de`)
 
----
+- **Background.** `--vyrx-bg-canvas` with a single restrained radial highlight in the upper third.
+- **Card.** Centred, `--vyrx-bg-card`, a `1px solid var(--vyrx-border-subtle)` edge and a soft shadow.
+- **Header.** The VYRX word mark in plain grotesque, tracking `-0.04em`, with the subtitle
+  `Sign in to access your services`.
+- **Passkey button.** White on dark, or a discreet fill with `--vyrx-accent-primary`. One clear icon and
+  one precise label: `Sign in with Passkey`.
+- **Form fields.** `--vyrx-bg-elevated` with `1px solid var(--vyrx-border-default)`, and a focus state
+  that changes the border and adds a ring - no colour explosion.
 
-## 4. Authentik SSO Loginmaske (`auth.vyrx.de`)
-
-Die Authentik-Oberfläche wird auf ein aufgeräumtes, elegantes Interface reduziert.
-
-### 4.1 Layout & Komponenten
-* **Hintergrund:** Ruhiges `--vyrx-bg-canvas` (`#09090B`) mit minimalem radialen Lichtakzent im oberen Drittel.
-* **Card-Container:**
-  * Maximalbreite 400px, zentriert.
-  * Hintergrund `--vyrx-bg-card` (`#121215`), dezente Kante (`1px solid var(--vyrx-border-subtle)`), feiner Schlagschatten.
-* **Header:**
-  * Minimalistisches VYRX-Wortmarken-Logo (schlichte Grotesk-Typografie, Tracking `-0.04em`).
-  * Subtiler Subtitle: `Sign in to access your services`.
-* **Passkey / WebAuthn Button:**
-  * Primäre Schaltfläche: Helles Weiß (`#F8FAFC`) auf dunklem Grund oder diskret gefüllt mit `--vyrx-accent-primary`.
-  * Klares Icon (FIDO2 / Biometrie-Symbol), präziser Text: `Sign in with Passkey`.
-* **Formular-Felder:**
-  * Dunkle, leicht abgesetzte Inputs (`--vyrx-bg-elevated`).
-  * Border `1px solid var(--vyrx-border-default)`, bei Focus saubere Kante ohne Farbexplosionen.
-
-### 4.2 Authentik Custom CSS Blueprint:
 ```css
 /* vyrx-authentik-clean.css */
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
@@ -166,11 +151,10 @@ body {
 }
 ```
 
----
+## 5. Caddy error pages
 
-## 5. Caddy Ingress Status- & Fehlerseiten
-
-Tritt beim Routing ein Fehler auf (z. B. 502 Bad Gateway oder 403 Forbidden), zeigt Caddy eine professionelle, klare Diagnoseseite nach dem Vorbild von Cloudflare- oder Vercel-Statusanzeigen:
+When routing fails, the page says what happened and what it was trying to reach - the calm version of a
+diagnostic, not an alarm:
 
 ```
 +-----------------------------------------------------------------------+
@@ -197,61 +181,55 @@ Tritt beim Routing ein Fehler auf (z. B. 502 Bad Gateway oder 403 Forbidden), ze
 +-----------------------------------------------------------------------+
 ```
 
-### Struktur:
-* **Keine reißerischen Alarmtexte:** Ruhige, eindeutige Fehlerbezeichnung (`502 Upstream Service Unavailable`).
-* **Kompakte Diagnosetabelle:** Zeigt Ziel-Service, Ziel-Host, Gateway und Request-ID in sauberer Monospace-Darstellung.
-* **Ergonomische Aktionen:** Ein klarer Retry-Button und ein Link zum internen Status-Dashboard.
+- **No shouting.** A plain, unambiguous label: `502 Upstream Service Unavailable`.
+- **A compact table.** Target service, target host, gateway and request ID in monospace.
+- **Two actions.** Retry, and a link to the cluster status.
 
----
+## 6. Status indicators
 
-## 6. Status-Indikatoren & Badges
-
-Diskrete Statusanzeigen für interne Dashboards und Service-Listen:
-
-| Zustand | Indikator | Farbe | Bedeutung |
+| State | Indicator | Colour | Meaning |
 |---|---|---|---|
-| **Operational** | Grüner Punkt (`8px`) | `#10B981` | Dienst erreichbar, Health Check 200 OK |
-| **Degraded** | Gelber Punkt (`8px`) | `#F59E0B` | Antwortzeit > 1500ms oder Warnungen |
-| **Down** | Roter Punkt (`8px`) | `#EF4444` | Dienst nicht erreichbar |
-| **Internal Only** | Monospace Badge | `text-slate-400, bg-zinc-900` | Nur im Mesh/LAN (`*.lan.vyrx.de`) |
+| **Operational** | green dot, `8px` | `#10B981` | reachable, health check 200 |
+| **Degraded** | amber dot, `8px` | `#F59E0B` | response above 1500 ms, or warnings |
+| **Down** | red dot, `8px` | `#EF4444` | does not answer |
+| **Internal only** | monospace badge | `text-slate-400`, `bg-zinc-900` | reachable only from the mesh or the LAN |
 
----
+## 7. Where the theme lives
 
-## 7. Deklarative Bereitstellung in NixOS (`features/system/theme`)
+A self-contained feature module, so a service does not have to know that a design exists:
 
-Das Theme wird als eigenständiges, agnostisches Feature-Modul in NixOS eingebunden:
+```
+features/system/theme/
+├── default.nix               # options and tmpfiles wiring
+└── assets/
+    ├── authentik.css         # the Authentik stylesheet above
+    ├── error-502.html        # the Caddy error template
+    └── logo.svg              # the VYRX mark
+```
 
-1. **Dateistruktur:**
-   ```
-   features/system/theme/
-   ├── default.nix               # NixOS Options & tmpfiles-Wiring
-   └── assets/
-       ├── authentik.css         # Bereinigtes Authentik CSS
-       ├── error-502.html        # Caddy Error-Template
-       └── logo.svg              # Minimales VYRX Vektorlogo
-   ```
+Caddy picks the error template up as a snippet:
 
-2. **Caddy Integration:**
-   ```caddy
-   (vyrx_errors) {
-     handle_errors {
-       rewrite * /errors/{err.status_code}.html
-       file_server {
-         root /etc/vyrx/theme
-       }
-     }
-   }
-   ```
+```caddy
+(vyrx_errors) {
+  handle_errors {
+    rewrite * /errors/{err.status_code}.html
+    file_server {
+      root /etc/vyrx/theme
+    }
+  }
+}
+```
 
-3. **Authentik Integration:**
-   ```nix
-   systemd.tmpfiles.rules = [
-     "L+ /var/lib/authentik/theme.css - - - - ${./assets/authentik.css}"
-   ];
-   ```
+and Authentik receives the stylesheet at the path it loads it from:
 
----
+```nix
+systemd.tmpfiles.rules = [
+  "L+ /var/lib/authentik/theme.css - - - - ${./assets/authentik.css}"
+];
+```
 
-## 8. Zusammenfassung
+## 8. Why it looks like this
 
-Das bereinigte **VYRX Design System** setzt auf **zeitloses, professionelles Industrie-Design**. Es verzichtet vollständig auf Gimmicks und liefert stattdessen eine ergonomische, konsistente und hochgradig saubere Oberfläche für Admins und Nutzer.
+The theme is deliberately timeless: industrial, quiet, consistent. Everything here exists to make an
+administrator's screen readable at a glance - which is the only design requirement a fleet's internal
+surface actually has.
