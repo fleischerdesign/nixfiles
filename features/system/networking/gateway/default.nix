@@ -64,11 +64,13 @@ let
   # addresses, and the reservations configured inside their own subnets were never reached. Each
   # served zone therefore becomes a client class matched on the MAC addresses its inventory entries
   # declare, and its subnet accepts only that class.
-  macMatch =
-    h:
-    "substring(hexstring(pkt4.mac,''),0,12) == '${
-      lib.toLower (lib.replaceStrings [ ":" ] [ "" ] h.mac)
-    }'";
+  # The documented direct form: compare the hardware address itself against a hexadecimal literal
+  # (`pkt4.mac == 0x…`, Kea ARM "Client Classification"). The earlier version built a string with
+  # `hexstring(pkt4.mac,'')` and compared it to lowercase hex - Kea accepted it syntactically and
+  # never matched, so every declared device fell through to the default zone. Measured on the wire:
+  # the AP kept a corp address and the six relays received default-zone pool addresses instead of
+  # their iot reservations. Comparing the address itself removes separator and case from the question.
+  macMatch = h: "pkt4.mac == 0x${lib.toLower (lib.replaceStrings [ ":" ] [ "" ] h.mac)}";
 
   membersOfZone = zone: lib.filter (h: h.zone == zone) (lib.attrValues allReservations);
 
