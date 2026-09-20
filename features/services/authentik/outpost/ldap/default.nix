@@ -64,7 +64,6 @@ in
         Environment = [
           "AUTHENTIK_HOST=${cfg.coreAddress}"
           "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
-          "AUTHENTIK_LOG_LEVEL=debug"
           # Bind the standard LDAP ports (the outpost binary defaults to 3389/6636).
           "AUTHENTIK_LISTEN__LDAP=0.0.0.0:389"
           "AUTHENTIK_LISTEN__LDAPS=0.0.0.0:636"
