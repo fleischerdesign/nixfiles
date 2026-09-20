@@ -39,6 +39,42 @@ let
     else
       cfg.primaryHub;
 
+  # --- LAN reachability over the mesh ----------------------------------------------------------
+  # The overlay alone is not enough: a roaming client has to reach the home LAN, whose services do
+  # not all have a public name. The LAN is every zone that is not the mesh, and it sits behind the
+  # one host that routes it - `lanGateway` in the topology. That host announces those CIDRs, every
+  # other host routes them to it, and a host that is itself inside a LAN zone installs nothing:
+  # a mesh route for a subnet it is attached to would shadow its connected route, and it reaches
+  # the LAN directly anyway. This is what Tailscale's subnet router used to carry.
+  lanZoneCidrs = map (zone: zone.cidr) (
+    lib.attrValues (lib.filterAttrs (name: _: name != "mesh" && name != "mesh-ipv6") topology.subnets)
+  );
+
+  meshCidr = topology.subnets.mesh.cidr or "10.10.100.0/24";
+
+  announcesLan = ownHost != null && (ownHost.lanGateway or false);
+
+  # Exactly one host may deliver the LAN; the assertion below keeps it that way. Cryptokey routing
+  # has one owner per prefix, so two announcers would send the LAN to whichever was configured last.
+  lanDeliveredBy = lib.attrNames (
+    lib.filterAttrs (_: h: (h.lanGateway or false) && h.wireguardIpv4 != null) topology.hosts
+  );
+
+  # Membership in a LAN zone, decided on the /24 network part - every zone here is a /24, and the
+  # assertion below holds that assumption rather than trusting it.
+  network = address: lib.concatStringsSep "." (lib.take 3 (lib.splitString "." address));
+  onLan =
+    ownHost != null
+    && ownHost.ipv4 != null
+    && builtins.any (cidr: network ownHost.ipv4 == network cidr) lanZoneCidrs;
+
+  # What a peer delivers: its own overlay address, plus the LAN zones if it routes them.
+  deliveredBy =
+    peer:
+    [ "${peer.wireguardIpv4}/32" ]
+    ++ lib.optional (peer.wireguardIpv6 != null) "${peer.wireguardIpv6}/128"
+    ++ lib.optionals (peer.lanGateway or false) lanZoneCidrs;
+
   # Map peers to NixOS wireguard peer attrsets
   peersConfig =
     if isRelay then
@@ -47,10 +83,7 @@ let
         _name: peer:
         {
           publicKey = peer.wireguardPublicKey;
-          allowedIPs = [
-            "${peer.wireguardIpv4}/32"
-          ]
-          ++ lib.optional (peer.wireguardIpv6 != null) "${peer.wireguardIpv6}/128";
+          allowedIPs = deliveredBy peer;
           persistentKeepalive = 25;
         }
         // lib.optionalAttrs ((peer.wireguardRelay or false) && peer.ipv4 != null) {
@@ -64,13 +97,16 @@ let
         endpoint = "${relay.ipv4}:${toString wireguardPort}";
         allowedIPs =
           if name == effectivePrimaryHub then
-            # Primary hub carries the entire mesh overlay subnet for transit / inter-spoke routing
+            # Primary hub carries the entire mesh overlay subnet for transit / inter-spoke routing,
+            # and - for a host without a permanent LAN presence - the home LAN zones too, because the
+            # hub routes them on to the host that delivers them.
             [
-              (topology.subnets.mesh.cidr or "10.10.100.0/24")
+              meshCidr
             ]
             ++ lib.optional (topology.subnets ? mesh-ipv6) (
               topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64"
             )
+            ++ lib.optionals (!onLan) lanZoneCidrs
           else
             # Secondary relay hub is directly reachable via host-specific route (/32 and /128)
             [
@@ -116,7 +152,22 @@ in
       allowedUDPPorts = lib.optional (isRelay || ownHost.ipv4 != null) cfg.port;
       trustedInterfaces = [ cfg.interfaceName ];
       checkReversePath = "loose";
+      # The host that delivers the LAN has to be allowed to forward mesh traffic into it; without
+      # this the packets reach the gateway and stop there, because reaching the gateway's own
+      # addresses is input, not forward.
+      extraForwardRules = lib.optionalString announcesLan "ip saddr ${meshCidr} accept\n";
     };
+
+    assertions = [
+      {
+        assertion = builtins.length lanDeliveredBy <= 1;
+        message = "WireGuard: ${toString (builtins.length lanDeliveredBy)} hosts declare themselves the LAN gateway (${lib.concatStringsSep ", " lanDeliveredBy}); exactly one may, or the LAN route becomes ambiguous.";
+      }
+      {
+        assertion = builtins.all (cidr: lib.hasSuffix "/24" cidr) lanZoneCidrs;
+        message = "WireGuard: a LAN zone is not a /24 (${lib.concatStringsSep ", " lanZoneCidrs}), but membership in a zone is decided on its /24 network part.";
+      }
+    ];
 
     # 2. Kernel packet forwarding on relay nodes
     boot.kernel.sysctl = lib.mkIf isRelay {

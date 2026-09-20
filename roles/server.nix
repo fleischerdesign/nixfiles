@@ -31,7 +31,6 @@
   };
 
   my.features.system.networking = {
-    tailscale.enable = lib.mkDefault true;
     static.enable = lib.mkDefault true;
   };
 

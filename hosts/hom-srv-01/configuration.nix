@@ -71,12 +71,6 @@
             user = "fritz1498";
           };
           tplink-ap.enable = true;
-          tailscale = {
-            subnetRouter = {
-              enable = true;
-              routes = [ "10.10.0.0/16" ];
-            };
-          };
         };
         backups.restic = {
           enable = true;

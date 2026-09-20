@@ -14,7 +14,6 @@
 
   networking.hostName = "cld-edge-01";
 
-  my.features.system.networking.tailscale.acceptRoutes = true;
   my.features.system.networking.cloudflare.enable = true;
 
   # Ingress alias for the OpenClaw family mesh. The redirect itself is served by

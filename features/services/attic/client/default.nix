@@ -121,14 +121,8 @@ in
       systemd.services.attic-auto-push = lib.mkIf cfg.autoPush {
         description = "Asynchronous Attic Binary Cache Push Service";
         wantedBy = [ "multi-user.target" ];
-        after = [
-          "network-online.target"
-          "tailscaled.service"
-        ];
-        wants = [
-          "network-online.target"
-          "tailscaled.service"
-        ];
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
         serviceConfig = {
           Type = "simple";
           ExecStart = "${pushScript}/bin/attic-auto-push";

@@ -204,10 +204,7 @@ in
           value = {
             description = "Obsidian LiveSync Bridge (${name})";
             wantedBy = [ "multi-user.target" ];
-            after = [
-              "network-online.target"
-              "tailscaled.service"
-            ];
+            after = [ "network-online.target" ];
             wants = [ "network-online.target" ];
 
             environment = {

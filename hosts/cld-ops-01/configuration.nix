@@ -10,8 +10,6 @@
 
   networking.hostName = "cld-ops-01";
 
-  my.features.system.networking.tailscale.acceptRoutes = true;
-
   my.features.services.monitoring = {
     pipeline = {
       enable = true;

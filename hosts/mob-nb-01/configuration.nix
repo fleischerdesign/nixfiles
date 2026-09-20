@@ -19,8 +19,6 @@
   my.features.dev.android.enable = true;
 
   my.features.media.gaming.sunshine.enable = false;
-  my.features.system.networking.tailscale.enable = true;
-  my.features.system.networking.tailscale.acceptRoutes = true;
 
   my.features.services.openclaw.node = {
     enable = true;

@@ -34,13 +34,13 @@ let
   # Overlay units that assign the addresses sshd binds to. sshd binds each
   # ListenAddress exactly once at startup and never rebinds, so it must start
   # after these units and wait until every address exists on some interface.
-  overlayUnits =
-    lib.optional config.services.tailscale.enable "tailscaled.service"
-    ++ map (name: "wireguard-${name}.service") (lib.attrNames config.networking.wireguard.interfaces);
+  overlayUnits = map (name: "wireguard-${name}.service") (
+    lib.attrNames config.networking.wireguard.interfaces
+  );
 in
 {
   options.my.features.system.networking.ssh = {
-    enable = lib.mkEnableOption "SSH server, bound to LAN and Tailscale only";
+    enable = lib.mkEnableOption "SSH server, bound to the LAN and the mesh overlay only";
     deployKeys = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [

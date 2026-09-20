@@ -207,11 +207,10 @@ let
           type = lib.types.enum [
             "all"
             "wireguard"
-            "tailscale"
             "local"
           ];
           default = "all";
-          description = "Network interface to bind firewall rule (all, wireguard, tailscale, or local)";
+          description = "Network interface to bind the firewall rule to (all, wireguard, or local)";
         };
       };
 
@@ -400,22 +399,6 @@ let
     ) ep.port
   ) directEndpoints;
 
-  tailscaleTcp = lib.concatMap (
-    ep:
-    lib.optional (
-      ep.directAccess.interface == "tailscale"
-      && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
-    ) ep.port
-  ) directEndpoints;
-
-  tailscaleUdp = lib.concatMap (
-    ep:
-    lib.optional (
-      ep.directAccess.interface == "tailscale"
-      && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
-    ) ep.port
-  ) directEndpoints;
-
   wireguardTcp = lib.concatMap (
     ep:
     lib.optional (
@@ -450,10 +433,6 @@ in
     networking.firewall = {
       allowedTCPPorts = allTcp;
       allowedUDPPorts = allUdp;
-      interfaces.tailscale0 = {
-        allowedTCPPorts = tailscaleTcp;
-        allowedUDPPorts = tailscaleUdp;
-      };
       interfaces.wg0 = {
         allowedTCPPorts = wireguardTcp;
         allowedUDPPorts = wireguardUdp;

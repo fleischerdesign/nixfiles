@@ -13,9 +13,6 @@
   networking.hostName = "hom-wrk-01";
 
   # Features
-  my.features.system.networking.tailscale.enable = true;
-  my.features.system.networking.tailscale.acceptRoutes = true;
-
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
   my.features.desktop.niri.enable = true;

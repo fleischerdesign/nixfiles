@@ -591,10 +591,7 @@ in
           value = {
             description = "OpenClaw gateway loopback tunnel (${name})";
             wantedBy = [ "multi-user.target" ];
-            after = [
-              "network-online.target"
-              "tailscaled.service"
-            ];
+            after = [ "network-online.target" ];
             wants = [ "network-online.target" ];
 
             serviceConfig = {
@@ -624,11 +621,7 @@ in
               description = "OpenClaw companion node (${name})";
               wantedBy = [ "multi-user.target" ];
               restartTriggers = lib.optional (inst._mergedConfig != { }) inst._configFile;
-              after = [
-                "network-online.target"
-                "tailscaled.service"
-              ]
-              ++ lib.optional inst._useTunnel "${tunnelServiceName}.service";
+              after = [ "network-online.target" ] ++ lib.optional inst._useTunnel "${tunnelServiceName}.service";
               wants = [ "network-online.target" ];
               requires = lib.optional inst._useTunnel "${tunnelServiceName}.service";
 
