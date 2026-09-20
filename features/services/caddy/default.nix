@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -328,15 +329,19 @@ in
     # returned no response, from the LAN and through the ingress alike.
     #
     # A restart loads the identical configuration cleanly and immediately, so a reload request is
-    # turned into a restart. The cost is a sub-second interruption on configuration changes; the
+    # turned into a restart. `lib.mkForce` is deliberate here: `ExecReload` is a systemd list and a
+    # plain assignment would *append* to the module's `caddy reload ... --force`, leaving the hanging
+    # command in place. The cost is a sub-second interruption on configuration changes; the
     # alternative is a hang that only shows up when someone notices the services are down.
     #
     # NOTE: this also means `Reload failed for Caddy.` no longer appears in the journal, and
-    # `nixos-rebuild` stops returning exit 4 for this host.
-    systemd.services.caddy.serviceConfig = {
-      ExecReload = "${pkgs.util-linux}/bin/kill -TERM $MAINPID";
-      Restart = "always";
-    };
+    # `nixos-rebuild` stops returning exit 4 for this host. `Restart` is deliberately left as the
+    # module sets it (`on-failure`): a TERM counts as a failure for systemd, so the process comes
+    # back with the new configuration. Do not "tidy" this into a plain reload without also setting
+    # `Restart`.
+    systemd.services.caddy.serviceConfig.ExecReload = lib.mkForce (
+      "${pkgs.util-linux}/bin/kill -TERM $MAINPID"
+    );
 
     systemd.tmpfiles.rules = [
       "d /var/log/caddy 0755 caddy caddy -"
