@@ -120,7 +120,12 @@ the unit exist, is the tool there);
   rather than from the last statement;
 - for a refactor, prove equivalence at the *delivered* level (rendered values, unit counts), not at the
   level of the options being changed — and read leaves, never whole subtrees, because forcing a subtree
-  evaluates options nobody evaluates in production.
+  evaluates options nobody evaluates in production;
+- a unit state that is not `active` (or not `success`, for a oneshot) is a **failure**, not a phase. A
+  `caddy` stuck in `reloading` answered nothing for any vhost on that host — from the LAN and through
+  the ingress alike — while reading like an intermediate state in a rollout script. The following
+  script checks `[ "$(systemctl is-active caddy)" = active ]` and aborts otherwise; the earlier ones
+  printed the state and moved on.
 
 ## 5. Open blockers
 
