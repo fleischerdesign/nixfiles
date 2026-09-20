@@ -642,6 +642,23 @@ let
             };
           }
           {
+            # A provider runs two flows: the bind flow authenticates the account, the *authorization*
+            # flow decides whether it may use the LDAP application. Measured in the core's log while a
+            # bind was failing: `f(exec): Flow not applicable to current user`, with
+            # `flow_slug: default-provider-authorization-implicit-consent` and a request to
+            # `/api/v3/flows/executor/default-provider-authorization-implicit-consent/` - the flow that
+            # rejected the account was this one, not the bind flow. The docs name the same requirement:
+            # "The user must also have access to the LDAP application."
+            model = "authentik_policies.policybinding";
+            identifiers = {
+              target = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
+              order = 1;
+            };
+            attrs = {
+              user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
+            };
+          }
+          {
             model = "authentik_core.token";
             identifiers = {
               identifier = "ldap-consumer-${name}-password";
