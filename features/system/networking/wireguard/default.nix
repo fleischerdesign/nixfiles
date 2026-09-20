@@ -41,39 +41,43 @@ let
 
   # --- LAN reachability over the mesh ----------------------------------------------------------
   # The overlay alone is not enough: a roaming client has to reach the home LAN, whose services do
-  # not all have a public name. The LAN is every zone that is not the mesh, and it sits behind the
-  # one host that routes it - `lanGateway` in the topology. That host announces those CIDRs, every
-  # other host routes them to it, and a host that is itself inside a LAN zone installs nothing:
-  # a mesh route for a subnet it is attached to would shadow its connected route, and it reaches
-  # the LAN directly anyway. This is what Tailscale's subnet router used to carry.
-  lanZoneCidrs = map (zone: zone.cidr) (
-    lib.attrValues (lib.filterAttrs (name: _: name != "mesh" && name != "mesh-ipv6") topology.subnets)
-  );
+  # not all have a public name. Which zones a host delivers is declared in the topology as zone names
+  # (`lanGateway`), so no CIDR is written twice; the host that delivers them announces them, every
+  # other host routes them to it through its peer entry, and a host that is itself inside a zone
+  # installs nothing for it - a mesh route for a subnet it is attached to would shadow its connected
+  # route. This is the job Tailscale's subnet router used to do.
+  lanCidrsOf = host: map (zone: topology.subnets.${zone}.cidr) (host.lanGateway or [ ]);
+
+  # Everything any host delivers into the mesh. A CIDR may be delivered once, and the assertion in
+  # `config` holds that: cryptokey routing has exactly one owner per prefix.
+  deliveredCidrs = lib.concatMap lanCidrsOf (lib.attrValues topology.hosts);
+  deliveredZones = lib.concatMap (host: host.lanGateway or [ ]) (lib.attrValues topology.hosts);
+
+  ownDeliveredCidrs = if ownHost == null then [ ] else lanCidrsOf ownHost;
 
   meshCidr = topology.subnets.mesh.cidr or "10.10.100.0/24";
 
-  announcesLan = ownHost != null && (ownHost.lanGateway or false);
+  announcesLan = ownDeliveredCidrs != [ ];
 
-  # Exactly one host may deliver the LAN; the assertion below keeps it that way. Cryptokey routing
-  # has one owner per prefix, so two announcers would send the LAN to whichever was configured last.
-  lanDeliveredBy = lib.attrNames (
-    lib.filterAttrs (_: h: (h.lanGateway or false) && h.wireguardIpv4 != null) topology.hosts
-  );
-
-  # Membership in a LAN zone, decided on the /24 network part - every zone here is a /24, and the
+  # Membership in a zone, decided on the /24 network part - every zone here is a /24, and the
   # assertion below holds that assumption rather than trusting it.
   network = address: lib.concatStringsSep "." (lib.take 3 (lib.splitString "." address));
-  onLan =
-    ownHost != null
-    && ownHost.ipv4 != null
-    && builtins.any (cidr: network ownHost.ipv4 == network cidr) lanZoneCidrs;
 
-  # What a peer delivers: its own overlay address, plus the LAN zones if it routes them.
+  # What this host routes over the mesh: every delivered zone it is not already inside and does not
+  # deliver itself. A route for a subnet this host is attached to would shadow its connected route,
+  # and one it delivers itself is local to begin with.
+  meshLanRoutes = lib.filter (
+    cidr:
+    !(builtins.any (own: network own == network cidr) ownDeliveredCidrs)
+    && !(ownHost != null && ownHost.ipv4 != null && network ownHost.ipv4 == network cidr)
+  ) deliveredCidrs;
+
+  # What a peer delivers: its own overlay address, plus the zones it announces into the mesh.
   deliveredBy =
     peer:
     [ "${peer.wireguardIpv4}/32" ]
     ++ lib.optional (peer.wireguardIpv6 != null) "${peer.wireguardIpv6}/128"
-    ++ lib.optionals (peer.lanGateway or false) lanZoneCidrs;
+    ++ lanCidrsOf peer;
 
   # Map peers to NixOS wireguard peer attrsets
   peersConfig =
@@ -106,7 +110,7 @@ let
             ++ lib.optional (topology.subnets ? mesh-ipv6) (
               topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64"
             )
-            ++ lib.optionals (!onLan) lanZoneCidrs
+            ++ meshLanRoutes
           else
             # Secondary relay hub is directly reachable via host-specific route (/32 and /128)
             [
@@ -160,12 +164,12 @@ in
 
     assertions = [
       {
-        assertion = builtins.length lanDeliveredBy <= 1;
-        message = "WireGuard: ${toString (builtins.length lanDeliveredBy)} hosts declare themselves the LAN gateway (${lib.concatStringsSep ", " lanDeliveredBy}); exactly one may, or the LAN route becomes ambiguous.";
+        assertion = builtins.length deliveredZones == builtins.length (lib.unique deliveredZones);
+        message = "WireGuard: ${lib.concatStringsSep ", " deliveredZones} delivers a zone into the mesh more than once; cryptokey routing has exactly one owner per prefix, so the route would be ambiguous.";
       }
       {
-        assertion = builtins.all (cidr: lib.hasSuffix "/24" cidr) lanZoneCidrs;
-        message = "WireGuard: a LAN zone is not a /24 (${lib.concatStringsSep ", " lanZoneCidrs}), but membership in a zone is decided on its /24 network part.";
+        assertion = builtins.all (cidr: lib.hasSuffix "/24" cidr) deliveredCidrs;
+        message = "WireGuard: a delivered zone is not a /24 (${lib.concatStringsSep ", " deliveredCidrs}), but membership in a zone is decided on its /24 network part.";
       }
     ];
 
@@ -177,6 +181,12 @@ in
 
     # 3. Kernel WireGuard interface configuration (Dual-Stack IPv4 / RFC 4193 ULA IPv6)
     networking.wireguard.interfaces.${cfg.interfaceName} = {
+      # The mesh is the last resort for a prefix that is also directly reachable. A roaming client
+      # that happens to be at home has a connected route to its own zone (NetworkManager gives wifi
+      # 600), and a tunnel route at the default metric 0 would win over it and send LAN traffic out
+      # through the hubs and back. The overlay itself has no competing route, so this only orders the
+      # LAN prefixes the mesh carries.
+      metric = 1000;
       ips = [
         "${ownHost.wireguardIpv4}/24"
       ]

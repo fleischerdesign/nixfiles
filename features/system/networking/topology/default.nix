@@ -128,13 +128,15 @@ let
         description = "Whether this host acts as a public WireGuard mesh relay hub";
       };
       lanGateway = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
         description = ''
-          Whether this host routes the home LAN and therefore announces its zones into the mesh.
-          Exactly one host may declare it: the mesh carries the overlay on its own, and a roaming
-          client needs this announcement to reach anything behind it. A host that sits inside a LAN
-          zone installs no mesh route for it - it reaches the LAN directly.
+          Zones this host delivers into the mesh, written as zone names - the CIDRs are read from
+          `my.topology.subnets`, so an address is never written twice. The mesh carries the overlay
+          on its own, so a roaming client needs this announcement to reach anything behind it. A
+          zone may be delivered by one host only: cryptokey routing has exactly one owner per
+          prefix. A host that sits inside a zone installs no mesh route for it, because it reaches
+          that zone directly.
         '';
       };
       hostType = lib.mkOption {
@@ -359,10 +361,15 @@ in
         wireguardIpv6 = "fd10:1000:100::10";
         wireguardPublicKey = "j80spw+2+Ojz51aKAytPdCZwFOc64yNOR05rAcXOESE=";
         hostType = "server";
-        # This host routes the home LAN, so it is the one that announces those zones into the mesh
+        # This host routes the home LAN, so it is the one that delivers those zones into the mesh
         # (DEPLOYMENT.md 10). The announcement replaced Tailscale's subnet router; without it a
-        # roaming client reaches the mesh but none of the services behind it.
-        lanGateway = true;
+        # roaming client reaches the mesh but none of the services behind it. `guest` is absent on
+        # purpose: no host carries that zone, so announcing it would route traffic into a hole.
+        lanGateway = [
+          "infra"
+          "corp"
+          "iot"
+        ];
         # TEMPORARY (subnet migration): stay reachable on the old network until the
         # FRITZ!Box has moved to 10.10.10.1/24 and DHCP is handed over to Kea.
         migration = {
