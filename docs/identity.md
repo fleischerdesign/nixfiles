@@ -297,8 +297,12 @@ This is the inventory that closes the third row. Every row here has been measure
   which is the intended behaviour, not a gap.
 - **A new consumer's SOPS secret is added by hand.** The endpoint contract derives the path; if the key is
   missing, `sops-install-secrets` fails the deploy loudly rather than starting with an empty credential.
-- **The drift report compares scalar fields, not relationships.** A change to a provider list, a permission
-  or a binding is not visible to the field diff; the apply's cardinal invariants still guard those.
+- **The derived relation inventory covers the relations that are their own rows** - policy bindings and
+  stage bindings - because those are not overwritten by an object's `present` update. Relations that are
+  fields of the object (outpost `providers`, user `roles`, role `permissions`) are already enforced by that
+  update. What is not derived are the **additive guardian permissions** applied through an entry's
+  `permissions:`; their access-critical case, the consumer's `search_full_directory`, is checked
+  directionally instead.
 - **A fresh install must create authentik's two unmanaged bootstrap tables** (`authentik_install_id`,
   `authentik_version_history`) before the first migration. authentik's own `server`/`worker` entrypoint (the
   Go binaries) does this on startup; the fresh-database acceptance test drove `ak migrate` plus a shell

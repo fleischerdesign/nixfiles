@@ -18,21 +18,11 @@ let
   consumerAccountName = name: "${config.my.directory.ldap.consumerAccountPrefix}${name}";
 
   blueprintExpectations = {
-    # The LDAP application carries no binding, which is what makes it open to every user
-    # (AppAccessWithoutBindings, default True); a single binding denies everyone it does not name.
-    applicationsWithoutBindings = [ "ldap" ];
-    # The flow the outpost executes runs before any account is authenticated, and the shared provider
-    # authorization flow runs for every provider login. A user-scoped binding on either denies everyone
-    # it does not name; the 2026-09-20 orphan is why the provider flows are checked too (practices.md §6.5).
-    flowsWithoutBindings = [
-      "ldap-authentication-flow"
-      "default-provider-authorization-implicit-consent"
-      "default-provider-authorization-explicit-consent"
-    ];
-    # The shape of that flow: identification (which carries the password stage), password, and user login.
-    flowStageBindings = {
-      ldap-authentication-flow = 3;
-    };
+    # Relation sets (policy bindings, stage bindings) are no longer listed here: the apply derives them
+    # from the blueprint entries themselves (`relation_diffs` in the server module), so a relation this
+    # repository does not declare fails the deploy without anyone editing a list. What remains are the
+    # directional facts that no entry states - a permission a consumer must hold, and token stability.
+    #
     # Every consumer's service account must be able to read the whole directory, or the service it serves
     # cannot find its users at all.
     searchFullDirectoryAccounts = map consumerAccountName sortedLdapEndpointNames;
@@ -190,9 +180,7 @@ let
   # rows and an `absent` entry deletes one match; the invariant fails the deploy if any remains.
   orphanedAuthorizationFlowBinding = blueprintLib.absent {
     model = blueprintLib.models.policyBinding;
-    identifiers.target =
-      blueprintLib.refs.byField blueprintLib.models.policyBindingModel "flow__slug"
-        "default-provider-authorization-implicit-consent";
+    identifiers.target = blueprintLib.refs.policyTargetBySlug "flow" "default-provider-authorization-implicit-consent";
   };
 
   # The LDAP outpost blueprint depends on the default provider flows, on the RBAC groups, and on the consumer

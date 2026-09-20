@@ -64,6 +64,12 @@ let
     byName = model: name: refs.byField model "name" name;
     bySlug = model: slug: refs.byField model "slug" slug;
 
+    # A `PolicyBinding.target` is keyed on the PolicyBindingModel's `pbm_uuid`, never on the concrete
+    # object's own pk: a Flow carries both `flow_uuid` and `pbm_uuid`, and `bySlug` on the flow returns
+    # the former, so a binding wrote a target that matched nothing and was neither created nor removed.
+    # Resolve through the base model instead; `child` is the reverse accessor (`flow`, `application`, ...).
+    policyTargetBySlug = child: slug: refs.byField models.policyBindingModel "${child}__slug" slug;
+
     file = path: marker "!File ${path}";
     env = name: marker "!Env ${name}";
     context = key: marker "!Context ${key}";

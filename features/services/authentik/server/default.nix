@@ -53,10 +53,8 @@ let
     from authentik.blueprints.v1.common import BlueprintEntryDesiredState, BlueprintLoader, YAMLTag
     from authentik.blueprints.v1.importer import Importer
     from authentik.blueprints.v1.tasks import apply_blueprint
-    from authentik.core.models import Application, Token, User
-    from authentik.flows.models import Flow, FlowStageBinding
+    from authentik.core.models import Token, User
     from authentik.lib.config import CONFIG
-    from authentik.policies.models import PolicyBinding
     from authentik.providers.ldap.models import LDAPProvider
 
     EXPECTED = ${builtins.toJSON blueprints.expectations}
@@ -65,6 +63,8 @@ let
     deadline = time.monotonic() + ${toString blueprintsApplyTimeoutSeconds}
 
     ${ownershipPython}
+
+    ${relationsPython}
 
     paths = owned_paths()
     if not paths:
@@ -156,28 +156,10 @@ let
             expect(f"token {identifier} is unmanaged (managed={token.managed!r})", token.managed is None)
             expect(f"token {identifier} does not expire (expiring={token.expiring!r})", token.expiring is False)
 
-    for slug in EXPECTED["applicationsWithoutBindings"]:
-        application = Application.objects.filter(slug=slug).first()
-        expect(
-            f"application {slug} exists",
-            application is not None,
-        )
-        if application is not None:
-            count = PolicyBinding.objects.filter(target=application).count()
-            expect(f"application {slug} has no policy binding (found {count})", count == 0)
-
-    for slug, expected in EXPECTED["flowStageBindings"].items():
-        flow = Flow.objects.filter(slug=slug).first()
-        expect(f"flow {slug} exists", flow is not None)
-        if flow is not None:
-            count = FlowStageBinding.objects.filter(target=flow).count()
-            expect(f"flow {slug} has {expected} stage bindings (found {count})", count == expected)
-
-    for slug in EXPECTED["flowsWithoutBindings"]:
-        flow = Flow.objects.filter(slug=slug).first()
-        if flow is not None:
-            count = PolicyBinding.objects.filter(target=flow).count()
-            expect(f"flow {slug} has no policy binding (found {count})", count == 0)
+    # Relation ownership: the declared relation sets are derived from the blueprints themselves (see
+    # relation_diffs), so a relation this repository does not declare - like the 2026-09-20 orphaned
+    # bindings on the shared authorization flow - fails the deploy instead of denying every login.
+    failures.extend(relation_diffs(paths))
 
     provider = LDAPProvider.objects.first()
     expect("an LDAP provider exists", provider is not None)
@@ -221,12 +203,15 @@ let
 
     ${ownershipPython}
 
+    ${relationsPython}
+
     def scalar(value):
         """Only plain values are compared. References, files, lists and FKs are not drift."""
         return isinstance(value, (str, bool, int)) and not isinstance(value, YAMLTag)
 
     findings = []
-    for rel in owned_paths():
+    paths = owned_paths()
+    for rel in paths:
         blueprint = Importer.from_string((root / rel).read_text(encoding="utf-8"), {}).blueprint
         for entry in blueprint.iter_entries():
             model_name = entry.get_model(blueprint)
@@ -254,6 +239,9 @@ let
                         f"RESET {model_name} {identifiers} field {field}: "
                         f"database {current!r}, declared {declared!r}"
                     )
+
+    # The same derived relation inventory the apply enforces, reported instead of corrected.
+    findings.extend(relation_diffs(paths))
 
     print(f"drift report: {len(findings)} finding(s)")
     for finding in findings:
@@ -317,6 +305,120 @@ let
             if (metadata.get("labels") or {}).get(OWNER_LABEL[0]) == OWNER_LABEL[1]:
                 owned.append(str(path.relative_to(root)))
         return owned
+  '';
+
+  # Relation ownership: the repository owns the *set* of relations on every object its blueprints
+  # declare or reference, and the blueprints are the single source for that set. This derives the
+  # expected counts from the same entries that generate the YAML - no hand-written model or slug list -
+  # and returns what differs from the database. The apply fails on a non-empty result; the drift report
+  # prints it. Only objects our entries touch are asserted, because upstream owns its own bindings.
+  relationsPython = ''
+    def relation_diffs(paths):
+        """Declared-vs-actual relation differences for the owned blueprints; empty means they match."""
+        from django.apps import apps
+
+        from authentik.blueprints.v1.common import BlueprintEntryDesiredState, Find, KeyOf
+        from authentik.blueprints.v1.importer import Importer
+        from authentik.flows.models import Flow, FlowStageBinding
+        from authentik.policies.models import PolicyBinding, PolicyBindingModel
+
+        flow_model = "authentik_flows.flow"
+        binding_model = "authentik_policies.policybinding"
+        stage_binding_model = "authentik_flows.flowstagebinding"
+
+        def tags(value):
+            if isinstance(value, (Find, KeyOf)):
+                yield value
+            elif isinstance(value, dict):
+                for inner in value.values():
+                    yield from tags(inner)
+            elif isinstance(value, list):
+                for inner in value:
+                    yield from tags(inner)
+
+        def key_of(tag, index):
+            if isinstance(tag, KeyOf):
+                return index.get(tag.id_from)
+            if isinstance(tag, Find) and len(tag.conditions) == 1:
+                field, value = tag.conditions[0]
+                return (tag.model_name, field, value)
+            return None
+
+        def resolve(key):
+            if key is None:
+                return None
+            model, field, value = key
+            return apps.get_model(*model.split(".")).objects.filter(**{field: value}).first()
+
+        def label(key):
+            return f"{key[0]} {key[1]}={key[2]}"
+
+        diffs = []
+        for path in paths:
+            blueprint = Importer.from_string((root / path).read_text(encoding="utf-8"), {}).blueprint
+            index = {}
+            for entry in blueprint.iter_entries():
+                identifiers = entry.identifiers or {}
+                if entry.id and len(identifiers) == 1:
+                    field, value = next(iter(identifiers.items()))
+                    index[entry.id] = (entry.get_model(blueprint), field, value)
+
+            # A target is keyed by the foreign key the database actually holds: `pbm_uuid` for a policy
+            # binding, `flow_uuid` for a stage binding. A Flow carries both, and a reference through the
+            # base model and one through the flow resolve to different pks, so comparing model names or
+            # object pks would silently count the wrong thing.
+            policy_targets = {}
+            stage_targets = {}
+            declared_policy = {}
+            declared_stage = {}
+            for entry in blueprint.iter_entries():
+                model = entry.get_model(blueprint)
+                identifiers = entry.identifiers or {}
+                # A tombstone declares that an object must not exist; it neither declares a relation nor
+                # contributes a target to assert on.
+                if entry.get_state(blueprint) == BlueprintEntryDesiredState.ABSENT:
+                    continue
+                # An object we declare: we own its relation sets.
+                if len(identifiers) == 1 and not any(isinstance(v, (Find, KeyOf)) for v in identifiers.values()):
+                    field, value = next(iter(identifiers.items()))
+                    key = (model, field, value)
+                    obj = resolve(key)
+                    if isinstance(obj, PolicyBindingModel):
+                        policy_targets.setdefault(obj.pbm_uuid, label(key))
+                    if model == flow_model and obj is not None:
+                        stage_targets.setdefault(obj.flow_uuid, label(key))
+                # An object we merely reference: we own its policy bindings, not its upstream stage shape.
+                for container in (entry.identifiers or {}), (entry.attrs or {}):
+                    for value in container.values():
+                        for tag in tags(value):
+                            key = key_of(tag, index)
+                            obj = resolve(key)
+                            if isinstance(obj, PolicyBindingModel):
+                                policy_targets.setdefault(obj.pbm_uuid, label(key))
+                if model == binding_model:
+                    obj = resolve(key_of(identifiers.get("target"), index))
+                    if isinstance(obj, PolicyBindingModel):
+                        declared_policy[obj.pbm_uuid] = declared_policy.get(obj.pbm_uuid, 0) + 1
+                elif model == stage_binding_model:
+                    obj = resolve(key_of(identifiers.get("target"), index))
+                    if isinstance(obj, Flow):
+                        declared_stage[obj.flow_uuid] = declared_stage.get(obj.flow_uuid, 0) + 1
+
+            for target, description in sorted(policy_targets.items(), key=lambda item: item[1]):
+                expected = declared_policy.get(target, 0)
+                found = PolicyBinding.objects.filter(target_id=target).count()
+                if found != expected:
+                    diffs.append(
+                        f"policy bindings on {description}: {found} in the database, {expected} declared"
+                    )
+            for target, description in sorted(stage_targets.items(), key=lambda item: item[1]):
+                expected = declared_stage.get(target, 0)
+                found = FlowStageBinding.objects.filter(target_id=target).count()
+                if found != expected:
+                    diffs.append(
+                        f"stage bindings on {description}: {found} in the database, {expected} declared"
+                    )
+        return diffs
   '';
 
   # The directory's structure comes from the fleet-wide contract, never from a literal here.
@@ -541,6 +643,25 @@ in
         OnCalendar = "daily";
         Persistent = true;
       };
+    };
+
+    # The deploy is not finished when the apply unit was started, only when it succeeded. `nod` runs
+    # custom probes after activation; this one observes the asynchronous apply unit and asserts its
+    # result, so a red apply fails the deploy instead of only the journal.
+    nod.healthChecks = {
+      timeoutSecs = blueprintsApplyTimeoutSeconds + 120;
+      customProbes = [
+        {
+          name = "authentik-blueprints-applied";
+          timeoutSecs = blueprintsApplyTimeoutSeconds + 60;
+          command = ''
+            while [ "$(systemctl show -p ActiveState --value authentik-blueprints-apply.service)" = "activating" ]; do
+              sleep 3
+            done
+            test "$(systemctl show -p Result --value authentik-blueprints-apply.service)" = success
+          '';
+        }
+      ];
     };
 
     # 4. Inversion of Control: Declare PostgreSQL requirement

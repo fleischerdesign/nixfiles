@@ -248,7 +248,7 @@ in A3 can be closed.
 
 ---
 
-## 6. Directory work - twelve findings, each one measured late
+## 6. Directory work - thirteen findings, each one measured late
 
 Making Jellyfin authenticate against the Authentik directory took a night and produced six generalisable
 findings. They are recorded because every one of them cost hours and none of them is specific to LDAP.
@@ -412,5 +412,19 @@ grants access. The discipline is one entry with the new name **and** one `state:
 one - the tombstone is the only thing that makes the rename declarative, and it may stay forever because
 `absent` on a missing object is a no-op. The apply checks the rule in both directions: every declared object
 resolves (`present`) and every tombstoned identifier is gone (`absent`).
+
+### 6.13 An invariant you type is a sample; derive it from the declaration
+
+The apply used to guard a hand-written list of flows and applications that must carry no policy binding. It
+missed the one that mattered: the shared provider authorization flow carried two user-scoped bindings from an
+old experiment, so every human login answered *Flow does not apply to current user* while only the LDAP
+service account passed. The list was a sample of the relations we care about, and the defect was precisely
+the relation that was not in the sample.
+
+The relation sets are now derived from the blueprint entries themselves - every object a blueprint declares
+or references, and the policy and stage bindings those entries declare - so there is no list to extend when
+the shape grows. What stays written by hand are the directional facts no entry can state: a permission a
+consumer has to hold, a token that must not expire. The rule is: **a comparison the database can answer is
+derived from the declaration; a statement only a person can make is declared for what it is.**
 
 
