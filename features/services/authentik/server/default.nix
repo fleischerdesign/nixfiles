@@ -400,6 +400,10 @@ let
             name = "LDAP authentication flow";
             title = "LDAP";
             designation = "authentication";
+            # A flow with no bindings and engine mode `any` evaluates to false - "none of the bindings
+            # matched" - which is exactly what `Flow does not apply to current user.` says. The bindings
+            # are attached per consumer below.
+            policy_engine_mode = "any";
           };
         }
         {
@@ -615,6 +619,18 @@ let
             model = "authentik_policies.policybinding";
             identifiers = {
               target = yamlTag "!Find [authentik_core.application, [slug, ldap]]";
+              order = 0;
+            };
+            attrs = {
+              user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
+            };
+          }
+          {
+            # The flow needs a binding that admits this account, otherwise its policy engine answers
+            # that it applies to nobody.
+            model = "authentik_policies.policybinding";
+            identifiers = {
+              target = yamlTag "!KeyOf flow_ldap_auth";
               order = 0;
             };
             attrs = {
