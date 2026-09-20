@@ -1,200 +1,181 @@
-# VYRX Enterprise Security Architecture Specification
+# Security
 
-> **Status:** Architecture Blueprint & Security Policy  
-> **Frameworks:** Zero Trust Architecture (NIST SP 800-207), Defense-in-Depth, Bell-LaPadula Lattice  
-> **Scope:** Cluster-weite Systemsicherheit, Kryptografie, Secrets-Lifecycle, OS-Hardening & Access Control  
-> **Domain:** `vyrx.de`
+> **Model:** zero trust, defence in depth · **Secrets:** SOPS with age · **Trust lattice:** the zones of
+> [architecture.md](architecture.md) §3, partially ordered
+>
+> This document states the security model as it is. Where a layer is declared but not yet applied, that
+> is said with the measurement, because a security document that describes an intention as a fact is
+> worse than no document at all.
 
----
+## 1. Model
 
-## 1. Theoretisches Fundament & Sicherheitsmodelle
+No segment is trusted, including the house LAN. Security is a property of every component, not a wall
+at the edge.
 
-Die Sicherheitsarchitektur von **nixfiles 2.0** basiert auf dem mathematischen Axiom, dass kein Netzwerksegment (auch nicht das heimische LAN) inhärent vertrauenswürdig ist. Sicherheit wird nicht als Perimeter an der Außenwand verstanden, sondern als **durchgängige Eigenschaft jeder einzelnen Komponente**.
+**Zero trust (NIST SP 800-207), applied:**
 
-### 1.1 Zero Trust Architecture (NIST SP 800-207)
-1. **Explizite Verifikation:** Jeder Zugriff auf interne Ressourcen (APIs, Web-Frontends, SSH, Metriken) erfordert eine kryptografische oder identitätsbasierte Verifikation (WireGuard Public-Key, FIDO2/Passkey oder mTLS).
-2. **Least Privilege (PoLP):** Prozesse, Service-Accounts und menschliche Nutzer erhalten ausschließlich die minimal notwendigen Berechtigungen zur Erfüllung ihrer Aufgaben.
-3. **Assume Breach:** Die Architektur geht davon aus, dass einzelne Knoten kompromittiert werden können. Horizontale Bewegungsfreiheit (Lateral Movement) wird durch strenge Netzwerksegmentierung und Namespace-Isolation unterbunden.
+1. **Verify explicitly.** Every access to an internal resource - API, web front end, SSH, metrics -
+   carries a cryptographic or identity-based proof: a WireGuard public key, a FIDO2/passkey assertion,
+   or an SSH key. There is no "inside, therefore allowed".
+2. **Least privilege.** A service account, a process and a person each hold what their task needs and
+   nothing else. Service accounts are separate identities from human ones ([identity.md](identity.md)).
+3. **Assume breach.** A node may be compromised. Lateral movement is limited by the trust lattice, by
+   the fact that the mesh is cryptographically addressed per host, and by keeping credentials narrow.
 
-### 1.2 Formale Trust-Modellierung (Bell-LaPadula Lattice)
-Das in [architecture.md](file:///etc/nixos/ARCHITECTURE.md#84-deklarative-topologie-registry--mathematisches-trust-lattice) definierte Zonenmodell $\mathcal{Z}$ wird als partiell geordnetes Vertrauensgitter formalisiert:
-$$\mathcal{Z} = \{ \text{Guest}, \text{IoT}, \text{Mesh}, \text{Corp}, \text{Infra} \}$$
-$$\text{Trust}(\text{Guest}) < \text{Trust}(\text{IoT}) < \text{Trust}(\text{Mesh}) \le \text{Trust}(\text{Corp}) < \text{Trust}(\text{Infra})$$
-
-* **Simple Security Property (No Read-Up):** Ein Knoten mit niedrigerem Vertrauenslevel darf niemals Lesezugriff auf Ressourcen eines höheren Levels erhalten (z. B. darf IoT niemals auf Infra-APIs zugreifen).
-* **$\star$-Property (No Write-Down):** Ein Knoten mit hohem Vertrauenslevel darf keine ungeschützten Schreiboperationen in niedrigere Zonen initiieren, die sensible Daten lecken könnten.
-
----
-
-## 2. Defense-in-Depth Schichtenmodell
-
-Die Sicherheitsmaßnahmen greifen modular auf sechs voneinander unabhängigen Ebenen:
+**Trust lattice.** The zones are partially ordered, and the firewall implements the order rather than
+each rule separately:
 
 ```
-┌────────────────────────────────────────────────────────┐
-│  1. Identität & Auth (Authentik Passkeys / FIDO2)      │
-├────────────────────────────────────────────────────────┤
-│  2. Ingress & Edge Shield (Caddy TLS + CrowdSec IPS)   │
-├────────────────────────────────────────────────────────┤
-│  3. Transport Layer (Kernel-WireGuard ChaCha20 Mesh)   │
-├────────────────────────────────────────────────────────┤
-│  4. Operating System (NixOS Hardening & Sandboxing)    │
-├────────────────────────────────────────────────────────┤
-│  5. Storage & State (Impermanence & Restic Encryption) │
-├────────────────────────────────────────────────────────┤
-│  6. Cryptographic Material (SOPS / Age Asymmetric Keys)│
-└────────────────────────────────────────────────────────┘
+Trust(guest) < Trust(iot) < Trust(mesh) ≤ Trust(corp) < Trust(infra)
 ```
 
----
+- *no read up* - `iot` cannot reach an `infra` service;
+- *no write down* - no zone initiates uncontrolled writes into a lower one;
+- zones are addressing and policy on **one Layer-2 segment**; isolation is enforced by the firewall, not
+  by broadcast domains ([architecture.md](architecture.md) §3.1, [naming.md](naming.md)).
 
-## 3. Kryptografie & Secrets-Lifecycle (SOPS 2.0)
-
-Das Secret-Management ist vollständig asymmetrisch, versionskontrolliert und host-entkoppelt aufgebaut.
-
-### 3.1 Schlüssel-Hierarchie & Material
-* **Host-Keys (Node Identity):** Jeder Host besitzt einen eigenen Ed25519-Hostkey (`/etc/ssh/ssh_host_ed25519_key`), aus dem deterministisch der Age-Schlüssel abgeleitet wird (`ssh-to-age`).
-* **Admin-Keys (User Identity):** Physische YubiKeys / Hardware-Tokens erzeugen den administrativen Age-Schlüssel für `philipp`.
-* **CI/CD-Keys:** Dedizierter Ephemeral-Key für GitHub Actions Matrix-Builds.
-
-### 3.2 Das Revocation- & Rekeying-Protokoll (Notfallplan bei Geräteverlust)
-Geht ein mobiles Gerät (z. B. `mob-nb-01`) verloren oder wird kompromittiert, greift ein deterministisches 5-Schritte-Protokoll zur vollständigen Aussperrung:
+## 2. Layers
 
 ```
-[ Gerät verloren ] 
-        │
-        ▼
-1. .sops.yaml:           Entferne Age-Key von mob-nb-01
-        │
-        ▼
-2. Rekeying:             sops updatekeys secrets/secrets.yaml (Neue Verschlüsselung)
-        │
-        ▼
-3. my.topology:          Entferne WireGuard-Public-Key von mob-nb-01
-        │
-        ▼
-4. Rollout:              nod switch auf allen verbleibenden Knoten
-        │
-        ▼
-[ mob-nb-01 verliert sofortigen Zugriff auf VPN und künftige Secrets ]
+1  Identity & authentication     Authentik, passkeys / FIDO2
+2  Ingress & edge                Caddy TLS, CrowdSec IPS, Authentik forward-auth
+3  Transport                     WireGuard (ChaCha20-Poly1305), cryptokey routing
+4  Operating system              NixOS hardening, systemd sandboxing (see the gap in §4.2)
+5  Storage & state               impermanence, restic encryption at rest and in transit
+6  Cryptographic material        SOPS / age, per-host and per-user keys
 ```
 
-### 3.3 Compile-Time Secret Validation
-Um fehlerhafte Deployments durch fehlende Secrets auszuschließen, prüft die CI/CD-Pipeline deklarativ, dass alle von aktiven Modulen referenzierten Secret-Pfade in `secrets/secrets.yaml` existieren (siehe [architecture.md](file:///etc/nixos/ARCHITECTURE.md#88-compile-time-verification--secret-schema-validation)).
+## 3. Secrets
 
----
+SOPS with age, one file (`secrets/secrets.yaml`), keys derived from identities that already exist.
 
-## 4. Betriebssystem- & Kernel-Härtung (NixOS OS Layer)
+### 3.1 Key hierarchy
 
-Jeder Host wird mit einer **pragmatischen, performanzneutralen Härtungs-Baseline** ausgerüstet. Auf esoterische Parameter, die messbare CPU-Zyklen kosten (wie z. B. `init_on_free=1`, das bei Builds und Datenbank-Transaktionen bis zu 10% Durchsatz kostet), wird bewusst verzichtet.
-
-### 4.1 Kernel-Parameter & Schutzmechanismen (Zero-Overhead Baseline)
-```nix
-# features/system/security/hardening.nix
-boot.kernelParams = [
-  # Zero-Overhead Memory Protection
-  "slab_nomerge"                  # Verhindert Heap-Exploits durch Zusammenlegung von Caches (0% Overhead)
-  "page_alloc.shuffle=1"          # Randomisiert Seitenallokation gegen Heap-Spraying (0% Overhead)
-];
-
-boot.kernel.sysctl = {
-  # Adressraum- & Log-Schutz (Verhindert Reconnaissance)
-  "kernel.kptr_restrict" = 2;     # Versteckt Kernel-Pointer vor Unprivileged Users
-  "kernel.dmesg_restrict" = 1;    # dmesg nur für Root lesbar
-  "kernel.unprivileged_bpf_disabled" = 1; # eBPF nur für Root (Schutz vor Sandbox-Escapes)
-
-  # Netzwerk-Stack Härtung (Anti-Spoofing & SYN-Flood Protection)
-  "net.ipv4.tcp_syncookies" = 1;
-  "net.ipv4.conf.all.rp_filter" = 1;
-  "net.ipv4.conf.default.rp_filter" = 1;
-  "net.ipv4.conf.all.accept_redirects" = 0;
-  "net.ipv4.conf.default.accept_redirects" = 0;
-  "net.ipv4.conf.all.send_redirects" = 0;
-  "net.ipv6.conf.all.accept_redirects" = 0;
-};
-```
-
-### 4.2 Systemd Service Sandboxing (Kanonischer Sicherheits-Contract)
-Jedes Service-Modul in `features/services/*` muss den standardisierten NixOS Systemd-Sandboxing-Contract erfüllen. Ein Daemon darf niemals ungehinderte Rechte auf dem Host besitzen:
-
-```nix
-systemd.services.<service-name>.serviceConfig = {
-  # Dateisystem-Isolation
-  ProtectSystem = "strict";
-  ProtectHome = true;
-  PrivateTmp = true;
-  PrivateDevices = true;
-
-  # Privilege & Namespace Isolation
-  NoNewPrivileges = true;
-  ProtectKernelTunables = true;
-  ProtectKernelModules = true;
-  ProtectControlGroups = true;
-  RestrictRealtime = true;
-  RestrictSUIDSGID = true;
-  RestrictNamespaces = true;
-
-  # Minimaler Capability Footprint
-  CapabilityBoundingSet = "";
-  AmbientCapabilities = "";
-};
-```
-
-### 4.3 Die Anti-Overkill-Garantie (Zero Performance Penalty)
-Sicherheit darf niemals zu Lasten der Usability oder Rechnerleistung gehen. Die Architektur setzt auf **Null-Overhead-Maßnahmen**:
-* **Systemd-Isolation:** Nutzt Linux-Kernel-Namespaces (`unshare`, `cgroups`). Der Overhead entsteht einmalig beim Prozessstart im Mikrosekundenbereich – zur Laufzeit beträgt der CPU- und Memory-Overhead exakt **0,00 %**.
-* **Netzwerk & WireGuard:** Kernel-WireGuard läuft mit hardwarebeschleunigter ChaCha20-Poly1305-Kryptografie. Da lokaler LAN-Verkehr über direkte Interfaces läuft (Anti-Hairpinning), bleibt die volle Leitungsgeschwindigkeit (1 Gbit/s / 2.5 Gbit/s) unberührt.
-* **Keine esoterischen Compiler-Bremsen:** Keine künstliche Speicher-Nullung auf jedem `free()` (`init_on_free=0`) und keine invasiven runtime-Interceptors, damit Builds (`nix build`), Datenbank-Transaktionen und Transcoding mit nativer CPU-Leistung laufen.
-
----
-
-## 5. Netzwerk-Sicherheit & Zero-Trust Ingress
-
-### 5.1 Kernel-WireGuard Mesh als vertrauenswürdige Transportschicht
-* **Kein unverschlüsselter Cluster-Verkehr:** Sämtliche Node-to-Node-Kommunikation (Logs, Metriken, Backups, Caddy-Upstreams, OpenClaw AI-Nodes) erfolgt zwingend über den Kernel-WireGuard-Tunnel (`10.10.100.x`).
-* **Kryptografische Identität:** WireGuard bindet IP-Adressen kryptografisch an den Public-Key (`AllowedIPs`). IP-Spoofing innerhalb des Mesh-Netzwerks ist mathematisch unmöglich.
-
-### 5.2 Edge Ingress & CrowdSec Intrusion Prevention (IPS)
-* **Cloudflare DNS-01 ACME:** Wildcard-Zertifikate werden ohne offene Port-Weiterleitungen im Heimnetz bezogen.
-* **CrowdSec Master-Node Pipeline:**
-  * Ingress-Proxy `cld-edge-01` analysiert Caddy-Access-Logs in Echtzeit.
-  * Erkennt CrowdSec Scans, Path-Traversal oder Brute-Force, wird die bösartige IP clusterweit blockiert.
-  * **Automatisches Whitelisting:** Die Topologie-Registry injiziert alle vertrauenswürdigen internen Subnetze (`my.topology.trustedSubnets`) als Parser-Whitelist, um False Positives für interne Systeme auszuschließen.
-
----
-
-## 6. Access Control & Deployment-Sicherheit (`nod switch`)
-
-### 6.1 SSH-Härtung (Ausschließliche Mesh-Exposition)
-* **Kein SSH im Internet:** Der SSH-Port 22 ist auf den öffentlichen WAN-Interfaces der Cloud-Server vollständig per Firewall geschlossen (`networking.firewall.allowedTCPPorts = []`).
-* **Exposition nur im Mesh:** SSH lauscht ausschließlich auf dem WireGuard-Interface (`wg0` an `10.10.100.x`). Angreifer aus dem öffentlichen Internet sehen den SSH-Port als gefiltert/geschlossen.
-* **Authentifizierung:** Ausschließlich Ed25519-Keys. Passwort-Authentifizierung (`PasswordAuthentication no`) und Root-Login mit Passwort sind systemweit deaktiviert.
-
-### 6.2 Schnelle & Autonome Deployments mit `nod switch`
-* **Entkopplung von Deployment und Probes:**
-  * Deployments via `nod switch` müssen schnell, atomar und unblockiert durchlaufen.
-  * **Architektur-Vorgabe:** Deployments werden **niemals** durch synchrone Liveness-Probes oder künstliche Warte-Schleifen verlangsamt.
-  * System-Health wird rein asynchron in der Monitoring-Ebene (Grafana/Prometheus/ntfy) überwacht. Schlägt ein Dienst nach einem Rebuild fehl, alarmiert das Alertmanager-Mesh unabhängig vom Deployment-Prozess.
-
----
-
-## 7. Auditierung, Logging & Incident Response
-
-### 7.1 Unveränderliches Log-Streaming
-* Systemd-Journal-Logs aller Hosts werden über den lokalen Vector/Alloy-Agenten verschlüsselt an Loki auf `cld-ops-01` gestreamt.
-* **Manipulationssicherheit:** Selbst wenn ein Angreifer Root-Zugriff auf einen Randknoten (`cld-edge-01`) erlangt, kann er seine Spuren nicht lokal verwischen, da die Audit-Logs bereits außerhalb des Knotens im Ops-Cluster persistiert sind.
-
-### 7.2 Incident Response Matrix
-
-| Vorfall | Automatische Gegenmaßnahme | Manuelle Sofortmaßnahme |
+| Key | Derived from | Used by |
 |---|---|---|
-| **Brute-Force Angriff auf Ingress** | CrowdSec bannt IP auf Caddy-Ebene | Überprüfung im Grafana Security Dashboard |
-| **Verlust eines mobilen Endgeräts** | N/A | Rekeying nach Kapitel 3.2 via `nod switch` |
-| **Dienst-Absturz nach Rebuild** | Systemd Restart-Loop Protection | Asynchrone ntfy-Push-Meldung $\to$ `nod rollback` |
-| **Unerlaubter SSH-Versuch** | CrowdSec bannt Ursprungs-IP | Alert via ntfy (`security`-Topic) |
+| host key | the host's own `/etc/ssh/ssh_host_ed25519_key`, converted with `ssh-to-age` | every host decrypts its own secrets |
+| operator key | the administrator's personal key | break-glass, adding keys |
+| deploy keys | generated per purpose, authorised via `deployKeys` in the ssh feature | root access during deployment |
 
----
+There are no hardware tokens in the current setup: the operator key is a file. That is a deviation from
+what this document claimed earlier, and it is stated here rather than left implied.
 
-## 8. Zusammenfassung
+The Cloudflare API token, the restic passphrase, the WireGuard private keys and the Authentik bootstrap
+material all live in that one file. No secret is passed on a command line, embedded in the Nix store, or
+written into a generated configuration - the ESPHome engine assembles its `secrets.yaml` in a private
+temporary directory and deletes it after the flash.
 
-Die VYRX-Sicherheitsarchitektur implementiert **echte Enterprise-Grade Sicherheit** ohne die typische Frustration von Insellösungen. Durch das Zusammenspiel aus **deklarativem Kernel-Hardening**, **asymmetrischem SOPS-Lifecycle**, **Passkey-First Authentik IAM** und dem **stateless WireGuard-Mesh** ist das Cluster gehärtet gegen Bedrohungen von außen und laterale Ausbreitung von innen.
+### 3.2 Losing a device
+
+Deterministic, because the two places that matter are both declared:
+
+```
+1  .sops.yaml            remove the lost host's age key
+2  sops updatekeys       re-encrypt secrets/secrets.yaml for the remaining recipients
+3  my.topology           remove the host's WireGuard public key
+4  deploy                all remaining hosts: nixos-rebuild switch --flake .#<host>
+   ─────────────────────
+   the device keeps no access: no mesh peer, no future secret
+```
+
+Nothing else grants it access, which is the point of deriving peers from the topology instead of
+maintaining a peer list.
+
+### 3.3 Missing secrets fail the build
+
+A module that references a secret path which does not exist in `secrets/secrets.yaml` fails
+evaluation, not deployment. Same principle as the contract invariants: the build is the place to
+discover that something is missing.
+
+## 4. Operating system
+
+### 4.1 Kernel hardening (applied)
+
+`features/system/security/default.nix`, part of the base role on every host:
+
+| Setting | Effect |
+|---|---|
+| `slab_nomerge` | no merging of slab caches, so a heap overwrite cannot be steered into another cache |
+| `page_alloc.shuffle=1` | randomised page allocation against heap spraying |
+| `kernel.kptr_restrict = 2` | kernel pointers hidden from unprivileged users |
+| `kernel.dmesg_restrict = 1` | `dmesg` readable by root only |
+| `kernel.unprivileged_bpf_disabled = 1` | eBPF only for root - the classic sandbox-escape vector |
+| `tcp_syncookies = 1` | SYN flood protection |
+| `rp_filter = 1` (all, default) | strict reverse-path filtering, anti-spoofing |
+| `accept_redirects = 0`, `send_redirects = 0` | no ICMP redirects |
+
+Chosen for **zero runtime cost**: no `init_on_free`, no runtime interceptors, nothing that trades
+throughput for a parameter nobody can measure. A build, a database transaction and a transcode run at
+native speed.
+
+### 4.2 systemd sandboxing: declared contract, not yet applied
+
+`features/services/*` is expected to sandbox its daemons - `ProtectSystem = "strict"`, `ProtectHome`,
+`PrivateTmp`, `PrivateDevices`, `NoNewPrivileges`, `ProtectKernel*`, `RestrictNamespaces`,
+`CapabilityBoundingSet = ""` and `AmbientCapabilities = ""`.
+
+**Measured 2026-09-20: none of the 35 service modules sets any of these.** The hardening that exists is
+the kernel baseline of §4.1, which comes from the base role and therefore applies everywhere. The
+sandboxing layer is a gap, not a claim: until the modules carry the contract, a compromised daemon has
+the privileges its unit file gives it, which currently means the defaults.
+
+Enforcing it is a per-service change with a real cost - each one has to be tested, because
+`ProtectSystem = "strict"` breaks any service that writes outside its declared state and cache
+directories, and the correct fix is to declare those directories rather than to relax the sandbox.
+
+## 5. Network
+
+- **Every host-to-host path is the mesh.** Logs, metrics, backups, Caddy upstreams and the AI gateways
+  all run over `wg0` (`10.10.100.0/24`). There is no unencrypted cluster traffic.
+- **Cryptographic addressing.** WireGuard binds each overlay address to a public key via `allowedIPs`,
+  so IP spoofing inside the mesh is not a possibility to defend against but a configuration error.
+- **The ingress is the only public surface.** Caddy terminates TLS, CrowdSec reads its access logs and
+  bans offending addresses cluster-wide, Authentik handles authentication. A service that declares
+  `scope = "public"` is proxied; one that does not is simply not reachable from outside.
+- **Certificates are per name**, issued on the host that terminates it. There is no shared wildcard and
+  no copied key material; see [architecture.md](architecture.md) §5.3.
+
+## 6. Access
+
+### 6.1 SSH
+
+- **Two paths, both deliberate.** The cloud hosts accept SSH on their **public address** - measured
+  2026-09-20: `cld-edge-01` listens on `173.249.22.211:22` and `10.10.100.1:22`. That public path is the
+  lifeline that survives a broken mesh, a bad route or a lockout, and it is why the cloud hosts can be
+  repaired when everything else is broken. Every other host listens on its LAN address and its overlay
+  address only.
+- **Keys only.** `PasswordAuthentication = false`, no root login with a password, Ed25519 keys
+  throughout. Two keys are authorised fleet-wide: the operator key (break-glass) and the fleet deploy
+  key (`~/.ssh/nixfiles-deploy-key`). `~/.ssh/deploy-key` is the node tunnel secret and never addresses
+  a fleet host.
+- **sshd binds explicitly.** It binds the addresses that exist on the host, and it waits for the units
+  that create them (the mesh interfaces), because sshd reads its `ListenAddress` list once at startup
+  and never rebinds.
+
+### 6.2 Deployment
+
+`nixos-rebuild switch --flake .#<host>` locally or with `--target-host`, or `nod switch`. Deployment is
+deliberately **not** coupled to health probes: a rebuild must be fast and atomic, and health is observed
+asynchronously by the monitoring stack, which alerts independently of who deployed what. A service that
+fails after a rebuild shows up as a failed unit and an alert - not as a blocked deploy.
+
+**Verified before a switch, not after:** that the replacement path exists (§1 of
+[practices.md](practices.md)). This is not process for its own sake - two outages came from a service
+being removed before the thing that replaced it was proven.
+
+## 7. Audit and incident response
+
+- **Logs leave the host.** Journal, Caddy access logs and CrowdSec decisions are shipped to Loki, which
+  runs on `cld-edge-01` with the full observability stack; `cld-ops-01` and `hom-srv-01` run collectors.
+  A compromised host cannot erase what has already left it. (An earlier version of this document said
+  Loki ran on `cld-ops-01` and named a Vector agent that no longer exists; both were wrong.)
+- **Failed units are part of the health check.** A backup that fails silently is a backup that does not
+  exist - one run was lost to a DNS outage and was found only by reading `systemctl --failed`.
+
+| Incident | Automatic | Manual |
+|---|---|---|
+| Brute force against the ingress | CrowdSec bans the address in Caddy | review the Grafana security dashboard |
+| Lost device | - | the rekeying sequence in §3.2, then deploy |
+| Service failed after a rebuild | systemd restart protection | `nixos-rebuild --rollback switch`, or the previous generation from the boot menu |
+| Unauthorised SSH attempt | CrowdSec bans the source | alert through the ntfy `security` topic |
+| Lost root access to a host | - | [operations.md](operations.md) §8 |
