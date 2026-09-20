@@ -187,3 +187,56 @@ rendered from SOPS onto tmpfs and symlinked into place, so the password never re
 is read-only by construction. `restartTriggers` ties the service to the rendered file, because the plugin
 loads its configuration once at start and nothing else would notice a change.
 
+## 11. Who owns what: this repository, or the admin interface
+
+Two authorities write into the same object store. The rule that keeps them apart is one sentence:
+
+> **This repository owns the shape of the system. The interface owns the people in it.**
+
+A fact has exactly one owner. It is never shared, and it never changes hands between the two: "first the
+repository, then the interface" is how a declaration turns into a statement that is no longer true.
+
+### 11.1 The interface may change
+
+- **Users** — existence, name, address, password, avatar. People are not configuration.
+- **Group membership** — who is in which group. Membership is the assignment of people to policy, and it is
+  the access decision: a service accepts a group, a human decides who is in it.
+- **Own credentials and devices** — app passwords, TOTP, WebAuthn, sessions. Nobody else can hold these; the
+  bootstrap admin password exists here only as a hash.
+- **Invitations** — an invitation link is a document, not system state.
+- **Own profile attributes** — phone number for MFA, preferences.
+- **Notifications** — "mail me when X happens" is an operational preference, not topology.
+
+### 11.2 The interface may not change
+
+Providers, applications, outposts, flows, stages, stage bindings, policies, roles, group *definitions*,
+certificates, branding, sources, machine tokens and service accounts. Each of these is topology, policy or
+integration, and all three have to be readable, reviewable and reproducible in the repository. A provider
+added in the interface would be a second truth about the shape of the system.
+
+The test for a new case is one question: **would I comment on this in a review?** If yes, it belongs in the
+repository; if it only concerns a person, it belongs in the interface.
+
+### 11.3 Two consequences that are easy to get wrong
+
+**Group names are part of the shape.** Access hangs on them: every consumer's `memberOf` filter names the
+groups it accepts. Renaming a group in the interface removes access for everyone without anything turning
+red. Renaming a group in this repository means a new entry **and** `state: absent` for the old one — otherwise
+the old name stays behind and can still grant access.
+
+**Access runs only through membership.** There are no per-user application bindings, because that would be a
+second mechanism next to the group filter — and two mechanisms are two truths. A service declares which groups
+it accepts; a human is put into one of them.
+
+### 11.4 Three kinds of fact, and what each one does
+
+| Kind | Owner | Behaviour |
+|---|---|---|
+| declared, with a declared value | repository | a change in the interface is overwritten at the next apply — and the drift report says so **before** that happens |
+| not declared | interface | it is never touched; it is reported as foreign, which is normal |
+| declared, but the database value came from elsewhere | **defect** | the declaration is incomplete; a fresh install or a restore produces a different world and nothing notices — this is what the work list closes |
+
+That third row is the only dangerous one, and it is not the interface's fault: it means we depend on a fact we
+do not name. `token.managed` and `mfa_support` are the two known cases today.
+
+

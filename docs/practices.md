@@ -351,6 +351,33 @@ would have been papered over on the second pass instead of failing a deploy. Dec
 one entry, and the deploy is green in a single pass - which is now the measurement that says the declaration
 is right.
 
+### 6.11 Depending on a fact we do not name is the quietest defect of all
+
+Four times in one night the same shape appeared: something worked because the database happened to be in a
+certain state, and nothing in the repository said so.
+
+```
+search_full_directory    set by hand in the database, needed by every consumer    (now declared)
+token.managed            `false` in the database, undeclared - a fresh install      (work list P2)
+                         would create a managed token, authentik would rotate it
+                         and the outpost would go blind
+provider.mfa_support     `true` in the database, and the blueprint refuses it       (work list P3)
+brand.branding_logo      a file that has to exist, referenced by name only         (work list P3)
+```
+
+All four are invisible: the system works, every check passes, and the defect only appears on a fresh install,
+a restore, or the day authentik rotates something. The rule that follows is not "the repository must contain
+everything" - that claim is what produces declarations that fight their users - but: **every fact we depend on
+is either declared, or documented with the reason it cannot be.** A silent dependency on the database is a
+defect, not a convention.
+
+The same night produced the mirror image, and it is worth naming both together: a fact the declaration *does*
+mention, which a person then changes in the interface. It is not a deviation, it is a revert with a deadline -
+`present` overwrites the declared fields at the next apply. The answer is to report it, not to forbid it, and
+to keep the declarations to the things that are topology, policy or integration (see
+[`identity.md` §11](./identity.md)).
+
+
 ### 6.10 The apply trigger, and how this repository closes it
 
 Upstream re-reads a blueprint file every 60 minutes and watches the directory for modification events. In
