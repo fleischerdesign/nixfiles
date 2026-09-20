@@ -409,24 +409,15 @@ let
             authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
             invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
           };
-          permissions =
-            map (o: {
-              permission = "authentik_providers_ldap.view_ldapprovider";
-              role = yamlTag "!KeyOf role_ldap_${o.safeHost}";
-            }) ldapOutposts
-            ++ map (name: {
-              # What the documentation prescribes as an object permission on the provider. Without it a
-              # bind account may search only itself - the trap a search account falls into: the bind
-              # succeeds and then returns nothing.
-              # The exact codename, read from the database rather than from the documentation's label:
-              # the LDAP provider's permissions are add/change/delete_ldapprovider, view_ldapprovider and
-              # `search_full_directory` - not `search_full_ldap_directory`, which is the label the docs
-              # use and which made every apply of this blueprint fail silently (the instance goes to
-              # `error`, the provider loses its configuration, and the outpost that serves it binds
-              # nothing).
-              permission = "authentik_providers_ldap.search_full_directory";
-              role = yamlTag "!KeyOf role_ldap_consumer_${builtins.replaceStrings [ "-" ] [ "_" ] name}";
-            }) sortedLdapEndpointNames;
+          permissions = map (o: {
+            permission = "authentik_providers_ldap.view_ldapprovider";
+            role = yamlTag "!KeyOf role_ldap_${o.safeHost}";
+          }) ldapOutposts;
+          # The consumers' `search_full_directory` object permission stood here and is rolled back on
+          # 2026-09-20: with it present this blueprint stops applying, the provider loses its
+          # configuration, the outpost that serves it binds no listener and the directory goes down.
+          # The codename itself was read from the database and is correct, so whatever rejects the
+          # entry is something else - and it needs the API's error message, not a seventh guess.
         }
         # The LDAP outpost config endpoint only exposes providers that are bound
         # to an application, so the provider is linked here explicitly.
@@ -499,35 +490,11 @@ let
       name = "vyrx-ldap-consumers";
     };
     entries =
-      # The `ldap` application is created by the outposts blueprint, and the access binding below
-      # references it. Blueprint application is unordered, so the dependency is declared explicitly -
-      # the same pattern the outpost blueprint itself uses for the flows and the RBAC groups.
-      [
-        {
-          model = "authentik_blueprints.metaapplyblueprint";
-          attrs = {
-            identifiers = {
-              path = "03-apps/ldap-outposts-generated.yaml";
-            };
-          };
-        }
-      ]
-      # The documentation is explicit that "a user must have access to the LDAP application before they
-      # can bind and search". One group carries that access for every directory consumer; the accounts
-      # are its members, and the binding below is what actually grants it.
-      ++ [
-        {
-          model = "authentik_core.group";
-          id = "group_ldap_consumers";
-          identifiers = {
-            name = "ldap-consumers";
-          };
-          attrs = {
-            is_superuser = false;
-          };
-        }
-      ]
-      ++ lib.concatMap (
+      # The application access - a group, its membership and a policy binding on the `ldap` application -
+      # stood here and is rolled back on 2026-09-20: with it present this blueprint stopped applying,
+      # which is why the `ldap-consumers` group never appeared. It comes back from the API's error
+      # message, not from another guess about field names.
+      lib.concatMap (
         name:
         let
           ep = ldapEndpoints.${name};
@@ -554,18 +521,6 @@ let
               name = "LDAP search account for ${name}";
               type = "service_account";
               roles = [ (yamlTag "!KeyOf role_ldap_consumer_${safeId}") ];
-              groups = [ (yamlTag "!KeyOf group_ldap_consumers") ];
-            };
-          }
-          {
-            model = "authentik_policies.policybinding";
-            identifiers = {
-              target = yamlTag "!Find [authentik_core.application, [slug, ldap]]";
-              group = yamlTag "!KeyOf group_ldap_consumers";
-            };
-            attrs = {
-              order = 0;
-              enabled = true;
             };
           }
           {
