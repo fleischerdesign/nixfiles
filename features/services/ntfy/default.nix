@@ -63,9 +63,6 @@ in
         auth = "none";
         subdomain = "push";
         publicExempt = "enforces its own authentication; push clients cannot perform a browser SSO redirect";
-        extraDomains = [
-          "ntfy.${config.my.topology.domain}"
-        ];
         dashboard = {
           show = true;
           displayName = "ntfy";

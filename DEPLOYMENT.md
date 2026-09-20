@@ -548,7 +548,7 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 6 | `rm -rf /var/lib/authentik` | Authentik service CHDIR failure | Fixed via tmpfiles rule; recreate dir if manual wipe |
 | 7 | Authentik `akadmin` is the only usable break-glass account | Family accounts have no password | Log in as `akadmin`; set/`Passwort vergessen` |
 | 8 | ~~Attic had no Cloudflare DNS record~~ **fixed.** The flat name is `cache.vyrx.de`, projected from the Attic contract endpoint; the ad-hoc `*.ops` wildcard is obsolete (#10). | — |
-| 9 | Legacy `/var/lib/docker` (21 GB, `camofox`) orphaned on `cld-ops-01` | Wasted disk; `camofox` is not referenced in the repo anymore | `rm -rf /var/lib/docker` once nothing needs it |
+| 9 | Legacy state on `cld-ops-01` | Wasted disk | **resolved 2026-09-20 — and the entry was wrong on three counts.** `/var/lib/docker` and `/var/lib/containers` do not exist. The 21 GB is `/var/lib/private/atticd`, the state of the *running* Attic cache, and it was left alone. What had no owner was `hermes` (4.3 GB state + 3.4 GB backup + 628 MB webui) and `gitea-runner`'s private state (176 MB): zero units, no user, no reference in the repository. Measured before deleting: 9 GB freed, `df` on `/` went 83 → 74 GB |
 | 10 | ~~Cloudflare held the removed wildcards~~ **closed.** `*.vyrx.de`, `*.ai.vyrx.de`, `*.ops.vyrx.de`, the stale `search.vyrx.de` CNAME and the wrongly created `fleischer.design.vyrx.de` were deleted; the live zone now equals the projection (38 records, internal planes absent). | — |
 | 12 | ~~`sandbox.<name>.ai.vyrx.de` had no listener~~ **closed.** Root cause: `mcp.apps.enabled` was never set, so OpenClaw never started its sandbox-only listener (the `port + 100` override is correct and configurable — `port + 1` would collide with the packed gateway ports). Fixed and verified: 18889–18894 listen, `/mcp-app-sandbox` is 200 through the ingress, `/` is 404 by design. | — |
 | 13 | OpenClaw gateways require the ingress in `gateway.trustedProxies`; without it every proxy-shaped request is rejected with `proxy_attribution_required` | Broken public routes | Derived from `my.topology.ingressHost` in the gateway feature; the ingress also overwrites `X-Forwarded-For/-Proto/-Host` (fix in place — do not regress either half) |
@@ -594,7 +594,7 @@ hunted separately.
 | 2 | remove the migration watchdog (unit + timer + file) | deploy is clean, no unit left |
 | 3 | drop the reconciler's old-address input (the `hom-rt-01.migration` half is **done**, 2026-09-20) | a reconciler run reports "unchanged" |
 | 4 | delete the `migration` option from the topology schema once no host needs it | `nix flake check`, `nix fmt`, statix/deadnix clean |
-| 5 | remove rename leftovers one by one (e.g. `ntfy.vyrx.de`); `fleischer.design`, `*.pub.*` and `docs.lan.vyrx.de` are **intended** aliases | the alias report shrinks to the intended set |
+| 5 | ~~remove rename leftovers one by one (e.g. `ntfy.vyrx.de`)~~ **done 2026-09-20**: the alias report (I8) now holds only the intended names - `fleischer.design`, the five `*.pub.*` and `docs.lan.vyrx.de`. `ntfy.vyrx.de` went with it, because the canonical plane is `push.vyrx.de` (which Grafana already alerts to). **Push clients that stored the old URL have to be repointed**, so this is the one change here with a user-visible consequence | alias report = the intended set (7 entries) |
 | 6 | remove the legacy topology shim once nothing reads it | `grep -rn 'networking\.topology' features/ roles/` |
 
 ### 14.3 What stays (target state, not scaffolding)
