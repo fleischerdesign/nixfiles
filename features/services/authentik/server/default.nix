@@ -384,6 +384,85 @@ let
         }
       ]) ldapOutposts
       ++ [
+        # The bind flow. Documented cause of `Invalid credentials (49)` for a service account: the
+        # `default-authentication-flow` **validates MFA**, and a bind account has no authenticator. The
+        # Authentik how-to says exactly this and prescribes a dedicated flow whose password stage has
+        # the app-password backend. Field names are from the blueprint model reference, not guessed:
+        # the provider's field is `authentication_flow`, the stage's is `backends`, and
+        # `authentik.core.auth.TokenBackend` is the app-password backend.
+        {
+          model = "authentik_flows.flow";
+          id = "flow_ldap_auth";
+          identifiers = {
+            slug = "ldap-authentication-flow";
+          };
+          attrs = {
+            name = "LDAP authentication flow";
+            title = "LDAP";
+            designation = "authentication";
+          };
+        }
+        {
+          model = "authentik_stages_password.passwordstage";
+          id = "stage_ldap_password";
+          identifiers = {
+            name = "ldap-authentication-password-stage";
+          };
+          attrs = {
+            backends = [
+              "authentik.core.auth.InbuiltBackend"
+              "authentik.core.auth.TokenBackend"
+            ];
+          };
+        }
+        {
+          model = "authentik_stages_identification.identificationstage";
+          id = "stage_ldap_identification";
+          identifiers = {
+            name = "ldap-identification-stage";
+          };
+          attrs = {
+            user_fields = [
+              "username"
+              "email"
+            ];
+            password_stage = yamlTag "!KeyOf stage_ldap_password";
+          };
+        }
+        {
+          model = "authentik_stages_user_login.userloginstage";
+          id = "stage_ldap_login";
+          identifiers = {
+            name = "ldap-authentication-login-stage";
+          };
+        }
+        {
+          model = "authentik_flows.flowstagebinding";
+          identifiers = {
+            target = yamlTag "!KeyOf flow_ldap_auth";
+            stage = yamlTag "!KeyOf stage_ldap_identification";
+            order = 10;
+          };
+          attrs = { };
+        }
+        {
+          model = "authentik_flows.flowstagebinding";
+          identifiers = {
+            target = yamlTag "!KeyOf flow_ldap_auth";
+            stage = yamlTag "!KeyOf stage_ldap_password";
+            order = 30;
+          };
+          attrs = { };
+        }
+        {
+          model = "authentik_flows.flowstagebinding";
+          identifiers = {
+            target = yamlTag "!KeyOf flow_ldap_auth";
+            stage = yamlTag "!KeyOf stage_ldap_login";
+            order = 40;
+          };
+          attrs = { };
+        }
         {
           model = "authentik_providers_ldap.ldapprovider";
           id = ldapProviderId;
@@ -392,6 +471,9 @@ let
           };
           attrs = {
             base_dn = "DC=vyrx,DC=de";
+            # Binds go through the dedicated flow above; the default one validates MFA, which a
+            # service account cannot satisfy.
+            authentication_flow = yamlTag "!KeyOf flow_ldap_auth";
             # `mfa_support` is deliberately NOT set here: the field exists in the database but setting
             # it through this blueprint makes the whole apply fail (measured: the instance went to
             # `status = error`, so the value never reached the database and the provider kept
