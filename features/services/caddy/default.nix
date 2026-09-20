@@ -5,6 +5,12 @@
 }:
 let
   cfg = config.my.features.services.caddy;
+  zone = config.my.topology.domain;
+  # The criterion for "can we get a certificate for this name" is not the scope but whether the name
+  # lies inside the zone this API manages: only then can `_acme-challenge.<name>` be published, and
+  # DNS-01 does not care where the name resolves. Internal-plane names are subdomains of the public
+  # zone, so they qualify too - which is what makes a vhost never need Caddy's own CA.
+  inZone = domain: domain == zone || lib.hasSuffix ".${zone}" domain;
 
   # Every public name this host terminates - its own endpoints, plus every host's when it runs the
   # ingress - computed once and used both for the certificate declarations and for the `tls`
@@ -29,12 +35,9 @@ let
       host.wireguardIpv4
     else
       host.ipv4;
-  publicEndpoints =
+  terminatedEndpoints =
     lib.concatMap (
-      contract:
-      lib.filter (ep: ep.scope == "public" && ep.canonicalDomain != null) (
-        lib.attrValues contract.endpoints
-      )
+      contract: lib.filter (ep: ep.canonicalDomain != null) (lib.attrValues contract.endpoints)
     ) (lib.attrValues (config.my.contracts.provides or { }))
     ++ lib.optionals isIngress (
       lib.concatLists (
@@ -42,16 +45,24 @@ let
           hostName: hostConfig:
           lib.optionals (hostName != config.networking.hostName) (
             lib.concatMap (
-              contract:
-              lib.filter (ep: ep.scope == "public" && ep.canonicalDomain != null) (
-                lib.attrValues contract.endpoints
-              )
+              contract: lib.filter (ep: ep.canonicalDomain != null) (lib.attrValues contract.endpoints)
             ) (lib.attrValues (hostConfig.config.my.contracts.provides or { }))
           )
         ) flakeConfigurations
       )
     );
-  publicNames = lib.unique (map (ep: ep.canonicalDomain) publicEndpoints);
+  publicNames = lib.unique (
+    lib.filter inZone (
+      map (ep: ep.canonicalDomain) terminatedEndpoints
+      ++ lib.concatMap (
+        ep:
+        # Aliases count as well, and internal-plane aliases such as `docs.lan.<zone>` are ordinary
+        # subdomains of the public zone. Wildcards are skipped: their vhosts are minted at runtime
+        # and Caddy issues those on demand.
+        lib.filter (d: d != null && !lib.hasInfix "*" d) ep.extraDomains
+      ) terminatedEndpoints
+    )
+  );
 in
 {
   options.my.features.services.caddy = {
@@ -310,6 +321,22 @@ in
 
     # Allow group read access to logs (for CrowdSec and Alloy)
     systemd.services.caddy.serviceConfig.UMask = "0027";
+
+    # Caddy's in-process reload (SIGUSR1 → admin API) blocks on this configuration and ends in
+    # "Reload operation timed out. Killing reload process.", leaving the service listening but
+    # answering nothing until it is restarted - measured on 2026-09-20: every vhost on hom-srv-01
+    # returned no response, from the LAN and through the ingress alike.
+    #
+    # A restart loads the identical configuration cleanly and immediately, so a reload request is
+    # turned into a restart. The cost is a sub-second interruption on configuration changes; the
+    # alternative is a hang that only shows up when someone notices the services are down.
+    #
+    # NOTE: this also means `Reload failed for Caddy.` no longer appears in the journal, and
+    # `nixos-rebuild` stops returning exit 4 for this host.
+    systemd.services.caddy.serviceConfig = {
+      ExecReload = "${pkgs.util-linux}/bin/kill -TERM $MAINPID";
+      Restart = "always";
+    };
 
     systemd.tmpfiles.rules = [
       "d /var/log/caddy 0755 caddy caddy -"
