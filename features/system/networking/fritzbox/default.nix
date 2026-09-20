@@ -106,8 +106,8 @@ in
     };
 
     settings = {
-      # The box's own LAN interface. `address` is the target; until the box has moved, the
-      # reconciler reaches it at the topology's migration address (see `host` above).
+      # The box's own LAN interface. `host` above derives the address the reconciler reaches it at
+      # from the same declared `ipv4`, so the two cannot disagree.
       lan = {
         address = lib.mkOption {
           type = lib.types.str;

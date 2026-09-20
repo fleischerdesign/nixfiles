@@ -556,55 +556,37 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 14 | Migration scaffolding (host `migration` block, watchdog, legacy labels) is temporary by design | Left in place the repository describes two states at once and an obsolete path onto the host stays open | Run the teardown in §14; `my.contracts.projections.migrationDebt` reports what is still temporary |
 | 15 | Running the FRITZ!Box reconciler in **apply** mode **is** P3 | It disables the box DHCP and hands out DNS `10.10.10.10`, which only exists after P1 (hom-srv-01 deployed). Applied too early it breaks DHCP/DNS for the whole LAN | Never apply before P1. Verify read-only with `…fritzbox.package/bin/fritzbox-sync --dry-run` (needs a TR-064 user: FRITZ!OS ≥ 7.24 rejects the password-only login, `dslf-config` is gone) |
 | 16 | Applying the `tplink-ap` reconciler **unifies the SSIDs to `VYRX`** (2.4 + 5 GHz) and needs the AP at its target address | Wi-Fi clients reconnect / lose a separate SSID | AP last (P5). Verify read-only with `…tplink-ap.package/bin/tplink-ap-sync --dry-run`; both reconcilers are dry-run-verified against the live devices |
-| 17 | `srv.lan.vyrx.de` is a host-specific **public** record, updated by `hom-srv-01` itself via `cloudflare-dyndns` to the home's dynamic address — while `NAMING.md` §1.1 cites exactly this name as an anti-example, and the spec has no rule for a host's dynamic public address | two naming schemes describe the same host: `srv.lan.vyrx.de` (public, dynamic) and `hom-srv-01.node.vyrx.de` (the node plane, which carries the overlay address, not the public one). Nothing internal uses the former — Blocky resolves it to the ingress regardless | decide once, in the spec: either drop the dyndns entry (measured: the public record points at `93.219.137.122`, the home's uplink) or add a public-plane rule for a dynamic host address. The Cloudflare reconciler deliberately does **not** own this record (it carries no engine comment), so `--prune` will never touch it |
+| 17 | ~~`srv.lan.vyrx.de` is a host-specific **public** record, updated by `hom-srv-01` itself via `cloudflare-dyndns` to the home's dynamic address~~ **resolved 2026-09-20: both removed.** The reasoning was measured rather than assumed: the dyndns service had exactly one consumer (that record) and the record had none. The mesh learns the home's endpoint from the packets the home itself sends (`persistentKeepalive 25`), ingress happens on the edge, and the box declares no port forwardings - so nothing initiates towards the home and no name for its changing address is needed. The record was deleted once via the API because the Cloudflare engine never owned it (no engine comment - which is exactly how `--prune` left it alone) | — | none |
 
 ---
 
-## 14. Migration Scaffolding — Teardown Checklist
+## 14. Migration Scaffolding — removed 2026-09-20
 
-Every transitional artifact is **deprecation debt with an expiry**. The repository must end up
-describing exactly one state (the target): scaffolding that lingers keeps an obsolete address
-and default route alive, is a second forgotten path onto the host, and will collide with the
-very networks we migrated for. `my.contracts.projections.migrationDebt` reports what is still
-temporary — a **report, never an assertion**, because an assertion would block the migration it
-is meant to clean up after.
+Every transitional artifact was **deprecation debt with an expiry**, and the expiry is reached: this
+repository describes exactly one state. The gate is gone rather than waited out - the stability window
+of days was a risk assumption with no measurement behind it, and the rollback it protected was never
+the only way in (the LAN hosts have local access, the cloud hosts a public IP). A failure gets fixed
+when it appears.
 
-### 14.1 Gate — do not start until all of these hold
+What was removed, and how each removal was verified:
 
-- [ ] every client holds a lease from `10.10.10.0/24` (Kea leases/logs, not the FRITZ!Box)
-- [ ] the FRITZ!Box answers on `10.10.10.1` and its DHCP is off
-- [ ] `grep -rn '192\.168\.178' --include='*.nix' .` returns **no** hits (documents may keep history)
-- [ ] `ip -4 neigh` on `hom-srv-01` shows no neighbour in the old subnet **other than the addresses the
-      declared migration blocks still carry** - those *are* the scaffolding, so a raw count can never
-      reach zero while the scaffolding stands. Count devices, not cache entries:
-      `ip -4 neigh | grep -E '^192\.168\.178\.' | awk '$3=="lladdr"'`
-- [ ] a stability window has passed (days, not hours) before the rollback generations are pruned
-
-**Measured 2026-09-20 — the gate is not met, which is why every scaffold is still in place:**
-
-| Gate | Measured |
+| Artifact | Verification |
 |---|---|
-| no `192.168.178` in `.nix` | hits remain, and every one is accounted for: the two `example` strings in the topology schema, the two real rollback addresses (`hom-srv-01`, `hom-wrk-01`) and `hom-prn-01.ipv4` for the scanner. The transitional Tailscale policy-routing block that used to be here went with the feature. Comments must not carry the literal either - a comment that does turns this grep from a gate into a reading exercise |
-| no old-subnet neighbour on `hom-srv-01` | **12 cache entries, exactly 1 real device.** Eleven are `FAILED`/`INCOMPLETE`: `ip neigh` keeps an entry after the device is gone, and these are the migrated relays' old leases, the access point's old address and the box. The only entry carrying an `lladdr` is `192.168.178.30` - `hom-wrk-01`'s own declared rollback address. **An ARP entry is not a device**: counted as lines, the old subnet looked eleven devices away from done; counted as devices it is one declaration away |
-| stability window | hours, not days |
+| `my.topology.hosts.<host>.migration` - addresses, gateway, old SSID | `ip -4 addr` on `hom-srv-01` and `hom-wrk-01` lists the new subnets only |
+| the addresses `sshd` bound | `ss -lnt` on both hosts lists only the LAN and overlay addresses |
+| the connectivity guard (unit + timer) | no unit matching `migration` remains |
+| the reconcilers' old-address input | both engines derive their target from the declared `ipv4` |
+| the `migrationDebt` projection (I11) | deleted with its subject |
+| the legacy WLAN in the ESP firmware configuration | nothing radiated that name any more (measured by scan); the running firmware keeps it until the next flash |
+| the `192.168.178` policy-routing block | went with the Tailscale feature that introduced it |
+| `cloudflare-dyndns` and its `srv.lan.vyrx.de` record | the service had exactly one consumer - that record - and the record had none |
 
-**The migration list, derived rather than counted** (`my.contracts.projections.migrationDebt` plus the
-neighbour table), measured 2026-09-20:
+The scanner is declared (MAC and an `iot` address) and takes its lease like the relays do. Two
+`192.168.178` literals remain, in the topology schema's `example` fields: documentation, not state, but
+they keep this gate's grep from reaching zero - so they go with the next schema touch rather than being
+hunted separately.
 
-| Declaration | Address | State |
-|---|---|---|
-| `hom-srv-01.migration` | `192.168.178.27/24` | real, applied to `enp2s0` - the rollback path. Stays until the stability window has passed |
-| `hom-wrk-01.migration` | `192.168.178.30/24` | real, applied - the rollback path. Stays |
-| ~~`hom-rt-01.migration`~~ | ~~`192.168.178.1/24`~~ | **removed**: the box answers on `10.10.10.1` (ICMP, 80 and 443 open, and the fleet's default route runs through it). The fritzbox reconciler takes its target from this block, so the entry had it addressing a dead address; it now derives `10.10.10.1` |
-| ~~`hom-ap-01.migration.addresses`~~ | ~~`192.168.178.54/24`~~ | **removed**: the access point leases `10.10.10.20` through the infra class and no longer answers there; the tplink-ap reconciler now derives `10.10.10.20` |
-| `hom-ap-01.migration.ssid` | `"Ancoris"` | not an address: the old WLAN name the ESP firmware still carries as a second network, so the relays survive the WiFi rename. It goes when the relays are reflashed without it |
-| `hom-prn-01.ipv4` | `192.168.178.109` | the scanner - a declared device that has not moved. It carries no MAC on purpose (a MAC plus an address outside every declared subnet makes Kea refuse to start), so it cannot become a reservation until the device is connected and its MAC is known. Not a bug to patch: it belongs in `my.topology.devices` like the relays, which is where it is |
-
-The scanner's address is the only entry in this list that is an **unmigrated device** rather than
-scaffolding, and it is therefore the one item a person has to act on: connect it, read its MAC, put the
-MAC in the entry - and Kea hands it an `iot` address from then on.
-
-### 14.2 Teardown steps (each independently reversible)
+### 14.2 The steps that were taken — the record
 
 | # | Change | Verification |
 |---|---|---|

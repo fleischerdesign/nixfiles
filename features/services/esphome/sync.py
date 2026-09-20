@@ -11,8 +11,8 @@ one in a private temporary directory, uses it, and deletes it. The compiled firm
 carries the secrets, but the build host only holds them for the duration of a flash.
 
 The device address is the reservation for its MAC in the topology: the firmware takes its lease
-from DHCP and that reservation is what pins the address down. During the LAN migration the device
-is still on the old subnet, so the address is passed explicitly for the first flash.
+from DHCP and that reservation is what pins the address down. A device that is not there yet is
+reached at whatever address it currently answers on, which is what `--device` is for.
 """
 
 import argparse
@@ -114,8 +114,8 @@ def main():
     parser.add_argument(
         "--device",
         required=True,
-        help="Address to flash: the reservation from my.topology.devices, or the device's current "
-        "old-subnet address for the first flash during the migration",
+        help="Address to flash: the reservation from my.topology.devices, or the address a device "
+        "that is not there yet currently answers on",
     )
     parser.add_argument("--secret-dir", help="Directory holding this device's SOPS secrets")
     parser.add_argument(

@@ -370,11 +370,6 @@ in
         zone = "infra";
         ipv4 = "10.10.10.1";
         hostType = "embedded";
-        # The migration block was removed on 2026-09-20, after measurement: the box answers on
-        # 10.10.10.1 (ICMP, 80 and 443 open, and the whole fleet's default route runs through it)
-        # and it no longer answers on its old LAN address. The fritzbox reconciler derives its target
-        # address from this block, so keeping the dead one meant addressing the box where it cannot
-        # be reached; with the block gone the schema default (empty) makes it use the ipv4 above.
       };
 
       hom-ap-01 = {
