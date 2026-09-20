@@ -12,8 +12,8 @@
 The 2.0 migration moves a historically grown setup ("hosts named after musicians", fragmented domains, `192.168.178.0/24`) onto:
 - RFC 1178 host taxonomy and RFC 1918 zoning (`10.10.0.0/16`),
 - declarative NixOS + Home Manager,
-- a WireGuard mesh (`10.10.100.0/24`) as the target transport,
-- **Tailscale as the transitional transport** until every host runs 2.0,
+- a WireGuard mesh (`10.10.100.0/24`) as the transport, which also delivers the home LAN zones to
+  roaming clients,
 - `hom-srv-01` taking over LAN services (DHCP, DNS, NTP, gateway) from the FRITZ!Box.
 
 This document is the **execution + safety guide**. It is deliberately explicit about **rollback and lockout avoidance**, because the rollout changes network services that can cut off the very access path you are deploying over.
@@ -24,10 +24,14 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 
 1. **Never remove your out-of-band path.** Before any network change you must have at least one working path that does *not* depend on the thing you are changing:
    - Public IP SSH (cloud hosts): `root@173.249.22.211`, `root@37.114.55.91`
-   - Tailscale (`tailscaled` on most hosts)
+   - the WireGuard mesh (`root@10.10.100.x`) — the only overlay; Tailscale was retired 2026-09-20
    - Wired LAN access + a client with a **static IP** in the affected subnet
    - Physical console / keyboard for home hardware; LAN web UI for FRITZ!Box and RE330
-2. **Keep Tailscale enabled** until WireGuard handshakes are verified on *all* hosts. It is the fallback mesh.
+2. **The mesh is the transport.** Tailscale was removed on 2026-09-20; the four cutover criteria of
+   §10 were measured first (every host on 2.0, handshakes on both hubs, `10.10.100.x` reachable, deploy
+   targets resolving to reachable WG addresses). The home LAN reaches roaming clients because
+   `hom-srv-01` delivers its zones into the mesh — one declaration in the topology (`lanGateway`), not a
+   second router.
 3. **Exactly one DHCP server per L2 segment.** Never run FRITZ!Box DHCP and `hom-srv-01` Kea DHCP at the same time on the same subnet.
 4. **Never point DNS at a host that is not serving DNS yet.** FRITZ!Box DNS may only be set to `10.10.10.10` (Blocky) after Blocky answers queries.
 5. **The FRITZ!Box is the WAN modem.** The declarative engine only manages its **DNS, DHCP toggle and port forwards** — *never* its LAN IP, subnet or Wi-Fi. Do not change those.
@@ -65,21 +69,16 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | `mesh-ipv6` | `fd10:1000:100::/64` | – | mesh | WireGuard overlay (RFC 4193 ULA). |
 | `guest` | `10.10.99.0/24` | 99 | guest | Internet-only. |
 
-### 3.3 Tailnet (transitional) — VERIFIED 2026-09-19
+### 3.3 Overlay — WireGuard only (Tailscale retired 2026-09-20)
 
-Tailnet owner `butchersmudda@`. Tailscale node names are the **legacy musician names** and do **not** match the 2.0 hostnames yet. Verified by SSH (`hostname` / `ip addr`):
+The tailnet was removed once its four cutover criteria (§10) were met and measured. Remaining tailnet
+devices exist only in Tailscale's own admin console and must be deleted there; nothing in this
+repository or in the fleet reads them.
 
-| Tailnet node | Tailscale IP | Actual `hostname` | Current address | 2.0 identity | State |
-|---|---|---|---|---|---|
-| `mackaye` | `100.120.39.68` | `cld-edge-01` | `173.249.22.211`, wg `10.10.100.1` | `cld-edge-01` — **migrated** | online |
-| `rollins` | `100.126.5.72` | **`rollins`** (legacy) | `37.114.55.91` | `cld-ops-01` — not migrated | online |
-| `strummer` | `100.125.253.108` | **`strummer`** (legacy) | `192.168.178.27` (old LAN) | `hom-srv-01` — not migrated | online |
-| `jello` | `100.88.135.75` | **`jello`** (legacy, desktop) | `192.168.178.30` (old LAN) | admin workstation / `hom-wrk-01` — not migrated | online |
-| `yorke` | `100.107.168.30` | unknown | – | likely `mob-nb-01` | offline (≥21h) |
-| `m2007j3sg` | `100.79.228.38` | – | – | Android phone | online |
-
-**Only `cld-edge-01` runs 2.0 today.** Every other host still runs the legacy configuration (legacy hostname, old `192.168.178.0/24` home LAN). Always confirm before targeting:
-`ssh root@173.249.22.211 tailscale status`
+The overlay is `10.10.100.0/24` (`fd10:1000:100::/64`), relay hubs `cld-edge-01` and `cld-ops-01`, and
+every host peers with both. NetworkManager gives wifi a route metric of 600, so the mesh interface
+carries 1000: a prefix the host can reach directly always wins, and the tunnel is used only when the
+LAN is elsewhere.
 
 ---
 
@@ -90,10 +89,17 @@ Tailnet owner `butchersmudda@`. Tailscale node names are the **legacy musician n
 | Situation | Use |
 |---|---|
 | Cloud host, any time | **Public IP** (`root@<public-ip>`) — always-on lifeline |
-| Transitional (now) | **Tailscale** (`root@100.x.x.x`) |
-| Target (after rollout) | **WireGuard** (`root@10.10.100.x`) |
+| Everything else | **WireGuard** (`root@10.10.100.x`) — all five hosts, hubs and spokes alike |
 
-### 4.2 Why `nod switch` / `deploy` fail today (both target the WG IP)
+### 4.2 `nod switch` / `deploy` target the WireGuard IPs — and work
+
+The flake's `deploy.nodes.<host>.hostname` is the host's `wireguardIpv4`, and the legacy `tailscaleIp`
+shim that used to stand behind it is gone. All five hosts answer on those addresses (measured
+2026-09-20: `ping` and `ssh` on `10.10.100.1`, `.2`, `.10`, `.20`, `.30`), so `nod switch <host>` no
+longer times out at the closure copy stage.
+
+`deploy` has `autoRollback = true`; `nixos-rebuild` does **not**, so keep out-of-band access ready — on
+the cloud hosts that is the public IP, which never depends on DHCP, DNS or the mesh.
 
 The flake `deploy.nodes.<host>.hostname` is computed as:
 
@@ -129,7 +135,7 @@ The topology "legacy shim" sets `tailscaleIp = h.wireguardIpv4`, so **both resol
       `infra.*_private_key` (WireGuard), `services/cloudflare/*`.
 - [ ] Backup done: FRITZ!Box config export (UI: System → Backup), current NixOS generation recorded
       (`readlink -f /run/current-system`).
-- [ ] Out-of-band access confirmed for the target (public IP / Tailscale / wired LAN / console).
+- [ ] Out-of-band access confirmed for the target (public IP / mesh overlay / wired LAN / console).
 - [ ] For network changes: a second device with a **static IP** in the affected subnet is online.
 - [ ] Maintenance window known (home Wi-Fi / DHCP changes are user-visible).
 
@@ -158,7 +164,7 @@ Rationale: servers first (they carry contracts/outposts/relay hubs), the home LA
 
 ```bash
 # from /etc/nixos on the admin workstation
-HOST=<host>; ADDR=<public-ip|tailscale-ip|lan-ip>
+HOST=<host>; ADDR=<public-ip|mesh-ip|lan-ip>
 
 nod plan "$HOST"                                   # optional preview
 nixos-rebuild switch --flake ".#$HOST" --target-host "root@$ADDR"
@@ -299,7 +305,7 @@ Force a client to re-lease (`dhclient -r && dhclient` or reconnect). It must rec
 | Clients lose DHCP after Step 4 | Re-enable FRITZ!Box DHCP (`settings.dhcp.enable = true` → reconcile), disable Kea (`enableDhcp = false`), redeploy. |
 | DNS broken network-wide | Set a client to `1.1.1.1` manually; re-point FRITZ!Box DNS to `1.1.1.1`; fix Blocky. |
 | Lost FRITZ!Box management | Access via LAN `10.10.10.1` / restore config export / factory reset (needs ISP credentials). |
-| hom-srv-01 broken | Boot previous generation (GRUB) or `nixos-rebuild --rollback switch` over LAN/Tailscale. |
+| hom-srv-01 broken | Boot previous generation (GRUB) or `nixos-rebuild --rollback switch` over the LAN or the mesh. |
 
 ### 8.5 AP cutover (TP-Link RE330, `hom-ap-01` / `10.10.10.20`)
 
@@ -361,7 +367,40 @@ faster.
 
 ---
 
-## 10. WireGuard ↔ Tailscale Transition
+## 10. WireGuard ↔ Tailscale Transition — COMPLETE 2026-09-20
+
+WireGuard carries everything. Tailscale is removed from all five hosts: the feature directory is gone,
+so are the host settings, the `tailscaled` ordering in sshd and four services, the endpoint contract's
+`tailscale` interface value with its firewall projection, and the last transition-only `192.168.178`
+policy-routing block in the repository.
+
+**The four criteria, measured before the removal:**
+
+1. All five cluster hosts deployed on the same revision.
+2. Fresh handshakes for every peer on **both** relay hubs.
+3. `10.10.100.x` reachable from the admin workstation — all five addresses.
+4. `deploy.nodes.<host>.hostname` resolves to a reachable WG address, with SSH confirmed on each
+   (including the edge, whose sshd does listen on its overlay address).
+
+The traffic already ran over WireGuard before the switch, proved by forcing it: `ping -I wg0` reaches
+the edge while `ping -I tailscale0` fails.
+
+**What Tailscale did that the mesh had to take over: delivering the LAN.** A roaming client has to
+reach the zones, and that is now derived rather than run by a second router:
+
+- `lanGateway = [ "infra" "corp" "iot" ]` on `hom-srv-01` names the zones it delivers; the CIDRs come
+  from `my.topology.subnets`, so no address is written twice;
+- every other host routes those CIDRs to it — through the peer's `allowedIPs` on a hub, through the
+  primary hub on a spoke;
+- a host that has an address inside a delivered zone installs **no** mesh route for the LAN: it already
+  has the LAN directly, and a tunnel route would send its traffic out through the hubs and back;
+- the delivering host is allowed to forward mesh traffic into the LAN; without that rule packets reach
+  the gateway and stop, because reaching the gateway's own addresses is input, not forward.
+
+`guest` (`10.10.99.0/24`) is deliberately **not** delivered: no host carries that zone, so announcing
+it would route traffic into a hole. Two assertions hold the assumptions: no zone may be delivered
+twice (cryptokey routing has one owner per prefix), and every delivered zone must be a /24, because
+membership is decided on the network part.
 
 - WireGuard is **already configured** on the servers (`wg0` up on `cld-edge-01`; relay hubs = `cld-edge-01` + `cld-ops-01`). Spokes use the primary hub for the full mesh CIDR.
 - Peers currently do **not** handshake (`wg show` shows `0 B received` for spokes) because the other hosts are not on 2.0 yet.
@@ -472,7 +511,7 @@ If a **network service** was misconfigured:
 - **AP unreachable:** physical reset; re-run reconcile.
 - **Complete network loss at home:** the FRITZ!Box is still the modem; its default LAN `10.10.10.1` remains the anchor.
 
-> The **public IP on the cloud hosts is the ultimate lifeline** — it never depends on DHCP/DNS/WG/Tailscale of the home network.
+> The **public IP on the cloud hosts is the ultimate lifeline** — it never depends on DHCP, DNS or the mesh of the home network.
 
 ---
 
@@ -489,7 +528,7 @@ ssh root@<addr> 'systemctl list-units --failed'
 ssh root@10.10.10.10 'dig +short @127.0.0.1 vyrx.de; journalctl -u kea-dhcp4-server -n 20'
 
 # mesh
-ssh root@173.249.22.211 'wg show; tailscale status'
+ssh root@173.249.22.211 'wg show'
 
 # authentik (cld-edge-01)
 curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
@@ -501,11 +540,11 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 
 | # | Item | Impact | Action |
 |---|---|---|---|
-| 1 | `nod` targets WireGuard IPs only (`tailscaleIp` shim = `wireguardIpv4`) | `nod switch` fails until WG peers up | Use `nixos-rebuild --target-host` now; fix mapping later (§4.2) |
+| 1 | ~~`nod` targets WireGuard IPs only (`tailscaleIp` shim = `wireguardIpv4`)~~ **resolved 2026-09-20**: the shim is gone, the deploy target is the WG address, and all five hosts answer and accept SSH on it | — | none |
 | 2 | Agentless reconcilers reject the `switch` action arg | `nod switch hom-rt-01` / `hom-ap-01` may fail | Verify `--dry-run`; fix scripts (§9) |
-| 3 | Authentik remote forward-auth → embedded outpost `10.10.100.1:9055` | Remote Caddy login breaks if WG down | Deploy host over LAN/Tailscale; verify WG up after deploy |
+| 3 | Authentik remote forward-auth → embedded outpost `10.10.100.1:9055` | Remote Caddy login breaks if WG down | Verify the mesh is up after a deploy; the outpost address is an overlay address |
 | 4 | FRITZ!Box DHCP default is **off** in desired state | Enabling Kea before reconciling → dual DHCP or no DHCP | Follow staged §8.3 |
-| 5 | Tailnet still uses legacy musician node names | Wrong host assumption | `tailscale status` before targeting (§3.3) |
+| 5 | ~~Tailnet still uses legacy musician node names~~ **resolved 2026-09-20**: the tailnet is retired; the stale device entries live only in Tailscale's admin console and read nothing | — | delete them in the console, or leave them unused |
 | 6 | `rm -rf /var/lib/authentik` | Authentik service CHDIR failure | Fixed via tmpfiles rule; recreate dir if manual wipe |
 | 7 | Authentik `akadmin` is the only usable break-glass account | Family accounts have no password | Log in as `akadmin`; set/`Passwort vergessen` |
 | 8 | ~~Attic had no Cloudflare DNS record~~ **fixed.** The flat name is `cache.vyrx.de`, projected from the Attic contract endpoint; the ad-hoc `*.ops` wildcard is obsolete (#10). | — |
@@ -545,7 +584,7 @@ is meant to clean up after.
 
 | Gate | Measured |
 |---|---|
-| no `192.168.178` in `.nix` | hits remain, and every one of them is now accounted for: the transitional Tailscale policy-routing block (by design), the two `example` strings in the topology schema, the two real rollback addresses (`hom-srv-01`, `hom-wrk-01`) and `hom-prn-01.ipv4` for the scanner. Comments must not carry the literal either - a comment that does turns this grep from a gate into a reading exercise |
+| no `192.168.178` in `.nix` | hits remain, and every one is accounted for: the two `example` strings in the topology schema, the two real rollback addresses (`hom-srv-01`, `hom-wrk-01`) and `hom-prn-01.ipv4` for the scanner. The transitional Tailscale policy-routing block that used to be here went with the feature. Comments must not carry the literal either - a comment that does turns this grep from a gate into a reading exercise |
 | no old-subnet neighbour on `hom-srv-01` | **12 cache entries, exactly 1 real device.** Eleven are `FAILED`/`INCOMPLETE`: `ip neigh` keeps an entry after the device is gone, and these are the migrated relays' old leases, the access point's old address and the box. The only entry carrying an `lladdr` is `192.168.178.30` - `hom-wrk-01`'s own declared rollback address. **An ARP entry is not a device**: counted as lines, the old subnet looked eleven devices away from done; counted as devices it is one declaration away |
 | stability window | hours, not days |
 
@@ -587,7 +626,7 @@ LAN/DHCP/DNS/forward capability, `enableDhcp`, and the naming invariants I1–I1
 
 **Key files**
 - `flake.nix` — hosts, `deploy.nodes`, `nodTargets`.
-- `features/system/networking/{gateway,fritzbox,tplink-ap,wireguard,tailscale,static,topology}` — network model.
+- `features/system/networking/{gateway,fritzbox,tplink-ap,wireguard,static,topology}` — network model.
 - `hosts/<host>/configuration.nix` — per-host feature switches.
 - `features/services/authentik/**` — identity (see `IDENTITY.md`).
 - `secrets/secrets.yaml` + `.sops.yaml` — encrypted secrets and age recipients.

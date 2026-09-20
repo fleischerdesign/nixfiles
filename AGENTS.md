@@ -71,7 +71,7 @@ nixos-rebuild dry-run --flake .#<host>
 │   ├── pc.nix              # PC/Desktop: audio, wayland, printing, containers, codium, nixvim, gaming, spotify
 │   ├── desktop.nix         # my.role = "desktop"
 │   ├── notebook.nix        # my.role = "notebook"
-│   └── server.nix          # my.role = "server": caddy, monitoring, tailscale, static-ip, nixvim
+│   └── server.nix          # my.role = "server": caddy, monitoring, static-ip, nixvim
 ├── user/philipp/
 │   ├── home.nix            # Root: imports sub-module, direnv, Nixcord, home packages
 │   ├── metadata.nix        # Statische User-Daten (Name, Email, SSH-Keys) — importiert von features/system/user

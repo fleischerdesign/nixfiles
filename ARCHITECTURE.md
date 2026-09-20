@@ -219,7 +219,7 @@ Ablösung des Standard-Subnetzes `192.168.178.0/24` durch das kollisionsfreie Su
    - Refactoring der `secrets/secrets.yaml` in hierarchische Namespaces (Beseitigung aller Host-Präfixe wie `_mackaye`).
 2. **Phase 2: Codebase-Vorbereitung (Service Contracts & Dual-Stack VPN)**
    - Einführung von `my.contracts` und `my.topology` mit Zonen-Support.
-   - Paralleler Rollout von Kernel-WireGuard (`wg0`) neben dem bestehenden Tailscale (`tailscale0`), um Lockouts auszuschließen.
+   - Erledigt 2026-09-20: Kernel-WireGuard (`wg0`) trug den Verkehr bereits vollständig, Tailscale wurde danach entfernt. Die vier Abbruchkriterien sind in `DEPLOYMENT.md` §10 gemessen.
    - Caddy auf Ingress-Host so konfigurieren, dass `.vyrx.de` parallel zu bestehenden Legacy-Domains bedient wird.
 3. **Phase 3: Router, Subnetz- & Storage-Migration (Heimnetz)**
    - Umstellung des Heimnetz-Routers auf `10.10.0.0/16` und Umschalten von FRITZ!Box und TP-Link AP in den reinen Bridge-Modus (DHCP aus).
@@ -236,7 +236,7 @@ Ablösung des Standard-Subnetzes `192.168.178.0/24` durch das kollisionsfreie Su
    - Rollout von Vector/Loki für zentrales Logging und CrowdSec-Mesh.
    - Etablierung der 3-2-1 Restic-Pipeline mit Remote-Tier auf `cld-ops-01`.
 6. **Phase 6: Decommissioning**
-   - Tailscale vollständig deaktivieren und entfernen.
+   - Erledigt 2026-09-20: Tailscale ist fullständig deaktiviert und entfernt; das Heim-LAN wird vom `hom-srv-01` über das Mesh zugestellt (`lanGateway`).
    - Entfernen aller temporären Legacy-Aliase (`.ancoris.ovh`) und Alt-Routen.
 
 ---

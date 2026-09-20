@@ -98,7 +98,7 @@ Rules:
 
 * The suffix is the **only** thing that encodes visibility. It never encodes a host.
 * `lan`/`mesh`/`iot` exist **only** in Blocky and must never be published (§5.1).
-* `mesh` is **our** overlay namespace. Tailscale is transitional and will be removed; the
+* `mesh` is **our** overlay namespace, carried by WireGuard. Tailscale was retired on 2026-09-20; the
   `mesh` plane is authoritative in our own DNS — **no MagicDNS dependency**.
 
 ---
@@ -353,7 +353,8 @@ Ingress host (Cloudflare + Caddy) deploys last, so DNS/TLS never point at an uns
 
 ## 10. Decisions
 
-1. **Overlay naming:** `mesh.vyrx.de` is authoritative in our own DNS. **Tailscale is
+1. **Overlay naming:** `mesh.vyrx.de` is authoritative in our own DNS. **The overlay is WireGuard
+   only** — Tailscale was retired on 2026-09-20 and its ULA prefix
    transitional and will be removed** — no MagicDNS dependency. *(resolved)*
 2. **Public IPv6:** resolved factually — neither `cld-edge-01` nor `cld-ops-01` announces a
    global unicast IPv6 prefix (verified: only `tailscale0` ULA `fd7a::/…` and `wg0` ULA

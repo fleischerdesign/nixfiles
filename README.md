@@ -29,7 +29,7 @@ Enterprise NixOS + Home Manager multi-node infrastructure managed via [Nix Flake
 Services are completely decoupled and host-agnostic. Modules declare their endpoints, scopes, authentication policies, and persistent storage boundaries (`stateDirs`, `dataDirs`, `cacheDirs`). Multi-consumer projections automatically synthesize Caddy virtual hosts, firewall openings, and monitoring probes.
 
 ### 2. Stateless Kernel-WireGuard Mesh (`10.10.100.0/24`)
-Zero external control planes (no Headscale/Tailscale lock-in). Direct peer-to-peer ChaCha20-Poly1305 tunnels between all nodes with TCP-MSS clamping and anti-hairpinning routing.
+Zero external control planes (no Headscale, no Tailscale — retired 2026-09-20). Direct peer-to-peer ChaCha20-Poly1305 tunnels between all nodes with TCP-MSS clamping and anti-hairpinning routing. The same mesh delivers the home LAN zones to a roaming client, so nothing behind the LAN needs a second router or a public name.
 
 ### 3. Single-NIC Gateway & RFC 1812 Router-on-a-Stick
 `hom-srv-01` acts as the single-NIC gateway for the home network, running Kea DHCPv4 (with static leases synthesized from `my.topology`), Chrony NTP, Blocky Split-Horizon DNS, and IPv4 packet forwarding.

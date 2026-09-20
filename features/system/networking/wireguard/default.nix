@@ -63,14 +63,19 @@ let
   # assertion below holds that assumption rather than trusting it.
   network = address: lib.concatStringsSep "." (lib.take 3 (lib.splitString "." address));
 
-  # What this host routes over the mesh: every delivered zone it is not already inside and does not
-  # deliver itself. A route for a subnet this host is attached to would shadow its connected route,
-  # and one it delivers itself is local to begin with.
-  meshLanRoutes = lib.filter (
-    cidr:
-    !(builtins.any (own: network own == network cidr) ownDeliveredCidrs)
-    && !(ownHost != null && ownHost.ipv4 != null && network ownHost.ipv4 == network cidr)
-  ) deliveredCidrs;
+  # A host that has an address in any delivered zone is on the home LAN and reaches the whole of it
+  # directly through its gateway, so it must install no mesh route at all - otherwise every LAN
+  # packet takes the long way out through the hubs and back. This is decided once for the host, not
+  # per zone: hom-wrk-01 sits in corp, and a per-zone test still gave it routes for infra and iot
+  # (caught by the route projection in the deployment script, not assumed).
+  onLan =
+    ownHost != null
+    && ownHost.ipv4 != null
+    && builtins.any (cidr: network ownHost.ipv4 == network cidr) deliveredCidrs;
+
+  # What this host routes over the mesh: everything delivered, but only when the LAN is not reachable
+  # directly. Its own deliveries are local to begin with, so they are never routed to themselves.
+  meshLanRoutes = if onLan then [ ] else lib.subtractLists ownDeliveredCidrs deliveredCidrs;
 
   # What a peer delivers: its own overlay address, plus the zones it announces into the mesh.
   deliveredBy =
