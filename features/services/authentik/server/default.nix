@@ -674,22 +674,24 @@ let
             # A flow without stages is an EmptyFlowException, not an implicit allowance: planner.py raises
             # `if not plan.bindings and not self.allow_empty_flows`. Measured in the core's log while the
             # bind failed: `f(exec): Flow is empty`, `flow_slug: ldap-authorization-flow`. The stock
-            # consent flow carries exactly one consent stage in implicit mode, which is why it is not
-            # empty; this flow does the same.
-            model = "authentik_stages_consent.consentstage";
-            id = "stage_ldap_authz_consent";
+            # A flow with no stages raises EmptyFlowException (measured: f(exec): Flow is empty for this
+            # flow), so the authorization flow needs one stage. A consent stage is wrong here: the explicit
+            # consent flow uses mode 'expiring', which requires an interactive answer a service account
+            # cannot give, and 'implicit_consent' is not a valid choice at all - it made the whole blueprint
+            # fail with EntryInvalidError and stopped every later entry, the stage binding included.
+            # The dummy stage does nothing and needs no interaction, which is what a bind needs.
+            model = "authentik_stages_dummy_dummystage";
+            id = "stage_ldap_authz_dummy";
             identifiers = {
               name = "Authorize LDAP consumer";
             };
-            attrs = {
-              mode = "implicit_consent";
-            };
+            attrs = { };
           }
           {
             model = "authentik_flows.flowstagebinding";
             identifiers = {
               target = yamlTag "!KeyOf flow_ldap_authz";
-              stage = yamlTag "!KeyOf stage_ldap_authz_consent";
+              stage = yamlTag "!KeyOf stage_ldap_authz_dummy";
               order = 0;
             };
             attrs = { };
