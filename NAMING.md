@@ -220,13 +220,25 @@ issued on the host that terminates it** — which is also how the rest of the in
 copying private keys between hosts (one policy, per-consumer credentials: SPIRE, Vault PKI,
 cert-manager).
 
-Consequences per plane:
+The criterion is **not** the scope but whether the name lies inside the zone this API manages: only
+then can `_acme-challenge.<name>` be published, and DNS-01 does not care where the name itself
+resolves. Internal-plane names are subdomains of the public zone, so they qualify like any other -
+which is why no vhost needs Caddy's own CA.
 
 | Plane | Certificate |
 |---|---|
 | public | one per name, issued on the terminating host via DNS-01 (never a wildcard) |
-| internal (`.lan`, `.mesh`) | Caddy's own CA — not resolvable from the internet, so no public CA can ever validate these names. Where an internal name is only a convenience, the public name plus split horizon serves the same purpose without a second trust anchor |
+| internal (`.lan`, `.mesh`) | one per name as well, from a public CA. Not reachable from outside — measured: every `.lan` name is NXDOMAIN publicly while the internal resolver answers it — but a **publicly trusted** certificate, so no client has to trust a private CA |
+| outside the managed zone | Caddy's own CA; no credential here can publish a challenge in a zone we do not manage |
 | multi-label public (`<app>.pub.<inst>.ai.${domain}`) | one per name as well; OpenClaw's dynamically minted hosts keep Caddy `on_demand_tls` (code §8.1) |
+
+**The deliberate trade-off:** a certificate says nothing about reachability, but Certificate
+Transparency logs publish every name a public CA issues for. Internal names therefore become
+*enumerable* (not reachable) once they hold public certificates. That is accepted here because these
+names are not secret - `sonarr`, `mainsail`, `moonraker` are guessable by design - and because the
+alternative, a private CA, would require trusting that CA on every client device, which is the
+friction this design exists to avoid. Where an internal name was only a convenience, the public name
+plus split horizon serves the same purpose without a second name at all.
 
 ### 5.1 The public catch-all conflicts with the internal planes (verified defect)
 
