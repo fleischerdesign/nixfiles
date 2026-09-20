@@ -127,7 +127,48 @@ the unit exist, is the tool there);
   script checks `[ "$(systemctl is-active caddy)" = active ]` and aborts otherwise; the earlier ones
   printed the state and moved on.
 
-## 5. Open blockers
+## 5. Open blockers — and one open investigation
+
+### 5.0 `caddy reload` stalls: five hypotheses tested and refuted (2026-09-20, night)
+
+**Symptom, measured.** `systemctl reload caddy` on `hom-srv-01` either failed fast (`exit 1`) or hung
+exactly 90 s (`TimeoutStartSec`, which also governs reload jobs) and was killed as
+`Reload operation timed out. Killing reload process.` The process stayed `active running`, kept
+listening on 443 and answered **nothing** for any vhost, from the LAN and through the ingress. Only a
+restart recovered it. Correlation: the host with 14 explicit `tls <file>` bindings hung; the ingress
+with none never did.
+
+**Reproduction built (isolated).** A scratch Caddy instance on ports 19119/19081/19443 with its own
+certificates, a precondition that asserts admin API *and* data plane answer before any case runs, and
+a data-plane probe that goes through TLS with SNI. Every hypothesis below was tested against it:
+
+| Hypothesis | Experiment | Result |
+|---|---|---|
+| unreadable / truncated / mismatched certificate file makes the load hang | replace the bound file with a missing, truncated, and foreign-key variant | **refuted**: all three fail *fast* (`400`, `failed to find any PEM data`), data plane keeps answering 200 |
+| a cert file rewritten *during* the load (the concurrent acme-unit situation) | writer replacing the file every 20 ms while reloading | **refuted**: reload 1 s, data plane 200 |
+| in-flight requests hold the reload (eternal grace period) | upstream that never answers, verified established connection, real config change, with default and with `grace_period 5s` | **refuted**: reload returns in 0 s; Caddy drains the old server asynchronously (`grace period initiated` → `load complete` → `context canceled`) |
+| concurrent reloads wedge the client | five simultaneous reloads, two with a broken config | **refuted**: all return in 0 s, data plane 200 |
+| the module's `--force` reload on an unchanged config, with 14 bound sites (what the 14 acme units' `reloadServices` produce) | 14 concurrent forced reloads, unchanged config | **refuted**: 13 ok, 0 hung, 1 s wall time, data plane 200 |
+
+**What the production log does show.** In the stall window Caddy logs the Caddyfile warnings, then
+`adapted config to JSON`, then `stopping current admin endpoint` and
+`shutting down admin server: stopping admin server: 10s timeout` — and nothing else. The load never
+completed, the old servers were already stopped, so the service listened and answered nothing. The
+load is triggered *through* the admin endpoint that Caddy tears down and rebuilds on every load, so
+the stall sits in Caddy's own admin-endpoint teardown - not in certificates, not in connections, not
+in concurrency.
+
+**Root cause: not yet proven.** Every mechanism I could think of was falsifiable and got falsified, so
+the next step is instrumentation, not another guess:
+
+1. On the next stall, capture the blocked stack: the admin API exposes
+   `GET /debug/pprof/goroutine?debug=1` (and `/debug/pprof/` generally). One request during a stall
+   yields the exact goroutine that blocks the load. This is the decisive, low-cost measurement.
+2. Enable `services.caddy.enableDebugLogs` so the next attempt logs its stages at debug level.
+3. The supported mitigation, if the in-process reload is not worth chasing further, is the module's own
+   `services.caddy.enableReload = false`: restarts instead of reloads, no admin-endpoint round trip.
+   **Not** an override of `ExecReload` - `lib.mkForce` on that list does not displace the module's
+   command, which survives in the rendered unit (measured).
 
 **B1 — root access to `cld-edge-01`.** The edge trusts only the old fleet deploy key, whose private
 half was destroyed when the openclaw tunnel rendered its secret over `~/.ssh/deploy-key`. Recovery
