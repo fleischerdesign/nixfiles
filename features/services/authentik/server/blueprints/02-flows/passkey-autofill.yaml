@@ -6,6 +6,8 @@
 version: 1
 metadata:
   name: "vyrx-passkey-autofill"
+  labels:
+    vyrx: "owned"
 entries:
   - model: authentik_blueprints.metaapplyblueprint
     attrs:

@@ -1,6 +1,8 @@
 version: 1
 metadata:
   name: "vyrx-rbac-groups-and-users"
+  labels:
+    vyrx: "owned"
 entries:
   # Groups
   - model: authentik_core.group
@@ -30,7 +32,12 @@ entries:
       attributes:
         description: "Family members with home automation & smart home access"
 
-  # Users: Philipp (Admin), Katja, Lilly, Kai, Rieke
+  # Users: Philipp (Admin), Katja, Lilly, Kai, Rieke.
+  #
+  # The object is seeded; the membership is not. `groups` is deliberately absent: who is in which
+  # group is the access decision and belongs to the interface (docs/identity.md §11.1). Declaring it
+  # here would overwrite a human's change at the next apply, and access runs only through membership
+  # (no per-user application bindings either).
   - model: authentik_core.user
     id: user_philipp
     identifiers:
@@ -38,10 +45,6 @@ entries:
     attrs:
       name: "Philipp"
       email: "philipp@vyrx.de"
-      groups:
-        - !KeyOf group_infra_admins
-        - !KeyOf group_media_users
-        - !KeyOf group_family
 
   - model: authentik_core.user
     id: user_katja
@@ -50,9 +53,6 @@ entries:
     attrs:
       name: "Katja"
       email: "katja@vyrx.de"
-      groups:
-        - !KeyOf group_media_users
-        - !KeyOf group_family
 
   - model: authentik_core.user
     id: user_lilly
@@ -61,9 +61,6 @@ entries:
     attrs:
       name: "Lilly"
       email: "lilly@vyrx.de"
-      groups:
-        - !KeyOf group_media_users
-        - !KeyOf group_family
 
   - model: authentik_core.user
     id: user_kai
@@ -72,9 +69,6 @@ entries:
     attrs:
       name: "Kai"
       email: "kai@vyrx.de"
-      groups:
-        - !KeyOf group_media_users
-        - !KeyOf group_family
 
   - model: authentik_core.user
     id: user_rieke
@@ -83,6 +77,3 @@ entries:
     attrs:
       name: "Rieke"
       email: "rieke@vyrx.de"
-      groups:
-        - !KeyOf group_media_users
-        - !KeyOf group_family

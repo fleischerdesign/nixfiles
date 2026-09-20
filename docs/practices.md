@@ -248,7 +248,7 @@ in A3 can be closed.
 
 ---
 
-## 6. Directory work - eleven findings, each one measured late
+## 6. Directory work - twelve findings, each one measured late
 
 Making Jellyfin authenticate against the Authentik directory took a night and produced six generalisable
 findings. They are recorded because every one of them cost hours and none of them is specific to LDAP.
@@ -351,33 +351,6 @@ would have been papered over on the second pass instead of failing a deploy. Dec
 one entry, and the deploy is green in a single pass - which is now the measurement that says the declaration
 is right.
 
-### 6.11 Depending on a fact we do not name is the quietest defect of all
-
-Four times in one night the same shape appeared: something worked because the database happened to be in a
-certain state, and nothing in the repository said so.
-
-```
-search_full_directory    set by hand in the database, needed by every consumer    (now declared)
-token.managed            `false` in the database, undeclared - a fresh install      (work list P2)
-                         would create a managed token, authentik would rotate it
-                         and the outpost would go blind
-provider.mfa_support     `true` in the database, and the blueprint refuses it       (work list P3)
-brand.branding_logo      a file that has to exist, referenced by name only         (work list P3)
-```
-
-All four are invisible: the system works, every check passes, and the defect only appears on a fresh install,
-a restore, or the day authentik rotates something. The rule that follows is not "the repository must contain
-everything" - that claim is what produces declarations that fight their users - but: **every fact we depend on
-is either declared, or documented with the reason it cannot be.** A silent dependency on the database is a
-defect, not a convention.
-
-The same night produced the mirror image, and it is worth naming both together: a fact the declaration *does*
-mention, which a person then changes in the interface. It is not a deviation, it is a revert with a deadline -
-`present` overwrites the declared fields at the next apply. The answer is to report it, not to forbid it, and
-to keep the declarations to the things that are topology, policy or integration (see
-[`identity.md` §11](./identity.md)).
-
-
 ### 6.10 The apply trigger, and how this repository closes it
 
 Upstream re-reads a blueprint file every 60 minutes and watches the directory for modification events. In
@@ -392,5 +365,52 @@ authentik applies nothing by itself. The unit queues the same task the API's app
 waits for every instance to settle, asserting on `last_applied` being **newer** than before **and** on
 `status`, because status alone describes the last attempt rather than this one. A deploy is therefore
 finished when the objects exist, not when a file was written.
+
+### 6.11 Depending on a fact we do not name is the quietest defect of all
+
+Four times in one night the same shape appeared: something worked because the database happened to be in a
+certain state, and nothing in the repository said so.
+
+```
+search_full_directory    set by hand in the database, needed by every consumer    (now declared)
+token.managed            undeclared - authentik could claim the token              (now declared)
+token.expiring           `true`, so authentik rotated the outpost key every        (now declared)
+                         30 minutes - measured as `secret_rotate` events
+provider.mfa_support     `true` in the database, undeclared                      (now declared)
+brand.branding_logo      a file that has to exist, referenced by name only         (documented)
+```
+
+All four are invisible: the system works, every check passes, and the defect only appears on a fresh install,
+a restore, or the day authentik rotates something. The rule that follows is not "the repository must contain
+everything" - that claim is what produces declarations that fight their users - but: **every fact we depend on
+is either declared, or documented with the reason it cannot be.** A silent dependency on the database is a
+defect, not a convention.
+
+The same case also shows why the field named in a bug report is not always the field that causes it.
+`token.managed` is a text marker - a non-empty string means authentik owns the object - and the serializer
+accepts only a non-empty string or SQL NULL: `managed = false` (the Nix boolean) is rejected as "not a valid
+string", which is what made every apply of the outposts blueprint fail on 2026-09-20, and `""` is rejected as
+blank. The declaration is `managed = null`. But the rotation that actually blinded the outposts is driven by a
+different field: `Token.expire_action` rotates **every** api-intent token whose `expires` has passed,
+regardless of `managed` - measured as `secret_rotate` events for both outpost tokens every 30 minutes, while
+the outpost had read its key once at start. `expiring = false` is what stops it (an app_password expires
+instead of rotating, which breaks a bind at the same interval). Both facts are declared, and the apply asserts
+them for every token whose key comes from SOPS.
+
+The same night produced the mirror image, and it is worth naming both together: a fact the declaration *does*
+mention, which a person then changes in the interface. It is not a deviation, it is a revert with a deadline -
+`present` overwrites the declared fields at the next apply. The answer is to report it, not to forbid it, and
+to keep the declarations to the things that are topology, policy or integration (see
+[`identity.md` §11](./identity.md)).
+
+### 6.12 A rename is a new entry plus a tombstone
+
+Access hangs on group names through every consumer's `memberOf` filter, so a name is part of the shape of the
+system, not a label. Renaming a group in the interface removes everyone's access and turns nothing red;
+renaming it here by editing the `identifiers` in place leaves the old object behind, and the old name still
+grants access. The discipline is one entry with the new name **and** one `state: absent` entry for the old
+one - the tombstone is the only thing that makes the rename declarative, and it may stay forever because
+`absent` on a missing object is a no-op. The apply checks the rule in both directions: every declared object
+resolves (`present`) and every tombstoned identifier is gone (`absent`).
 
 

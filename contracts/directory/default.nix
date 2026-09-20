@@ -65,7 +65,11 @@
   };
 
   config.my.directory.ldap = {
-    baseDn = lib.mkDefault "DC=vyrx,DC=de";
+    # The DN is a projection of the topology's apex domain, never a second place that names it:
+    # a literal here would keep serving the old directory after a domain move.
+    baseDn = lib.mkDefault (
+      "DC=" + lib.concatStringsSep ",DC=" (lib.splitString "." config.my.topology.domain)
+    );
     usersDn = "${config.my.directory.ldap.usersOu},${config.my.directory.ldap.baseDn}";
     groupsDn = "${config.my.directory.ldap.groupsOu},${config.my.directory.ldap.baseDn}";
   };

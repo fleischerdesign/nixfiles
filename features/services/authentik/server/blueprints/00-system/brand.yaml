@@ -1,6 +1,8 @@
 version: 1
 metadata:
   name: "vyrx-system-brand"
+  labels:
+    vyrx: "owned"
 entries:
   # The recovery flow must exist before the brand can point at it, and authentik
   # does not order blueprints; declare the dependency explicitly.

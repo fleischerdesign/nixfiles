@@ -19,6 +19,13 @@ let
   # reach the file unquoted.
   marker = value: "@@YAML_TAG@@${value}";
 
+  # Ownership marker. Every blueprint this repository owns carries it; the apply reads it to separate our
+  # declarations from authentik's own defaults, whose objects an administrator may edit in the interface
+  # without a deploy reverting the edit. The name and value live here once so the apply cannot disagree
+  # with the files it selects.
+  ownerLabelName = "vyrx";
+  ownerLabelValue = "owned";
+
   # The models this repository uses, named once.
   models = {
     metaApplyBlueprint = "authentik_blueprints.metaapplyblueprint";
@@ -31,6 +38,8 @@ let
     passwordStage = "authentik_stages_password.passwordstage";
     identificationStage = "authentik_stages_identification.identificationstage";
     userLoginStage = "authentik_stages_user_login.userloginstage";
+    # Retained only for the "Authorize LDAP consumer" tombstone in the consumers blueprint; there is no
+    # builder for it any more (the authorization-flow experiment that used one was removed).
     consentStage = "authentik_stages_consent.consentstage";
     proxyProvider = "authentik_providers_proxy.proxyprovider";
     oauth2Provider = "authentik_providers_oauth2.oauth2provider";
@@ -157,6 +166,16 @@ let
       identifiers.identifier = identifier;
       attrs = {
         inherit intent user key;
+        # Two measured facts keep a SOPS-backed token in step with the outpost that reads it once at
+        # start. `expiring = false` is the one that stops the loss: `Token.expire_action` rotates
+        # **every** api-intent token whose `expires` has passed, regardless of `managed`, which rotated
+        # these keys every 30 minutes (measured: `secret_rotate` events for both outpost tokens; an
+        # app_password expires instead, which would have broken the Jellyfin bind at the same interval).
+        # `managed = null` keeps authentik from claiming ownership; the serializer accepts only a
+        # non-empty string or SQL NULL for it (a boolean is rejected as "not a valid string", the
+        # 2026-09-20 failure; `""` is rejected as blank).
+        managed = null;
+        expiring = false;
       };
     };
 
@@ -250,19 +269,6 @@ let
       inherit id;
       model = models.userLoginStage;
       identifiers.name = name;
-    };
-
-  consentStage =
-    {
-      name,
-      id,
-      mode,
-    }:
-    entry {
-      inherit id;
-      model = models.consentStage;
-      identifiers.name = name;
-      attrs = { inherit mode; };
     };
 
   # Which stage runs when. All three fields identify the binding, so all three belong in `identifiers`:
@@ -363,6 +369,15 @@ let
         authorization_flow = authorizationFlow;
         base_dn = baseDn;
         invalidation_flow = invalidationFlow;
+        # Declared, not inherited. `mfa_support` defaults to true in the model and the database carried
+        # true while nothing in the repository named it - an undeclared dependency (identity.md §11.4).
+        # Code-based MFA is meaningless for a bind account, and declaring the value keeps a fresh
+        # install from silently depending on the model default.
+        mfa_support = false;
+        # Both default to `direct`; declared so their origin is the repository, not a model default
+        # an upgrade may change.
+        bind_mode = "direct";
+        search_mode = "direct";
       };
       inherit permissions;
     };
@@ -420,11 +435,16 @@ let
     {
       version = 1;
       inherit entries;
-      metadata = { inherit name; };
+      metadata = {
+        inherit name;
+        labels.${ownerLabelName} = ownerLabelValue;
+      };
     };
 in
 {
   inherit
+    ownerLabelName
+    ownerLabelValue
     models
     refs
     entry
@@ -439,7 +459,6 @@ in
     passwordStage
     identificationStage
     userLoginStage
-    consentStage
     flowStageBinding
     proxyProvider
     oauth2Provider

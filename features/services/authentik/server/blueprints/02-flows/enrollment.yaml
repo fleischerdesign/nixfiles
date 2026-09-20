@@ -7,6 +7,8 @@
 version: 1
 metadata:
   name: "vyrx-enrollment"
+  labels:
+    vyrx: "owned"
 entries:
   # The baseline group must exist before it can be referenced below.
   - model: authentik_blueprints.metaapplyblueprint

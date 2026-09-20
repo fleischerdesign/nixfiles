@@ -6,6 +6,8 @@
 version: 1
 metadata:
   name: "vyrx-remember-me"
+  labels:
+    vyrx: "owned"
 entries:
   - model: authentik_blueprints.metaapplyblueprint
     attrs:

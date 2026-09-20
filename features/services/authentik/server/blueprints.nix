@@ -30,6 +30,13 @@ let
     # Every consumer's service account must be able to read the whole directory, or the service it serves
     # cannot find its users at all.
     searchFullDirectoryAccounts = map consumerAccountName sortedLdapEndpointNames;
+    # Tokens whose key comes from SOPS and is read once at outpost start. They must stay unmanaged
+    # **and** non-expiring: `Token.expire_action` rotates an expiring api token's key on its own
+    # schedule and expires an app_password, while the standalone outpost read the key once
+    # (docs/practices.md §6.11).
+    sopsBackedTokens =
+      map (o: "outpost-${o.hostName}-ldap-token") ldapOutposts
+      ++ map (name: "ldap-consumer-${name}-password") sortedLdapEndpointNames;
   };
 
   flakeConfigurations =
@@ -213,13 +220,18 @@ let
         ]
       ) sortedEndpointNames)
       ++ [
-        # The outpost embedded in the server itself. It authenticates with the core secret key, so it has no
-        # type and no service connection - hence the plain entry rather than the builder, which sets both.
+        # The outpost embedded in the server itself. authentik creates it on startup with `type = proxy` and
+        # the managed marker; we declare both so the entry is reproducible on a fresh database instead of
+        # depending on the reconcile having run first. `type` is required on create, and `managed` is the
+        # marker the reconcile looks up - without it a create races the reconcile into a duplicate-name
+        # error. It has no service connection: it runs inside the server process.
         (blueprintLib.entry {
           id = "embedded_outpost";
           model = blueprintLib.models.outpost;
           identifiers.name = "authentik Embedded Outpost";
           attrs = {
+            type = "proxy";
+            managed = "goauthentik.io/outposts/embedded";
             providers = map (
               name:
               blueprintLib.refs.sameBlueprint "provider_proxy_${builtins.replaceStrings [ "-" ] [ "_" ] name}"

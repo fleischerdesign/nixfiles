@@ -6,6 +6,8 @@
 version: 1
 metadata:
   name: "vyrx-recovery"
+  labels:
+    vyrx: "owned"
 entries:
   - model: authentik_flows.flow
     id: flow
@@ -51,7 +53,9 @@ entries:
       use_global_settings: true
       # The stage uses the global SMTP transport but its own sender/subject, so a
       # verified SMTP2GO sender is required here.
-      from_address: "noreply@ancoris.ovh"
+      # The sender must be a verified SMTP2GO identity. It is resolved from the environment so the
+      # address follows `my.topology.domain` instead of naming a domain a second time here.
+      from_address: !Env [AUTHENTIK_RECOVERY_FROM_ADDRESS, noreply@vyrx.de]
       subject: "VYRX – Passwort zurücksetzen"
       template: email/password_reset.html
       activate_user_on_success: true

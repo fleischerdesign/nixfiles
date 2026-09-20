@@ -110,9 +110,12 @@ Nothing is generated at runtime that would have to be recovered later.
 - **No OOBE.** The bootstrap password in `services/authentik/core_env` drives `system/bootstrap.yaml`,
   which creates `akadmin` and marks setup complete.
 - **Break-glass.** `akadmin` is the only account that can always get in, and it belongs to
-  `authentik Admins`. `infra-admins` is a **separate** cluster-admin group: the fleet's administrators
+  `authentik Admins`. Its password is `AUTHENTIK_BOOTSTRAP_PASSWORD` in the `services/authentik/core_env`
+  secret; authentik consumes it only while `akadmin` does not exist, so it never resets a password that has
+  already been changed. `infra-admins` is a **separate** cluster-admin group: the fleet's administrators
   are not the same set as Authentik's own administrators, and conflating them would make the identity
-  system unable to lock anyone out of itself.
+  system unable to lock anyone out of itself. To make a person a fleet administrator, put them into
+  `infra-admins` in the interface - that single membership is the whole answer.
 - **Family accounts** (`family`, `media-users`) are created through the enrollment invitation and carry
   no password until they register a passkey.
 - **Self-service:** e-mail recovery wired to the brand, invitation enrollment, passkey autofill
@@ -237,9 +240,65 @@ it accepts; a human is put into one of them.
 |---|---|---|
 | declared, with a declared value | repository | a change in the interface is overwritten at the next apply — and the drift report says so **before** that happens |
 | not declared | interface | it is never touched; it is reported as foreign, which is normal |
-| declared, but the database value came from elsewhere | **defect** | the declaration is incomplete; a fresh install or a restore produces a different world and nothing notices — this is what the work list closes |
+| declared, but the database value came from elsewhere | **defect** | the declaration is incomplete; a fresh install or a restore produces a different world and nothing notices - §11.6 is the inventory that closes it |
 
 That third row is the only dangerous one, and it is not the interface's fault: it means we depend on a fact we
-do not name. `token.managed` and `mfa_support` are the two known cases today.
+do not name. `token.managed`, `token.expiring` and `LDAPProvider.mfa_support` were three of them and are
+closed - each is now declared with the value the serializer actually accepts (`practices.md` §6.11, §11.6
+below). What remains in
+§11.6 are dependencies on files and flags that are not model fields, each documented with its source.
+
+### 11.5 The table: every model, its owner, and whether a human may change it
+
+"Owner" is who writes the object's definition. "Relationships we set" are the links that come from a
+blueprint; a relationship that is not listed is not ours. The last column answers "may I change X in the
+interface?" in one sentence.
+
+| Model | Object owner | Relationships we set | May a human change it? |
+|---|---|---|---|
+| `authentik_brands.brand` | repository | `flow_recovery` | no - topology and branding |
+| `authentik_core.group` | repository | - | the definition: no. **Membership: yes** - that is an interface decision |
+| `authentik_core.user` (people) | repository seeds existence | - (`groups` is deliberately absent) | yes - name, address, password, avatar, group membership |
+| `authentik_core.user` (service account) | repository | `roles` | no |
+| `authentik_core.token` (machine) | repository | `user`, `managed` | no - topology, and the key comes from SOPS |
+| `authentik_rbac.role` | repository | `permissions` | no |
+| `authentik_flows.flow` | repository | - | no |
+| `authentik_flows.flowstagebinding` | repository | `target`, `stage`, `order` | no |
+| `authentik_stages_*` (password, identification, user login, prompt, invitation, user write, email) | repository | - | no |
+| `authentik_providers_*` (LDAP, OAuth2, proxy) | repository | flow fields, object `permissions` | no |
+| `authentik_core.application` | repository | `provider`, `group`, launch URL | no |
+| `authentik_outposts.outpost` | repository | `providers`, `permissions` | no |
+| `authentik_policies.policybinding` | repository | `target`, `order`, policy/group/user | no |
+
+The membership column is the line. A service declares which groups it accepts through its `memberOf` filter;
+a human decides who is in those groups. There are no per-user application bindings, because a second mechanism
+next to the group filter would be a second truth. The interface-only things from §11.1 - credentials and
+devices, invitations, profile attributes, notifications - are not blueprinted at all and therefore appear in
+no row of this table.
+
+### 11.6 Facts we rely on but do not set
+
+The rule from §11.4: a fact we depend on is either declared, or documented with the reason it cannot be.
+This is the inventory that closes the third row. Every row here has been measured, not guessed.
+
+| Fact | Where it comes from | Resolution |
+|---|---|---|
+| `LDAPProvider.mfa_support` | model default `true`; the database carried `true` | declared `false` in the provider builder - code-based MFA is meaningless for a bind account |
+| `LDAPProvider.bind_mode`, `search_mode` | model default `direct` | declared `direct`, so their origin is the repository rather than a model default |
+| `token.managed`, `token.expiring` | model defaults `NULL` and `true` | declared `null` and `false`; `managed` accepts only a non-empty string or NULL, and an expiring api token is rotated by authentik on its own schedule (see [`practices.md` §6.11](./practices.md)) |
+| `Brand.branding_logo`, `branding_favicon`, `branding_custom_css` | names of files that must exist under `/var/lib/authentik/media` | provided by `features/system/theme`, which symlinks `logo.svg` and `theme.css` there through `systemd.tmpfiles`; the brand references them by name |
+| `core_default_app_access` (`AppAccessWithoutBindings`) | tenant flag, default `true`, `authentik/core/apps.py`; read by `providers/ldap/api.py` | relied on: the LDAP application carries no binding, so it is open to every user and access is decided by the consumer's `memberOf` filter |
+
+### 11.7 What this does not close
+
+- **Direct SQL writes stay invisible.** No event, no blueprint. The rule "the database is not a change path"
+  plus the event arm of the drift report are the only countermeasures.
+- **Objects created in the interface that nobody declares are not reclaimed.** They are reported as foreign,
+  which is the intended behaviour, not a gap.
+- **A new consumer's SOPS secret is added by hand.** The endpoint contract derives the path; if the key is
+  missing, `sops-install-secrets` fails the deploy loudly rather than starting with an empty credential.
+- **A fresh install must create authentik's two unmanaged bootstrap tables** (`authentik_install_id`,
+  `authentik_version_history`) before the first migration; authentik's own startup does this. The fresh-database
+  acceptance test reproduced the install by seeding them.
 
 

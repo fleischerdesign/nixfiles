@@ -34,30 +34,79 @@ let
   # database rather than in a blueprint, so a fresh install would come up looking healthy while Jellyfin could
   # not search. These are the invariants the design rests on, and a deploy that breaks one must fail.
 
-  # Apply path: queue the task and wait for the effect, then check the invariants above. It asserts on
-  # `last_applied` rather than on `status` alone: status describes the last attempt, so a failed apply leaves
-  # the previous value behind and a blueprint can read `successful` while the object it declares does not
-  # exist.
+  # Apply path: queue the task and wait for the effect, then check the invariants above. Only the blueprints
+  # this repository owns are sent - the ownership label, not `enabled`, decides. Applying authentik's own
+  # defaults would silently revert an administrator's edit to their objects at every deploy (see E1). It
+  # asserts on `last_applied` rather than on `status` alone: status describes the last attempt, so a failed
+  # apply leaves the previous value behind and a blueprint can read `successful` while the object it declares
+  # does not exist.
   blueprintsApplyScript = pkgs.writeText "authentik-apply-blueprints.py" ''
     import sys
     import time
+    from pathlib import Path
+
+    from yaml import YAMLError, load
+
+    from django.apps import apps
 
     from authentik.blueprints.models import BlueprintInstance
+    from authentik.blueprints.v1.common import BlueprintEntryDesiredState, BlueprintLoader, YAMLTag
+    from authentik.blueprints.v1.importer import Importer
     from authentik.blueprints.v1.tasks import apply_blueprint
-    from authentik.core.models import Application, User
+    from authentik.core.models import Application, Token, User
     from authentik.flows.models import Flow, FlowStageBinding
+    from authentik.lib.config import CONFIG
     from authentik.policies.models import PolicyBinding
     from authentik.providers.ldap.models import LDAPProvider
 
     EXPECTED = ${builtins.toJSON blueprints.expectations}
+    OWNER_LABEL = ("${blueprintLib.ownerLabelName}", "${blueprintLib.ownerLabelValue}")
+    root = Path(CONFIG.get("blueprints_dir"))
+    deadline = time.monotonic() + ${toString blueprintsApplyTimeoutSeconds}
 
-    instances = list(BlueprintInstance.objects.filter(enabled=True))
-    if not instances:
-        print("no enabled blueprint instances")
-        sys.exit(0)
+    def owned_paths():
+        """The paths of the blueprints this repository owns, read from the deployed files themselves.
+
+        The label is the ownership marker. Reading it from the directory rather than from
+        `instance.metadata` closes a chicken-and-egg on a fresh database: metadata is only written once an
+        instance is applied, so selecting on it would apply nothing exactly while the world is being built.
+        The files are the declaration the deploy just shipped, so they are the authority on who we are.
+        """
+        owned = []
+        for path in sorted(root.rglob("*.yaml")):
+            if any(part.startswith(".") for part in path.parts):
+                continue
+            with open(path, encoding="utf-8") as handle:
+                try:
+                    raw = load(handle.read(), BlueprintLoader)
+                except YAMLError as exc:
+                    print(f"FAILED parse {path}: {exc}")
+                    sys.exit(1)
+            if not raw:
+                continue
+            metadata = raw.get("metadata") or {}
+            if (metadata.get("labels") or {}).get(OWNER_LABEL[0]) == OWNER_LABEL[1]:
+                owned.append(str(path.relative_to(root)))
+        return owned
+
+    paths = owned_paths()
+    if not paths:
+        print("FAILED: no owned blueprints in " + str(CONFIG.get("blueprints_dir")))
+        sys.exit(1)
+
+    # The worker's discovery creates the instance rows, asynchronously and not necessarily before this unit
+    # starts on a fresh database. Wait for every owned file to be instantiated before applying any of them.
+    while True:
+        instances = list(BlueprintInstance.objects.filter(enabled=True, path__in=paths))
+        missing = sorted(set(paths) - {instance.path for instance in instances})
+        if not missing:
+            break
+        if time.monotonic() > deadline:
+            print("FAILED, discovery did not instantiate: " + ", ".join(missing))
+            sys.exit(1)
+        time.sleep(3)
 
     before = {i.name: i.last_applied for i in instances}
-    deadline = time.monotonic() + ${toString blueprintsApplyTimeoutSeconds}
 
     def send(targets):
         for instance in targets:
@@ -101,6 +150,35 @@ let
         if not condition:
             failures.append(description)
 
+    # Derived invariants. The existential level parses every owned blueprint with the importer - the same
+    # source the apply uses - and queries the database for each declared object, so a missing object fails
+    # the deploy instead of hiding behind a `successful` status (the failure mode of §6.2). Entry types
+    # whose identifiers contain a YAML tag (stage and policy bindings) are covered by the cardinal checks
+    # below. A tombstone must resolve to nothing: that is the rename discipline of §11.3, enforced.
+    for path in paths:
+        blueprint = Importer.from_string((root / path).read_text(encoding="utf-8"), {}).blueprint
+        for entry in blueprint.iter_entries():
+            model_name = entry.get_model(blueprint)
+            if model_name == "authentik_blueprints.metaapplyblueprint":
+                continue
+            identifiers = entry.identifiers or {}
+            if any(isinstance(value, YAMLTag) for value in identifiers.values()):
+                continue
+            model = apps.get_model(*model_name.split("."))
+            exists = model.objects.filter(**identifiers).exists()
+            state = entry.get_state(blueprint)
+            if state == BlueprintEntryDesiredState.ABSENT:
+                expect(f"tombstone {model_name} {identifiers} is gone", not exists)
+            else:
+                expect(f"{model_name} {identifiers} resolves to an object", exists)
+
+    for identifier in EXPECTED["sopsBackedTokens"]:
+        token = Token.objects.filter(identifier=identifier).first()
+        expect(f"token {identifier} exists", token is not None)
+        if token is not None:
+            expect(f"token {identifier} is unmanaged (managed={token.managed!r})", token.managed is None)
+            expect(f"token {identifier} does not expire (expiring={token.expiring!r})", token.expiring is False)
+
     for slug in EXPECTED["applicationsWithoutBindings"]:
         application = Application.objects.filter(slug=slug).first()
         expect(
@@ -142,6 +220,87 @@ let
         sys.exit(1)
 
     print("applied and verified: " + ", ".join(sorted(before)))
+    sys.exit(0)
+  '';
+
+  # Drift report: report only, never correct. The apply only runs when the deployment changed, so a
+  # change made in the interface is invisible until the next deploy - exactly the window in which the
+  # ownership rule needs a voice. It compares the declared scalar fields against the objects and lists
+  # the recent interface events, and it writes nothing.
+  driftReportScript = pkgs.writeText "authentik-drift-report.py" ''
+    import sys
+    from pathlib import Path
+
+    from django.apps import apps
+    from yaml import load
+
+    from authentik.blueprints.v1.common import BlueprintEntryDesiredState, BlueprintLoader, YAMLTag
+    from authentik.blueprints.v1.importer import Importer
+    from authentik.events.models import Event
+    from authentik.lib.config import CONFIG
+
+    OWNER_LABEL = ("${blueprintLib.ownerLabelName}", "${blueprintLib.ownerLabelValue}")
+    root = Path(CONFIG.get("blueprints_dir"))
+
+    def owned_paths():
+        owned = []
+        for path in sorted(root.rglob("*.yaml")):
+            if any(part.startswith(".") for part in path.parts):
+                continue
+            with open(path, encoding="utf-8") as handle:
+                raw = load(handle.read(), BlueprintLoader)
+            metadata = (raw or {}).get("metadata") or {}
+            if (metadata.get("labels") or {}).get(OWNER_LABEL[0]) == OWNER_LABEL[1]:
+                owned.append(str(path.relative_to(root)))
+        return owned
+
+    def scalar(value):
+        """Only plain values are compared. References, files, lists and FKs are not drift."""
+        return isinstance(value, (str, bool, int)) and not isinstance(value, YAMLTag)
+
+    findings = []
+    for rel in owned_paths():
+        blueprint = Importer.from_string((root / rel).read_text(encoding="utf-8"), {}).blueprint
+        for entry in blueprint.iter_entries():
+            model_name = entry.get_model(blueprint)
+            if model_name == "authentik_blueprints.metaapplyblueprint":
+                continue
+            identifiers = entry.identifiers or {}
+            if any(isinstance(value, YAMLTag) for value in identifiers.values()):
+                continue
+            model = apps.get_model(*model_name.split("."))
+            instance = model.objects.filter(**identifiers).first()
+            state = entry.get_state(blueprint)
+            if instance is None:
+                if state != BlueprintEntryDesiredState.ABSENT:
+                    findings.append(f"MISSING {model_name} {identifiers}: declared but not in the database")
+                continue
+            if state == BlueprintEntryDesiredState.ABSENT:
+                findings.append(f"STALE {model_name} {identifiers}: tombstoned but still present")
+                continue
+            for field, declared in (entry.attrs or {}).items():
+                if not scalar(declared):
+                    continue
+                current = getattr(instance, field, None)
+                if scalar(current) and current != declared:
+                    findings.append(
+                        f"RESET {model_name} {identifiers} field {field}: "
+                        f"database {current!r}, declared {declared!r}"
+                    )
+
+    print(f"drift report: {len(findings)} finding(s)")
+    for finding in findings:
+        print("DRIFT " + finding)
+
+    recent = list(
+        Event.objects.filter(
+            action__in=["model_updated", "model_created", "model_deleted"],
+        ).order_by("-created")[:50]
+    )
+    print(f"interface events: {len(recent)} recent")
+    for event in recent:
+        user = (event.user or {}).get("username", "<system>")
+        print(f"EVENT {event.created.isoformat()} {event.action} user={user} {event.context}")
     sys.exit(0)
   '';
 
@@ -256,9 +415,11 @@ in
           "AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true"
           "AUTHENTIK_AVATARS=gravatar"
           "AUTHENTIK_EVENTS__CONTEXT_PROCESSORS__GEOIP=/var/lib/GeoIP/GeoLite2-City.mmdb"
-          # Populate the bootstrap admin on first start; the matching
-          # AUTHENTIK_BOOTSTRAP_PASSWORD_HASH lives in the core_env secret.
+          # Populate the bootstrap admin on first start. The plaintext break-glass password lives in the
+          # core_env secret as `AUTHENTIK_BOOTSTRAP_PASSWORD`; it is only consumed while `akadmin` does
+          # not exist yet, so it never resets a password that has already been changed.
           "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
+          "AUTHENTIK_RECOVERY_FROM_ADDRESS=noreply@${config.my.topology.domain}"
           "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
         ];
         Restart = "always";
@@ -303,6 +464,7 @@ in
           # throughput on scaled-out replicas; this instance is single-replica.
           "AUTHENTIK_WORKER__THREADS=1"
           "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
+          "AUTHENTIK_RECOVERY_FROM_ADDRESS=noreply@${config.my.topology.domain}"
           "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
         ];
         Restart = "always";
@@ -347,10 +509,60 @@ in
           "AUTHENTIK_POSTGRESQL__NAME=authentik"
           "AUTHENTIK_POSTGRESQL__USER=authentik"
           "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
+          "AUTHENTIK_RECOVERY_FROM_ADDRESS=noreply@${config.my.topology.domain}"
           "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
         ];
         ExecStart = "${lib.getExe authentikPackage} shell";
         StandardInput = "file:${blueprintsApplyScript}";
+      };
+    };
+
+    # Drift report, report only. It runs when a deploy changes the blueprints (so the report lands next to
+    # the apply) and daily (so a change made in the interface is reported even when nobody deploys). It
+    # always exits 0: a report that fails would be an alarm, and the intent is to name the drift without
+    # changing anything.
+    systemd.services.authentik-drift-report = {
+      description = "Report drift between the declared blueprints and the database";
+      wantedBy = [ "multi-user.target" ];
+      # Run after the apply, not beside it: a report that reads the database while the apply is still
+      # settling reported the SOPS tokens as missing on 2026-09-20 (a transient false positive).
+      after = [
+        "authentik-worker.service"
+        "authentik-blueprints-apply.service"
+      ];
+      requires = [
+        "authentik-worker.service"
+        "authentik-blueprints-apply.service"
+      ];
+      restartTriggers = [ cfg.blueprintsDir ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = "authentik";
+        Group = "authentik";
+        WorkingDirectory = "/var/lib/authentik";
+        EnvironmentFile = [
+          config.sops.secrets."services/authentik/core_env".path
+          config.sops.templates."authentik_secrets.env".path
+        ];
+        Environment = [
+          "AUTHENTIK_REDIS__HOST=127.0.0.1"
+          "AUTHENTIK_REDIS__PORT=6379"
+          "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
+          "AUTHENTIK_POSTGRESQL__NAME=authentik"
+          "AUTHENTIK_POSTGRESQL__USER=authentik"
+          "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
+        ];
+        ExecStart = "${lib.getExe authentikPackage} shell";
+        StandardInput = "file:${driftReportScript}";
+      };
+    };
+
+    systemd.timers.authentik-drift-report = {
+      description = "Daily drift report for the declared blueprints";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "daily";
+        Persistent = true;
       };
     };
 
