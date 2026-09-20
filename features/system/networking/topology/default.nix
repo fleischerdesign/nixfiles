@@ -440,13 +440,12 @@ in
 
     # Default IoT devices conforming to RFC 1178 Enterprise Taxonomy
     my.topology.devices = lib.mkDefault {
-      # Peripheral hardware that is not a microcontroller. No MAC on purpose: a device with MAC and
-      # ipv4 becomes a DHCP reservation, and the gateway asserts that every reservation lies inside
-      # a declared subnet - which this one does not until it moves. The MAC goes in when it does.
+      # Peripheral hardware that is not a microcontroller.
       hom-prn-01 = {
         zone = "iot";
-        ipv4 = "192.168.178.109";
-        description = "HP Multifunktionsdrucker/Scanner; noch im alten Subnetz (siehe DEPLOYMENT.md 14)";
+        mac = "80:ce:62:8a:7c:06"; # HP MFP, hostname hp8a7c05; leases its iot address from Kea
+        ipv4 = "10.10.30.19";
+        description = "HP Multifunktionsdrucker/Scanner (hp8a7c05), iot-Zone";
       };
       # Enterprise Relais-Aktoren (Sonoff Basic ESP8266 Inline-Relais)
       hom-rly-01 = {
