@@ -17,7 +17,6 @@ agentic contributors).
 | How do I deploy, reach a host, verify a change, recover a host I locked myself out of? | [operations.md](operations.md) |
 | How do we work here - what counts as verified, what are the failure patterns? | [practices.md](practices.md) |
 | Who is a user, what is a service account, how does authentication and authorisation work? | [identity.md](identity.md) |
-| How does a service declare what it needs, and how does the platform provide it? | [provisioning.md](provisioning.md) |
 | What is the security model, layer by layer? | [security.md](security.md) |
 | What are the microcontrollers, the access point, the router - and how are they configured? | [embedded.md](embedded.md) |
 | What do the interfaces look like, which tokens and typography? | [design.md](design.md) |

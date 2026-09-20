@@ -21,7 +21,7 @@ in
     outputs = lib.mkOption {
       type = lib.types.attrs;
       default =
-        if hostname == "jello" then
+        if hostname == "hom-wrk-01" then
           {
             "DP-1" = {
               position = {

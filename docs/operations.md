@@ -2,7 +2,7 @@
 
 > **Status:** Operational runbook (living document)
 > **Audience:** Operators and autonomous agents. Everything needed to finish (or recover) the 2.0 rollout is here.
-> **Companion docs:** `architecture.md` (target design), `provisioning.md` (service config-as-code), `identity.md` (Authentik), `embedded.md` (IoT fleet), `AGENTS.md` (repo rules).
+> **Companion docs:** `architecture.md` (the system and its vocabulary), `naming.md` (names and planes), `identity.md` (Authentik), `security.md` (the threat model), `embedded.md` (the device fleet), `practices.md` (how we work).
 > **Emergency?** Jump straight to [§11 Emergency Recovery](#11-emergency-recovery--regaining-access).
 
 ---

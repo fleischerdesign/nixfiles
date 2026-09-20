@@ -19,7 +19,7 @@ in
       enable = true;
       user = "klipper";
       group = "klipper";
-      # Declarative Core & Macros from Git, dynamic calibration state from /var/lib/klipper (docs/provisioning.md 4)
+      # Declarative Core & Macros from Git, dynamic calibration state from /var/lib/klipper (docs/architecture.md §6.1)
       configFile = pkgs.writeText "klipper-master.cfg" ''
         # Immutable macros from the Nix store
         [include ${./printer-config/macros.cfg}]

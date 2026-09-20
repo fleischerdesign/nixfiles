@@ -3,8 +3,8 @@
 # and exposes a command surface (system.run, system.which, browser proxy, MCP servers, …)
 # which the gateway invokes through node.invoke.
 #
-# Supports running multiple node instances concurrently (e.g. jello connecting to Philipp's
-# gateway, while shared nodes like strummer can connect instances to multiple user gateways).
+# Supports running multiple node instances concurrently (e.g. hom-wrk-01 connecting to Philipp's
+# gateway, while shared nodes like hom-srv-01 can connect instances to multiple user gateways).
 #
 # Transports:
 #   loopback-tunnel   (Default) The node connects to the gateway via an SSH -L forward

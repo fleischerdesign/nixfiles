@@ -22,7 +22,6 @@ vocabulary the other documents use.
 | The engineering bar and the failure patterns | [docs/practices.md](docs/practices.md) |
 | Identity and access | [docs/identity.md](docs/identity.md) |
 | Security model | [docs/security.md](docs/security.md) |
-| Service provisioning | [docs/provisioning.md](docs/provisioning.md) |
 | Microcontrollers, access point, router | [docs/embedded.md](docs/embedded.md) |
 | Visual identity | [docs/design.md](docs/design.md) |
 | Instructions for agentic contributors | [AGENTS.md](AGENTS.md) |

@@ -33,7 +33,7 @@ features/services/authentik/
 `ldap-outposts-generated.yaml`) does not exist in the tree: the compiler in `server/default.nix` emits
 it **from the service contracts** - every service that declares an OIDC or forward-auth endpoint gets a
 provider and an application without writing any blueprint. That is the whole point of the contract
-layer, see [provisioning.md](provisioning.md).
+layer - see [architecture.md](architecture.md) §6.1.
 
 ## 3. Constraints that cost real time
 

@@ -206,6 +206,25 @@ The invariants (`contracts/*`) are evaluation-time assertions, not conventions: 
 public plane without authentication, a name that cannot be derived, an endpoint on a host that does not
 serve it, or a subnet a reservation falls outside - each fails the build rather than the deployment.
 
+### 6.1 What is compiled, and what is still a setting
+
+A projection earns its complexity only where it replaces a manual step. Measured 2026-09-20, service by
+service:
+
+| Surface | Compiled from the repository | Still configured in a UI |
+|---|---|---|
+| cluster dashboard (Homarr) | tiles, categories, icons and URLs from `endpoints.dashboard` | nothing |
+| Grafana | three dashboards as files, plus datasources and alerts from the module | nothing |
+| CrowdSec | the trusted-subnet whitelist, from `my.topology.trustedSubnets` | nothing |
+| ntfy | accounts and tokens from SOPS, `deny-all` by default | nothing |
+| Klipper | the machine definition and macros from the store | calibration state - the `runtime_variables.cfg` include is prepared but commented out |
+| Home Assistant | integrations, MQTT, the reverse-proxy configuration | **automations**: the module includes them in UI mode, so they are not in Git, not reviewed, and do not survive a reinstall |
+| arr stack, Sabnzbd | quality profiles and custom formats (Recyclarr) | root folders, download clients, categories, paths - only the secrets are templated |
+
+The two gaps in the last rows are real and worth being explicit about: they are the difference between
+"the instance can be rebuilt" and "the instance behaves the same afterwards". Neither is blocked by
+anything except the work.
+
 ## 8. Observability
 
 `cld-edge-01` runs the full pipeline (Prometheus, Grafana, Loki, Alertmanager); `cld-ops-01` and
@@ -238,7 +257,6 @@ silently lost to a DNS outage and only showed up in that list).
 | What a name may look like and who owns it | [naming.md](naming.md) |
 | Users, service accounts, authentication flows | [identity.md](identity.md) |
 | The security model, layer by layer | [security.md](security.md) |
-| How a service declares and receives what it needs | [provisioning.md](provisioning.md) |
 | Microcontrollers, access point, router | [embedded.md](embedded.md) |
 | Interfaces, tokens, typography | [design.md](design.md) |
 | Deploy, verify, recover | [operations.md](operations.md) |
