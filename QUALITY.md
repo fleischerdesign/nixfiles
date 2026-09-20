@@ -58,6 +58,8 @@ stated.
 | **A6** | **resolved**. Root access was restored through the provider's rescue system after my own gateway precedence change had left the edge with no default route; the edge now boots the corrected generation by default, and every server trusts both the operator key and the fleet key (`~/.ssh/nixfiles-deploy-key`, `SHA256:EduFlyo…`). `~/.ssh/config`, `nod`'s `identityFile` and `deploy-rs`'s `-i` argument all use the fleet key; `~/.ssh/deploy-key` points at the node tunnel secret and is documented as not for fleet access. The LAN certificate failure is resolved by the per-name DNS-01 model, measured from inside the LAN: `jellyfin` 302, `mealie` 200, `hass` 200, `seerr` 307, each with a Let's Encrypt issuer where there used to be a handshake failure |
 | **A6 (passwords)** | `users.philipp.password` was **always** the hash of `173695` — verified against the value in git history with `perl -e 'print crypt(…)'`. The drift was never in the declaration but in its enforcement: `mutableUsers = true` applied it only at account creation, so `cld-edge-01` kept whatever the provider's install set, and the panel's password reset never reached the OS (it works through cloud-init on the provider's own images; this is NixOS). Servers now set `users.mutableUsers = false`, so the declaration is applied on every activation — and this is now **measured**, not assumed: the `hom-wrk-01` activation printed `modifying secret: users/philipp/password`, and a non-interactive `sudo -S` with `173695` succeeds |
 
+| **Zones (LAN)** | **resolved, and proven on a device**: the inventory decides the address range. The three zones live in **one** Kea shared network, each subnet bound to one client class - `infra`, `iot`, and the complement `corp` for whatever the inventory does not declare. Kea's default subnet selection for a directly connected client uses the *receiving interface's address* and ignores classification entirely, so classes could never have taken effect without it (ARM 8.6, see §4.2). Proof: `hom-rly-01` was flashed over OTA, re-requested DHCP, and came back on the address its inventory entry declares - `DHCP4_LEASE_ALLOC lease 10.10.30.11`, neighbour `REACHABLE`, ICMP/OTA/API answering |
+
 **Holding:** invariants I1–I10 assert clean (0 errors under `flake check`); the compatibility shim is
 gone (0 occurrences); the `vlan` field is gone (0 occurrences).
 
@@ -126,6 +128,37 @@ the unit exist, is the tool there);
   the ingress alike — while reading like an intermediate state in a rollout script. The following
   script checks `[ "$(systemctl is-active caddy)" = active ]` and aborts otherwise; the earlier ones
   printed the state and moved on.
+
+### 4.2 A symptom treated three times, because the documented mechanism was never read
+
+The LAN zone model — the inventory decides the address range a device lands in — took three rounds,
+because every round fixed something visible instead of reading the mechanism that produced the
+behaviour:
+
+| Round | Belief | How it was "verified" | What was actually true |
+|---|---|---|---|
+| 1 | the MAC test `hexstring(pkt4.mac,'')` returns a string form that never compares equal | Kea parsed the file, the classes were in the rendered config, exactly one subnet was classless | the class test was never observed *matching*. Kea's validator had been printing `DHCPSRV_CLIENT_CLASS_DEPRECATED` on **every start** — through a filter that looked for `ERROR` only |
+| 2 | the unrestricted default subnet shadows class-restricted ones later in the list | plausible-sounding reasoning about "the first eligible subnet", plus one ambiguous measurement | no documentation was consulted at all; the measurement was equally consistent with the classes never being evaluated |
+| 3 | the direct `pkt4.mac == 0x…` form and the corrected order | Kea accepted and validated it | still nothing changed on the wire - because the selection never reached the classes |
+
+The actual answer was in the documentation the whole time. ARM **8.6**: for a directly connected
+client the server selects the single subnet the *receiving interface's address* falls into, and "the
+subnet selection mechanism described in this section is based on the assumption that client
+classification is not used". The gateway's interface carries an address of every zone at once, so one
+zone won for every client, deterministically. ARM **8.4** names this deployment exactly — "more than
+one logical IP subnet deployed on the same physical link … called shared networks in Kea" — and
+offers the interface selector at shared-network level; "when the selected subnet is a member of a
+shared network, the whole shared network is selected", and *there* the classes decide. ARM **8.4.2**
+adds the part that makes a classless default subnet a defect rather than an omission: a subnet that
+names no class accepts every client, and "a common mistake is to assume that a subnet that includes a
+client class is preferred over subnets without client classes".
+
+**The rule, and it generalises past Kea:** a behaviour question is answered by the section that
+*defines* the behaviour, and reading it is cheaper than any number of experiments. Where a tool
+validates its own input, read the whole verdict — warnings included — and count them; a filter that
+keeps only `ERROR` throws away the tool telling you what is deprecated or ignored. And a measurement
+that cannot distinguish the hypothesis from its alternative is not evidence for either: round 2 rested
+on exactly such a measurement, and it was read as confirmation.
 
 ## 5. Open blockers — and one open investigation
 
