@@ -25,7 +25,7 @@ let
   dhcpSubnets = map (zone: {
     inherit zone;
     config = topology.subnets.${zone};
-  }) servedZones;
+  }) orderedZones;
 
   # Determine static reservations for DHCP from hosts and devices declared in topology with MAC address
   hostsWithMac = lib.filterAttrs (_name: h: h.mac != null && h.ipv4 != null) topology.hosts;
@@ -78,7 +78,16 @@ let
   # expression language has no literal that never matches (measured: `false` is rejected with
   # "Invalid character: f"), so an empty zone is handled by not serving it: serving it would make its
   # subnet a second pool that any client can reach - the opposite of what the zone declares.
+  # Order matters, and deliberately so: Kea takes the first subnet a client is eligible for, and a
+  # subnet without a class is eligible for every client. A class-restricted subnet listed after the
+  # default one is therefore unreachable - measured: a relay matched the iot class and still received
+  # a default-zone address, because the unrestricted subnet came first in the list. The default zone
+  # is appended last, and the assertion further down keeps it there.
   servedZones = lib.filter (zone: zone == cfg.defaultZone || membersOfZone zone != [ ]) dhcpZones;
+
+  orderedZones =
+    lib.filter (zone: zone != cfg.defaultZone) servedZones
+    ++ lib.optional (lib.elem cfg.defaultZone servedZones) cfg.defaultZone;
 
   unservedZones = lib.subtractLists servedZones dhcpZones;
 
@@ -187,6 +196,12 @@ in
         # Without the default zone being served, an undeclared client would receive no lease at all.
         assertion = lib.elem cfg.defaultZone dhcpZones;
         message = "Gateway: defaultZone '${cfg.defaultZone}' is not among the zones served by DHCP (uplinkZone plus routedZones), so undeclared clients would get no address.";
+      }
+      {
+        # Kea takes the first eligible subnet and an unrestricted subnet is eligible for everyone, so
+        # the default zone has to come last or every class-restricted subnet after it is dead weight.
+        assertion = lib.last (map (entry: entry.zone) dhcpSubnets) == cfg.defaultZone;
+        message = "Gateway: the default zone '${cfg.defaultZone}' must be the last subnet in the served list - Kea picks the first subnet a client is eligible for, and an unrestricted one is eligible for every client.";
       }
     ];
 
