@@ -242,6 +242,17 @@ plus split horizon serves the same purpose without a second name at all.
 
 ### 5.1 The public catch-all conflicts with the internal planes (verified defect)
 
+**What the internal resolver does with undeclared names (measured 2026-09-20).** Blocky's `customDNS`
+resolves subdomains of a mapped name automatically, and the apex `${domain}` is itself mapped (the
+landing endpoint terminates on the ingress). Every `*.${domain}` therefore resolves to the ingress
+internally, declared or not: `zzz-nonsense-4711.${domain}` answers `10.10.100.1` inside the LAN while
+publicly returning NXDOMAIN. This is deliberate — a single refusal point instead of a DNS failure —
+and it discloses nothing beyond the existence of the zone. The ingress refuses a name it does not
+serve (TLS alert `internal error`, no certificate), which is why a mistyped public name shows as
+`ERR_SSL_PROTOCOL_ERROR` in a browser rather than as a certificate for a name we do not own. Removing
+this would mean un-mapping the apex and losing internal resolution for `${domain}` itself, so it
+stays - and is recorded here so the spec and the behaviour agree.
+
 RFC 4592 resolves wildcards by *closest encloser*, so an apex wildcard `*.${domain}` absorbs
 names that merely look like they belong to an internal plane. **Verified live** (Cloudflare
 DoH): `foo.lan.vyrx.de`, `bar.mesh.vyrx.de` and `x.iot.vyrx.de` **all resolve to the ingress**.
