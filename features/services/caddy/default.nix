@@ -322,6 +322,24 @@ in
     # Allow group read access to logs (for CrowdSec and Alloy)
     systemd.services.caddy.serviceConfig.UMask = "0027";
 
+    # A configuration change restarts Caddy instead of reloading it.
+    #
+    # Measured twice on 2026-09-20: the in-process reload ended in "Reload operation timed out.
+    # Killing reload process." and left the service listening but answering nothing for any vhost -
+    # from the LAN and through the ingress alike - while an isolated reproduction of every mechanism
+    # we could think of (unreadable, truncated and mismatched certificate files; files rewritten
+    # during the load; in-flight requests with default and finite grace periods; five concurrent
+    # reloads; fourteen concurrent forced reloads on an unchanged config with fourteen bound sites)
+    # failed to hang even once. What the production log does show is the load stalling in Caddy's own
+    # admin-endpoint teardown (`stopping current admin endpoint` -> `10s timeout`), and a reload
+    # necessarily round-trips through that endpoint while a restart never does. The root cause is not
+    # proven; the affected code path is simply not used any more. See QUALITY.md 5.0.
+    #
+    # This is the module's documented knob for exactly this trade-off (`enableReload`), not an
+    # override of `ExecReload`: `lib.mkForce` on that list does not displace the module's command,
+    # which survives in the rendered unit - also measured.
+    services.caddy.enableReload = false;
+
     systemd.tmpfiles.rules = [
       "d /var/log/caddy 0755 caddy caddy -"
       "z /var/log/caddy/*.log 0640 caddy caddy -"
