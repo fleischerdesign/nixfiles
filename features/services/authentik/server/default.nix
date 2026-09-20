@@ -625,22 +625,13 @@ let
               user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
             };
           }
-          {
-            # The flow needs a binding that admits this account, otherwise its policy engine answers
-            # that it applies to nobody.
-            model = "authentik_policies.policybinding";
-            identifiers = {
-              # `!Find`, not `!KeyOf`: the model reference's own example resolves a policy binding's
-              # target this way. With `!KeyOf flow_ldap_auth` the entry created no row at all while the
-              # blueprint still reported success - measured: exactly one binding existed, on the
-              # application, and none on the flow, so the flow kept applying to nobody.
-              target = yamlTag "!Find [authentik_flows.flow, [slug, ldap-authentication-flow]]";
-              order = 0;
-            };
-            attrs = {
-              user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
-            };
-          }
+          # No policy binding on the flow the outpost executes, deliberately. The outpost runs it before
+          # any account is authenticated, so a binding naming the service account cannot match and the
+          # flow answers "Flow does not apply to current user" - measured, twice, for the same reason the
+          # authorization flow failed. An unbound flow applies to everyone, which is what an LDAP bind
+          # needs; who may actually bind is decided afterwards by the application access check (bind.go
+          # calls OutpostsLdapAccessCheck after the flow), exactly as the docs describe it: "A user must
+          # have access to the LDAP application before they can bind and search the directory."
           {
             # A provider runs two flows: the bind flow authenticates the account, and the authorization
             # flow decides whether it may use the LDAP application. Measured: the core rejected the bind
