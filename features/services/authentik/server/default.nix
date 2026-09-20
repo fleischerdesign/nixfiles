@@ -689,11 +689,10 @@ let
             model = "authentik_flows.flowstagebinding";
             identifiers = {
               target = yamlTag "!KeyOf flow_ldap_authz";
+              stage = yamlTag "!KeyOf stage_ldap_authz_consent";
               order = 0;
             };
-            attrs = {
-              stage = yamlTag "!KeyOf stage_ldap_authz_consent";
-            };
+            attrs = { };
           }
           {
             model = "authentik_core.token";
