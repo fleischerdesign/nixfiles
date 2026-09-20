@@ -167,8 +167,13 @@ let
     (metaApply "default/flow-default-provider-invalidation.yaml")
   ];
 
+  # The LDAP outpost blueprint depends on the default provider flows, on the RBAC groups, and on the consumer
+  # blueprint: it carries an object permission for each consumer's role, and those roles are created by
+  # `vyrx-ldap-consumers`. Declared as a dependency rather than hoped for, because authentik guarantees no
+  # apply order across files.
   ldapDependencies = providerFlowDependencies ++ [
     (metaApply "01-rbac/users-and-groups.yaml")
+    (blueprintLib.metaApplyInstance "vyrx-ldap-consumers")
   ];
 
   # Declarative model-driven blueprint compiling all auth endpoints into Authentik ProxyProviders and Applications

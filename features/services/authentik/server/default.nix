@@ -84,22 +84,12 @@ let
             if time.monotonic() > deadline:
                 return waiting
 
-    # Two passes, because authentik documents that blueprint discovery and evaluation follow no guaranteed
-    # order, and our blueprints reference each other across files: the provider carries an object permission
-    # for the consumer's role, which a different file creates. A first pass can therefore fail on a
-    # reference that does not exist yet, and a second pass over the whole set is idempotent - by then the
-    # referenced object exists. Measured before this existed: a deploy failed with
-    # `KeyOf: failed to find entry with id of sa_ldap_consumer_jellyfin`, and the very next run succeeded.
+    # The order across blueprint files is not guaranteed by authentik, so the dependency is declared with the
+    # meta model rather than retried here: `ldapDependencies` makes the outposts blueprint apply the
+    # consumers blueprint first, because the provider carries a permission for the consumer's roles. A deploy
+    # that breaks such a dependency fails loudly instead of being papered over by a second pass.
     send(instances)
     waiting = settle(instances)
-
-    if waiting:
-        for instance in instances:
-            instance.refresh_from_db()
-            if instance.status == "error":
-                print(f"first pass failed for {instance.name}, applying again")
-        send(instances)
-        waiting = settle(instances)
 
     if waiting:
         print("FAILED apply, still not settled: " + ", ".join(sorted(waiting)))

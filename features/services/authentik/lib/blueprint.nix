@@ -89,12 +89,27 @@ let
       state = "absent";
     };
 
-  # Dependencies between blueprints, because authentik guarantees no apply order across files.
+  # Dependencies between blueprints, because authentik guarantees no apply order across files and documents
+  # the meta model for exactly this: "If you have dependencies between blueprints, you should use meta
+  # models to make sure that objects are created in the correct order."
+  #
+  # The identifiers of that meta model are "key-value attributes used to match the blueprint instance", so
+  # there are two ways to name the dependency: the path of a file-based blueprint (the upstream ones) and the
+  # instance name of a generated one. Both exist here, and mixing them up would be silent - the entry would
+  # match nothing, and `required` defaults to true, so it would fail the whole blueprint rather than the
+  # dependency alone.
   metaApply =
     path:
     entry {
       model = models.metaApplyBlueprint;
       attrs.identifiers.path = path;
+    };
+
+  metaApplyInstance =
+    name:
+    entry {
+      model = models.metaApplyBlueprint;
+      attrs.identifiers.name = name;
     };
 
   role =
@@ -415,6 +430,7 @@ in
     entry
     absent
     metaApply
+    metaApplyInstance
     role
     serviceAccount
     token
