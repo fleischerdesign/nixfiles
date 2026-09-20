@@ -23,19 +23,19 @@ Everything below serves that sentence.
 
 | # | Fact | Where measured |
 |---|---|---|
-| E1 | The apply unit applies **all** enabled instances, including authentik's own defaults | `server/default.nix:54`, `filter(enabled=True)` |
+| E1 | The apply unit applies **all** enabled instances, including authentik's own defaults | `features/services/authentik/server/default.nix`, in the apply script: `BlueprintInstance.objects.filter(enabled=True)` |
 | E2 | A UI change to a declared field is silently reverted by the next apply (`present` overwrites `attrs`) | blueprint structure documentation |
 | E3 | `state: absent` deletes; `state: created` creates once and never updates afterwards | same documentation |
 | E4 | Order across blueprint files is not guaranteed; dependencies go through `metaapplyblueprint` | blueprint index page |
-| E5 | `metadata.labels` exist; the apply task copies them to `instance.metadata` | structure docs + `blueprints/v1/tasks.py` |
+| E5 | `metadata.labels` exist; the apply task copies them to `instance.metadata` | structure docs + upstream `authentik/blueprints/v1/tasks.py` |
 | E6 | Our tokens have `managed = ''`, authentik's own have `goauthentik.io/outpost/…` — and `managed` appears nowhere in Nix | `authentik_core_token`, `grep managed` |
 | E7 | `provider.mfa_support` is `true` in the database and cannot be set through the blueprint (the apply fails) | earlier attempt, recorded in commit history |
-| E8 | The five seeded users declare `groups:` — a relationship humans must be able to change | `blueprints/01-rbac/users-and-groups.yaml:34-87` |
+| E8 | The five seeded users declare `groups:` — a relationship humans must be able to change | `features/services/authentik/server/blueprints/01-rbac/users-and-groups.yaml`, the five `- model: authentik_core.user` entries |
 | E9 | Groups declare **no** member list (`users:` occurs 0×) — correct, and must stay that way | same file |
 | E10 | The blueprint JSON schema has `additionalProperties` 32× but `false` 0× — it cannot catch an unknown field name | `https://goauthentik.io/blueprints/schema.json` |
-| E11 | `recovery.yaml:54` sends mail from `noreply@ancoris.ovh` (old domain) | `grep ancoris` |
-| E12 | `DC=vyrx,DC=de` is a literal in `contracts/directory`, not derived from `my.topology.domain` | `contracts/directory/default.nix:68` |
-| E13 | The `consentStage` builder and its model entry are unused since the authorization-flow experiment was removed | `lib/blueprint.nix` |
+| E11 | `features/services/authentik/server/blueprints/02-flows/recovery.yaml`, the line with `from_address:` sends mail from `noreply@ancoris.ovh` (old domain) | `grep ancoris` |
+| E12 | `DC=vyrx,DC=de` is a literal in `contracts/directory`, not derived from `my.topology.domain` | `contracts/directory/default.nix`, the line with `lib.mkDefault "DC=vyrx,DC=de"` |
+| E13 | The `consentStage` builder and its model entry are unused since the authorization-flow experiment was removed | `features/services/authentik/lib/blueprint.nix` |
 | E14 | `akadmin`'s password exists only as a hash in SOPS — no human can sign in as it | `AUTHENTIK_BOOTSTRAP_PASSWORD_HASH` |
 
 ## Work packages
@@ -71,7 +71,7 @@ a reason and a citation. No row reads "unknown".
 
 ### P4 — Invariants: from a sample to a derivation
 
-**Evidence**: seven hand-written `expect()` calls (`server/default.nix:100-133`) guard exactly the two
+**Evidence**: seven hand-written `expect()` calls (`features/services/authentik/server/default.nix`, the `def expect(` calls in the apply script) guard exactly the two
 failures of that night.
 **What**, three levels:
 - **existential**: every non-`absent` entry of every one of our instances resolves to an object — the
@@ -173,5 +173,5 @@ Four of the failures of 2026-09-20 came from trusting a *name* (`authentication_
 a *status* (`successful`), a *plausible story* ("the permission must be missing") or an *incomplete read*
 (`grep -c` counting lines in a one-line file). Every correction came from opening the source that actually
 decides — the API serializer, the Go outpost, the Django policy engine, the importer, the JSON schema. The
-sources are in the store and the documentation is checked out at `/tmp/authentik-docs`; nothing here needs a
+sources are in the store and the documentation is checked out at `/tmp/authentik-docs` (a checkout of goauthentik/authentik, `website/docs/`); nothing here needs a
 hypothesis.

@@ -63,7 +63,10 @@ and the consuming service reads the same secret. Neither side needs a human.
 
 ### 4.2 People - the shell is declarative, the credential is not
 
-Username, display name, e-mail and group membership are declared. The **passkey cannot be**: FIDO2 is
+Username, display name and e-mail are **seeded once**: the entry carries `state: created`, so the object
+exists after the first apply and everything about it afterwards belongs to the person and to whoever
+administers identities in the interface. **Group membership is not declared at all** - it is the assignment
+of people to policy and therefore people data, not configuration; see section 11 for the whole boundary. The **passkey cannot be**: FIDO2 is
 bound to a secure element and created through an interactive challenge-response ceremony in the
 browser. A person therefore exists immediately with every right they will have, and registers their
 passkey at first login through the standard WebAuthn flow.

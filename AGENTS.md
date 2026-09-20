@@ -18,8 +18,9 @@ deadnix --fail                     # no unused code
 statix check                       # lint (only repeated_keys disabled, see statix.toml)
 nix flake check                    # every host evaluates + statix + deadnix
 git config core.hooksPath .githooks # pre-commit runs the three above
-nixos-rebuild switch --flake .#<host>            # local
-nixos-rebuild switch --flake .#<host> --target-host root@<addr>   # remote
+nod switch <host>              # the fleet deploy: discovers hosts, builds, transfers, activates
+nixos-rebuild switch --flake .#<host>            # local, single host
+nixos-rebuild switch --flake .#<host> --target-host root@<addr>   # remote, single host
 ```
 
 A shell here is **fish** locally and on the hosts. `VAR=value cmd`, `$?`, `${PIPESTATUS[0]}` and
@@ -54,7 +55,7 @@ hosts/<name>/             entry point: role + hardware + host-specific features
 roles/                    base → server | pc → desktop | notebook
 features/                 auto-discovered modules, each behind `enable`
   system/  services/  dev/  media/  desktop/
-contracts/                provides (interfaces, storage, backup, telemetry), consumes, naming, endpoints
+contracts/                provides (interfaces, storage, backup, telemetry), consumes, naming, endpoints, directory
 lib/core/                 mkSystem, module auto-discovery
 user/<name>/              Home Manager: home.nix, packages, fish, editors
 secrets/                  SOPS-encrypted, one file

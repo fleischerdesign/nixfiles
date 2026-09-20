@@ -248,7 +248,7 @@ in A3 can be closed.
 
 ---
 
-## 6. Directory work - ten findings, each one measured late
+## 6. Directory work - eleven findings, each one measured late
 
 Making Jellyfin authenticate against the Authentik directory took a night and produced six generalisable
 findings. They are recorded because every one of them cost hours and none of them is specific to LDAP.
