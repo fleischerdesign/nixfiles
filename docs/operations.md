@@ -335,6 +335,7 @@ here: they belong in the commit that resolved them.
 | Authentik's `akadmin` is the only usable break-glass account | family accounts carry no password and are created through the enrollment flow |
 | The remote forward-auth outpost is reached at an overlay address (`10.10.100.1:9055`) | Caddy logins on the LAN hosts break if the mesh is down |
 | OpenClaw gateways require the ingress in `gateway.trustedProxies` | without it every proxy-shaped request is rejected |
+| The repository patches `nod` locally (`packages/overlays/fix/nod`) | `nix flake update nod` drops or breaks the patch, and `nod switch` silently returns exit 0 on a failed host again |
 
 ## 11. Appendix — Files, Secrets, Commands
 
