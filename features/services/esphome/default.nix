@@ -13,20 +13,15 @@ let
   specs = import ./devices/switches.nix;
   mkSonoff = import ./templates/sonoff-basic.nix { inherit pkgs lib; };
 
-  # The device stores both the fleet WLAN and, while the migration is in progress, the old name
-  # the access point still radiates. That is what lets the relays be flashed *before* the AP is
-  # renamed without locking anything out (DEPLOYMENT.md 8.6).
-  legacySsid = topology.hosts.hom-ap-01.migration.ssid or null;
+  # The device stores the fleet WLAN. The transitional second network it used to carry is gone:
+  # nothing radiates that name any more (measured 2026-09-20 - no such SSID on air), so a firmware
+  # entry for it would be a credential for a network that does not exist.
   wifiNetworks = [
     {
       ssid = topology.wifi.ssid;
       secret = "wifi_psk";
     }
-  ]
-  ++ lib.optional (legacySsid != null) {
-    ssid = legacySsid;
-    secret = "wifi_psk_legacy";
-  };
+  ];
 
   # Only devices the topology can pin down: its MAC reservation is what gives the firmware a
   # stable address, and the address is what discovery needs.
@@ -58,7 +53,6 @@ let
         --device "${device.ipv4}" \
         --secret-dir "/run/secrets/${secretPath name}" \
         --wifi-psk-file "/run/secrets/services/wifi/psk" \
-        --legacy-wifi-psk-file "/run/secrets/services/wifi/legacy_psk" \
         "$@"
     '';
 in
@@ -84,13 +78,7 @@ in
     # Rendered from SOPS as individual files; the sync engine assembles the secrets.yaml ESPHome
     # resolves `!secret` against, so no credential is ever embedded in the generated firmware
     # configuration or written into the Nix store.
-    sops.secrets = lib.genAttrs (
-      deviceSecrets
-      ++ [
-        "services/wifi/psk"
-        "services/wifi/legacy_psk"
-      ]
-    ) (_: { });
+    sops.secrets = lib.genAttrs (deviceSecrets ++ [ "services/wifi/psk" ]) (_: { });
 
     # The flash scripts belong on the host that holds the credentials: sops-nix materializes them
     # under /run/secrets here, and this is the machine on the segment the devices live on.

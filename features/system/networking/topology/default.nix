@@ -78,35 +78,6 @@ let
         '';
       };
 
-      # TEMPORARY migration aid. Keeps a host reachable on the OLD network while the LAN is
-      # being re-addressed, so a cutover can never lock us out. Must be emptied (addresses)
-      # and nulled (gateway) once the migration is complete.
-      migration = {
-        addresses = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
-          default = [ ];
-          example = [ "192.168.178.27/24" ];
-          description = "Additional addresses (CIDR) kept during a subnet migration.";
-        };
-
-        gateway = lib.mkOption {
-          type = lib.types.nullOr lib.types.str;
-          default = null;
-          example = "192.168.178.1";
-          description = "Default gateway to use while migrating (the old uplink).";
-        };
-
-        ssid = lib.mkOption {
-          type = lib.types.nullOr lib.types.str;
-          default = null;
-          example = "Ancoris";
-          description = ''
-            WLAN name this device still radiates/joins under its old identity. Devices that must
-            stay reachable across the rename store both this and the fleet SSID, so the rename
-            locks nothing out.
-          '';
-        };
-      };
       wireguardIpv4 = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
@@ -261,8 +232,7 @@ in
         default = "VYRX";
         description = ''
           Fleet-wide WLAN name. The single source of truth: the access point radiates it and the
-          microcontrollers store it, so the two cannot drift apart. A transitional old name lives
-          in the device's `migration.ssid` and disappears at teardown.
+          microcontrollers store it, so the two cannot drift apart.
         '';
       };
     };
@@ -370,14 +340,6 @@ in
           "corp"
           "iot"
         ];
-        # TEMPORARY (subnet migration): stay reachable on the old network until the
-        # FRITZ!Box has moved to 10.10.10.1/24 and DHCP is handed over to Kea.
-        migration = {
-          addresses = [ "192.168.178.27/24" ];
-          # Cleared: the FRITZ!Box has moved to 10.10.10.1 and is now the ordinary uplink again.
-          # Keeping the old default route would cut the server off the moment the box moves.
-          gateway = null;
-        };
       };
 
       hom-wrk-01 = {
@@ -391,11 +353,6 @@ in
         wireguardIpv6 = "fd10:1000:100::20";
         wireguardPublicKey = "y9CMim/6IWIKdIztKJQh5BR7R2ygjYwCjjEvgJQSLT0=";
         hostType = "workstation";
-        # TEMPORARY (subnet migration): the old address stays until the new configuration has
-        # proven itself, and it is what keeps this host reachable if the switch goes wrong.
-        migration = {
-          addresses = [ "192.168.178.30/24" ];
-        };
       };
 
       mob-nb-01 = {
@@ -425,16 +382,6 @@ in
         ipv4 = "10.10.10.20";
         mac = "7c:f1:7e:6a:b0:82"; # wired MAC: leases the declared address from Kea
         hostType = "embedded";
-        # The address half of the migration is finished: the access point leases 10.10.10.20 from
-        # Kea through the infra class and no longer answers on its old LAN address (measured silent). The
-        # tplink-ap reconciler derives its target address from this block, so the dead address is
-        # gone and the reconciler addresses the ipv4 above again. What remains is the WiFi half,
-        # which is not an address at all: the old SSID the ESP firmware still carries as a second
-        # network so the relays survive that rename. It goes when the relays are reflashed without
-        # it.
-        migration = {
-          ssid = "Ancoris";
-        };
       };
     };
 

@@ -87,21 +87,9 @@ in
 
     host = lib.mkOption {
       type = lib.types.str;
-      default =
-        let
-          migrationAddresses = if routerHost == null then [ ] else routerHost.migration.addresses;
-        in
-        if migrationAddresses != [ ] then
-          # Still on the old network: reach it where it currently answers.
-          lib.head (lib.splitString "/" (lib.head migrationAddresses))
-        else if routerHost != null && routerHost.ipv4 != null then
-          routerHost.ipv4
-        else
-          "10.10.10.1";
+      default = if routerHost != null && routerHost.ipv4 != null then routerHost.ipv4 else "10.10.10.1";
       description = ''
-        TR-064 reachable address of the FRITZ!Box. While the topology declares a `migration`
-        address the box is reached there (it has not moved yet); `ipv4` stays the target address
-        that the reconciler will set once it can write the LAN interface.
+        TR-064 reachable address of the FRITZ!Box: its declared `ipv4` in `my.topology`.
       '';
     };
 

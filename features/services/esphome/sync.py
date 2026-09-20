@@ -122,9 +122,6 @@ def main():
         "--wifi-psk-file", help="File holding the current WLAN pre-shared key"
     )
     parser.add_argument(
-        "--legacy-wifi-psk-file", help="File holding the transitional WLAN pre-shared key"
-    )
-    parser.add_argument(
         "--dry-run", action="store_true", help="Validate and resolve, but do not flash"
     )
     parser.add_argument(
@@ -154,7 +151,6 @@ def main():
             args.secret_dir,
             {
                 "wifi_psk": args.wifi_psk_file,
-                "wifi_psk_legacy": args.legacy_wifi_psk_file,
             },
         )
         secrets_path = os.path.join(workdir, "secrets.yaml")

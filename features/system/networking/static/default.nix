@@ -1,10 +1,10 @@
 # features/system/networking/static/default.nix
 # Topology-driven static addressing.
 #
-# Single source of truth: my.topology.hosts.<host> — interface, ipv4, gateway and the
-# temporary `migration` block. Nothing here hardcodes an interface name (the previous
-# version addressed eth0, which silently did nothing on hosts whose NIC is enp2s0) or a
-# public resolver (which would bypass Blocky's split horizon).
+# Single source of truth: my.topology.hosts.<host> — interface, ipv4 and gateway.
+# Nothing here hardcodes an interface name (the previous version addressed eth0, which
+# silently did nothing on hosts whose NIC is enp2s0) or a public resolver (which would
+# bypass Blocky's split horizon).
 #
 # NetworkManager must not own an interface that this module addresses, so the interface is
 # declared unmanaged: exactly one system may own a NIC.
@@ -20,34 +20,12 @@ let
 
   interface = hostTopology.interface or null;
 
-  # Parse a CIDR string into the address submodule shape NixOS expects.
-  parseCidr =
-    cidr:
-    let
-      parts = lib.splitString "/" cidr;
-    in
-    {
-      address = builtins.elemAt parts 0;
-      prefixLength = lib.toInt (builtins.elemAt parts 1);
-    };
-
   targetAddresses = lib.optional (hostTopology != null && hostTopology.ipv4 != null) {
     address = hostTopology.ipv4;
     prefixLength = 24;
   };
 
-  migration =
-    if hostTopology == null then
-      {
-        addresses = [ ];
-        gateway = null;
-      }
-    else
-      hostTopology.migration;
-
-  # While migrating, the old gateway must stay in charge - the new one may not exist yet.
-  #
-  # Then the host's own declaration wins, and the zone gateway is only a fallback. The order is not
+  # The host's own declaration wins; the zone gateway is only a fallback. The order is not
   # cosmetic: a VPS declares its provider's router (a public address) while its zone is `mesh`, whose
   # gateway is the mesh address - so letting the zone win handed the edge a default route via itself
   # and took it off the network. A zone gateway is the right default for a host that has no uplink of
@@ -60,19 +38,14 @@ let
       .gateway or null;
 
   gateway =
-    if migration.gateway != null then
-      migration.gateway
-    else if hostTopology != null && hostTopology.gateway != null then
-      hostTopology.gateway
-    else
-      zoneGateway;
+    if hostTopology != null && hostTopology.gateway != null then hostTopology.gateway else zoneGateway;
 
   active =
     cfg.enable
     && hostTopology != null
     && interface != null
     && hostTopology.ipv4 != null
-    && (hostTopology.gateway != null || migration.gateway != null || zoneGateway != null);
+    && (hostTopology.gateway != null || zoneGateway != null);
 in
 {
   options.my.features.system.networking.static = {
@@ -84,7 +57,7 @@ in
 
     networking.interfaces.${interface} = {
       useDHCP = false;
-      ipv4.addresses = targetAddresses ++ map parseCidr migration.addresses;
+      ipv4.addresses = targetAddresses;
     };
 
     # null means "no default route", which is not a state we want to reach silently.

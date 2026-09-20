@@ -34,10 +34,6 @@
         blocky.enable = true;
         bazarr.enable = true;
         jellyseerr.enable = true;
-        cloudflare-dyndns = {
-          enable = true;
-          domains = [ "srv.lan.vyrx.de" ];
-        };
         klipper.enable = true;
         authentik.outpost.ldap = {
           enable = true;

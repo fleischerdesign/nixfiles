@@ -45,20 +45,9 @@ in
 
     host = lib.mkOption {
       type = lib.types.str;
-      default =
-        let
-          migrationAddresses = if apHost == null then [ ] else apHost.migration.addresses;
-        in
-        if migrationAddresses != [ ] then
-          # Still on the old network: reach it where it currently answers.
-          lib.head (lib.splitString "/" (lib.head migrationAddresses))
-        else if apHost != null && apHost.ipv4 != null then
-          apHost.ipv4
-        else
-          "10.10.10.20";
+      default = if apHost != null && apHost.ipv4 != null then apHost.ipv4 else "10.10.10.20";
       description = ''
-        Management address of the access point. While the topology declares a `migration`
-        address the AP is reached there (it has not moved yet); `ipv4` stays the target address.
+        Management address of the access point: its declared `ipv4` in `my.topology`.
       '';
     };
 
