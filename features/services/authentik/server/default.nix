@@ -263,20 +263,21 @@ let
   sortedEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames authEndpoints);
   sortedOidcEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames oidcEndpoints);
 
-  # Authentik blueprint references (!KeyOf, !Find, !Env, ...) are YAML-level tags.
-  # Neither builtins.toJSON nor a plain YAML emitter can express them, so tagged
-  # values carry a sentinel prefix that is converted into a real YAML tag after
-  # serialization. Blueprints must be *.yaml: authentik's discovery and the
-  # blueprint migration only scan for *.yaml files.
-  yamlTag = value: "@@YAML_TAG@@${value}";
-
+  # Blueprints must be *.yaml: authentik's discovery and the blueprint migration only scan for that
+  # extension, while everything else about the encoding lives in the constructors.
   toBlueprintYaml =
     name: blueprint:
     let
       serialized = pkgs.writeText "${name}.json" (builtins.toJSON blueprint);
     in
     pkgs.runCommandLocal "${name}.yaml" { } ''
-      sed 's/"@@YAML_TAG@@\([^"]*\)"/\1/g' ${serialized} > "$out"
+      # The schema line is what editors and any JSON-Schema checker key on; authentik itself ignores it.
+      # Field-level validation still happens where it can: in the apply, which is part of the deploy, so a
+      # wrong field name fails a deployment rather than producing a blueprint that never applies.
+      {
+        echo '# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json'
+        sed 's/"@@YAML_TAG@@\([^"]*\)"/\1/g' ${serialized}
+      } > "$out"
     '';
 
   # authentik does not guarantee any apply order across blueprints (docs:
@@ -285,14 +286,7 @@ let
   # upstream default blueprints and by the RBAC blueprint, so the dependency is
   # declared explicitly with the `metaapplyblueprint` meta model instead of
   # relying on filesystem/discovery order.
-  metaApply = path: {
-    model = "authentik_blueprints.metaapplyblueprint";
-    attrs = {
-      identifiers = {
-        inherit path;
-      };
-    };
-  };
+  metaApply = blueprintLib.metaApply;
 
   providerFlowDependencies = [
     (metaApply "default/flow-default-provider-authorization-implicit-consent.yaml")
@@ -308,11 +302,8 @@ let
   # authentik server. It authenticates with the core secret key (no managed token),
   # so every host's Caddy can forward auth to the same server without per-host
   # proxy outposts.
-  proxyBlueprint = {
-    version = 1;
-    metadata = {
-      name = "vyrx-apps-proxy";
-    };
+  proxyBlueprint = blueprintLib.blueprint {
+    name = "vyrx-apps-proxy";
     entries =
       providerFlowDependencies
       ++ (lib.concatMap (
@@ -324,48 +315,35 @@ let
           safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
         in
         [
-          {
-            model = "authentik_providers_proxy.proxyprovider";
+          (blueprintLib.proxyProvider {
             id = "provider_proxy_${safeId}";
-            identifiers = {
-              name = "Provider for ${displayName}";
-            };
-            attrs = {
-              mode = "forward_single";
-              external_host = "https://${ep.canonicalDomain}";
-              authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
-              invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
-            };
-          }
-          {
-            model = "authentik_core.application";
-            identifiers = {
-              slug = name;
-            };
-            attrs = {
-              name = displayName;
-              provider = yamlTag "!KeyOf provider_proxy_${safeId}";
-              meta_launch_url = "https://${ep.canonicalDomain}";
-              inherit group;
-              open_in_new_tab = true;
-            };
-          }
+            name = "Provider for ${displayName}";
+            mode = "forward_single";
+            externalHost = "https://${ep.canonicalDomain}";
+            authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
+            invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
+          })
+          (blueprintLib.application {
+            slug = name;
+            name = displayName;
+            provider = blueprintLib.refs.sameBlueprint "provider_proxy_${safeId}";
+            group = group;
+            metaLaunchUrl = "https://${ep.canonicalDomain}";
+            openInNewTab = true;
+          })
         ]
       ) sortedEndpointNames)
       ++ [
-        {
-          model = "authentik_outposts.outpost";
+        # The outpost embedded in the server itself. It authenticates with the core secret key, so it has no
+        # type and no service connection - hence the plain entry rather than the builder, which sets both.
+        (blueprintLib.entry {
           id = "embedded_outpost";
-          identifiers = {
-            name = "authentik Embedded Outpost";
-          };
+          model = blueprintLib.models.outpost;
+          identifiers.name = "authentik Embedded Outpost";
           attrs = {
             providers = map (
               name:
-              let
-                safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-              in
-              yamlTag "!KeyOf provider_proxy_${safeId}"
+              blueprintLib.refs.sameBlueprint "provider_proxy_${builtins.replaceStrings [ "-" ] [ "_" ] name}"
             ) sortedEndpointNames;
             config = {
               authentik_host = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
@@ -373,16 +351,13 @@ let
               authentik_host_insecure = false;
             };
           };
-        }
+        })
       ];
   };
 
   # Declarative model-driven blueprint compiling all OIDC endpoints into Authentik OAuth2Providers and Applications
-  oidcBlueprint = {
-    version = 1;
-    metadata = {
-      name = "vyrx-apps-oidc";
-    };
+  oidcBlueprint = blueprintLib.blueprint {
+    name = "vyrx-apps-oidc";
     entries =
       providerFlowDependencies
       ++ lib.concatMap (
@@ -394,11 +369,11 @@ let
           safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
           secretAttr =
             if ep.oidc.clientSecretEnv != null then
-              yamlTag "!Env ${ep.oidc.clientSecretEnv}"
+              blueprintLib.refs.env ep.oidc.clientSecretEnv
             else if ep.oidc.clientSecret != null then
               ep.oidc.clientSecret
             else
-              yamlTag "!Env AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
+              blueprintLib.refs.env "AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
           launchUrl =
             if ep.publicUrl != null then
               ep.publicUrl
@@ -408,38 +383,28 @@ let
               null;
         in
         [
-          {
-            model = "authentik_providers_oauth2.oauth2provider";
+          (blueprintLib.oauth2Provider {
             id = "provider_${safeId}";
-            identifiers = {
-              name = "Provider for ${displayName}";
-            };
-            attrs = {
-              client_id = ep.oidc.clientId;
-              client_secret = secretAttr;
-              authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
-              invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
-              redirect_uris = map (uri: {
-                matching_mode = "strict";
-                url = uri;
-              }) ep.oidc.redirectUris;
-              sub_mode = ep.oidc.subMode;
-              include_claims_in_id_token = ep.oidc.includeClaimsInIdToken;
-            };
-          }
-          {
-            model = "authentik_core.application";
-            identifiers = {
-              slug = name;
-            };
-            attrs = {
-              name = displayName;
-              provider = yamlTag "!KeyOf provider_${safeId}";
-              meta_launch_url = launchUrl;
-              inherit group;
-              open_in_new_tab = true;
-            };
-          }
+            name = "Provider for ${displayName}";
+            clientId = ep.oidc.clientId;
+            clientSecret = secretAttr;
+            authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
+            invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
+            redirectUris = map (uri: {
+              matching_mode = "strict";
+              url = uri;
+            }) ep.oidc.redirectUris;
+            subMode = ep.oidc.subMode;
+            includeClaimsInIdToken = ep.oidc.includeClaimsInIdToken;
+          })
+          (blueprintLib.application {
+            slug = name;
+            name = displayName;
+            provider = blueprintLib.refs.sameBlueprint "provider_${safeId}";
+            group = group;
+            metaLaunchUrl = launchUrl;
+            openInNewTab = true;
+          })
         ]
       ) sortedOidcEndpointNames;
   };
@@ -478,11 +443,8 @@ let
 
   ldapProviderId = "provider_ldap_main";
 
-  ldapOutpostBlueprint = {
-    version = 1;
-    metadata = {
-      name = "vyrx-outposts-ldap";
-    };
+  ldapOutpostBlueprint = blueprintLib.blueprint {
+    name = "vyrx-outposts-ldap";
     entries =
       # The LDAP outpost blueprint depends on the default provider flows and on
       # the RBAC groups, so those are applied first via meta models.
@@ -491,215 +453,132 @@ let
       # permissions an outpost needs for users/groups/events, while the
       # object-level permissions (provider, outpost) are attached below.
       ++ lib.concatMap (o: [
-        {
-          model = "authentik_rbac.role";
+        (blueprintLib.role {
           id = "role_ldap_${o.safeHost}";
-          identifiers = {
-            name = "Outpost LDAP ${o.hostName}";
-          };
-          attrs = {
-            permissions = [
-              "authentik_core.view_user"
-              "authentik_core.view_group"
-              "authentik_events.add_event"
-            ];
-          };
-        }
-        {
-          model = "authentik_core.user";
+          name = "Outpost LDAP ${o.hostName}";
+          permissions = [
+            "authentik_core.view_user"
+            "authentik_core.view_group"
+            "authentik_events.add_event"
+          ];
+        })
+        (blueprintLib.serviceAccount {
           id = "sa_ldap_${o.safeHost}";
-          identifiers = {
-            username = "ak-outpost-${o.hostName}-ldap";
-          };
-          attrs = {
-            name = "Service Account LDAP Outpost ${o.hostName}";
-            type = "service_account";
-            roles = [ (yamlTag "!KeyOf role_ldap_${o.safeHost}") ];
-          };
-        }
+          username = "ak-outpost-${o.hostName}-ldap";
+          name = "Service Account LDAP Outpost ${o.hostName}";
+          roles = [ (blueprintLib.refs.sameBlueprint "role_ldap_${o.safeHost}") ];
+        })
       ]) ldapOutposts
       ++ [
         # The bind flow. Documented cause of `Invalid credentials (49)` for a service account: the
-        # `default-authentication-flow` **validates MFA**, and a bind account has no authenticator. The
-        # Authentik how-to says exactly this and prescribes a dedicated flow whose password stage has
-        # the app-password backend. Field names are from the blueprint model reference, not guessed:
-        # the provider's field is `authentication_flow`, the stage's is `backends`, and
-        # `authentik.core.auth.TokenBackend` is the app-password backend.
-        {
-          # No policy binding on this flow, deliberately: the outpost executes it before any account is
-          # authenticated, so a binding naming the service account cannot match and the flow answers
-          # "Flow does not apply to current user". An unbound flow applies to everyone, which is what a
-          # bind needs. Who may use a service is decided afterwards by the application access check, in
-          # the consumer's own memberOf filter.
-          model = "authentik_flows.flow";
+        # `default-authentication-flow` validates MFA, and a bind account has no authenticator. The
+        # authentik how-to prescribes a dedicated flow whose password stage carries the app-password
+        # backend.
+        #
+        # No policy binding on this flow, deliberately: the outpost executes it before any account is
+        # authenticated, so a binding naming the service account cannot match and the flow answers
+        # "Flow does not apply to current user". An unbound flow applies to everyone, which is what a
+        # bind needs; who may use a service is decided afterwards, in the consumer's own memberOf filter.
+        (blueprintLib.flow {
           id = "flow_ldap_auth";
-          identifiers = {
-            slug = "ldap-authentication-flow";
-          };
-          attrs = {
-            name = "LDAP authentication flow";
-            title = "LDAP";
-            designation = "authentication";
-            # A flow with no bindings and engine mode `any` evaluates to false - "none of the bindings
-            # matched" - which is exactly what `Flow does not apply to current user.` says. The bindings
-            # are attached per consumer below.
-            policy_engine_mode = "any";
-          };
-        }
-        {
-          model = "authentik_stages_password.passwordstage";
+          slug = "ldap-authentication-flow";
+          name = "LDAP authentication flow";
+          title = "LDAP";
+          designation = "authentication";
+        })
+        (blueprintLib.passwordStage {
           id = "stage_ldap_password";
-          identifiers = {
-            name = "ldap-authentication-password-stage";
-          };
-          attrs = {
-            backends = [
-              "authentik.core.auth.InbuiltBackend"
-              "authentik.core.auth.TokenBackend"
-            ];
-          };
-        }
-        {
-          model = "authentik_stages_identification.identificationstage";
+          name = "ldap-authentication-password-stage";
+          # `InbuiltBackend` accepts a real password, `TokenBackend` an app password; a service account
+          # has no usable password, so the second is what makes the bind possible at all.
+          backends = [
+            "authentik.core.auth.InbuiltBackend"
+            "authentik.core.auth.TokenBackend"
+          ];
+        })
+        (blueprintLib.identificationStage {
           id = "stage_ldap_identification";
-          identifiers = {
-            name = "ldap-identification-stage";
-          };
-          attrs = {
-            user_fields = [
-              "username"
-              "email"
-            ];
-            password_stage = yamlTag "!KeyOf stage_ldap_password";
-          };
-        }
-        {
-          model = "authentik_stages_user_login.userloginstage";
+          name = "ldap-identification-stage";
+          userFields = [
+            "username"
+            "email"
+          ];
+          passwordStage = blueprintLib.refs.sameBlueprint "stage_ldap_password";
+        })
+        (blueprintLib.userLoginStage {
           id = "stage_ldap_login";
-          identifiers = {
-            name = "ldap-authentication-login-stage";
-          };
-        }
-        {
-          model = "authentik_flows.flowstagebinding";
-          identifiers = {
-            target = yamlTag "!KeyOf flow_ldap_auth";
-            stage = yamlTag "!KeyOf stage_ldap_identification";
-            order = 10;
-          };
-          attrs = { };
-        }
-        {
-          model = "authentik_flows.flowstagebinding";
-          identifiers = {
-            target = yamlTag "!KeyOf flow_ldap_auth";
-            stage = yamlTag "!KeyOf stage_ldap_password";
-            order = 30;
-          };
-          attrs = { };
-        }
-        {
-          model = "authentik_flows.flowstagebinding";
-          identifiers = {
-            target = yamlTag "!KeyOf flow_ldap_auth";
-            stage = yamlTag "!KeyOf stage_ldap_login";
-            order = 40;
-          };
-          attrs = { };
-        }
-        {
-          model = "authentik_providers_ldap.ldapprovider";
+          name = "ldap-authentication-login-stage";
+        })
+        (blueprintLib.flowStageBinding {
+          order = 10;
+          target = blueprintLib.refs.sameBlueprint "flow_ldap_auth";
+          stage = blueprintLib.refs.sameBlueprint "stage_ldap_identification";
+        })
+        (blueprintLib.flowStageBinding {
+          order = 30;
+          target = blueprintLib.refs.sameBlueprint "flow_ldap_auth";
+          stage = blueprintLib.refs.sameBlueprint "stage_ldap_password";
+        })
+        (blueprintLib.flowStageBinding {
+          order = 40;
+          target = blueprintLib.refs.sameBlueprint "flow_ldap_auth";
+          stage = blueprintLib.refs.sameBlueprint "stage_ldap_login";
+        })
+        (blueprintLib.ldapProvider {
           id = ldapProviderId;
-          identifiers = {
-            name = "VYRX LDAP Provider";
-          };
-          attrs = {
-            base_dn = directory.baseDn;
-            # Binds go through the dedicated flow above; the default one validates MFA, which a
-            # service account cannot satisfy.
-            authentication_flow = yamlTag "!KeyOf flow_ldap_auth";
-            # `mfa_support` is deliberately NOT set here: the field exists in the database but setting
-            # it through this blueprint makes the whole apply fail (measured: the instance went to
-            # `status = error`, so the value never reached the database and the provider kept
-            # `mfa_support = true`). Whether that setting is what rejects a password-only bind is
-            # therefore still open - and it has to be answered by finding a way to change it, not by
-            # writing the field again.
-            # No `search_group` and no other access restriction here, for two reasons, both
-            # measured: the field does not exist on this version's LDAP provider
-            # (authentik_providers_ldap_ldapprovider carries search_mode, bind_mode and the id
-            # ranges - no search_group), so the value that used to stand here was silently
-            # ignored; and if it did exist it would restrict the directory for *every*
-            # consumer, while there is one provider for the whole fleet. Who may use a service
-            # is that service's decision: it declares `my.contracts.consumes.<name>.ldap` and
-            # renders its own filter from it.
-            authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, ldap-authentication-flow]]";
-            invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
-          };
-          permissions = map (o: {
-            permission = "authentik_providers_ldap.view_ldapprovider";
-            role = yamlTag "!KeyOf role_ldap_${o.safeHost}";
-          }) ldapOutposts;
-          # The consumers' `search_full_directory` object permission stood here and is rolled back on
-          # 2026-09-20: with it present this blueprint stops applying, the provider loses its
-          # configuration, the outpost that serves it binds no listener and the directory goes down.
-          # The codename itself was read from the database and is correct, so whatever rejects the
-          # entry is something else - and it needs the API's error message, not a seventh guess.
-        }
-        # The LDAP outpost config endpoint only exposes providers that are bound
-        # to an application, so the provider is linked here explicitly.
-        {
-          model = "authentik_core.application";
-          identifiers = {
-            slug = "ldap";
-          };
-          attrs = {
-            name = "LDAP Directory";
-            provider = yamlTag "!KeyOf ${ldapProviderId}";
-            open_in_new_tab = false;
-          };
-        }
+          name = "VYRX LDAP Provider";
+          baseDn = directory.baseDn;
+          # Binds go through the dedicated flow above; the default one validates MFA, which a service
+          # account cannot satisfy. Which of these two fields the outpost consumes is counter-intuitive
+          # and documented in the library: it reads `authorization_flow` as its bind flow.
+          authenticationFlow = blueprintLib.refs.sameBlueprint "flow_ldap_auth";
+          authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "ldap-authentication-flow";
+          invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
+          permissions =
+            # Object permissions on the provider, one per role that needs them. The consumer role lives in
+            # another blueprint, so it is resolved with !Find: a `!KeyOf` across blueprint boundaries
+            # produces an entry that is skipped without an error, which is what earlier attempts here
+            # suffered from.
+            map (o: {
+              permission = "authentik_providers_ldap.view_ldapprovider";
+              role = blueprintLib.refs.sameBlueprint "role_ldap_${o.safeHost}";
+            }) ldapOutposts
+            ++ map (name: {
+              permission = "authentik_providers_ldap.search_full_directory";
+              role = blueprintLib.refs.byName blueprintLib.models.role "LDAP consumer ${name}";
+            }) sortedLdapEndpointNames;
+        })
+        # The LDAP outpost config endpoint only exposes providers that are bound to an application, so the
+        # provider is linked here explicitly.
+        (blueprintLib.application {
+          slug = "ldap";
+          name = "LDAP Directory";
+          provider = blueprintLib.refs.sameBlueprint ldapProviderId;
+        })
       ]
       ++ lib.concatMap (o: [
-        {
-          model = "authentik_core.token";
-          identifiers = {
-            identifier = "outpost-${o.hostName}-ldap-token";
-          };
-          attrs = {
-            intent = "api";
-            # The token's value comes from SOPS and is read by the outpost from its
-            # environment file. `managed = false` is what keeps those two in step: a managed
-            # token is rotated by Authentik on its own schedule, while a standalone outpost
-            # reads its token once at start - measured 2026-09-20, the stored value was 60
-            # characters against the 48 in the secret, and the outpost answered
-            # "auth_via: unauthenticated" to every config fetch, which is why it never bound
-            # a listener and Jellyfin could not reach it.
-            user = yamlTag "!KeyOf sa_ldap_${o.safeHost}";
-            key = yamlTag "!File ${config.sops.secrets.${o.tokenSecretName}.path}";
-          };
-        }
-        {
-          model = "authentik_outposts.outpost";
+        (blueprintLib.token {
+          identifier = "outpost-${o.hostName}-ldap-token";
+          intent = "api";
+          user = blueprintLib.refs.sameBlueprint "sa_ldap_${o.safeHost}";
+          key = blueprintLib.refs.file config.sops.secrets.${o.tokenSecretName}.path;
+        })
+        (blueprintLib.outpost {
           id = "outpost_ldap_${o.safeHost}";
-          identifiers = {
-            name = o.outpostName;
-          };
-          attrs = {
-            type = "ldap";
-            service_connection = null;
-            providers = [ (yamlTag "!KeyOf ${ldapProviderId}") ];
-            config = {
-              authentik_host = o.coreAddress;
-              authentik_host_insecure = true;
-            };
+          name = o.outpostName;
+          type = "ldap";
+          providers = [ (blueprintLib.refs.sameBlueprint ldapProviderId) ];
+          config = {
+            authentik_host = o.coreAddress;
+            authentik_host_insecure = true;
           };
           permissions = [
             {
               permission = "authentik_outposts.view_outpost";
-              role = yamlTag "!KeyOf role_ldap_${o.safeHost}";
+              role = blueprintLib.refs.sameBlueprint "role_ldap_${o.safeHost}";
             }
           ];
-        }
+        })
       ]) ldapOutposts;
   };
 

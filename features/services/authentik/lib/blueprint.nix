@@ -52,11 +52,14 @@ let
     bySlug = model: slug: refs.byField model "slug" slug;
 
     file = path: marker "!File ${path}";
+    env = name: marker "!Env ${name}";
     context = key: marker "!Context ${key}";
   };
 
   # A raw entry. Fields that are not needed are omitted rather than set to null: the importer hands the
-  # entry to a serializer, and an absent field is not the same as an empty one.
+  # entry to a serializer, and an absent field is not the same as an empty one. `identifiers` is dropped
+  # when empty because no model takes an empty identifier set, while `attrs = { }` is meaningful - a stage
+  # binding with no extra fields is exactly that.
   entry =
     {
       model,
@@ -66,7 +69,7 @@ let
       state ? null,
       permissions ? null,
     }:
-    lib.filterAttrs (_: value: value != null) {
+    lib.filterAttrs (name: value: value != null && !(name == "identifiers" && value == { })) {
       inherit
         model
         identifiers
@@ -148,6 +151,8 @@ let
       name,
       provider,
       openInNewTab ? false,
+      group ? null,
+      metaLaunchUrl ? null,
     }:
     entry {
       model = models.application;
@@ -155,7 +160,9 @@ let
       attrs = {
         inherit name provider;
         open_in_new_tab = openInNewTab;
-      };
+      }
+      // lib.optionalAttrs (group != null) { inherit group; }
+      // lib.optionalAttrs (metaLaunchUrl != null) { meta_launch_url = metaLaunchUrl; };
     };
 
   flow =
@@ -349,7 +356,7 @@ let
     {
       name,
       id,
-      type,
+      type ? null,
       providers,
       config,
       permissions ? [ ],
@@ -359,11 +366,12 @@ let
       model = models.outpost;
       identifiers.name = name;
       attrs = {
-        config = config;
-        providers = providers;
-        type = type;
-        service_connection = null;
-      };
+        inherit config providers;
+      }
+      // lib.optionalAttrs (type != null) { inherit type; }
+      # Only a non-embedded outpost carries a service connection field; authentik's own embedded
+      # outpost has neither a type nor a connection.
+      // lib.optionalAttrs (type != null) { service_connection = null; };
       inherit permissions;
     };
 
