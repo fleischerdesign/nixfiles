@@ -492,7 +492,7 @@ let
             # consumer, while there is one provider for the whole fleet. Who may use a service
             # is that service's decision: it declares `my.contracts.consumes.<name>.ldap` and
             # renders its own filter from it.
-            authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, ldap-authorization-flow]]";
+            authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, ldap-authentication-flow]]";
             invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
           };
           permissions = map (o: {
