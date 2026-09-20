@@ -7,6 +7,13 @@
 
 let
   cfg = config.my.features.services.authentik.server;
+
+  # The directory's structure comes from the fleet-wide contract, never from a literal here.
+  directory = config.my.directory.ldap;
+
+  # One rule for the name of every consumer's service account, taken from the directory contract so
+  # that a consumer on another host composes exactly the same DN without reading anything of ours.
+  consumerAccountName = name: "${config.my.directory.ldap.consumerAccountPrefix}${name}";
   authentikPackage = pkgs.authentik;
 
   # Single listener for the API *and* the embedded proxy outpost (authentik serves
@@ -474,7 +481,7 @@ let
             name = "VYRX LDAP Provider";
           };
           attrs = {
-            base_dn = "DC=vyrx,DC=de";
+            base_dn = directory.baseDn;
             # Binds go through the dedicated flow above; the default one validates MFA, which a
             # service account cannot satisfy.
             authentication_flow = yamlTag "!KeyOf flow_ldap_auth";
@@ -601,7 +608,7 @@ let
             model = "authentik_core.user";
             id = "sa_ldap_consumer_${safeId}";
             identifiers = {
-              username = "ak-ldap-${name}";
+              username = consumerAccountName name;
             };
             attrs = {
               name = "LDAP search account for ${name}";
@@ -761,6 +768,8 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # The directory's structure is not projected from here: the provider and its consumers usually run
+    # on different hosts, so anything a consumer needs must live in the directory contract itself.
 
     # 1. User & Group
     users.users.authentik = {
