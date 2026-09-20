@@ -1,131 +1,85 @@
-# NixOS Konfiguration (nixfiles 2.0 / VYRX Enterprise Architecture)
+# Working in this repository
 
-Nix-Flake-basierte Enterprise-NixOS-Konfiguration für 5 Hosts (`cld-edge-01`, `cld-ops-01`, `hom-srv-01`, `hom-wrk-01`, `mob-nb-01`) mit Home-Manager-Integration, SOPS-Secret-Management, WireGuard-Mesh (`10.10.100.0/24`), RFC 1812 Single-NIC Gateway, Service Contracts und `nod`-Orchestrierung.
+Agent-facing instructions. Everything substantive lives in [`docs/`](docs/README.md); this file says
+what an agent must know before touching anything, and nothing twice.
 
-## Host-Übersicht (RFC 1178 Enterprise Taxonomy)
+## What this is
 
-| Host | Rolle | Zone / Subnetz | Hardware | Besonderheit |
+Declarative NixOS + Home Manager configuration for five hosts, a WireGuard mesh, SOPS secrets, modular
+service contracts and agentless reconcilers for devices that cannot run NixOS. The
+[architecture](docs/architecture.md) defines the vocabulary - zone, plane, contract, scope, mesh - that
+this file uses without redefining.
+
+## Commands
+
+```bash
+nix fmt                            # nixfmt over the tree, in place
+deadnix --fail                     # no unused code
+statix check                       # lint (only repeated_keys disabled, see statix.toml)
+nix flake check                    # every host evaluates + statix + deadnix
+git config core.hooksPath .githooks # pre-commit runs the three above
+nixos-rebuild switch --flake .#<host>            # local
+nixos-rebuild switch --flake .#<host> --target-host root@<addr>   # remote
+```
+
+A shell here is **fish** locally and on the hosts. `VAR=value cmd`, `$?`, `${PIPESTATUS[0]}` and
+`for … do … done` all fail. Wrap anything non-trivial in `bash -c '…'` or `bash -s` with a heredoc,
+and prefer a script file over nested quoting - nested quotes have broken more runs in this repository
+than any real defect.
+
+## Non-negotiables
+
+1. **Prove the replacement before deleting the original.** Not "it looks right" - a measurement at the
+   level the consumer sees. Two outages came from skipping this, one of them taking a host's DNS with
+   the service that owned `/etc/resolv.conf`.
+2. **A check must be able to fail loudly.** Keep `stderr`, derive the exit code from the checks rather
+   than from the last statement, and never end a script on a bare `echo`. A missing tool, a guessed
+   file name and a real negative look identical at the point of measurement.
+3. **Write the expectation next to the measurement.** It is the only way a number can disagree.
+4. **Verify per host class before applying fleet-wide**, and read the tool's *whole* verdict - warnings
+   included. A deprecation warning that nobody read cost three rounds of wrong diagnosis.
+5. **Documents are specifications of the present.** No migration diaries, no phase plans, no status
+   sections - those belong in commit messages. Where a document and the code disagree, the code is
+   right and the document is a bug.
+6. **English** for code, comments, commits and documentation.
+7. **The inventory decides, not the order of a list.** Zones, addresses, names and firewall rules are
+   derived from `my.topology` and the contract projections. If you find yourself writing an address or
+   a name twice, the derivation is missing.
+
+## Layout
+
+```
+flake.nix                 15 inputs, overlays, one mkSystem call per host
+hosts/<name>/             entry point: role + hardware + host-specific features
+roles/                    base → server | pc → desktop | notebook
+features/                 auto-discovered modules, each behind `enable`
+  system/  services/  dev/  media/  desktop/
+contracts/                provides (interfaces, storage, backup, telemetry), consumes, naming, endpoints
+lib/core/                 mkSystem, module auto-discovery
+user/<name>/              Home Manager: home.nix, packages, fish, editors
+secrets/                  SOPS-encrypted, one file
+docs/                     the specification, see docs/README.md
+```
+
+## Adding a service
+
+1. `features/services/<name>/default.nix` with an `enable` option.
+2. Declare what it offers and needs: `my.contracts.provides.<name>` (endpoints, storage, backup,
+   telemetry) and `my.contracts.consumes.<name>`. Caddy vHosts, Authentik blueprints and provider
+   resources (databases, users, buckets) are projected from those declarations - never written by hand.
+3. Enable it on the host that should run it. Nothing else: names, certificates, firewall rules and
+   backup jobs follow from the contracts.
+
+## Hosts
+
+| Host | Role | Zone | Address | Mesh |
 |---|---|---|---|---|
-| `hom-wrk-01` | desktop | `corp` (`10.10.20.10`) | PC (Intel, NVMe, Intel GPU) | Niri-Desktop + Axis Shell, OpenClaw Node |
-| `mob-nb-01` | notebook | `corp` (Roaming) | Laptop (AMD, NVMe) | Niri-Desktop + Axis Shell, OpenClaw Node |
-| `cld-edge-01` | server | `mesh` / Public (`173.249.22.211`) | VPS (QEMU, GRUB/BIOS) | Ingress Hub: WireGuard Relay, Caddy Edge, Authentik SSO, ntfy, DBs, Observability Stack (Grafana, Prometheus, Loki) |
-| `cld-ops-01` | server | `mesh` / Public (`37.114.55.91`) | VPS (QEMU, GRUB/BIOS) | Observability Collector (Alloy, Node/Blackbox Exporter), OpenClaw AI Gateway (`:18789`), Attic Cache |
-| `hom-srv-01` | server | `infra` (`10.10.10.10`) | Bare Metal (Intel, 4TB+1TB) | Single-NIC Gateway (Kea DHCP, Chrony NTP, Blocky DNS), Media (\*arr, Jellyfin), Home Assistant, Klipper |
+| `cld-edge-01` | server | `mesh` / public | `173.249.22.211` | `10.10.100.1` |
+| `cld-ops-01` | server | `mesh` / public | `37.114.55.91` | `10.10.100.2` |
+| `hom-srv-01` | server | `infra` | `10.10.10.10` | `10.10.100.10` |
+| `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` |
+| `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` |
 
-> **Benennung (normativ):** Host-, Service- und Zonen-Namen folgen ausschließlich
-> [`NAMING.md`](NAMING.md) und werden **abgeleitet**, nicht gepflegt. Öffentliche Services sind
-> flach (`<service>.vyrx.de`), interne Ebenen liegen unter `.lan` / `.mesh` / `.iot`, Hosts im
-> `node`-Plane (`<hostname>.node.vyrx.de`). Die maschinelle Liste ist
-> `my.contracts.projections.fqdns`; `ARCHITECTURE.md` §3 nennt nur Beispiele.
-
-### Embedded Devices, IoT-Flotte & GitOps-Targets
-- `hom-rt-01` (`10.10.10.1`): AVM FRITZ!Box Uplink-Modem (TR-064 GitOps Target `nodTargets.hom-rt-01`).
-- `hom-ap-01` (`10.10.10.20`): TP-Link RE330 Wi-Fi Access Point (`tplinkrouterc6u` GitOps Target `nodTargets.hom-ap-01`, Unified SSID `VYRX`).
-- `hom-rly-01` .. `hom-rly-08` (`10.10.30.11` .. `10.10.30.18`): Sonoff Basic ESP8266 Inline-Relais (ESPHome GitOps Targets `nodTargets.hom-rly-01` bis `hom-rly-08`).
-- `cloudflare`: Deklarative Cloudflare DNS GitOps Engine (`nodTargets.cloudflare`).
-- `authentik`: Deklarative Authentik Blueprints & RBAC GitOps Engine (`nodTargets.authentik`).
-
-## Identitäts- & Benutzerverwaltung (RBAC)
-
-Deklarative Authentik-Blueprints und User-Identity für alle 5 Haushaltsmitglieder:
-- **Philipp**: Administrator & Developer (`wheel`, `networkmanager`, `media`, Vollzugriff)
-- **Katja**: Familie & Mediennutzerin (`media-users`, `family`)
-- **Lilly**: Familie & Mediennutzerin (`media-users`, `family`)
-- **Kai**: Familie & Mediennutzerin (`media-users`, `family`)
-- **Rieke**: Familie & Mediennutzerin (`media-users`, `family`, OpenClaw AI Mesh)
-
-## Build, Test, Lint
-
-**Pre-commit (automatisch):**
-```bash
-git config core.hooksPath .githooks    # einmalig aktivieren
-```
-Pipeline: `nixfmt` → `deadnix --fail` → `statix check` (auf `.nix`-Dateien). `set -e` — jeder Fehler bricht ab.
-
-**Manuelle Checks:**
-```bash
-nix flake check                     # eval-hosts (alle 5 Hosts) + statix + deadnix
-nix fmt                             # nixfmt auf das gesamte Repo
-nixos-rebuild dry-run --flake .#<host>
-```
-
-**Reihenfolge nach Code-Änderungen:**
-1. `nixfmt <dateien>` — formatiert in-place
-2. `deadnix --fail` — entfernt unbenutzten Code
-3. `statix check <datei>` — lintet (nur `repeated_keys` disabled)
-4. `nix flake check` — validiert alle Hosts evaluieren korrekt
-
-## Projektstruktur
-
-```
-/etc/nixos/
-├── flake.nix               # 15 Flake-Inputs, Overlay-Liste, mkSystem-Aufruf pro Host
-├── flake.lock
-├── hosts/<name>/
-│   ├── configuration.nix   # Einstiegspunkt: imports role + hardware + host-spezifische Features
-│   ├── hardware-configuration.nix  # Generiert oder manuell (VPS: QEMU-Gast)
-│   ├── hardware-specific.nix       # Zusätzliche Hardware (Intel GPU, Bluetooth, Extra-Disks, GRUB-Override)
-│   └── disk-config.nix     # Nur Server mit Disko (GPT-Partitionierung)
-├── roles/
-│   ├── base.nix            # Alle Hosts: common, bootloader, kernel, fish-shell, topology, security, ssh
-│   ├── pc.nix              # PC/Desktop: audio, wayland, printing, containers, codium, nixvim, gaming, spotify
-│   ├── desktop.nix         # my.role = "desktop"
-│   ├── notebook.nix        # my.role = "notebook"
-│   └── server.nix          # my.role = "server": caddy, monitoring, static-ip, nixvim
-├── user/philipp/
-│   ├── home.nix            # Root: imports sub-module, direnv, Nixcord, home packages
-│   ├── metadata.nix        # Statische User-Daten (Name, Email, SSH-Keys) — importiert von features/system/user
-│   ├── packages.nix        # Packages (server-gated: desktop-only = 22 extra packages + Ghostty)
-│   ├── opencode.nix        # programs.opencode + home.file symlinks (server-gated)
-│   └── fish.nix            # Fish-Shell, Aliase, tpl-Funktion (templates bootstrapper)
-├── contracts/                  # Modular Service Contracts: endpoints, storage, backup, telemetry, dependencies
-├── features/
-│   ├── desktop/{gnome,niri}/       # Desktop Environments (mutual exclusion via assertions)
-│   ├── dev/{android,codium,containers,git,nixvim,openclaw,opencode,pi}
-│   ├── media/{gaming,spotify}/
-│   ├── services/{35 Features}      # arr-Stack, Monitoring, Auth, DBs, Automation, Media
-│   └── system/{15 Features}        # audio, bootloader, common, gateway, networking, security, theme, user
-├── lib/
-│   ├── default.nix         # Public API: { mkSystem } — akzeptiert { home-manager-unstable }
-│   ├── helper.nix          # Compatibility-Shim → default.nix
-│   ├── features.nix        # { requires } — Feature-Dependency-Manager (mkDefault + assertion)
-│   └── core/
-│       ├── system-builder.nix  # mkSystem: auto-discovers features, contracts + users, baut nixosSystem
-│       └── module-loader.nix   # findModules: rekursiv alle default.nix unter einem Pfad
-├── secrets/                # SOPS-verschlüsselte secrets.yaml
-├── .sops.yaml              # Age-Keys für cld-edge-01, cld-ops-01, hom-srv-01, hom-wrk-01, mob-nb-01, philipp, ci
-├── .githooks/pre-commit
-├── statix.toml             # disabled = ["repeated_keys"]
-└── AGENTS.md               # Diese Datei
-```
-
-## Architektur
-
-### Rollen-Vererbungskette
-
-```
-base.nix                  # Alle Hosts (common, bootloader, kernel, fish-shell, ssh, security, topology)
-├── server.nix            # Server: caddy, monitoring, static-ip, nixvim
-└── pc.nix                # Desktop/Notebook: audio, wayland, printing, containers, codium, nixvim, gaming, spotify
-    ├── desktop.nix       # my.role = "desktop"
-    └── notebook.nix      # my.role = "notebook"
-```
-
-### Feature-System & Service Contracts
-
-- **Auto-Discovery**: `lib/core/module-loader.nix` scanned `features/` und `contracts/` rekursiv nach `default.nix`. Jedes Feature und jeder Contract wird in **jeden** Host geladen.
-- **Gating**: Feature-Konfiguration steht hinter `lib.mkIf cfg.enable`. Ein Feature ist geladen, aber nur aktiv wenn `enable = true`.
-- **Modular Service Contracts**:
-  - `my.contracts.provides.<name>`: Services deklarieren rein passiv und host-agnostisch ihre Schnittstellen (`endpoints`), Persistenzbedarfe (`storage`), Sicherungsstrategien (`backup`) und Observability (`telemetry`).
-  - `my.contracts.consumes.<name>`: Services deklarieren nach dem Inversion-of-Control-Prinzip ihren strukturellen Bedarf (z. B. PostgreSQL-Datenbanken & User, Redis), während die Provider-Engines die Ressourcen deklarativ und entkoppelt bereitstellen.
-  - Projektionen nach Caddy-vHosts, Authentik-Blueprints (Proxy & OIDC), Firewall-Rules, Restic-Backups und Prometheus-Scrapes erfolgen automatisch und strikt entkoppelt über die Contracts.
-- **Single-NIC Gateway & RFC 1812**:
-  `features/system/networking/gateway` bündelt Kea DHCPv4, Chrony NTP und IPv4 Forwarding/NAT auf `hom-srv-01`, gespeist aus `my.topology`.
-
-## Deployment
-
-```bash
-nod switch <host>       # Direktes Deployment via nod CLI über verifizierte IP / Mesh
-```
-
-SSH-Key: `~/.ssh/deploy-key` (User: `root`).
+Reach a host over the mesh (`root@10.10.100.x`, key `~/.ssh/nixfiles-deploy-key`) or - for the cloud
+hosts, always available - over their public address. `~/.ssh/deploy-key` is the node tunnel secret and
+must never address the fleet. Details in [`docs/operations.md`](docs/operations.md).

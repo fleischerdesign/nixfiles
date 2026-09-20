@@ -1,8 +1,8 @@
 # contracts/naming/default.nix
-# Normative naming invariants (NAMING.md §7).
+# Normative naming invariants (docs/naming.md §7).
 #
-# These assertions make the naming rules of ARCHITECTURE.md §1/§3/§8.1 *enforceable*.
-# Without them the drift documented in NAMING.md §0.2 could reappear silently: nothing
+# These assertions make the naming rules of docs/architecture.md §1/§3/§8.1 *enforceable*.
+# Without them the drift documented in docs/naming.md §0.2 could reappear silently: nothing
 # failed when a service name encoded a host, when a public service sat on an unreachable
 # host, or when an unauthenticated endpoint was published.
 #
@@ -77,7 +77,7 @@ let
 
   # I3 - a `public` endpoint must be reachable from the ingress. That means the provider has
   #      an address the ingress can dial (LAN address or overlay address); it does *not* mean
-  #      the provider has a public address (NAMING.md §3.1).
+  #      the provider has a public address (docs/naming.md §3.1).
   unreachablePublic = builtins.filter (
     e:
     e.ep.scope == "public"
@@ -110,7 +110,7 @@ let
   ) named;
 
   # I10 - the ingress terminates TLS and proxies to a remote public endpoint *directly over the
-  # mesh* (ARCHITECTURE.md §8.1, "WireGuard-Upstreams"), so such an endpoint must be declared
+  # mesh* (docs/architecture.md §8.1, "WireGuard-Upstreams"), so such an endpoint must be declared
   # reachable there: listen on a non-loopback address and open the port on the wireguard
   # interface. Without this the ingress answers 502 (observed live for cache.vyrx.de while
   # atticd still bound 127.0.0.1).
@@ -144,7 +144,7 @@ in
         };
         hostFqdns = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          description = "Every host FQDN of the `node` plane (ARCHITECTURE.md §3.3).";
+          description = "Every host FQDN of the `node` plane (docs/architecture.md §3.3).";
         };
         hostFqdnOf = lib.mkOption {
           type = lib.types.attrsOf lib.types.str;

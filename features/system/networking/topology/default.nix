@@ -188,7 +188,7 @@ in
 
     # Single source of truth for the public ingress host. The Caddy ingress engine and the
     # Cloudflare DNS projection both read this, so ingress responsibility is declared once
-    # (ARCHITECTURE.md §8.1).
+    # (docs/architecture.md §8.1).
     ingressHost = lib.mkOption {
       type = lib.types.str;
       default = "cld-edge-01";
@@ -249,7 +249,7 @@ in
   # wireguardIpv4 -> wireguardIpv4) and its hosts lacked ipv4 entirely, so a consumer filtering on
   # that field silently matched nothing.
   config = {
-    # Default subnet taxonomy as specified in ARCHITECTURE.md (RFC 1918 10.10.0.0/16 Supernet).
+    # Default subnet taxonomy as specified in docs/architecture.md (RFC 1918 10.10.0.0/16 Supernet).
     #
     # There are no VLANs: the zones are subnets on one flat L2 behind a single NIC, separated by
     # routing policy rather than by an 802.1Q tag. The per-subnet `vlan` field that used to sit here
@@ -332,7 +332,7 @@ in
         wireguardPublicKey = "j80spw+2+Ojz51aKAytPdCZwFOc64yNOR05rAcXOESE=";
         hostType = "server";
         # This host routes the home LAN, so it is the one that delivers those zones into the mesh
-        # (DEPLOYMENT.md 10). The announcement replaced Tailscale's subnet router; without it a
+        # (docs/operations.md 10). The announcement replaced Tailscale's subnet router; without it a
         # roaming client reaches the mesh but none of the services behind it. `guest` is absent on
         # purpose: no host carries that zone, so announcing it would route traffic into a hole.
         lanGateway = [
@@ -365,7 +365,7 @@ in
         hostType = "client";
       };
 
-      # Embedded targets as specified in EMBEDDED.md
+      # Embedded targets as specified in docs/embedded.md
       hom-rt-01 = {
         zone = "infra";
         ipv4 = "10.10.10.1";

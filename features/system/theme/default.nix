@@ -1,5 +1,5 @@
 # features/system/theme/default.nix
-# Declarative theme assets, branding, and diagnostic status page deployment (DESIGN.md).
+# Declarative theme assets, branding, and diagnostic status page deployment (docs/design.md).
 # Exposes theme assets to Authentik, Caddy, and local web services.
 {
   config,

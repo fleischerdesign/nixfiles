@@ -36,7 +36,7 @@ in
       endpoints.web = {
         port = 5055;
         protocol = "tcp";
-        # Public per NAMING.md §10.4. Seerr authenticates with its own Jellyfin login — exactly
+        # Public per docs/naming.md §10.4. Seerr authenticates with its own Jellyfin login — exactly
         # like Home Assistant and Jellyfin — so no forward-auth layer and no double login.
         # The image in use is an OIDC-capable fork, but its OIDC configuration contract is not
         # environment based and is undocumented (settings-file based); wiring it declaratively

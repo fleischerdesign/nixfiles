@@ -1,6 +1,6 @@
-# QUALITY.md — the engineering bar, and what still stands in its way
+# practices.md — the engineering bar, and what still stands in its way
 
-`ARCHITECTURE.md`, `NAMING.md` and `IDENTITY.md` describe **what** this configuration is.
+`architecture.md`, `naming.md` and `identity.md` describe **what** this configuration is.
 This file describes **how good** it has to be, what that means concretely, and what is still
 missing. It is a working document: it shrinks as the gaps close, and it gets deleted when empty.
 
@@ -257,7 +257,7 @@ paths, in order of effort: (a) the old private key still exists somewhere (noteb
 password manager); (b) the old SOPS hash is retrievable from git and candidate passwords can be
 verified against it **without touching the VPS**; (c) the provider console — GRUB is unrestricted, so
 `init=/bin/sh` then `passwd philipp`; (d) the provider's rescue system, then chroot and `passwd`.
-The exact procedure, with the verified disk layout, is in `DEPLOYMENT.md` §11.2.
+The exact procedure, with the verified disk layout, is in `operations.md` §11.2.
 
 **B2 — the deploy signal (A1).** Blocked on the one `cscli machines add` for `hom-srv-01` on the
 master, which is also blocked on B1.

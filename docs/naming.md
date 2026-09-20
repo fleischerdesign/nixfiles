@@ -1,26 +1,26 @@
 # VYRX — DNS, Host & Service Naming Specification
 
 > **Status:** Normative derivation rules and enforcement for the naming intent declared in
-> `ARCHITECTURE.md`. The parent specification defines **what names must express**; this
+> `architecture.md`. The parent specification defines **what names must express**; this
 > document defines **how they are derived** and **how conformance is enforced**.
 >
 > **Authority split (three distinct questions):**
-> * *What should a name express?* → `ARCHITECTURE.md` is authoritative (planes,
+> * *What should a name express?* → `architecture.md` is authoritative (planes,
 >   service-first principle, split horizon, projection engines).
 > * *How is it derived and how is it checked?* → this document is authoritative; the parent
 >   specifies intent but neither a derivation function nor any verification.
 > * *What does the code actually do?* → neither: where the implementation contradicts
->   `ARCHITECTURE.md`, **the implementation is the defect**, not the specification (§0.2).
+>   `architecture.md`, **the implementation is the defect**, not the specification (§0.2).
 >   A documented decision is evidence of intent, not proof of correctness.
 >
-> **Companion documents:** `ARCHITECTURE.md` §1 (principles), §3 (edge diagram),
-> §5 (split horizon), §8.1 (projection engines), `IDENTITY.md`, `DEPLOYMENT.md`.
+> **Companion documents:** `architecture.md` §1 (principles), §3 (edge diagram),
+> §5 (split horizon), §8.1 (projection engines), `identity.md`, `operations.md`.
 
 ---
 
 ## 0. Intent, implementation, and gaps
 
-### 0.1 Specified intent (quoted from `ARCHITECTURE.md`)
+### 0.1 Specified intent (quoted from `architecture.md`)
 
 * **§1.1 (l. 14) — Service-First statt Host-First:**
   "Dienste besitzen feste DNS-Endpunkte (`jellyfin.vyrx.de`, `sonarr.lan.vyrx.de`).
@@ -58,7 +58,7 @@
 ### 0.3 Where the parent specification is **under**-specified
 
 These are the additions this document contributes. They are not restatements of
-`ARCHITECTURE.md` — the parent is silent on them, and that silence is why the drift in §0.2
+`architecture.md` — the parent is silent on them, and that silence is why the drift in §0.2
 could go unnoticed:
 
 1. **Derivation functions.** The parent fixes hostnames (§2) and gives naming *examples*,
@@ -105,7 +105,7 @@ Rules:
 
 ## 2. Host names
 
-`ARCHITECTURE.md` §3.3 specifies the host plane:
+`architecture.md` §3.3 specifies the host plane:
 
 > **§3.3 Node Management: `*.node.vyrx.de`** — "Feste CNAMEs auf die jeweiligen VPN-IPs für
 > SSH- und Administrationszugriffe: `cld-edge-01.node.vyrx.de`, `cld-ops-01.node.vyrx.de`,
@@ -121,7 +121,7 @@ record         = CNAME -> host's overlay (VPN) address
 
 Consequences:
 
-* Host FQDNs are **derived from the RFC 1178 hostname** (`ARCHITECTURE.md` §2) and live in a
+* Host FQDNs are **derived from the RFC 1178 hostname** (`architecture.md` §2) and live in a
   dedicated plane: a new host needs one inventory entry and collisions are structurally
   impossible.
 * `node` names target the **overlay address** on purpose (admin access from anywhere over the
@@ -383,7 +383,7 @@ Verified against the running evaluation (`nix flake check`, fleet-wide):
 
 Not yet deployed: all of the above is repository state and evaluation-verified only.
 4. **Zone membership — resolved.** `hass`, `seerr`, `mealie` and `mon` (Grafana) are **public**.
-   `ARCHITECTURE.md` §3.2 is therefore stale for `mealie`/`mon` (they belong in §3.1). Contract
+   `architecture.md` §3.2 is therefore stale for `mealie`/`mon` (they belong in §3.1). Contract
    deltas:
 
    | Service | Current | Required | Resulting FQDN |
@@ -419,9 +419,9 @@ claims:
 | # | Gap | Needed to close it |
 |---|---|---|
 | G1 | ~~Unenforced~~ **closed.** I1–I4 and I9 are hard assertions in `contracts/naming/default.nix`, evaluated fleet-wide on every host: `nix flake check` now fails cluster-wide on any violation. I9 immediately surfaced 14 pre-existing unauthenticated public endpoints, which are now declared with a reason. | I5–I8 remain reports (I8 is `my.contracts.projections.aliases`). |
-| G2 | **Partially closed.** `NAMING.md` is the normative derivation, `ARCHITECTURE.md` §3.1 defers to `my.contracts.projections.fqdns`, and `caddy.baseDomain` / `endpoints.<n>.domain` are gone from the naming path. | Still open: `AGENTS.md`, `DESIGN.md`, `DEPLOYMENT.md`, `README.md`, `PROVISIONING.md` restate service names and must point at `NAMING.md` instead. |
+| G2 | **Partially closed.** `naming.md` is the normative derivation, `architecture.md` §3.1 defers to `my.contracts.projections.fqdns`, and `caddy.baseDomain` / `endpoints.<n>.domain` are gone from the naming path. | Still open: `AGENTS.md`, `design.md`, `operations.md`, `README.md`, `provisioning.md` restate service names and must point at `naming.md` instead. |
 | G3 | **No formal grammar.** No charset/length rules (LDH, 63-octet label, 253-octet name), no statement about non-DNS-safe subdomains already in use (`cam.moonraker`, `*.pub.*`), case, or trailing dot. | Add a grammar section + a name validator used by I1/I2. |
 | G4 | **No operational DNS policy.** No TTL strategy per plane, no PTR/reverse-zone policy (relevant for mail), no DNSSEC statement. | Add a TTL/PTR/DNSSEC policy section. |
 | G5 | **Migration has no verification gates.** §9 lists stages but not how completion is proven. | Add per-stage acceptance checks (record/vhost/redirect diffs, consumer greps). |
-| G6 | ~~Host-FQDN rule missing~~ **retracted — my error.** `ARCHITECTURE.md` §3.3 *does* specify it (`*.node.vyrx.de`, CNAME to the overlay address); §2 above invented `<hostname>.<plane>` instead. | §2 now follows §3.3; still open: whether the undeclared `edge`/`ops` labels become aliases or are dropped. |
-| G7 | ~~overlay plane naming~~ **closed.** The overlay plane is **`mesh`** (`.mesh.vyrx.de`), matching the contract enum value. `ARCHITECTURE.md` §3 and this document were updated; the enum is unchanged. | — |
+| G6 | ~~Host-FQDN rule missing~~ **retracted — my error.** `architecture.md` §3.3 *does* specify it (`*.node.vyrx.de`, CNAME to the overlay address); §2 above invented `<hostname>.<plane>` instead. | §2 now follows §3.3; still open: whether the undeclared `edge`/`ops` labels become aliases or are dropped. |
+| G7 | ~~overlay plane naming~~ **closed.** The overlay plane is **`mesh`** (`.mesh.vyrx.de`), matching the contract enum value. `architecture.md` §3 and this document were updated; the enum is unchanged. | — |

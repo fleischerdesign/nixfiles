@@ -108,7 +108,7 @@ let
     ]
   );
 
-  # <hostname>.node.<domain> -> overlay address (ARCHITECTURE.md §3.3). An `A` record is the
+  # <hostname>.node.<domain> -> overlay address (docs/architecture.md §3.3). An `A` record is the
   # correct encoding: a CNAME may not point at an IP address.
   nodeRecords = lib.concatLists (
     lib.mapAttrsToList (
@@ -120,7 +120,7 @@ let
   );
 
   # Every `public` endpoint resolves to the *ingress*, which terminates TLS and proxies to the
-  # provider over the WireGuard mesh (ARCHITECTURE.md §8.1). The provider host does **not**
+  # provider over the WireGuard mesh (docs/architecture.md §8.1). The provider host does **not**
   # need a public address -- that is the whole point of the ingress engine.
   endpointRecords = lib.concatLists (
     lib.mapAttrsToList (

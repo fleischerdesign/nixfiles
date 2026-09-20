@@ -88,7 +88,7 @@ Geroutet über `cld-edge-01` (Caddy) mit Cloudflare DNS-01 ACME Wildcard-Zertifi
 - `<name>.ai.vyrx.de` ➔ OpenClaw-Gateways (`philipp.ai`, `katja.ai`, …)
 
 > **Normativ:** Die vollständige, maschinell erzeugte Liste ist `my.contracts.projections.fqdns`;
-> die Ableitungsregeln stehen in `NAMING.md`. Diese Aufzählung ist illustrativ.
+> die Ableitungsregeln stehen in `naming.md`. Diese Aufzählung ist illustrativ.
 
 ### 3.2 Internal Zone: `*.lan.vyrx.de` / `*.mesh.vyrx.de`
 Ausschließlich aus dem Heimnetzwerk (`10.10.0.0/16`) oder über das Mesh-VPN erreichbar. Diese Zonen existieren **nur** im lokalen Resolver (Blocky) und werden **niemals** in Cloudflare veröffentlicht:
@@ -219,7 +219,7 @@ Ablösung des Standard-Subnetzes `192.168.178.0/24` durch das kollisionsfreie Su
    - Refactoring der `secrets/secrets.yaml` in hierarchische Namespaces (Beseitigung aller Host-Präfixe wie `_mackaye`).
 2. **Phase 2: Codebase-Vorbereitung (Service Contracts & Dual-Stack VPN)**
    - Einführung von `my.contracts` und `my.topology` mit Zonen-Support.
-   - Erledigt 2026-09-20: Kernel-WireGuard (`wg0`) trug den Verkehr bereits vollständig, Tailscale wurde danach entfernt. Die vier Abbruchkriterien sind in `DEPLOYMENT.md` §10 gemessen.
+   - Erledigt 2026-09-20: Kernel-WireGuard (`wg0`) trug den Verkehr bereits vollständig, Tailscale wurde danach entfernt. Die vier Abbruchkriterien sind in `operations.md` §10 gemessen.
    - Caddy auf Ingress-Host so konfigurieren, dass `.vyrx.de` parallel zu bestehenden Legacy-Domains bedient wird.
 3. **Phase 3: Router, Subnetz- & Storage-Migration (Heimnetz)**
    - Umstellung des Heimnetz-Routers auf `10.10.0.0/16` und Umschalten von FRITZ!Box und TP-Link AP in den reinen Bridge-Modus (DHCP aus).

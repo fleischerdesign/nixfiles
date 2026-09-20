@@ -25,7 +25,7 @@
 6. **Bootstrap/Setup:** kein OOBE. `AUTHENTIK_BOOTSTRAP_PASSWORD` (in `services/authentik/core_env`) triggert `system/bootstrap.yaml` → legt `akadmin` an und setzt `setup = true`. `akadmin` = Break-Glass (`authentik Admins`); `infra-admins` bleibt separater Cluster-Admin.
 7. **Self-Service:** Email-Recovery (`flow_recovery` am Brand), Invitation-Enrollment, Passkey-Autofill (Conditional UI), Remember-me (`session_duration = days=7`, `remember_me_offset = days=30`). Keine erzwungenen Passwort-Policies.
 8. **Worker:** `AUTHENTIK_WORKER__THREADS=1` (verhindert den `authentik_flows_stage`-Deadlock beim frischen Bootstrap); Worker-Metrics auf `9301` (Server `9300`).
-9. **Apply-Pfad:** Änderungen gehen über das **Host-Closure** (`nixos-rebuild` bzw. `nod switch cld-edge-01`); `nodTargets.authentik` wurde entfernt. Rollout/Runbook: **`DEPLOYMENT.md`**.
+9. **Apply-Pfad:** Änderungen gehen über das **Host-Closure** (`nixos-rebuild` bzw. `nod switch cld-edge-01`); `nodTargets.authentik` wurde entfernt. Rollout/Runbook: **`operations.md`**.
 
 ---
 
@@ -147,7 +147,7 @@ Die Konfiguration wird unter `features/services/authentik/server/blueprints/` mo
 ```
 features/services/authentik/server/blueprints/
 ├── 00-system/
-│   ├── brand.yaml           # Titel, Design-Tokens aus DESIGN.md, Favicon
+│   ├── brand.yaml           # Titel, Design-Tokens aus design.md, Favicon
 │   └── flows-core.yaml      # Exportierte Passkey- & Invalidation-Flows
 ├── 01-rbac/
 │   ├── groups.yaml          # Rollen (infra-admins, media, guest)

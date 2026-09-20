@@ -29,7 +29,7 @@ let
     else
       host.ipv4;
 
-  # Split-horizon projection (ARCHITECTURE.md §5 and §8.1): every named contract endpoint
+  # Split-horizon projection (docs/architecture.md §5 and §8.1): every named contract endpoint
   # resolves locally to the host that serves it - the *same* name that resolves publicly to
   # the ingress. The internal planes (.lan/.vpn/.iot) exist only here.
   endpointMappings = lib.listToAttrs (

@@ -5,7 +5,7 @@
 > **Scope:** Authentik SSO Gateway, Caddy Error Pages, Internal Dashboards & Web Services  
 > **Domain:** `vyrx.de`
 >
-> **Naming:** siehe [`NAMING.md`](NAMING.md) — normativ, abgeleitet, nie handgepflegt.
+> **Naming:** siehe [`naming.md`](naming.md) — normativ, abgeleitet, nie handgepflegt.
 
 ---
 

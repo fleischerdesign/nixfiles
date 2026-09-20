@@ -2,7 +2,7 @@
 
 > **Status:** Operational runbook (living document)
 > **Audience:** Operators and autonomous agents. Everything needed to finish (or recover) the 2.0 rollout is here.
-> **Companion docs:** `ARCHITECTURE.md` (target design), `PROVISIONING.md` (service config-as-code), `IDENTITY.md` (Authentik), `EMBEDDED.md` (IoT fleet), `AGENTS.md` (repo rules).
+> **Companion docs:** `architecture.md` (target design), `provisioning.md` (service config-as-code), `identity.md` (Authentik), `embedded.md` (IoT fleet), `AGENTS.md` (repo rules).
 > **Emergency?** Jump straight to [§11 Emergency Recovery](#11-emergency-recovery--regaining-access).
 
 ---
@@ -182,7 +182,7 @@ ssh root@$ADDR 'nixos-rebuild --rollback switch'
 Worst case: reboot and select the previous generation in the bootloader (GRUB).
 
 ### 7.1 cld-edge-01 — DONE
-Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `IDENTITY.md`).
+Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `identity.md`).
 
 **Naming/ingress rollout (2026-09-19): live.** The host now runs the flat public naming, the
 cluster-wide ingress engine (vhosts + WireGuard upstreams), the `node` plane, the tunnel
@@ -494,7 +494,7 @@ the next deploy. The declaration in SOPS is the source of truth; the host is a c
 **Afterwards, deploy the host once.** Servers declare `users.mutableUsers = false` and the secret
 store now holds the correct hash, so the password is enforced from then on and cannot drift again.
 That single activation also restores `ssh root@…` via the operator key, which unblocks the fleet key
-rotation and the fleet-wide rollout (`QUALITY.md` §5).
+rotation and the fleet-wide rollout (`practices.md` §5).
 4. **Wired LAN** from a static-IP client: `ssh root@10.10.10.10` (hom-srv-01), FRITZ!Box UI `http://10.10.10.1`, AP UI `http://10.10.10.20`.
 5. **Physical console** for home hardware.
 
@@ -552,7 +552,7 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 | 10 | ~~Cloudflare held the removed wildcards~~ **closed.** `*.vyrx.de`, `*.ai.vyrx.de`, `*.ops.vyrx.de`, the stale `search.vyrx.de` CNAME and the wrongly created `fleischer.design.vyrx.de` were deleted; the live zone now equals the projection (38 records, internal planes absent). | — |
 | 12 | ~~`sandbox.<name>.ai.vyrx.de` had no listener~~ **closed.** Root cause: `mcp.apps.enabled` was never set, so OpenClaw never started its sandbox-only listener (the `port + 100` override is correct and configurable — `port + 1` would collide with the packed gateway ports). Fixed and verified: 18889–18894 listen, `/mcp-app-sandbox` is 200 through the ingress, `/` is 404 by design. | — |
 | 13 | OpenClaw gateways require the ingress in `gateway.trustedProxies`; without it every proxy-shaped request is rejected with `proxy_attribution_required` | Broken public routes | Derived from `my.topology.ingressHost` in the gateway feature; the ingress also overwrites `X-Forwarded-For/-Proto/-Host` (fix in place — do not regress either half) |
-| 11 | Naming model changed: flat public names, ingress engine, Blocky split horizon, `node` plane | Deploy order matters — DNS/TLS must exist before a name is served | Deploy `cld-edge-01` first, then `cld-ops-01`, `hom-srv-01`, clients. See `NAMING.md` §9/§12 |
+| 11 | Naming model changed: flat public names, ingress engine, Blocky split horizon, `node` plane | Deploy order matters — DNS/TLS must exist before a name is served | Deploy `cld-edge-01` first, then `cld-ops-01`, `hom-srv-01`, clients. See `naming.md` §9/§12 |
 | 14 | ~~Migration scaffolding (host `migration` block, watchdog, legacy labels) is temporary by design~~ **removed 2026-09-20**: every block, the connectivity guard, the old `sshd` addresses, the reconcilers' old-address input, the `migrationDebt` report and the legacy WLAN are gone, each verified afterwards — see §14 | — | none |
 | 15 | Running the FRITZ!Box reconciler in **apply** mode **is** P3 | It disables the box DHCP and hands out DNS `10.10.10.10`, which only exists after P1 (hom-srv-01 deployed). Applied too early it breaks DHCP/DNS for the whole LAN | Never apply before P1. Verify read-only with `…fritzbox.package/bin/fritzbox-sync --dry-run` (needs a TR-064 user: FRITZ!OS ≥ 7.24 rejects the password-only login, `dslf-config` is gone) |
 | 16 | Applying the `tplink-ap` reconciler **unifies the SSIDs to `VYRX`** (2.4 + 5 GHz) and needs the AP at its target address | Wi-Fi clients reconnect / lose a separate SSID | AP last (P5). Verify read-only with `…tplink-ap.package/bin/tplink-ap-sync --dry-run`; both reconcilers are dry-run-verified against the live devices |
@@ -610,7 +610,7 @@ LAN/DHCP/DNS/forward capability, `enableDhcp`, and the naming invariants I1–I1
 - `flake.nix` — hosts, `deploy.nodes`, `nodTargets`.
 - `features/system/networking/{gateway,fritzbox,tplink-ap,wireguard,static,topology}` — network model.
 - `hosts/<host>/configuration.nix` — per-host feature switches.
-- `features/services/authentik/**` — identity (see `IDENTITY.md`).
+- `features/services/authentik/**` — identity (see `identity.md`).
 - `secrets/secrets.yaml` + `.sops.yaml` — encrypted secrets and age recipients.
 
 **Relevant secrets**

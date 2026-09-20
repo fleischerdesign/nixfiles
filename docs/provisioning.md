@@ -239,7 +239,7 @@ Um unbefugtes Triggern von Benachrichtigungen zu verhindern, wird ntfy mit einer
 ### 7.2 Deklarative Konfiguration:
 
 > **Kanonische Quelle:** Der Auszug unten spiegelt `features/services/ntfy/default.nix`.
-> Namen folgen [`NAMING.md`](NAMING.md) — hier `push.vyrx.de` (flach, Ingress-terminiert).
+> Namen folgen [`naming.md`](naming.md) — hier `push.vyrx.de` (flach, Ingress-terminiert).
 
 ```nix
 services.ntfy-sh.settings = {

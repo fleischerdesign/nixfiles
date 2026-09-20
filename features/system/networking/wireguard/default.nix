@@ -201,7 +201,7 @@ in
       peers = peersConfig;
     };
 
-    # 4. MSS Clamping and relay packet forwarding via iptables / ip6tables (ARCHITECTURE.md 5.1)
+    # 4. MSS Clamping and relay packet forwarding via iptables / ip6tables (docs/architecture.md 5.1)
     networking.firewall.extraCommands = ''
       # TCP-MSS-Clamping for WireGuard interface (IPv4 & IPv6)
       ${pkgs.iptables}/bin/iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -o ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true

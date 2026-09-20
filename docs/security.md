@@ -17,7 +17,7 @@ Die Sicherheitsarchitektur von **nixfiles 2.0** basiert auf dem mathematischen A
 3. **Assume Breach:** Die Architektur geht davon aus, dass einzelne Knoten kompromittiert werden können. Horizontale Bewegungsfreiheit (Lateral Movement) wird durch strenge Netzwerksegmentierung und Namespace-Isolation unterbunden.
 
 ### 1.2 Formale Trust-Modellierung (Bell-LaPadula Lattice)
-Das in [ARCHITECTURE.md](file:///etc/nixos/ARCHITECTURE.md#84-deklarative-topologie-registry--mathematisches-trust-lattice) definierte Zonenmodell $\mathcal{Z}$ wird als partiell geordnetes Vertrauensgitter formalisiert:
+Das in [architecture.md](file:///etc/nixos/ARCHITECTURE.md#84-deklarative-topologie-registry--mathematisches-trust-lattice) definierte Zonenmodell $\mathcal{Z}$ wird als partiell geordnetes Vertrauensgitter formalisiert:
 $$\mathcal{Z} = \{ \text{Guest}, \text{IoT}, \text{Mesh}, \text{Corp}, \text{Infra} \}$$
 $$\text{Trust}(\text{Guest}) < \text{Trust}(\text{IoT}) < \text{Trust}(\text{Mesh}) \le \text{Trust}(\text{Corp}) < \text{Trust}(\text{Infra})$$
 
@@ -80,7 +80,7 @@ Geht ein mobiles Gerät (z. B. `mob-nb-01`) verloren oder wird kompromittiert, g
 ```
 
 ### 3.3 Compile-Time Secret Validation
-Um fehlerhafte Deployments durch fehlende Secrets auszuschließen, prüft die CI/CD-Pipeline deklarativ, dass alle von aktiven Modulen referenzierten Secret-Pfade in `secrets/secrets.yaml` existieren (siehe [ARCHITECTURE.md](file:///etc/nixos/ARCHITECTURE.md#88-compile-time-verification--secret-schema-validation)).
+Um fehlerhafte Deployments durch fehlende Secrets auszuschließen, prüft die CI/CD-Pipeline deklarativ, dass alle von aktiven Modulen referenzierten Secret-Pfade in `secrets/secrets.yaml` existieren (siehe [architecture.md](file:///etc/nixos/ARCHITECTURE.md#88-compile-time-verification--secret-schema-validation)).
 
 ---
 

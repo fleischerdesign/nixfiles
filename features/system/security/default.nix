@@ -150,7 +150,7 @@ in
       '';
     };
 
-    # Zero-Overhead Kernel & Network-Stack Hardening Baseline (SECURITY.md 4.1)
+    # Zero-Overhead Kernel & Network-Stack Hardening Baseline (docs/security.md 4.1)
     boot = lib.mkIf cfg.hardening.enable {
       kernelParams = [
         "slab_nomerge" # Zero-overhead heap protection
