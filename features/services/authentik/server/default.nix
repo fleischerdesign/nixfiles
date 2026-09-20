@@ -630,7 +630,11 @@ let
             # that it applies to nobody.
             model = "authentik_policies.policybinding";
             identifiers = {
-              target = yamlTag "!KeyOf flow_ldap_auth";
+              # `!Find`, not `!KeyOf`: the model reference's own example resolves a policy binding's
+              # target this way. With `!KeyOf flow_ldap_auth` the entry created no row at all while the
+              # blueprint still reported success - measured: exactly one binding existed, on the
+              # application, and none on the flow, so the flow kept applying to nobody.
+              target = yamlTag "!Find [authentik_flows.flow, [slug, ldap-authentication-flow]]";
               order = 0;
             };
             attrs = {
