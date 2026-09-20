@@ -57,31 +57,53 @@ let
         sys.exit(0)
 
     before = {i.name: i.last_applied for i in instances}
-    for instance in instances:
-        apply_blueprint.send_with_options(args=(instance.pk,), rel_obj=instance)
-
     deadline = time.monotonic() + ${toString blueprintsApplyTimeoutSeconds}
-    waiting = []
-    while True:
-        time.sleep(3)
-        waiting = []
+
+    def send(targets):
+        for instance in targets:
+            apply_blueprint.send_with_options(args=(instance.pk,), rel_obj=instance)
+
+    def settle(targets):
+        """Wait until every target reports a fresh, successful apply; return the names still waiting."""
+        while True:
+            time.sleep(3)
+            waiting = []
+            for instance in targets:
+                instance.refresh_from_db()
+                if instance.status == "error":
+                    continue
+                previous = before[instance.name]
+                if not (
+                    instance.last_applied is not None
+                    and instance.status == "successful"
+                    and (previous is None or instance.last_applied > previous)
+                ):
+                    waiting.append(instance.name)
+            if not waiting:
+                return []
+            if time.monotonic() > deadline:
+                return waiting
+
+    # Two passes, because authentik documents that blueprint discovery and evaluation follow no guaranteed
+    # order, and our blueprints reference each other across files: the provider carries an object permission
+    # for the consumer's role, which a different file creates. A first pass can therefore fail on a
+    # reference that does not exist yet, and a second pass over the whole set is idempotent - by then the
+    # referenced object exists. Measured before this existed: a deploy failed with
+    # `KeyOf: failed to find entry with id of sa_ldap_consumer_jellyfin`, and the very next run succeeded.
+    send(instances)
+    waiting = settle(instances)
+
+    if waiting:
         for instance in instances:
             instance.refresh_from_db()
             if instance.status == "error":
-                print(f"FAILED apply: {instance.name} -> status={instance.status}")
-                sys.exit(1)
-            previous = before[instance.name]
-            if not (
-                instance.last_applied is not None
-                and instance.status == "successful"
-                and (previous is None or instance.last_applied > previous)
-            ):
-                waiting.append(instance.name)
-        if not waiting:
-            break
-        if time.monotonic() > deadline:
-            print("timeout waiting for: " + ", ".join(sorted(waiting)))
-            sys.exit(1)
+                print(f"first pass failed for {instance.name}, applying again")
+        send(instances)
+        waiting = settle(instances)
+
+    if waiting:
+        print("FAILED apply, still not settled: " + ", ".join(sorted(waiting)))
+        sys.exit(1)
 
     failures = []
 
