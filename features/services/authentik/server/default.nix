@@ -616,22 +616,18 @@ let
               roles = [ (yamlTag "!KeyOf role_ldap_consumer_${safeId}") ];
             };
           }
-          {
-            # The documented prerequisite, in the shape the blueprint model reference prescribes:
-            # `target` and `order` identify the binding, and exactly one of policy/group/user goes in
-            # `attrs` - a binding with none or several is a validation error, which is what made the
-            # earlier attempt fail. `user` rather than a group, because the account that needs the
-            # access *is* this service account; a group would be an object that exists for nothing.
-            # Without this the outpost answers `Flow does not apply to current user.`
-            model = "authentik_policies.policybinding";
-            identifiers = {
-              target = yamlTag "!Find [authentik_core.application, [slug, ldap]]";
-              order = 0;
-            };
-            attrs = {
-              user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
-            };
-          }
+          # Deliberately no binding on the LDAP application.
+          #
+          # The outpost checks per user whether that user may use the application
+          # (providers/ldap/api.py runs PolicyEngine(application, request.user); bind.go answers
+          # LDAPResultInsufficientAccessRights when it does not pass). With a single binding naming the
+          # service account, every human failed that check with 50 while the service account passed -
+          # measured with the same account: 49 with a wrong password, 50 with the right one.
+          #
+          # An application without any binding is accessible to every user: the flag behind it is
+          # AppAccessWithoutBindings, key `core_default_app_access`, default True. The directory therefore
+          # stays open to bind, and who may use a service is decided where it belongs - in the consumer's
+          # own memberOf filter, projected from its endpoint contract.
           # No policy binding on the flow the outpost executes, deliberately. The outpost runs it before
           # any account is authenticated, so a binding naming the service account cannot match and the
           # flow answers "Flow does not apply to current user" - measured, twice, for the same reason the
