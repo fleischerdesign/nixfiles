@@ -69,6 +69,14 @@ in
       UMask = lib.mkForce "0002";
     };
 
+    # The plugin reads its configuration when it loads, and the file is rendered outside the unit, so
+    # nothing else would notice a changed render: restartTriggers ties the two together. Measured
+    # before this existed: restartTriggers was empty ([]), a deploy left the service running with the
+    # previous configuration, and only a manual restart made the new file take effect.
+    systemd.services.jellyfin.restartTriggers = [
+      config.sops.templates."jellyfin-ldap-auth.xml".path
+    ];
+
     my.contracts.provides.jellyfin = {
       endpoints.web = {
         port = 8096;

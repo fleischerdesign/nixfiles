@@ -248,3 +248,68 @@ in A3 can be closed.
 
 ---
 
+## 6. Directory work - six findings, each one measured late
+
+Making Jellyfin authenticate against the Authentik directory took a night and produced six generalisable
+findings. They are recorded because every one of them cost hours and none of them is specific to LDAP.
+
+### 6.1 A blueprint is one atomic transaction - one invalid entry discards all of them
+
+The upstream documentation states it plainly: *"When a blueprint is applied, all entries are processed within
+a single atomic database transaction. If any entry fails validation, the entire blueprint is rolled back. No
+partial changes."* A single invented value (`mode: implicit_consent` on a consent stage) therefore discarded
+every entry of that blueprint, including the ones that were correct, and left the objects the previous apply
+had created. Objects from an older, successful apply and objects from the current file can coexist; the file
+is not a description of the database.
+
+### 6.2 `status` is a statement about the blueprint, never about its entries
+
+Four times this night the instance read `successful` while the object it should have created did not exist.
+The cause is always the same: `last_applied` and `status` describe the last *attempt*, and a failed apply
+leaves the previous value behind. The importer does name the failing entry - it logs
+`Entry invalid: Serializer errors {...}` at warning level and it prints the entry, with its model and
+attributes - but the log lines are JSON, and `grep -v '^{'` removes exactly the evidence. Read the object
+(the row, the count, the model), and let the importer speak without filtering it.
+
+### 6.3 Files in a read-only store cannot trigger the file watcher
+
+The same page documents the two triggers: the blueprint directory is watched for modification events, and
+every file is re-read hourly. Under Nix the directory is an immutable store path that a deploy replaces
+wholesale, so no file inside it is ever *modified* and the watcher structurally cannot fire. The hourly tick
+is the only automatic mechanism, which is why a change deployed at minute :29 takes effect at :27 of the next
+hour. Two conclusions: never read a blueprint's status inside that window, and apply explicitly when a change
+has to be live now (`apply_blueprint` is the task the discovery itself sends).
+
+### 6.4 The LDAP provider's "Bind Flow" is the `authorization_flow` field
+
+`providers/ldap/api.py` line 90: `bind_flow_slug = CharField(source="authorization_flow.slug")`. The outpost
+reads `provider.BindFlowSlug` (`internal/outpost/ldap/refresh.go` line 67) and answers it with the
+identification and password answers (`bind/direct/bind.go` lines 20-22), so the flow named there has to
+authenticate. The provider's own `authentication_flow` field is a different thing. Setting the obvious field
+leaves a bind broken in a way that looks like a credential problem.
+
+### 6.5 A flow that runs before authentication must not carry bindings
+
+A policy binding that names a specific user cannot match a request that arrives unauthenticated. With
+`policy_engine_mode = any` and one failing binding the engine answers false - `any([False])` - and the flow
+reports "Flow does not apply to current user". The same rule applies to the bind flow and to the application
+access check. An unbound flow applies to everyone, and the audience belongs in the consumer's own filter.
+
+### 6.6 An application bound to one account denies everyone else
+
+The outpost calls the provider's `check_access` per user, which evaluates the *application's* policy engine;
+a non-passing result becomes LDAP result 50, `Insufficient access rights`. Binding the LDAP application to
+the service account alone therefore let the service account search and denied every human, with exactly the
+same credentials: 49 for a wrong password, 50 for the right one. An application without any binding is open
+to every user - `AppAccessWithoutBindings`, key `core_default_app_access`, default `True` - so the LDAP
+application carries no binding and each consumer's `memberOf` filter decides who may sign in.
+
+### 6.7 The rule underneath 6.4 to 6.6
+
+**Read the consuming code, not the configuration it consumes.** Every wrong turn this night came from
+trusting a field name (`authentication_flow`), a status (`successful`) or a plausible story ("the permission
+must be missing"), and every correction came from opening the source that actually decides: the API
+serializer, the Go outpost, the Django policy engine, the importer. The sources sit in the store
+(`/nix/store/*-authentik-*/lib/python3.14/site-packages/authentik` and the outpost's Go tree), and the
+documentation is available as a checkout, so none of this needs a hypothesis.
+

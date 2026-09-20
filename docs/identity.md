@@ -133,3 +133,57 @@ what its closure contains. See [operations.md](operations.md).
 Recovery time after a database loss is **not measured**. What is known is that the blueprints are
 applied on start and that their dependencies are declared; how long that takes on the actual hardware
 has not been timed, so no number is claimed here.
+
+## 10. The directory
+
+Authentik is the directory. It is served by the LDAP outpost on each of `hom-srv-01` and `cld-edge-01`
+(389 plain, 636 TLS), and applications authenticate their users against it instead of keeping their own
+accounts. Jellyfin is the first consumer; the mechanism is generic.
+
+### 10.1 One declaration, no restatements
+
+`contracts/directory` holds the structure of the directory for the whole fleet: the base DN, the user and
+group subtrees, and the prefix of consumer service accounts. It is a contract module rather than a feature,
+so it is loaded on every host and is not behind an enable flag. `usersDn` and `groupsDn` are derived from it.
+
+A consumer never composes a DN. `contracts/endpoints` projects the resolved values into
+`my.contracts.consumes.<service>.ldap` - the audience the service stated on its own endpoint, the SOPS path of
+its app password (derived when the endpoint leaves it empty), and the bind DN. The provider creates its
+accounts from the same contract, so both sides agree without reading each other's configuration. That matters
+because provider and consumer normally run on different hosts: an earlier attempt published the bind DN from
+the provider's feature and evaluated to an empty value on `hom-srv-01`, where Jellyfin runs.
+
+### 10.2 What a consumer declares, and what it does not
+
+A consumer states its **audience** once, on its endpoint:
+
+```nix
+ldap = {
+  enable = true;
+  accessGroups = [ "media-users" "infra-admins" ];
+  adminGroups = [ "infra-admins" ];
+};
+```
+
+That is policy, and it belongs to the service. The provider exposes identities and encodes no consumer's
+policy - it does not know who may sign in anywhere. The compiler refuses a consumer that enables directory
+authentication without naming `accessGroups`, because a service that authenticates against a directory
+without stating its audience has no access policy.
+
+### 10.3 How a bind is decided
+
+The outpost runs the provider's bind flow, which authenticates with an app password, and then asks the core
+whether that user may use the application. The application carries **no** policy binding, so it is open to
+every user; the actual decision is the consumer's `memberOf` filter, which is why each service keeps deciding
+its own audience. A service account whose role holds `search_full_directory` (an object permission on the
+provider) may read the whole directory - Jellyfin needs that to find users at all - while an ordinary user
+can only see their own entry. Jellyfin's login is verified end to end: `philipp` authenticates with his
+Authentik password and is an administrator in Jellyfin because `infra-admins` is his group.
+
+### 10.4 The client configuration is not state
+
+Jellyfin's plugin reads one XML file from its state directory, and that file carries the bind password. It is
+rendered from SOPS onto tmpfs and symlinked into place, so the password never reaches the store and the file
+is read-only by construction. `restartTriggers` ties the service to the rendered file, because the plugin
+loads its configuration once at start and nothing else would notice a change.
+

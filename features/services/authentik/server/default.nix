@@ -398,6 +398,11 @@ let
         # the provider's field is `authentication_flow`, the stage's is `backends`, and
         # `authentik.core.auth.TokenBackend` is the app-password backend.
         {
+          # No policy binding on this flow, deliberately: the outpost executes it before any account is
+          # authenticated, so a binding naming the service account cannot match and the flow answers
+          # "Flow does not apply to current user". An unbound flow applies to everyone, which is what a
+          # bind needs. Who may use a service is decided afterwards by the application access check, in
+          # the consumer's own memberOf filter.
           model = "authentik_flows.flow";
           id = "flow_ldap_auth";
           identifiers = {
@@ -629,67 +634,6 @@ let
           # stays open to bind, and who may use a service is decided where it belongs - in the consumer's
           # own memberOf filter, projected from its endpoint contract.
           # No policy binding on the flow the outpost executes, deliberately. The outpost runs it before
-          # any account is authenticated, so a binding naming the service account cannot match and the
-          # flow answers "Flow does not apply to current user" - measured, twice, for the same reason the
-          # authorization flow failed. An unbound flow applies to everyone, which is what an LDAP bind
-          # needs; who may actually bind is decided afterwards by the application access check (bind.go
-          # calls OutpostsLdapAccessCheck after the flow), exactly as the docs describe it: "A user must
-          # have access to the LDAP application before they can bind and search the directory."
-          {
-            # A provider runs two flows: the bind flow authenticates the account, and the authorization
-            # flow decides whether it may use the LDAP application. Measured: the core rejected the bind
-            # with `f(exec): Flow not applicable to current user` for
-            # `default-provider-authorization-implicit-consent`, whose `authentication` requirement is
-            # `require_authenticated` - while the outpost calls the flow executor unauthenticated
-            # (`"auth_via": "unauthenticated"`). A policy binding on that stock flow is ignored: the
-            # entry reported blueprint success and created no row, because authentik manages the flow.
-            # The bind flow solves the same problem by requiring `authentication = none`, so the fleet
-            # gets its own authorization flow with that requirement.
-            model = "authentik_flows.flow";
-            id = "flow_ldap_authz";
-            identifiers = {
-              slug = "ldap-authorization-flow";
-            };
-            attrs = {
-              name = "Authorize LDAP consumer";
-              title = "Authorize %(app)s";
-              designation = "authorization";
-              denied_action = "message_continue";
-              layout = "stacked";
-              authentication = "none";
-            };
-          }
-          # No policy binding for the authorization flow, deliberately: it is evaluated *before* the
-          # account is authenticated - the core logs those requests as `"auth_via": "unauthenticated"` -
-          # so a binding that names the service account cannot match. A flow without bindings applies to
-          # everyone, which is what the stock flow relies on and what this flow needs. The bind flow is
-          # different: it runs with the account's credentials, so it keeps its binding.
-          {
-            # A flow without stages is an EmptyFlowException, not an implicit allowance: planner.py raises
-            # `if not plan.bindings and not self.allow_empty_flows`. Measured in the core's log while the
-            # bind failed: `f(exec): Flow is empty`, `flow_slug: ldap-authorization-flow`. The stock
-            # A flow with no stages raises EmptyFlowException (measured: f(exec): Flow is empty for this
-            # flow), so the authorization flow needs one stage, and the docs list the stages the LDAP
-            # provider supports: identification, password, authenticator validation, user logout, user
-            # login and deny. Dummy is not among them, and a consent stage is wrong - the explicit-consent
-            # flow uses mode 'expiring', which needs an interactive answer a service account cannot give.
-            # User login is supported and needs no interaction.
-            model = "authentik_stages_user_login.userloginstage";
-            id = "stage_ldap_authz_login";
-            identifiers = {
-              name = "Authorize LDAP consumer";
-            };
-            attrs = { };
-          }
-          {
-            model = "authentik_flows.flowstagebinding";
-            identifiers = {
-              target = yamlTag "!KeyOf flow_ldap_authz";
-              stage = yamlTag "!KeyOf stage_ldap_authz_login";
-              order = 0;
-            };
-            attrs = { };
-          }
           {
             model = "authentik_core.token";
             identifiers = {
@@ -860,12 +804,6 @@ in
           # deterministically. The documented "<2 not recommended" caveat targets
           # throughput on scaled-out replicas; this instance is single-replica.
           "AUTHENTIK_WORKER__THREADS=1"
-          # TEMPORARY (2026-09-20): the blueprint importer reports individual entry failures only at
-          # debug level, so a failed apply reads as `status = error` with no reason anywhere - the
-          # server and worker journals contain the apply, the task and `exc: null`, and nothing else.
-          # Six guesses about which entry was invalid were wrong. This turns the reason on; it comes
-          # out again once the entry is found.
-          "AUTHENTIK_LOG_LEVEL=debug"
           "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
           "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
         ];
