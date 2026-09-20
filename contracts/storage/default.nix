@@ -1,5 +1,5 @@
 # contracts/storage/default.nix
-# Storage & Impermanence Contract Specification (Clean Architecture & docs/architecture.md 8.5).
+# Storage & Impermanence Contract Specification (Clean Architecture & docs/architecture.md 7.5).
 # Declares persistence boundaries (state, data, cache) and backup hooks for services.
 {
   lib,

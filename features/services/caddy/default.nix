@@ -333,7 +333,7 @@ in
     # failed to hang even once. What the production log does show is the load stalling in Caddy's own
     # admin-endpoint teardown (`stopping current admin endpoint` -> `10s timeout`), and a reload
     # necessarily round-trips through that endpoint while a restart never does. The root cause is not
-    # proven; the affected code path is simply not used any more. See docs/practices.md 5.0.
+    # proven; the affected code path is simply not used any more. See docs/practices.md §4.
     #
     # This is the module's documented knob for exactly this trade-off (`enableReload`), not an
     # override of `ExecReload`: `lib.mkForce` on that list does not displace the module's command,

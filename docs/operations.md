@@ -184,172 +184,7 @@ Worst case: reboot and select the previous generation in the bootloader (GRUB).
 ### 7.1 cld-edge-01 — DONE
 Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `identity.md`).
 
-**Naming/ingress rollout (2026-09-19): live.** The host now runs the flat public naming, the
-cluster-wide ingress engine (vhosts + WireGuard upstreams), the `node` plane, the tunnel
-credential and no apex catch-all. Verified: switch exit **0**, no failed units, 38 Cloudflare
-records matching the projection, `auth`/`grafana`/`search`/`philipp.ai` 302, `cache`/`push` 200.
-
-### 7.2 cld-ops-01 — DONE
-Public `37.114.55.91`, Tailscale node still named `rollins` (`100.126.5.72`). Deployed 2026-09-19: hostname **`cld-ops-01`** (was `rollins`), generation `8siiv7vj…`, **0 failed units**. Runs observability collector, Attic server, CrowdSec agent, OpenClaw gateways (5), SearXNG, Caddy.
-```bash
-nixos-rebuild switch --flake .#cld-ops-01 --target-host root@37.114.55.91
-ssh root@37.114.55.91 'hostnamectl --static; systemctl --failed'
-```
-Verified: `ops.vyrx.de` 200; `philipp|katja|lilly|kai|rieke.ai.vyrx.de` → 302 Authentik forward-auth; `ai.vyrx.de` → 301 → `philipp.ai.vyrx.de`; `search.vyrx.de` → 302; **wg0 up with a live handshake to `cld-edge-01` (`10.10.100.1`)**.
-Open: `cache.ops.vyrx.de` has **no DNS record** (§13 #8); orphaned `/var/lib/docker` (§13 #9).
-
-### 7.3 hom-srv-01 — READ FIRST: §8 network cutover
-Currently **`strummer`** at `192.168.178.27` (old LAN), Tailscale `100.125.253.108`. Target: `10.10.10.10`. Runs media stack, Blocky (DNS), Kea (DHCP), Chrony, gateway/NAT, ESPhome, Home Assistant, Klipper, LDAP outpost, Tailscale subnet router (`10.10.0.0/16`).
-Reach it today via Tailscale (`root@100.125.253.108`); `10.10.10.10` does not exist until the re-IP (§8.0).
-**Do not enable Kea DHCP before disabling FRITZ!Box DHCP (§8).**
-
-### 7.4 hom-wrk-01
-Currently **`jello`** at `192.168.178.30` (old LAN, desktop), Tailscale `100.88.135.75`. Target: `10.10.20.10`. Deploy via LAN/Tailscale; **verify graphically** (login, Wayland, Home Manager) — not automatable.
-
-### 7.5 mob-nb-01
-Roaming; likely the offline Tailscale node `yorke` (`100.107.168.30`). Deploy when online. Verify WireGuard roaming.
-
----
-
-## 8. Network Cutover — FRITZ!Box ↔ hom-srv-01 (critical)
-
-### 8.0 Precondition — the home LAN is still on the OLD subnet
-
-**Verified 2026-09-19:** the home LAN is still `192.168.178.0/24`; the FRITZ!Box is at `192.168.178.1` (HTTP 200); `hom-srv-01` (`strummer`) is `192.168.178.27`; the workstation (`jello`) is `192.168.178.30`. The 2.0 target is `10.10.10.0/24` with the FRITZ!Box at `10.10.10.1`.
-
-This means the cutover is **not only a DHCP/DNS handoff — it is a full LAN re-IP**, including the FRITZ!Box. The declarative FRITZ!Box engine manages only **DNS / DHCP toggle / port forwards** — *not* the LAN IP. Moving the FRITZ!Box from `192.168.178.1` to `10.10.10.1/24` is therefore a **manual, high-risk step and an open design/execution item**; decide and document it before executing.
-
-Conservative outline (to be agreed before execution):
-1. Prepare a client that can hold a static IP in the **new** subnet (`10.10.10.x/24`) — this is the anchor during the re-IP.
-2. Re-IP the FRITZ!Box LAN to `10.10.10.1/24` (DHCP still on) in the maintenance window; reconnect the anchor client and confirm WAN + management.
-3. Bring up `hom-srv-01` as `10.10.10.10` and follow §8.3 for the DHCP/DNS handoff.
-4. **Rollback:** set the FRITZ!Box LAN back to `192.168.178.1/24`; the anchor client keeps working.
-
-### 8.1 Current state (before cutover)
-
-| Function | Provider |
-|---|---|
-| WAN uplink / modem | FRITZ!Box `192.168.178.1` (target `10.10.10.1`) |
-| DHCP (all LAN subnets) | FRITZ!Box |
-| DNS (handed to clients) | FRITZ!Box |
-| Routing infra → WAN | FRITZ!Box |
-
-### 8.2 Target state (after cutover, per `my.topology` + feature code)
-
-| Function | Provider |
-|---|---|
-| WAN uplink / modem | FRITZ!Box `10.10.10.1` (unchanged) |
-| DHCP | **`hom-srv-01` Kea** (`enp2s0`); FRITZ!Box DHCP **off** |
-| DNS handed out | **`10.10.10.10` (Blocky)** primary, `1.1.1.1` fallback |
-| Routing corp/iot → WAN | `hom-srv-01` (`ip_forward` + `MASQUERADE`) |
-| NTP | `hom-srv-01` Chrony (`allow 10.10.0.0/16`) |
-
-Kea subnets: `10.10.10.0/24` pool `.100–.200` (router `10.10.10.1`), `10.10.20.0/24` and `10.10.30.0/24` pools `.100–.200` (router `10.10.10.10`), plus static reservations from topology MACs.
-
-### 8.3 Safe staged sequence
-
-> Do **one step at a time**, verify, and only then proceed. Between steps you can always roll back (§8.4).
-
-**Step 1 — Deploy hom-srv-01 with DHCP OFF (avoid dual-DHCP).**
-Temporarily set in `hosts/hom-srv-01/configuration.nix`:
-```nix
-my.features.system.networking.gateway.enableDhcp = false;
-```
-Deploy. Verify routing/NTP/Blocky:
-```bash
-ssh root@10.10.10.10 'systemctl status blocky chrony; dig +short @10.10.10.10 vyrx.de; chronyc clients'
-```
-
-**Step 2 — Verify Blocky answers before touching FRITZ!Box DNS.**
-`dig @10.10.10.10` must resolve. If not, stop and fix Blocky.
-
-**Step 3 — Reconcile the FRITZ!Box.**
-The reconciler is implemented (`features/system/networking/fritzbox/sync.py`); `nod` still fails (§4.2),
-so run the built binary directly — `--dry-run` prints a real per-item diff:
-```bash
-P=$(nix build --no-link --print-out-paths .#nixosConfigurations.hom-srv-01.config.my.features.system.networking.fritzbox.package)
-$P/bin/fritzbox-sync --dry-run     # read-only preview
-$P/bin/fritzbox-sync              # apply
-```
-It manages the **LAN address / subnet mask** (`SetIPInterface`), the **DHCP range**
-(`SetAddressRange`) and **DHCP on/off** (`SetDHCPServerEnable`), and removes **port forwardings**
-(the declared target is Zero Open Ports).
-
-Two things it cannot do, both verified on the device:
-- **The DHCP-announced DNS cannot be set over TR-064** (`LANHostConfigManagement:1` exposes no
-  such action, and no other of its 46 services does either). Set `10.10.10.10` in the box UI, or
-  ignore it — once Kea serves DHCP the box no longer announces DNS at all.
-- **The LAN address change is a hard cutover** (see §8.6).
-
-**Before applying, confirm this diff:** the box currently forwards **TCP/80 and TCP/443 to
-`192.168.178.27`** (legacy bypass of the edge ingress). The reconciler will **delete** them —
-intended, but it is an externally visible security change.
-
-Verify: FRITZ!Box UI reachable at `http://10.10.10.1`; a client still resolves via `10.10.10.10`.
-
-**Step 4 — Bring Kea up.**
-Revert the temporary change (`gateway.enableDhcp = true`) and redeploy hom-srv-01.
-```bash
-nixos-rebuild switch --flake .#hom-srv-01 --target-host root@10.10.10.10
-ssh root@10.10.10.10 'systemctl status kea-dhcp4-server; journalctl -u kea-dhcp4-server -n 30'
-```
-
-**Step 5 — Verify a test client.**
-Force a client to re-lease (`dhclient -r && dhclient` or reconnect). It must receive an address in the zone pool with the correct router/DNS. Check both an `infra` and a `corp`/`iot` client if possible.
-
-### 8.4 Rollback per step
-
-| Failure | Action |
-|---|---|
-| Blocky not resolving | Leave FRITZ!Box DNS unchanged; fix Blocky; do not proceed. |
-| Clients lose DHCP after Step 4 | Re-enable FRITZ!Box DHCP (`settings.dhcp.enable = true` → reconcile), disable Kea (`enableDhcp = false`), redeploy. |
-| DNS broken network-wide | Set a client to `1.1.1.1` manually; re-point FRITZ!Box DNS to `1.1.1.1`; fix Blocky. |
-| Lost FRITZ!Box management | Access via LAN `10.10.10.1` / restore config export / factory reset (needs ISP credentials). |
-| hom-srv-01 broken | Boot previous generation (GRUB) or `nixos-rebuild --rollback switch` over the LAN or the mesh. |
-
-### 8.5 AP cutover (TP-Link RE330, `hom-ap-01` / `10.10.10.20`)
-
-**The reconciler cannot change the SSID.** The library exposes only `set_wifi(wifi, enable)` for
-the RE330 — it toggles a band and nothing else (`ssid`/`psk` setters exist for other models, not
-this one). `tplink-ap-sync` therefore owns **band enablement** and reports the SSID as a diff.
-
-Renaming `Ancoris` → `VYRX` is a **one-time UI action** on the AP (done while someone is home),
-and it must happen **before** the FRITZ!Box moves (§8.6): afterwards the AP still bridges Wi-Fi to
-LAN, but its management address is on the dead old subnet until it re-leases.
-- Management is over **wired** LAN — keep wired access.
-- If the AP becomes unreachable: physical reset button, rejoin, re-run the reconcile.
-- Renaming drops every Wi-Fi client once; they reconnect to the same AP, so it self-heals.
-
-### 8.6 The one unavoidable disruption — and the correct phase order
-
-Moving the box's LAN address invalidates every existing lease: clients still hold
-`192.168.178.x/24` with gateway `192.168.178.1`, which no longer exists. Same-subnet traffic
-(a legacy-address host such as `hom-srv-01`, see `migration.addresses`) keeps working, but
-**gateway and internet do not** until each client renews. There is no way around one renewal per
-device (the box cannot serve two subnets); it is a single disruption, not a recurring one:
-
-| Step | Effect on clients |
-|---|---|
-| Box moves to `10.10.10.1`, still serving DHCP with range `10.10.10.20-.99` | one lease renewal, then gateway/DNS are correct again |
-| Kea takes over DHCP (box DHCP off) | **none** — same subnet, same gateway, same DNS |
-
-Practical mitigation: announce it, do it when the house is quiet, and toggle Wi-Fi on any device
-that clings to its old lease. A short lease time on the box (UI setting) makes renewals come
-faster.
-
-**Corrected order** (the device layer must be handled while the old subnet still routes):
-
-1. **Relays first** (§P6): flash with **both** SSIDs (`VYRX` + `Ancoris`) while they are still
-   reachable on `192.168.178.x`. Keep them on **DHCP** in this first flash — a static `10.10.30.x`
-   address would make them unreachable until Kea serves the `iot` subnet; move them to static
-   addresses only after the cutover.
-2. **Then the AP rename** (one click, §8.5) — the relays already follow both SSIDs, so nothing
-   is locked out.
-3. **Then the box** (Step 3) and **Kea** (Step 4).
-
----
-
-## 9. nodTargets (agentless reconcilers)
+## 7. nodTargets (agentless reconcilers)
 
 `flake.nix → nodTargets` (all `targetType = "agentless"`; `nod` builds `#nodTargets.<name>.package` and runs its single binary locally):
 
@@ -367,57 +202,7 @@ faster.
 
 ---
 
-## 10. WireGuard ↔ Tailscale Transition — COMPLETE 2026-09-20
-
-WireGuard carries everything. Tailscale is removed from all five hosts: the feature directory is gone,
-so are the host settings, the `tailscaled` ordering in sshd and four services, the endpoint contract's
-`tailscale` interface value with its firewall projection, and the last transition-only `192.168.178`
-policy-routing block in the repository.
-
-**The four criteria, measured before the removal:**
-
-1. All five cluster hosts deployed on the same revision.
-2. Fresh handshakes for every peer on **both** relay hubs.
-3. `10.10.100.x` reachable from the admin workstation — all five addresses.
-4. `deploy.nodes.<host>.hostname` resolves to a reachable WG address, with SSH confirmed on each
-   (including the edge, whose sshd does listen on its overlay address).
-
-The traffic already ran over WireGuard before the switch, proved by forcing it: `ping -I wg0` reaches
-the edge while `ping -I tailscale0` fails.
-
-**What Tailscale did that the mesh had to take over: delivering the LAN.** A roaming client has to
-reach the zones, and that is now derived rather than run by a second router:
-
-- `lanGateway = [ "infra" "corp" "iot" ]` on `hom-srv-01` names the zones it delivers; the CIDRs come
-  from `my.topology.subnets`, so no address is written twice;
-- every other host routes those CIDRs to it — through the peer's `allowedIPs` on a hub, through the
-  primary hub on a spoke;
-- a host that has an address inside a delivered zone installs **no** mesh route for the LAN: it already
-  has the LAN directly, and a tunnel route would send its traffic out through the hubs and back;
-- the delivering host is allowed to forward mesh traffic into the LAN; without that rule packets reach
-  the gateway and stop, because reaching the gateway's own addresses is input, not forward.
-
-`guest` (`10.10.99.0/24`) is deliberately **not** delivered: no host carries that zone, so announcing
-it would route traffic into a hole. Two assertions hold the assumptions: no zone may be delivered
-twice (cryptokey routing has one owner per prefix), and every delivered zone must be a /24, because
-membership is decided on the network part.
-
-- WireGuard is **already configured** on the servers (`wg0` up on `cld-edge-01`; relay hubs = `cld-edge-01` + `cld-ops-01`). Spokes use the primary hub for the full mesh CIDR.
-- Peers currently do **not** handshake (`wg show` shows `0 B received` for spokes) because the other hosts are not on 2.0 yet.
-- **As each host is deployed, its WG peer comes up.** Verify:
-  ```bash
-  ssh root@173.249.22.211 'wg show wg0; wg show wg0 latest-handshakes'
-  ```
-- **Cutover criteria (only then switch transport to WG and retire Tailscale):**
-  1. All 5 cluster hosts deployed on 2.0.
-  2. Handshakes present for every spoke on both relay hubs.
-  3. `10.10.100.x` reachable from the admin workstation.
-  4. `deploy.nodes.<host>.hostname` verified to resolve to reachable WG addresses.
-- Until then: **keep Tailscale enabled** on every host.
-
----
-
-## 11. Emergency Recovery — Regaining Access
+## 8. Emergency Recovery — Regaining Access
 
 Order of attempts (stop as soon as one works):
 
@@ -515,7 +300,7 @@ If a **network service** was misconfigured:
 
 ---
 
-## 12. Verification Cheat-Sheet
+## 9. Verification cheat-sheet
 
 ```bash
 # per host
@@ -536,75 +321,22 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 
 ---
 
-## 13. Known Gotchas / Open Items
+## 10. Known hazards
 
-| # | Item | Impact | Action |
-|---|---|---|---|
-| 1 | ~~`nod` targets WireGuard IPs only (`tailscaleIp` shim = `wireguardIpv4`)~~ **resolved 2026-09-20**: the shim is gone, the deploy target is the WG address, and all five hosts answer and accept SSH on it | — | none |
-| 2 | Agentless reconcilers reject the `switch` action arg | `nod switch hom-rt-01` / `hom-ap-01` may fail | Verify `--dry-run`; fix scripts (§9) |
-| 3 | Authentik remote forward-auth → embedded outpost `10.10.100.1:9055` | Remote Caddy login breaks if WG down | Verify the mesh is up after a deploy; the outpost address is an overlay address |
-| 4 | FRITZ!Box DHCP default is **off** in desired state | Enabling Kea before reconciling → dual DHCP or no DHCP | Follow staged §8.3 |
-| 5 | ~~Tailnet still uses legacy musician node names~~ **resolved 2026-09-20**: the tailnet is retired; the stale device entries live only in Tailscale's admin console and read nothing | — | delete them in the console, or leave them unused |
-| 6 | `rm -rf /var/lib/authentik` | Authentik service CHDIR failure | Fixed via tmpfiles rule; recreate dir if manual wipe |
-| 7 | Authentik `akadmin` is the only usable break-glass account | Family accounts have no password | Log in as `akadmin`; set/`Passwort vergessen` |
-| 8 | ~~Attic had no Cloudflare DNS record~~ **fixed.** The flat name is `cache.vyrx.de`, projected from the Attic contract endpoint; the ad-hoc `*.ops` wildcard is obsolete (#10). | — |
-| 9 | Legacy state on `cld-ops-01` | Wasted disk | **resolved 2026-09-20 — and the entry was wrong on three counts.** `/var/lib/docker` and `/var/lib/containers` do not exist. The 21 GB is `/var/lib/private/atticd`, the state of the *running* Attic cache, and it was left alone. What had no owner was `hermes` (4.3 GB state + 3.4 GB backup + 628 MB webui) and `gitea-runner`'s private state (176 MB): zero units, no user, no reference in the repository. Measured before deleting: 9 GB freed, `df` on `/` went 83 → 74 GB |
-| 10 | ~~Cloudflare held the removed wildcards~~ **closed.** `*.vyrx.de`, `*.ai.vyrx.de`, `*.ops.vyrx.de`, the stale `search.vyrx.de` CNAME and the wrongly created `fleischer.design.vyrx.de` were deleted; the live zone now equals the projection (38 records, internal planes absent). | — |
-| 12 | ~~`sandbox.<name>.ai.vyrx.de` had no listener~~ **closed.** Root cause: `mcp.apps.enabled` was never set, so OpenClaw never started its sandbox-only listener (the `port + 100` override is correct and configurable — `port + 1` would collide with the packed gateway ports). Fixed and verified: 18889–18894 listen, `/mcp-app-sandbox` is 200 through the ingress, `/` is 404 by design. | — |
-| 13 | OpenClaw gateways require the ingress in `gateway.trustedProxies`; without it every proxy-shaped request is rejected with `proxy_attribution_required` | Broken public routes | Derived from `my.topology.ingressHost` in the gateway feature; the ingress also overwrites `X-Forwarded-For/-Proto/-Host` (fix in place — do not regress either half) |
-| 11 | Naming model changed: flat public names, ingress engine, Blocky split horizon, `node` plane | Deploy order matters — DNS/TLS must exist before a name is served | Deploy `cld-edge-01` first, then `cld-ops-01`, `hom-srv-01`, clients. See `naming.md` §9/§12 |
-| 14 | ~~Migration scaffolding (host `migration` block, watchdog, legacy labels) is temporary by design~~ **removed 2026-09-20**: every block, the connectivity guard, the old `sshd` addresses, the reconcilers' old-address input, the `migrationDebt` report and the legacy WLAN are gone, each verified afterwards — see §14 | — | none |
-| 15 | Running the FRITZ!Box reconciler in **apply** mode **is** P3 | It disables the box DHCP and hands out DNS `10.10.10.10`, which only exists after P1 (hom-srv-01 deployed). Applied too early it breaks DHCP/DNS for the whole LAN | Never apply before P1. Verify read-only with `…fritzbox.package/bin/fritzbox-sync --dry-run` (needs a TR-064 user: FRITZ!OS ≥ 7.24 rejects the password-only login, `dslf-config` is gone) |
-| 16 | Applying the `tplink-ap` reconciler **unifies the SSIDs to `VYRX`** (2.4 + 5 GHz) and needs the AP at its target address | Wi-Fi clients reconnect / lose a separate SSID | AP last (P5). Verify read-only with `…tplink-ap.package/bin/tplink-ap-sync --dry-run`; both reconcilers are dry-run-verified against the live devices |
-| 17 | ~~`srv.lan.vyrx.de` is a host-specific **public** record, updated by `hom-srv-01` itself via `cloudflare-dyndns` to the home's dynamic address~~ **resolved 2026-09-20: both removed.** The reasoning was measured rather than assumed: the dyndns service had exactly one consumer (that record) and the record had none. The mesh learns the home's endpoint from the packets the home itself sends (`persistentKeepalive 25`), ingress happens on the edge, and the box declares no port forwardings - so nothing initiates towards the home and no name for its changing address is needed. The record was deleted once via the API because the Cloudflare engine never owned it (no engine comment - which is exactly how `--prune` left it alone) | — | none |
+Standing conditions that will bite an operator who does not know them. Resolved items do not belong
+here: they belong in the commit that resolved them.
 
----
-
-## 14. Migration Scaffolding — removed 2026-09-20
-
-Every transitional artifact was **deprecation debt with an expiry**, and the expiry is reached: this
-repository describes exactly one state. The gate is gone rather than waited out - the stability window
-of days was a risk assumption with no measurement behind it, and the rollback it protected was never
-the only way in (the LAN hosts have local access, the cloud hosts a public IP). A failure gets fixed
-when it appears.
-
-What was removed, and how each removal was verified:
-
-| Artifact | Verification |
+| Hazard | Why it matters |
 |---|---|
-| `my.topology.hosts.<host>.migration` - addresses, gateway, old SSID | `ip -4 addr` on `hom-srv-01` and `hom-wrk-01` lists the new subnets only |
-| the addresses `sshd` bound | `ss -lnt` on both hosts lists only the LAN and overlay addresses |
-| the connectivity guard (unit + timer) | no unit matching `migration` remains |
-| the reconcilers' old-address input | both engines derive their target from the declared `ipv4` |
-| the `migrationDebt` projection (I11) | deleted with its subject |
-| the legacy WLAN in the ESP firmware configuration | nothing radiated that name any more (measured by scan); the running firmware keeps it until the next flash |
-| the `192.168.178` policy-routing block | went with the Tailscale feature that introduced it |
-| `cloudflare-dyndns` and its `srv.lan.vyrx.de` record | the service had exactly one consumer - that record - and the record had none |
-| the rollback generations (44/30/18/11 kept on edge/srv/ops/wrk) | pruned to the last three, then `nix-store --gc`. Three is the depth now: enough to roll a bad activation back twice from the bootloader, and the store sizes afterwards are 22G/24G/44G/58G/59G |
+| Both agentless reconcilers reject the `switch` action argument | `nod switch hom-rt-01` / `hom-ap-01` may fail; run the tool directly |
+| The FRITZ!Box's DHCP is **off** in the desired state | enabling Kea before reconciling the box gives you two DHCP servers on one segment, or none |
+| Applying the `tplink-ap` reconciler unifies the SSIDs to `VYRX` on both bands and needs the access point at its current address | it changes the WLAN for everyone, including the microcontrollers that store the fleet SSID |
+| Neither reconciler has ever been run in apply mode | their desired state is verified as a **diff**, not as an applied state — the box's LAN interface, its DNS and its port forwards are still whatever the device already had |
+| Authentik's `akadmin` is the only usable break-glass account | family accounts carry no password and are created through the enrollment flow |
+| The remote forward-auth outpost is reached at an overlay address (`10.10.100.1:9055`) | Caddy logins on the LAN hosts break if the mesh is down |
+| OpenClaw gateways require the ingress in `gateway.trustedProxies` | without it every proxy-shaped request is rejected |
 
-The scanner is declared (MAC and an `iot` address) and takes its lease like the relays do. **No
-`192.168.178` literal remains anywhere** - the two that used to sit in the topology schema's `example`
-fields went with the `migration` option they documented.
-
-### 14.2 The steps that were taken — the record
-
-| # | Change | Verification |
-|---|---|---|
-| 1 | empty `my.topology.hosts.hom-srv-01.migration` (`addresses = []`, `gateway = null`), redeploy | `ip -br a` shows only `10.10.10.10`; default route via `10.10.10.1`; Tailscale and services up |
-| 2 | remove the migration watchdog (unit + timer + file) | deploy is clean, no unit left |
-| 3 | drop the reconciler's old-address input (the `hom-rt-01.migration` half is **done**, 2026-09-20) | a reconciler run reports "unchanged" |
-| 4 | delete the `migration` option from the topology schema once no host needs it | `nix flake check`, `nix fmt`, statix/deadnix clean |
-| 5 | ~~remove rename leftovers one by one (e.g. `ntfy.vyrx.de`)~~ **done 2026-09-20**: the alias report (I8) now holds only the intended names - `fleischer.design`, the five `*.pub.*` and `docs.lan.vyrx.de`. `ntfy.vyrx.de` went with it, because the canonical plane is `push.vyrx.de` (which Grafana already alerts to). **Push clients that stored the old URL have to be repointed**, so this is the one change here with a user-visible consequence | alias report = the intended set (7 entries) |
-| 6 | remove the legacy topology shim once nothing reads it | `grep -rn 'networking\.topology' features/ roles/` |
-
-### 14.3 What stays (target state, not scaffolding)
-
-`my.topology.hosts.<h>.interface`, `my.topology.resolvers`, the router reconciler's
-LAN/DHCP/DNS/forward capability, `enableDhcp`, and the naming invariants I1–I11.
-
----
-
-## 15. Appendix — Files, Secrets, Commands
+## 11. Appendix — Files, Secrets, Commands
 
 **Key files**
 - `flake.nix` — hosts, `deploy.nodes`, `nodTargets`.

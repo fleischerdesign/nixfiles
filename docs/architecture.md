@@ -212,36 +212,7 @@ Ablösung des Standard-Subnetzes `192.168.178.0/24` durch das kollisionsfreie Su
 
 ---
 
-## 7. Migrations-Phasenplan (Zero-Downtime & Zero-Rework)
-
-1. **Phase 1: Domain Setup & Secrets-Restrukturierung**
-   - Registrierung von `vyrx.de` und Cloudflare DNS-Zone einrichten.
-   - Refactoring der `secrets/secrets.yaml` in hierarchische Namespaces (Beseitigung aller Host-Präfixe wie `_mackaye`).
-2. **Phase 2: Codebase-Vorbereitung (Service Contracts & Dual-Stack VPN)**
-   - Einführung von `my.contracts` und `my.topology` mit Zonen-Support.
-   - Erledigt 2026-09-20: Kernel-WireGuard (`wg0`) trug den Verkehr bereits vollständig, Tailscale wurde danach entfernt. Die vier Abbruchkriterien sind in `operations.md` §10 gemessen.
-   - Caddy auf Ingress-Host so konfigurieren, dass `.vyrx.de` parallel zu bestehenden Legacy-Domains bedient wird.
-3. **Phase 3: Router, Subnetz- & Storage-Migration (Heimnetz)**
-   - Umstellung des Heimnetz-Routers auf `10.10.0.0/16` und Umschalten von FRITZ!Box und TP-Link AP in den reinen Bridge-Modus (DHCP aus).
-   - Etablierung des zentralen Gateways auf `hom-srv-01` (`features/system/networking/gateway` für DHCP, Blocky DNS, Chrony NTP und nftables-Routing).
-   - Migration von `hom-srv-01` auf Disko-Btrfs (Vorbereitung für Impermanence und Tier-1 Snapshots).
-   - Lokales DNS (Blocky) und lokaler Ingress-Caddy auf `hom-srv-01` für Split-Horizon DNS-01 ACME etablieren.
-4. **Phase 4: Host-Renaming & Re-Keying (Sauberer Schnitt)**
-   - Git-Branch anlegen und Host-Ordner nach Enterprise-Taxonomie umbenennen (`hosts/<new-name>/`).
-   - `.sops.yaml` Age-Key-Namen anpassen und `secrets.yaml` mit neuen Host-Keys re-encrypten.
-   - Gezieltes Deployment via `nod switch` über die verifizierten Verbindungs-IPs.
-5. **Phase 5: WireGuard Cutover, OpenClaw Mesh & Observability**
-   - Umschalten aller Dienst-Upstreams auf das WireGuard-Mesh (`10.10.100.x`).
-   - OpenClaw Nodes direkt nativ über das Mesh mit `cld-ops-01` verbinden (Loopback-Tunnel entfernen).
-   - Rollout von Vector/Loki für zentrales Logging und CrowdSec-Mesh.
-   - Etablierung der 3-2-1 Restic-Pipeline mit Remote-Tier auf `cld-ops-01`.
-6. **Phase 6: Decommissioning**
-   - Erledigt 2026-09-20: Tailscale ist fullständig deaktiviert und entfernt; das Heim-LAN wird vom `hom-srv-01` über das Mesh zugestellt (`lanGateway`).
-   - Entfernen aller temporären Legacy-Aliase (`.ancoris.ovh`) und Alt-Routen.
-
----
-
-## 8. Codebase & NixOS-Architektur (nixfiles 2.0)
+## 7. Codebase & NixOS-Architektur (nixfiles 2.0)
 
 Dieses Kapitel definiert die software-architektonischen Prinzipien zur Realisierung einer akademisch sauberen, modularen und wartungsarmen NixOS-Infrastruktur.
 

@@ -1,4 +1,4 @@
-# practices.md — the engineering bar, and what still stands in its way
+# Engineering practices
 
 `architecture.md`, `naming.md` and `identity.md` describe **what** this configuration is.
 This file describes **how good** it has to be, what that means concretely, and what is still
@@ -46,26 +46,7 @@ stated.
 
 ---
 
-## 3. Measured state (2026-09-20, after the 2.0 refactor pass)
-
-| Criterion | Measurement |
-|---|---|
-| **A1** | **resolved and measured**: `--failed` is `0` on all five hosts and `nixos-rebuild switch` returns `exit 0` on every one of them. The last failure was the CrowdSec agent (renamed host → `ent: machine not found`), registered on the master. The `2` failed units seen on the edge after the rescue were transient state, not defects, and cleared on their own |
-| **A2** | **10 of 12 resolved** in `58f4139` (+17/−69): searxng (the reference case), the nine live options, and the dead `couchdb` option deleted outright. Every consumer now reads its contract's `canonicalDomain` — which is derived plane-aware, so the option that could only ever express the public plane is gone. **2 remain, both verified as correct rather than pending**: `mail` (SMTP hostname and certificate copy — legitimately independent) and `openclaw/gateway`'s per-instance `domain`, which turned out to be a *contract parameter* (the base domain the endpoint builds its name from, set by `cld-ops-01` for all five instances) and not a second derivation — the construct is right where it is |
-| **A3** | **resolved for all five hosts**: `hom-srv-01` (already current; the no-op deploy proved it), `cld-ops-01`, `cld-edge-01` (rebuilt and activated after the rescue) and `hom-wrk-01`; `mob-nb-01` followed once it was online — it was on an old generation without fleet access, so the closure was built locally and pushed with `nix copy` (the target's daemon imports as root), then activated detached through a `sudo` from `philipp`. It came back as `mob-nb-01` on the current revision with 0 failed units, `sshd` listening only on its overlay address, and its WireGuard up |
-| **A4** | **resolved 2026-09-20**: every `migration` block, the connectivity guard, the old addresses sshd bound to and the reconcilers' old-address input are gone — `ip -4 addr` on `hom-srv-01` and `hom-wrk-01` shows the new subnets only, `ss -lnt` no longer binds the old ones, and no unit matching `migration` remains. The stability window §14.1 demanded was dropped as a criterion: it was a risk assumption with no measurement behind it, and the rollback it protected was never the only way in (local access on the LAN hosts, a public IP on the cloud hosts). What replaced it is observable, and a failure gets fixed when it appears |
-| **A5** | **resolved and applied**: `--prune` existed, was documented as deleting records, and `args.prune` was read nowhere — the reconciler was additive only and could never remove the labels it had created itself. Pruning is now ownership-scoped (the desired-set check is primary, the comment vocabulary answers "did we write this?"), and the unit passes it, so the zone is a function of the configuration. First real run: `0 created, 0 updated, 35 unchanged, 3 stale, 3 deleted` — `edge.`, `ops.` and `salus.vyrx.de` are gone. Records the engine does not own are unreachable by construction, which is why `srv.lan.vyrx.de` (written by `cloudflare-dyndns`) survived; see §13 item 17 |
-| **A6** | **resolved**. Root access was restored through the provider's rescue system after my own gateway precedence change had left the edge with no default route; the edge now boots the corrected generation by default, and every server trusts both the operator key and the fleet key (`~/.ssh/nixfiles-deploy-key`, `SHA256:EduFlyo…`). `~/.ssh/config`, `nod`'s `identityFile` and `deploy-rs`'s `-i` argument all use the fleet key; `~/.ssh/deploy-key` points at the node tunnel secret and is documented as not for fleet access. The LAN certificate failure is resolved by the per-name DNS-01 model, measured from inside the LAN: `jellyfin` 302, `mealie` 200, `hass` 200, `seerr` 307, each with a Let's Encrypt issuer where there used to be a handshake failure |
-| **A6 (passwords)** | `users.philipp.password` was **always** the hash of `173695` — verified against the value in git history with `perl -e 'print crypt(…)'`. The drift was never in the declaration but in its enforcement: `mutableUsers = true` applied it only at account creation, so `cld-edge-01` kept whatever the provider's install set, and the panel's password reset never reached the OS (it works through cloud-init on the provider's own images; this is NixOS). Servers now set `users.mutableUsers = false`, so the declaration is applied on every activation — and this is now **measured**, not assumed: the `hom-wrk-01` activation printed `modifying secret: users/philipp/password`, and a non-interactive `sudo -S` with `173695` succeeds |
-
-| **Zones (LAN)** | **mechanism resolved and proven; one device is still on a pre-change lease.** All three zones live in **one** Kea shared network, each subnet bound to one client class - `infra`, `iot`, and the complement `corp` for whatever the inventory does not declare - because Kea's default subnet selection for a directly connected client uses the *receiving interface's address* and ignores classification entirely (ARM 8.6, see §4.2). Proof: all six iot relays were flashed over OTA, re-requested DHCP, and came back on the addresses their inventory entries declare (`hom-rly-01` … `hom-rly-08` → `10.10.30.11/.12/.13/.16/.17/.18`, each confirmed by `DHCP4_LEASE_ALLOC` and a `REACHABLE` neighbour entry). **Also moved:** `hom-ap-01`, after a reboot through the same library the tplink-ap engine uses (`TplinkRE330Router.reboot()`; the engine itself exposes no reboot action) — it came back on its declared `10.10.10.20` and stopped answering on `10.10.20.100`. A software reboot alone does *not* do it: measured, no DHCP packet from its MAC appeared in Kea's log while it kept its stored 24 h lease. And `hom-prn-01`, the scanner, is declared with its MAC and leases `10.10.30.19` from the iot zone; until the MAC was declared it sat on a corp pool lease, which is the rule rather than a fallback. Every device in the inventory is therefore in the zone its entry names |
-
-**Holding:** invariants I1–I10 assert clean (0 errors under `flake check`); the compatibility shim is
-gone (0 occurrences); the `vlan` field is gone (0 occurrences).
-
----
-
-## 4. The method that works here — and the two times it was ignored
+## 3. The method that works here — and the two times it was ignored
 
 For every change that removes or replaces something:
 
@@ -202,7 +183,7 @@ can see a contradiction instead of a number. And when an instrument can fail sil
 loudly: keep `stderr`, check the exit code, and prefer the file the running unit actually reads over a
 pattern that happens to match several.
 
-## 5. Open blockers — and one open investigation
+## 4. One open investigation
 
 ### 5.0 `caddy reload` stalls: five hypotheses tested and refuted (2026-09-20, night)
 
@@ -267,27 +248,3 @@ in A3 can be closed.
 
 ---
 
-## 6. The rename problem — six registries, one cause
-
-Renaming the hosts (`strummer` → `hom-srv-01`, `jello` → `hom-wrk-01`, `mackaye` → `cld-edge-01`,
-`rollins` → `cld-ops-01`, `yorke` → `mob-nb-01`) was treated as a configuration change. It was a
-state migration, and every system that keys on the hostname had to be migrated with it. The ones we
-stumbled over on 2026-09-19, in the order they bit:
-
-| # | Registry | Symptom | State |
-|---|---|---|---|
-| 1 | `sshd` `listenAddresses` | the migration address was never bound → deploy locked itself out of the host | fixed |
-| 2 | Chrome `SingletonLock` (contains `<hostname>-<pid>`) | "profile in use on another computer" and no way to start Chrome | fixed (stale lock removed) |
-| 3 | CrowdSec machine registry | the agent authenticates as `<hostname>`, so the rename made it a stranger: `ent: machine not found` | **resolved, and it was a latent defect rather than debt.** `hom-srv-01` had been registered first, but the ops agent still authenticated as `rollins`: its process had been running since before the rename, so it kept working with the old credentials file in memory while the *rendered* file already said `cld-ops-01`. It would therefore have gone blind at its next restart, and `active` would not have shown it. The registry held the proof - `rollins` heartbeating while `cld-ops-01` had no heartbeat. Both current identities were registered and their heartbeats **verified before anything was deleted**; then `rollins`, `strummer`, `jello`, `yorke` were removed. `mackaye` stays - it is the master's own entry. All three hosts: crowdsec active, bouncer active, 0 failed |
-| 4 | per-host `domain` fields | a second naming scheme that the rename made visibly wrong (`srv.lan.vyrx.de` for `hom-srv-01`) | fixed (fields deleted) |
-| 5 | Caddy access-log filenames (`access-<vhost>.log`) | stale files, and the agent could not read them (`permission denied`) → the IPS ran but was blind to HTTP | **fixed and verified**: `z /var/log/caddy/*.log 0640 caddy caddy` plus `crowdsec` ∈ `caddy`; `cscli metrics` shows every `access-<vhost>.log` read and parsed. My later "still not readable" check tested an invented filename (`access.log`) — see §4.1 |
-| 6 | host-keyed state in user profiles (`dconf`, VS Code, kdeconnect, session stores) | harmless strings, no action | accepted |
-
-**The rule this yields:** a hostname change is finished only when every registry keyed on the hostname
-has been migrated — and since we found six by accident, the list is probably incomplete. The systemic
-conclusion is not a longer checklist but a narrower habit: **treat a fleet-wide rename as a migration
-with a verification phase, like the subnet cutover — or do not rename at all.**
-
-The concrete open item #5 from this table is closed. What remains here is not a defect but inert debt:
-the stale entries in the CrowdSec machine registry (#3), harmless as long as nobody mistakes them for
-live machines — `mackaye` is the master's own entry and must not be deleted.

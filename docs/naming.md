@@ -337,21 +337,7 @@ Read-only projections for inspection and tests: `my.contracts.projections.fqdns`
 
 ---
 
-## 9. Migration (staged, reversible)
-
-| Stage | Change |
-|---|---|
-| 0 | This document, the read-only projections and invariants I1–I8 in **report-only** mode. No behaviour change. |
-| 1 | Publish the derived names **in addition** to the current ones (via `aliases`). Everything keeps working. |
-| 2 | Migrate consumers to the documented names (`jellyfin.vyrx.de`, `push.vyrx.de`, `hass.vyrx.de`, `sonarr.lan.vyrx.de`, …): Caddy vhosts from the projection, OIDC redirect URIs, Blocky mappings, `home.nix` shortcuts, client defaults. |
-| 3 | Enable I3/I4/I5 as hard failures; reclassify endpoints (`internal`→`lan`, wrong planes). |
-| 4 | Remove legacy names, `baseDomain`, `endpoints.<n>.domain`, `*.edge`/`*.ops`, then run the Cloudflare projection with `--prune` after verification. |
-
-Ingress host (Cloudflare + Caddy) deploys last, so DNS/TLS never point at an unserved name.
-
----
-
-## 10. Decisions
+## 9. Decisions
 
 1. **Overlay naming:** `mesh.vyrx.de` is authoritative in our own DNS. **The overlay is WireGuard
    only** — Tailscale was retired on 2026-09-20 and its ULA prefix
@@ -365,63 +351,3 @@ Ingress host (Cloudflare + Caddy) deploys last, so DNS/TLS never point at an uns
 
 ---
 
-## 12. Implementation status
-
-Verified against the running evaluation (`nix flake check`, fleet-wide):
-
-| Rule | Implementation |
-|---|---|
-| §2 host plane | `nodeRecords` in the Cloudflare feature project `<hostname>.node.<domain>` → overlay address. |
-| §3 service plane | `contracts/endpoints` derives `canonicalDomain` from `scope` + `subdomain` (`public`→apex, `internal`→`.lan`, `mesh`→`.mesh`, no subdomain/`isolated`→no name). `endpoint.domain` and `caddy.baseDomain` are removed from the naming path; the latter no longer exists. |
-| §4 split horizon | Blocky projects every named endpoint fleet-wide to the address a LAN client should use; `.lan`/`.mesh`/`.iot` exist only there. |
-| §5 wildcards | One opt-in apex catch-all (`catchAll`, default **off**), plus service-declared dynamic wildcards. Host-encoded service wildcards are gone. |
-| §5.1 catch-all conflict | Resolved as option **A**: the catch-all is disabled, so internal planes return NXDOMAIN instead of being absorbed. |
-| §6/§8.1 ingress engine | The ingress host publishes every fleet-wide `public` endpoint and proxies to the provider over the LAN/overlay (verified: `jellyfin.vyrx.de → 10.10.10.10:8096`, `cache.vyrx.de → 10.10.100.2:8080` with `flush_interval -1`, `hass.vyrx.de` with forward-auth). `my.topology.ingressHost` is the single SSOT. |
-| §7 invariants | I1–I4, I9 enforced as assertions; I8 exposed as `my.contracts.projections.aliases`. |
-| §8 API delta | Done, except that the `scope` enum is unchanged (mapped, not renamed — the overlay plane is spelled `mesh`, see §1). |
-| §10.4 decisions | `hass`, `seerr`, `mealie`, `grafana` are public; `hass`/`seerr` moved behind Authentik forward-auth in the same change. |
-
-Not yet deployed: all of the above is repository state and evaluation-verified only.
-4. **Zone membership — resolved.** `hass`, `seerr`, `mealie` and `mon` (Grafana) are **public**.
-   `architecture.md` §3.2 is therefore stale for `mealie`/`mon` (they belong in §3.1). Contract
-   deltas:
-
-   | Service | Current | Required | Resulting FQDN |
-   |---|---|---|---|
-   | `home-assistant` | `scope = "internal"; auth = "none"` | `scope = "public"; auth = "authentik"` (+ `unauthenticatedPaths` for the companion-app/token APIs) | `hass.vyrx.de` |
-   | `jellyseerr` | `scope = "internal"; auth = "none"` | `scope = "public"; auth = "authentik"` | `seerr.vyrx.de` |
-   | `mealie` | `scope = "public"; auth = "oidc"` | unchanged | `mealie.vyrx.de` |
-   | `grafana` | `scope = "public"; auth = "oidc"` (+ `mon.lan` alias) | unchanged; drop the `mon.lan` alias (§4) | `grafana.vyrx.de` |
-
-   **Critical:** `home-assistant` and `jellyseerr` currently pair `scope = "public"`-intent with
-   `auth = "none"`. Changing only the scope would publish both **unauthenticated** on the
-   internet. The scope and the auth must change together — this is exactly the class of mistake
-   I9 exists to prevent.
-
-   Operational caveat for `home-assistant`: the companion app and integrations authenticate with
-   long-lived tokens, not a browser SSO redirect. Authentik forward-auth must therefore be
-   combined with `unauthenticatedPaths` (and the already-configured `trusted_proxies`), or the
-   mobile app breaks. The exact path list must be taken from Home Assistant's documented
-   trusted-proxy setup, not guessed.
-
-5. **Auth exemption mechanism (new, required by I9):** `public` + `auth = "none"` stays legal
-   for self-authenticating or intentionally public endpoints (Attic's own token auth, `search`,
-   the static `portfolio` / `vyrx-landing` sites). Those must declare `publicExempt = "<reason>"`
-   so the exemption is visible in review rather than assumed.
-
----
-
-## 11. Known gaps (this document is not yet "done")
-
-Honest status. These are the open items that keep this specification short of the standard it
-claims:
-
-| # | Gap | Needed to close it |
-|---|---|---|
-| G1 | ~~Unenforced~~ **closed.** I1–I4 and I9 are hard assertions in `contracts/naming/default.nix`, evaluated fleet-wide on every host: `nix flake check` now fails cluster-wide on any violation. I9 immediately surfaced 14 pre-existing unauthenticated public endpoints, which are now declared with a reason. | I5–I8 remain reports (I8 is `my.contracts.projections.aliases`). |
-| G2 | **Partially closed.** `naming.md` is the normative derivation, `architecture.md` §3.1 defers to `my.contracts.projections.fqdns`, and `caddy.baseDomain` / `endpoints.<n>.domain` are gone from the naming path. | Still open: `AGENTS.md`, `design.md`, `operations.md`, `README.md`, `provisioning.md` restate service names and must point at `naming.md` instead. |
-| G3 | **No formal grammar.** No charset/length rules (LDH, 63-octet label, 253-octet name), no statement about non-DNS-safe subdomains already in use (`cam.moonraker`, `*.pub.*`), case, or trailing dot. | Add a grammar section + a name validator used by I1/I2. |
-| G4 | **No operational DNS policy.** No TTL strategy per plane, no PTR/reverse-zone policy (relevant for mail), no DNSSEC statement. | Add a TTL/PTR/DNSSEC policy section. |
-| G5 | **Migration has no verification gates.** §9 lists stages but not how completion is proven. | Add per-stage acceptance checks (record/vhost/redirect diffs, consumer greps). |
-| G6 | ~~Host-FQDN rule missing~~ **retracted — my error.** `architecture.md` §3.3 *does* specify it (`*.node.vyrx.de`, CNAME to the overlay address); §2 above invented `<hostname>.<plane>` instead. | §2 now follows §3.3; still open: whether the undeclared `edge`/`ops` labels become aliases or are dropped. |
-| G7 | ~~overlay plane naming~~ **closed.** The overlay plane is **`mesh`** (`.mesh.vyrx.de`), matching the contract enum value. `architecture.md` §3 and this document were updated; the enum is unchanged. | — |

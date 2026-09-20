@@ -110,7 +110,7 @@ let
   ) named;
 
   # I10 - the ingress terminates TLS and proxies to a remote public endpoint *directly over the
-  # mesh* (docs/architecture.md §8.1, "WireGuard-Upstreams"), so such an endpoint must be declared
+  # mesh* (docs/architecture.md §7.1, "WireGuard-Upstreams"), so such an endpoint must be declared
   # reachable there: listen on a non-loopback address and open the port on the wireguard
   # interface. Without this the ingress answers 502 (observed live for cache.vyrx.de while
   # atticd still bound 127.0.0.1).

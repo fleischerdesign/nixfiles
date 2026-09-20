@@ -120,7 +120,7 @@ let
   );
 
   # Every `public` endpoint resolves to the *ingress*, which terminates TLS and proxies to the
-  # provider over the WireGuard mesh (docs/architecture.md §8.1). The provider host does **not**
+  # provider over the WireGuard mesh (docs/architecture.md §7.1). The provider host does **not**
   # need a public address -- that is the whole point of the ingress engine.
   endpointRecords = lib.concatLists (
     lib.mapAttrsToList (

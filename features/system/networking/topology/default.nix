@@ -188,7 +188,7 @@ in
 
     # Single source of truth for the public ingress host. The Caddy ingress engine and the
     # Cloudflare DNS projection both read this, so ingress responsibility is declared once
-    # (docs/architecture.md §8.1).
+    # (docs/architecture.md §7.1).
     ingressHost = lib.mkOption {
       type = lib.types.str;
       default = "cld-edge-01";
@@ -332,7 +332,7 @@ in
         wireguardPublicKey = "j80spw+2+Ojz51aKAytPdCZwFOc64yNOR05rAcXOESE=";
         hostType = "server";
         # This host routes the home LAN, so it is the one that delivers those zones into the mesh
-        # (docs/operations.md 10). The announcement replaced Tailscale's subnet router; without it a
+        # (docs/docs/architecture.md). The announcement replaced Tailscale's subnet router; without it a
         # roaming client reaches the mesh but none of the services behind it. `guest` is absent on
         # purpose: no host carries that zone, so announcing it would route traffic into a hole.
         lanGateway = [

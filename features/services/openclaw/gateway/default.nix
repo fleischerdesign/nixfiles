@@ -17,7 +17,7 @@ let
   # The public ingress (Caddy + Authentik forward-auth) is the only legitimate proxy in front
   # of a gateway, so its overlay address is the only non-loopback entry allowed in
   # gateway.trustedProxies. Derived from the topology, so a new ingress host needs no edit
-  # here (docs/architecture.md §8.1). OpenClaw validates the source address of proxy-shaped traffic
+  # here (docs/architecture.md §7.1). OpenClaw validates the source address of proxy-shaped traffic
   # and rejects untrusted ones with `proxy_attribution_required`.
   ingressProxyAddress =
     (osConfig.my.topology.hosts.${osConfig.my.topology.ingressHost} or { }).wireguardIpv4 or null;
