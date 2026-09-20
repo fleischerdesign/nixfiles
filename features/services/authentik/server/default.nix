@@ -60,6 +60,44 @@ let
     && (item.ep.canonicalDomain != null || item.ep.oidc.redirectUris != [ ])
   ) allClusterEndpointsList;
 
+  # LDAP consumers: endpoints that authenticate their users against the directory. For a `web`/
+  # `default` endpoint the name is the service name, so `jellyfin` is the whole identity of that
+  # consumer - which is also what its secret path and its account name derive from.
+  rawLdapEndpointsList = lib.filter (item: item.ep.ldap.enable) allClusterEndpointsList;
+
+  # A consumer without a stated audience has no policy. The contract gives `accessGroups` no default
+  # for the same reason; this makes it enforceable rather than a convention.
+  ldapPolicyCheck =
+    let
+      unstated = map (item: item.name) (
+        lib.filter (item: item.ep.ldap.accessGroups == [ ]) rawLdapEndpointsList
+      );
+    in
+    if unstated != [ ] then
+      throw "Authentik LDAP compiler error: ${lib.concatStringsSep ", " unstated} enables directory authentication without naming accessGroups - a service without a stated audience has no access policy"
+    else
+      true;
+
+  # The app password lives in SOPS like every other credential; the path is derived so a service only
+  # has to say that it wants LDAP, not where its secret lives.
+  ldapConsumerSecretPath =
+    name: ep:
+    if ep.ldap.secretPath != null then
+      ep.ldap.secretPath
+    else
+      "services/authentik/consumers/${name}-ldap-password";
+
+  ldapEndpoints =
+    assert ldapPolicyCheck;
+    builtins.listToAttrs (
+      map (item: {
+        inherit (item) name;
+        value = item.ep;
+      }) rawLdapEndpointsList
+    );
+
+  sortedLdapEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames ldapEndpoints);
+
   # Collision Guard: Assert that no two hosts declare the same OIDC endpoint name
   duplicateOidcCheck =
     let
@@ -365,10 +403,18 @@ let
             authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
             invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
           };
-          permissions = map (o: {
-            permission = "authentik_providers_ldap.view_ldapprovider";
-            role = yamlTag "!KeyOf role_ldap_${o.safeHost}";
-          }) ldapOutposts;
+          permissions =
+            map (o: {
+              permission = "authentik_providers_ldap.view_ldapprovider";
+              role = yamlTag "!KeyOf role_ldap_${o.safeHost}";
+            }) ldapOutposts
+            ++ map (name: {
+              # What the documentation prescribes as an object permission on the provider. Without it a
+              # bind account may search only itself - the trap a search account falls into: the bind
+              # succeeds and then returns nothing.
+              permission = "authentik_providers_ldap.search_full_ldap_directory";
+              role = yamlTag "!KeyOf role_ldap_consumer_${builtins.replaceStrings [ "-" ] [ "_" ] name}";
+            }) sortedLdapEndpointNames;
         }
         # The LDAP outpost config endpoint only exposes providers that are bound
         # to an application, so the provider is linked here explicitly.
@@ -430,6 +476,62 @@ let
 
   generatedLdapOutpostBlueprint = toBlueprintYaml "ldap-outposts-generated" ldapOutpostBlueprint;
 
+  # One search account per consumer, which is the shape the Authentik documentation prescribes
+  # ("Example: LDAP search account"): a service account, an **app password** - not an API token, which
+  # authenticates against the HTTP API only and is rejected by an LDAP bind (measured: `Invalid
+  # credentials (49)` with the outpost's API token against a DN that exists) - a role, and the
+  # "Search full LDAP directory" object permission on the provider, added above.
+  ldapConsumerBlueprint = {
+    version = 1;
+    metadata = {
+      name = "vyrx-ldap-consumers";
+    };
+    entries = lib.concatMap (
+      name:
+      let
+        ep = ldapEndpoints.${name};
+        safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
+      in
+      [
+        {
+          model = "authentik_rbac.role";
+          id = "role_ldap_consumer_${safeId}";
+          identifiers = {
+            name = "LDAP consumer ${name}";
+          };
+          attrs = {
+            permissions = [ ];
+          };
+        }
+        {
+          model = "authentik_core.user";
+          id = "sa_ldap_consumer_${safeId}";
+          identifiers = {
+            username = "ak-ldap-${name}";
+          };
+          attrs = {
+            name = "LDAP search account for ${name}";
+            type = "service_account";
+            roles = [ (yamlTag "!KeyOf role_ldap_consumer_${safeId}") ];
+          };
+        }
+        {
+          model = "authentik_core.token";
+          identifiers = {
+            identifier = "ldap-consumer-${name}-password";
+          };
+          attrs = {
+            intent = "app_password";
+            user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
+            key = yamlTag "!File ${config.sops.secrets.${ldapConsumerSecretPath name ep}.path}";
+          };
+        }
+      ]
+    ) sortedLdapEndpointNames;
+  };
+
+  generatedLdapConsumerBlueprint = toBlueprintYaml "ldap-consumers-generated" ldapConsumerBlueprint;
+
   # Merged blueprints directory containing upstream base blueprints, custom blueprints and generated applications
   effectiveBlueprintsDir = pkgs.runCommandLocal "authentik-blueprints" { } ''
     mkdir -p "$out"
@@ -445,6 +547,7 @@ let
     cp ${generatedProxyBlueprint} "$out/03-apps/proxy-apps-generated.yaml"
     cp ${generatedOidcBlueprint} "$out/03-apps/oidc-apps-generated.yaml"
     cp ${generatedLdapOutpostBlueprint} "$out/03-apps/ldap-outposts-generated.yaml"
+    cp ${generatedLdapConsumerBlueprint} "$out/03-apps/ldap-consumers-generated.yaml"
   '';
 
   # Apply path: blueprint changes ship inside the system closure. `nod switch
@@ -633,6 +736,16 @@ in
           name = ep.oidc.secretPath;
           value = { };
         }) (lib.filter (ep: ep.oidc.secretPath != null) (builtins.attrValues oidcEndpoints))
+      ))
+      # The consumers' app passwords are read by the worker at apply time (the token's `key` comes
+      # from that file), so they are declared here as well - the same inversion as the outpost tokens.
+      (lib.listToAttrs (
+        map (name: {
+          name = ldapConsumerSecretPath name ldapEndpoints.${name};
+          value = {
+            owner = "authentik";
+          };
+        }) sortedLdapEndpointNames
       ))
     ];
 

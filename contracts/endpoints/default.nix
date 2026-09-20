@@ -108,6 +108,45 @@ let
         };
       };
 
+      # Directory authentication, parallel to `oidc` and on the same axis: `auth` says who gets through
+      # the ingress, this says where the application's users come from. LDAP is not an ingress concern
+      # - the proxy speaks no LDAP - so it does not belong in the `auth` enum.
+      ldap = {
+        enable = lib.mkEnableOption "Authenticate this endpoint's users against the Authentik LDAP directory";
+
+        accessGroups = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = ''
+            Authentik groups whose members may sign in to this service. Deliberately has no default:
+            a service that authenticates against a directory without naming its audience has no
+            access policy, and the compiler refuses to build it.
+          '';
+        };
+
+        adminGroups = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Groups whose members are administrators of this service (usually a subset of accessGroups)";
+        };
+
+        baseDn = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Directory base DN; null uses the one the LDAP provider declares.";
+        };
+
+        secretPath = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = ''
+            SOPS path holding the app password this service binds with. An LDAP bind takes a username
+            and a password, so this is an app password and not an API token, which authenticates to the
+            HTTP API only. Null derives `services/authentik/consumers/<endpoint-name>-ldap-password`.
+          '';
+        };
+      };
+
       domain = lib.mkOption {
         type = lib.types.str;
         default = config.my.topology.domain;

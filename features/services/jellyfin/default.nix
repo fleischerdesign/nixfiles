@@ -61,6 +61,18 @@ in
         scope = "public";
         auth = "none";
         subdomain = "jellyfin";
+
+        # Users live in Authentik; Jellyfin keeps its own sessions, users and library permissions.
+        # Who may sign in, and who administers, is a Jellyfin decision and is declared here - the
+        # directory exposes identities and encodes no consumer's policy.
+        ldap = {
+          enable = true;
+          accessGroups = [
+            "media-users"
+            "infra-admins"
+          ];
+          adminGroups = [ "infra-admins" ];
+        };
         publicExempt = "enforces its own user authentication; Jellyfin clients cannot perform a browser SSO redirect";
         # Ingress reaches this over the WireGuard mesh (invariant I10).
         directAccess = {
