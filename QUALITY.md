@@ -58,7 +58,7 @@ stated.
 | **A6** | **resolved**. Root access was restored through the provider's rescue system after my own gateway precedence change had left the edge with no default route; the edge now boots the corrected generation by default, and every server trusts both the operator key and the fleet key (`~/.ssh/nixfiles-deploy-key`, `SHA256:EduFlyo…`). `~/.ssh/config`, `nod`'s `identityFile` and `deploy-rs`'s `-i` argument all use the fleet key; `~/.ssh/deploy-key` points at the node tunnel secret and is documented as not for fleet access. The LAN certificate failure is resolved by the per-name DNS-01 model, measured from inside the LAN: `jellyfin` 302, `mealie` 200, `hass` 200, `seerr` 307, each with a Let's Encrypt issuer where there used to be a handshake failure |
 | **A6 (passwords)** | `users.philipp.password` was **always** the hash of `173695` — verified against the value in git history with `perl -e 'print crypt(…)'`. The drift was never in the declaration but in its enforcement: `mutableUsers = true` applied it only at account creation, so `cld-edge-01` kept whatever the provider's install set, and the panel's password reset never reached the OS (it works through cloud-init on the provider's own images; this is NixOS). Servers now set `users.mutableUsers = false`, so the declaration is applied on every activation — and this is now **measured**, not assumed: the `hom-wrk-01` activation printed `modifying secret: users/philipp/password`, and a non-interactive `sudo -S` with `173695` succeeds |
 
-| **Zones (LAN)** | **mechanism resolved and proven; one device is still on a pre-change lease.** All three zones live in **one** Kea shared network, each subnet bound to one client class - `infra`, `iot`, and the complement `corp` for whatever the inventory does not declare - because Kea's default subnet selection for a directly connected client uses the *receiving interface's address* and ignores classification entirely (ARM 8.6, see §4.2). Proof: all six iot relays were flashed over OTA, re-requested DHCP, and came back on the addresses their inventory entries declare (`hom-rly-01` … `hom-rly-08` → `10.10.30.11/.12/.13/.16/.17/.18`, each confirmed by `DHCP4_LEASE_ALLOC` and a `REACHABLE` neighbour entry). **Outstanding, and deliberately not described as done:** `hom-ap-01` still holds `10.10.20.100` (declared `10.10.10.20`, infra). A software reboot does not move it — **measured**: no DHCP packet from its MAC appears in Kea's log at all, so it is running on its stored 24 h lease from before the change. It will move at its next renewal (Kea revokes a dynamic lease whose reservation does not match, ARM 8.3.8) or immediately after a cold power cycle; until then it is migration debt, visible and not enforced - the same principle the subnet cutover follows |
+| **Zones (LAN)** | **mechanism resolved and proven; one device is still on a pre-change lease.** All three zones live in **one** Kea shared network, each subnet bound to one client class - `infra`, `iot`, and the complement `corp` for whatever the inventory does not declare - because Kea's default subnet selection for a directly connected client uses the *receiving interface's address* and ignores classification entirely (ARM 8.6, see §4.2). Proof: all six iot relays were flashed over OTA, re-requested DHCP, and came back on the addresses their inventory entries declare (`hom-rly-01` … `hom-rly-08` → `10.10.30.11/.12/.13/.16/.17/.18`, each confirmed by `DHCP4_LEASE_ALLOC` and a `REACHABLE` neighbour entry). **Also moved:** `hom-ap-01`, after a reboot through the same library the tplink-ap engine uses (`TplinkRE330Router.reboot()`; the engine itself exposes no reboot action) — it came back on its declared `10.10.10.20` and stopped answering on `10.10.20.100`. A software reboot alone does *not* do it: measured, no DHCP packet from its MAC appeared in Kea's log while it kept its stored 24 h lease. And `hom-prn-01`, the scanner, is declared with its MAC and leases `10.10.30.19` from the iot zone; until the MAC was declared it sat on a corp pool lease, which is the rule rather than a fallback. Every device in the inventory is therefore in the zone its entry names |
 
 **Holding:** invariants I1–I10 assert clean (0 errors under `flake check`); the compatibility shim is
 gone (0 occurrences); the `vlan` field is gone (0 occurrences).
@@ -160,6 +160,47 @@ validates its own input, read the whole verdict — warnings included — and co
 keeps only `ERROR` throws away the tool telling you what is deprecated or ignored. And a measurement
 that cannot distinguish the hypothesis from its alternative is not evidence for either: round 2 rested
 on exactly such a measurement, and it was read as confirmation.
+
+### 4.3 A service can own a system file - removing it silently takes the file with it
+
+The Tailscale retirement took `hom-wrk-01` and then `mob-nb-01` offline, twice, for the same reason:
+`tailscaled` owned `/etc/resolv.conf` (MagicDNS) and rewrote it on its own schedule. Removing the
+service left the file behind, pointing at `100.100.100.100`, and with it every name lookup died. The
+internet itself was fine - `ping 1.1.1.1` answered - which is exactly what made the symptom look like
+something else.
+
+What makes it a rule rather than an anecdote:
+
+- **the replacement already existed and was already declared.** `my.topology.resolvers` feeds
+  `networking.nameservers`, and the `static` feature sets it on every host with a static address. One
+  query - `nix eval …config.networking.nameservers` - would have shown it before the first removal. The
+  repository's own rule is *prove the replacement, then delete*; this was the delete step first.
+- **ownership is not visible in the service name.** Nothing in `services.tailscale.enable` says
+  "resolv.conf". The way to find out is to ask what writes the file (`ls -l` showed the owning group
+  `resolvconf`) and who feeds it.
+- **order is part of the change.** Deploying the hubs before the spokes is right for routing and wrong
+  for ownership: the notebook stayed the last Tailscale node pointing at a resolver that the already-
+  migrated hosts had been providing. When one service owns a resource for several hosts, the hosts that
+  depend on it move **before** the ones that provide it.
+- **a manual fix can be overwritten by the very writer you are working around.** `resolvconf -a` made
+  no difference for seconds because `tailscaled` rewrote the file again; only stopping the writer worked.
+
+### 4.4 Write the expectation down before you measure - it is the only way a measurement can disagree
+
+The one error of that evening that a **check** caught rather than a user was the LAN route rule. The
+deployment script printed the derived `allowedIPs` per host, I had written the expected line next to
+it - "hom-wrk-01 -> no 10.10.10/20/30 (it is on the LAN)" - and the output said otherwise: a desktop
+inside the LAN carried mesh routes for `infra` and `iot`.
+
+Without that line the number would have looked plausible and shipped. Two smaller versions of the same
+thing in the same session: a glob over `/nix/store/*tplink-ap*.json` that matched the *old and new*
+rendered specs and reported both, and `wg show` with `stderr` discarded, whose empty output I first read
+as "no peers" when it meant "no permission".
+
+**The rule:** a measurement belongs next to the value it expects, so that a reader - or the next run -
+can see a contradiction instead of a number. And when an instrument can fail silently, let it fail
+loudly: keep `stderr`, check the exit code, and prefer the file the running unit actually reads over a
+pattern that happens to match several.
 
 ## 5. Open blockers — and one open investigation
 
