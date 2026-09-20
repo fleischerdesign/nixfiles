@@ -315,7 +315,7 @@ Aliases are tracked as deprecation debt and reported by §7 I8.
 | I5 | The Cloudflare record set contains at most one `*` catch-all, pointing at the ingress, and it must not absorb the internal planes (§5.1). |
 | I6 | Every projected record's FQDN lies inside a declared plane suffix. |
 | I7 | `scope ∈ { public, internal, mesh, isolated }` — the **existing** contract enum, unmapped (`iot` is not an endpoint scope). |
-| I8 | Aliases are enumerated in a deprecation report. The same report-only mechanism covers subnet-migration debt as I11 (`my.contracts.projections.migrationDebt`). |
+| I8 | Aliases are enumerated in a deprecation report. The subnet-migration debt report (I11) that used the same mechanism retired with its subject on 2026-09-20: there is no migration scaffolding left to report. |
 | I9 | A `public` endpoint with `auth = "none"` must carry an explicit `publicExempt = "<reason>"`. Publishing an unauthenticated service to the internet is a **decision**, never a default. |
 
 Read-only projections for inspection and tests: `my.contracts.projections.fqdns`,
