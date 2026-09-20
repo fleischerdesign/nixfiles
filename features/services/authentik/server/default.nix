@@ -64,30 +64,7 @@ let
     root = Path(CONFIG.get("blueprints_dir"))
     deadline = time.monotonic() + ${toString blueprintsApplyTimeoutSeconds}
 
-    def owned_paths():
-        """The paths of the blueprints this repository owns, read from the deployed files themselves.
-
-        The label is the ownership marker. Reading it from the directory rather than from
-        `instance.metadata` closes a chicken-and-egg on a fresh database: metadata is only written once an
-        instance is applied, so selecting on it would apply nothing exactly while the world is being built.
-        The files are the declaration the deploy just shipped, so they are the authority on who we are.
-        """
-        owned = []
-        for path in sorted(root.rglob("*.yaml")):
-            if any(part.startswith(".") for part in path.parts):
-                continue
-            with open(path, encoding="utf-8") as handle:
-                try:
-                    raw = load(handle.read(), BlueprintLoader)
-                except YAMLError as exc:
-                    print(f"FAILED parse {path}: {exc}")
-                    sys.exit(1)
-            if not raw:
-                continue
-            metadata = raw.get("metadata") or {}
-            if (metadata.get("labels") or {}).get(OWNER_LABEL[0]) == OWNER_LABEL[1]:
-                owned.append(str(path.relative_to(root)))
-        return owned
+    ${ownershipPython}
 
     paths = owned_paths()
     if not paths:
@@ -232,7 +209,7 @@ let
     from pathlib import Path
 
     from django.apps import apps
-    from yaml import load
+    from yaml import YAMLError, load
 
     from authentik.blueprints.v1.common import BlueprintEntryDesiredState, BlueprintLoader, YAMLTag
     from authentik.blueprints.v1.importer import Importer
@@ -242,17 +219,7 @@ let
     OWNER_LABEL = ("${blueprintLib.ownerLabelName}", "${blueprintLib.ownerLabelValue}")
     root = Path(CONFIG.get("blueprints_dir"))
 
-    def owned_paths():
-        owned = []
-        for path in sorted(root.rglob("*.yaml")):
-            if any(part.startswith(".") for part in path.parts):
-                continue
-            with open(path, encoding="utf-8") as handle:
-                raw = load(handle.read(), BlueprintLoader)
-            metadata = (raw or {}).get("metadata") or {}
-            if (metadata.get("labels") or {}).get(OWNER_LABEL[0]) == OWNER_LABEL[1]:
-                owned.append(str(path.relative_to(root)))
-        return owned
+    ${ownershipPython}
 
     def scalar(value):
         """Only plain values are compared. References, files, lists and FKs are not drift."""
@@ -302,6 +269,54 @@ let
         user = (event.user or {}).get("username", "<system>")
         print(f"EVENT {event.created.isoformat()} {event.action} user={user} {event.context}")
     sys.exit(0)
+  '';
+
+  # The environment every authentik process shares. Defined once so the four units cannot drift apart;
+  # `authentikBlueprintEnvironment` holds what a process needs while it applies or bootstraps.
+  authentikEnvironmentFiles = [
+    config.sops.secrets."services/authentik/core_env".path
+    config.sops.templates."authentik_secrets.env".path
+  ];
+
+  authentikDatabaseEnvironment = [
+    "AUTHENTIK_REDIS__HOST=127.0.0.1"
+    "AUTHENTIK_REDIS__PORT=6379"
+    "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
+    "AUTHENTIK_POSTGRESQL__NAME=authentik"
+    "AUTHENTIK_POSTGRESQL__USER=authentik"
+  ];
+
+  authentikBlueprintEnvironment = [
+    "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
+    "AUTHENTIK_RECOVERY_FROM_ADDRESS=noreply@${config.my.topology.domain}"
+    "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
+  ];
+
+  # The ownership reader, defined once and interpolated into both scripts, so the apply and the drift
+  # report can never disagree about which blueprints this repository owns.
+  ownershipPython = ''
+    def owned_paths():
+        """The paths of the blueprints this repository owns, read from the deployed files themselves.
+
+        The label is the ownership marker. Reading it from the directory rather than from
+        `instance.metadata` closes a chicken-and-egg on a fresh database: metadata is only written once an
+        instance is applied, so selecting on it would apply nothing exactly while the world is being built.
+        The files are the declaration the deploy just shipped, so they are the authority on who we are.
+        """
+        owned = []
+        for path in sorted(root.rglob("*.yaml")):
+            if any(part.startswith(".") for part in path.parts):
+                continue
+            with open(path, encoding="utf-8") as handle:
+                try:
+                    raw = load(handle.read(), BlueprintLoader)
+                except YAMLError as exc:
+                    print(f"FAILED parse {path}: {exc}")
+                    sys.exit(1)
+            metadata = (raw or {}).get("metadata") or {}
+            if (metadata.get("labels") or {}).get(OWNER_LABEL[0]) == OWNER_LABEL[1]:
+                owned.append(str(path.relative_to(root)))
+        return owned
   '';
 
   # The directory's structure comes from the fleet-wide contract, never from a literal here.
@@ -398,30 +413,22 @@ in
         Group = "authentik";
         WorkingDirectory = "/var/lib/authentik";
         # Environment
-        EnvironmentFile = [
-          config.sops.secrets."services/authentik/core_env".path
-          config.sops.templates."authentik_secrets.env".path
-        ];
-        Environment = [
-          "AUTHENTIK_REDIS__HOST=127.0.0.1"
-          "AUTHENTIK_REDIS__PORT=6379"
-          "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
-          "AUTHENTIK_POSTGRESQL__NAME=authentik"
-          "AUTHENTIK_POSTGRESQL__USER=authentik"
-          # The embedded proxy outpost and the API share this listener.
-          "AUTHENTIK_LISTEN__HTTP=0.0.0.0:${toString listenHttpPort}"
-          "AUTHENTIK_LISTEN__METRICS=0.0.0.0:9300"
-          "AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS=${trustedProxyCidrs}"
-          "AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true"
-          "AUTHENTIK_AVATARS=gravatar"
-          "AUTHENTIK_EVENTS__CONTEXT_PROCESSORS__GEOIP=/var/lib/GeoIP/GeoLite2-City.mmdb"
+        EnvironmentFile = authentikEnvironmentFiles;
+        Environment =
+          authentikDatabaseEnvironment
+          ++ [
+            # The embedded proxy outpost and the API share this listener.
+            "AUTHENTIK_LISTEN__HTTP=0.0.0.0:${toString listenHttpPort}"
+            "AUTHENTIK_LISTEN__METRICS=0.0.0.0:9300"
+            "AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS=${trustedProxyCidrs}"
+            "AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true"
+            "AUTHENTIK_AVATARS=gravatar"
+            "AUTHENTIK_EVENTS__CONTEXT_PROCESSORS__GEOIP=/var/lib/GeoIP/GeoLite2-City.mmdb"
+          ]
           # Populate the bootstrap admin on first start. The plaintext break-glass password lives in the
           # core_env secret as `AUTHENTIK_BOOTSTRAP_PASSWORD`; it is only consumed while `akadmin` does
           # not exist yet, so it never resets a password that has already been changed.
-          "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
-          "AUTHENTIK_RECOVERY_FROM_ADDRESS=noreply@${config.my.topology.domain}"
-          "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
-        ];
+          ++ authentikBlueprintEnvironment;
         Restart = "always";
       };
       restartTriggers = [ cfg.blueprintsDir ];
@@ -441,32 +448,24 @@ in
         User = "authentik";
         Group = "authentik";
         WorkingDirectory = "/var/lib/authentik";
-        EnvironmentFile = [
-          config.sops.secrets."services/authentik/core_env".path
-          config.sops.templates."authentik_secrets.env".path
-        ];
-        Environment = [
-          "AUTHENTIK_REDIS__HOST=127.0.0.1"
-          "AUTHENTIK_REDIS__PORT=6379"
-          "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
-          "AUTHENTIK_POSTGRESQL__NAME=authentik"
-          "AUTHENTIK_POSTGRESQL__USER=authentik"
-          # The worker exposes its own metrics listener; keep it off the server's
-          # scrape port (9300), otherwise the second bind fails and the worker
-          # supervisor tears the task runner down on startup.
-          "AUTHENTIK_LISTEN__METRICS=127.0.0.1:9301"
-          # Serialize blueprint application. On a fresh install authentik applies all
-          # blueprints concurrently; the upstream default flow blueprints then
-          # deadlock on authentik_flows_stage (PostgreSQL), and our application
-          # blueprints additionally apply those same flow blueprints via
-          # metaapplyblueprint. One thread removes the lock-order inversion
-          # deterministically. The documented "<2 not recommended" caveat targets
-          # throughput on scaled-out replicas; this instance is single-replica.
-          "AUTHENTIK_WORKER__THREADS=1"
-          "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
-          "AUTHENTIK_RECOVERY_FROM_ADDRESS=noreply@${config.my.topology.domain}"
-          "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
-        ];
+        EnvironmentFile = authentikEnvironmentFiles;
+        Environment =
+          authentikDatabaseEnvironment
+          ++ [
+            # The worker exposes its own metrics listener; keep it off the server's
+            # scrape port (9300), otherwise the second bind fails and the worker
+            # supervisor tears the task runner down on startup.
+            "AUTHENTIK_LISTEN__METRICS=127.0.0.1:9301"
+            # Serialize blueprint application. On a fresh install authentik applies all
+            # blueprints concurrently; the upstream default flow blueprints then
+            # deadlock on authentik_flows_stage (PostgreSQL), and our application
+            # blueprints additionally apply those same flow blueprints via
+            # metaapplyblueprint. One thread removes the lock-order inversion
+            # deterministically. The documented "<2 not recommended" caveat targets
+            # throughput on scaled-out replicas; this instance is single-replica.
+            "AUTHENTIK_WORKER__THREADS=1"
+          ]
+          ++ authentikBlueprintEnvironment;
         Restart = "always";
       };
       restartTriggers = [ cfg.blueprintsDir ];
@@ -498,20 +497,8 @@ in
         Group = "authentik";
         WorkingDirectory = "/var/lib/authentik";
         TimeoutStartSec = toString (blueprintsApplyTimeoutSeconds + 60);
-        EnvironmentFile = [
-          config.sops.secrets."services/authentik/core_env".path
-          config.sops.templates."authentik_secrets.env".path
-        ];
-        Environment = [
-          "AUTHENTIK_REDIS__HOST=127.0.0.1"
-          "AUTHENTIK_REDIS__PORT=6379"
-          "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
-          "AUTHENTIK_POSTGRESQL__NAME=authentik"
-          "AUTHENTIK_POSTGRESQL__USER=authentik"
-          "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
-          "AUTHENTIK_RECOVERY_FROM_ADDRESS=noreply@${config.my.topology.domain}"
-          "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
-        ];
+        EnvironmentFile = authentikEnvironmentFiles;
+        Environment = authentikDatabaseEnvironment ++ authentikBlueprintEnvironment;
         ExecStart = "${lib.getExe authentikPackage} shell";
         StandardInput = "file:${blueprintsApplyScript}";
       };
@@ -540,18 +527,8 @@ in
         User = "authentik";
         Group = "authentik";
         WorkingDirectory = "/var/lib/authentik";
-        EnvironmentFile = [
-          config.sops.secrets."services/authentik/core_env".path
-          config.sops.templates."authentik_secrets.env".path
-        ];
-        Environment = [
-          "AUTHENTIK_REDIS__HOST=127.0.0.1"
-          "AUTHENTIK_REDIS__PORT=6379"
-          "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
-          "AUTHENTIK_POSTGRESQL__NAME=authentik"
-          "AUTHENTIK_POSTGRESQL__USER=authentik"
-          "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
-        ];
+        EnvironmentFile = authentikEnvironmentFiles;
+        Environment = authentikDatabaseEnvironment ++ [ "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}" ];
         ExecStart = "${lib.getExe authentikPackage} shell";
         StandardInput = "file:${driftReportScript}";
       };

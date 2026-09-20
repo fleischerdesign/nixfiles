@@ -260,7 +260,7 @@ interface?" in one sentence.
 | `authentik_core.group` | repository | - | the definition: no. **Membership: yes** - that is an interface decision |
 | `authentik_core.user` (people) | repository seeds existence | - (`groups` is deliberately absent) | yes - name, address, password, avatar, group membership |
 | `authentik_core.user` (service account) | repository | `roles` | no |
-| `authentik_core.token` (machine) | repository | `user`, `managed` | no - topology, and the key comes from SOPS |
+| `authentik_core.token` (machine) | repository | `user`; fields `managed`, `expiring` | no - topology, and the key comes from SOPS |
 | `authentik_rbac.role` | repository | `permissions` | no |
 | `authentik_flows.flow` | repository | - | no |
 | `authentik_flows.flowstagebinding` | repository | `target`, `stage`, `order` | no |
@@ -297,6 +297,8 @@ This is the inventory that closes the third row. Every row here has been measure
   which is the intended behaviour, not a gap.
 - **A new consumer's SOPS secret is added by hand.** The endpoint contract derives the path; if the key is
   missing, `sops-install-secrets` fails the deploy loudly rather than starting with an empty credential.
+- **The drift report compares scalar fields, not relationships.** A change to a provider list, a permission
+  or a binding is not visible to the field diff; the apply's cardinal invariants still guard those.
 - **A fresh install must create authentik's two unmanaged bootstrap tables** (`authentik_install_id`,
   `authentik_version_history`) before the first migration. authentik's own `server`/`worker` entrypoint (the
   Go binaries) does this on startup; the fresh-database acceptance test drove `ak migrate` plus a shell
