@@ -399,7 +399,6 @@ let
             # characters against the 48 in the secret, and the outpost answered
             # "auth_via: unauthenticated" to every config fetch, which is why it never bound
             # a listener and Jellyfin could not reach it.
-            managed = false;
             user = yamlTag "!KeyOf sa_ldap_${o.safeHost}";
             key = yamlTag "!File ${config.sops.secrets.${o.tokenSecretName}.path}";
           };
