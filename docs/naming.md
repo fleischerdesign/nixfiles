@@ -18,64 +18,24 @@
 
 ---
 
-## 0. Intent, implementation, and gaps
+## 0. What this document is
 
-### 0.1 Specified intent (quoted from `architecture.md`)
+Names here are **derived, not maintained**. An FQDN is a function of the topology and the contract
+projections, which is what makes a host rename a derivation change rather than a migration with a
+checklist. Where the code and this document disagree, the code is right and this is a bug.
 
-* **§1.1 (l. 14) — Service-First statt Host-First:**
-  "Dienste besitzen feste DNS-Endpunkte (`jellyfin.vyrx.de`, `sonarr.lan.vyrx.de`).
-  Sie sind **niemals an physische Rechnernamen gekoppelt**."
-* **§3 (l. 69) — zone diagram:** public names (`jellyfin.vyrx.de`) and a mesh namespace
-  `*.mesh.vyrx.de (Mesh VPN)`.
-* **§3 (l. 79):** "`jellyfin.vyrx.de` ➔ Jellyfin Media Streaming (**gesichert, geroutet via
-  VPN zu `hom-srv-01`**)."
-* **§3 (l. 89):** "`paperless.lan.vyrx.de` / `mealie.lan.vyrx.de`" — internal services live
-  under `.lan`.
-* **§5 (l. 154) — split horizon:** "Zuhause (VLAN 10/20): `jellyfin.vyrx.de` oder
-  `hass.vyrx.de` **löst direkt lokal auf `10.10.10.10` auf** (volle LAN-Performance, keine
-  Latenz, kein Hairpin-NAT)."
-* **§8.1 — projection engines:**
-  * *Ingress Engine (`cld-edge-01`)*: "projiziert clusterweit alle `scope = "public"` Endpoints
-    in Caddy-VHosts **und WireGuard-Upstreams**" — `VHosts = Π_public(ClusterContracts)`.
-  * *DNS Engine (`hom-srv-01`)*: "projiziert alle internen Endpoints und
-    **Split-Horizon-Rewrites** in Blocky-Hosts" — `DNSRecords = Π_dns(ClusterContracts)`.
-  * *Module neutrality:* "Feature-Module sind strikt **agnostisch** und passiv. Ein Modul
-    kennt weder seinen Zielhost, noch Routing-Details, noch die Caddy-Konfiguration."
+The rules are enforced at evaluation time (`contracts/naming/*`), not left as conventions:
 
-### 0.2 The implementation contradicts the specified intent (verified)
+| Invariant | What it prevents |
+|---|---|
+| a public endpoint without authentication must declare why | an accidentally open service |
+| every endpoint name is derivable from its contract | hand-written names that drift from the service |
+| no name carries a host label | coupling a service to the machine that happens to serve it |
+| internal planes are never projected into the public zone | leaking an internal name into Cloudflare |
 
-| Specified intent | Actual implementation | Consequence |
-|---|---|---|
-| §1.1: services are never coupled to machine names | `caddy.baseDomain` (`edge.` / `ops.`) → `push.edge.vyrx.de`, `grafana.edge.vyrx.de`, `cache.ops.vyrx.de` | every host migration becomes a rename (DNS + vHost + OIDC redirect URI + bookmarks); observed: stale `grafana.ops.…`, orphan `mon.lan.…`, `push.edge…` vs documented `push.vyrx.de` |
-| §1.1 example `sonarr.lan.vyrx.de` | `sonarr.srv.lan.vyrx.de` | host label injected into the service name |
-| §3 example `hass.vyrx.de` | `hass.srv.lan.vyrx.de` | same |
-| §8.1: modules know neither their host nor routing | `plausible`, `linkwarden`, `vaultwarden`, `couchdb`, `obsidian-livesync` hardcode `"<svc>.edge.${domain}"` | placement knowledge leaked into service modules |
-| §8.1: Ingress Engine projects **all** `public` endpoints cluster-wide into vHosts **and WireGuard upstreams** | the DNS/Caddy projection is host-local; no ingress upstreams exist | `public` endpoints on LAN hosts produce **no** record — `jellyfin.vyrx.de` does not exist although §3 requires it |
-| §5: `jellyfin.vyrx.de` resolves locally to `10.10.10.10` | Blocky maps `host.domain` only, not service names | the specified split horizon for service names is not implemented |
-| §2: deterministic host naming | host FQDNs hand-written (`edge`, `ops`, `srv`, `wrk`, `nb`, `rt`, `ap`) | the documented node plane `*.node.vyrx.de` (§3.3) is not implemented at all |
-| §3.1 marks `seerr`, `hass` public; §3.2 marks `mealie`, `mon` internal | contracts evaluate to `jellyseerr=internal`, `home-assistant=internal`, `mealie=public`, `grafana=public` (+ orphan `mon.lan` extraDomain) | **4 of the 11 documented zone members are classified the other way round** — zone membership is not actually driven by §3 |
-
-### 0.3 Where the parent specification is **under**-specified
-
-These are the additions this document contributes. They are not restatements of
-`architecture.md` — the parent is silent on them, and that silence is why the drift in §0.2
-could go unnoticed:
-
-1. **Derivation functions.** The parent fixes hostnames (§2) and gives naming *examples*,
-   but defines neither a host-FQDN rule nor a service-FQDN rule. §2/§3 below are those rules.
-2. **Zone authority and publishing.** The parent names the planes and locates the DNS engine
-   on `hom-srv-01`, but never states who is authoritative for `lan`/`mesh`/`iot` or whether
-   they may be published. §1 fixes that (Blocky-only, never published).
-3. **A plane for cloud-internal services.** The parent's model has no plane for services that
-   are reachable only over the overlay and are not internet-facing (Prometheus, PostgreSQL,
-   Redis on the cloud hosts). §3 resolves them (`subdomain = null` → no name).
-4. **Enforcement.** The parent states principles but no invariants, and nothing failed when the
-   implementation violated them. §7 makes conformance a hard evaluation failure.
-5. **Bindings to the engines.** §8.1 declares the Ingress/DNS engines as intent; §5/§6 here
-   turn them into concrete record/vhost/upstream projections, including the missing
-   ingress → mesh upstream path.
-
----
+This section used to quote the architecture document and list where the implementation contradicted
+it. That drift has been fixed, so the quotes and the list are gone with it: the only thing worse than
+an undocumented rule is a document describing a violation that no longer exists.
 
 ## 1. Planes (visibility boundaries)
 
@@ -105,13 +65,8 @@ Rules:
 
 ## 2. Host names
 
-`architecture.md` §3.3 specifies the host plane:
-
-> **§3.3 Node Management: `*.node.vyrx.de`** — "Feste CNAMEs auf die jeweiligen VPN-IPs für
-> SSH- und Administrationszugriffe: `cld-edge-01.node.vyrx.de`, `cld-ops-01.node.vyrx.de`,
-> `hom-srv-01.node.vyrx.de`, etc."
-
-Therefore:
+The host plane is `<host>.node.vyrx.de`: one record per host, pointing at that host's overlay
+address ([architecture.md](architecture.md) §5.1). Therefore:
 
 ```
 hostFqdn(host) = "${hostname}.node.${domain}"      # cld-edge-01.node.vyrx.de
