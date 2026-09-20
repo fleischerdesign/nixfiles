@@ -91,7 +91,14 @@ in
         ripgrep
       ]
       ++ lib.optionals (inputs ? nod && inputs.nod ? packages) [
-        inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default
+        # `nod switch` recorded a failed host in its summary but still returned exit 0, so automation saw
+        # success. This carries the one-line fix (return an error when a host failed or rolled back) until
+        # it lands in the fork.
+        (inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [
+            ../../../packages/overlays/fix/nod/0001-exit-nonzero-on-failed-deployment.patch
+          ];
+        }))
       ];
 
     sops = {
