@@ -322,20 +322,6 @@ in
     # Allow group read access to logs (for CrowdSec and Alloy)
     systemd.services.caddy.serviceConfig.UMask = "0027";
 
-    # Caddy's in-process reload is unreliable here, measured twice on 2026-09-20:
-    #   - it hung ("Reload operation timed out. Killing reload process.") while loading many newly
-    #     bound `tls` files, leaving the service listening but answering nothing - every vhost on
-    #     hom-srv-01, from the LAN and through the ingress alike;
-    #   - the module's own `ExecReload` points at `/etc/caddy/Caddyfile` while the service runs with
-    #     `/etc/caddy/caddy_config`, so it fails with exit 1 - the `exit 4` every activation on this
-    #     host reported.
-    #
-    # Both are avoided by restarting when the unit changes: a restart loads the identical
-    # configuration cleanly and immediately. Overriding `ExecReload` does not work - `lib.mkForce` on
-    # that list does not displace the module's command, which survives in the rendered unit - so the
-    # switch behaviour is overridden instead.
-    systemd.services.caddy.restartIfChanged = lib.mkForce true;
-
     systemd.tmpfiles.rules = [
       "d /var/log/caddy 0755 caddy caddy -"
       "z /var/log/caddy/*.log 0640 caddy caddy -"

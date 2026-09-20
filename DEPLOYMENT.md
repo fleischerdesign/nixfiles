@@ -592,11 +592,20 @@ ssh root@<addr> 'nixos-rebuild --rollback switch'   # manual rollback
 
 **Change history of this runbook:** created during the initial 2.0 rollout (cld-edge-01 first). Keep it updated as hosts are migrated.
 
-### 13.1 A benign non-zero deploy exit
+### 13.1 `exit 4` from the Caddy reload - and what it actually was
 
-`nixos-rebuild switch` can end with `exit 4` while the system is fully activated. Observed twice,
-both times with the line "Reload failed for Caddy." followed by a second attempt and "Reloaded
-Caddy.": systemd reports the first, failed reload, while `switch-to-configuration` carries that
-failure forward as its exit status. The configuration is live — verify with
-`systemctl is-active caddy` and `journalctl -u caddy | grep 'Reloaded Caddy'` before treating the
-exit code as a failure. Do not "fix" the exit code by suppressing it; read the reload outcome.
+`nixos-rebuild switch` returned `exit 4` on every activation of `hom-srv-01`, next to "Failed to reload
+caddy.service". It is tempting to file that as a cosmetic quirk - systemd retrying a reload that the
+end state does not depend on - and an earlier version of this section did exactly that. It was wrong:
+
+- The reload **hung** once ("Reload operation timed out. Killing reload process.") while it had to
+  load many newly bound `tls` files, and left Caddy listening but answering nothing. Every vhost on
+  the host was down, from the LAN and through the ingress, until the service was restarted.
+- The **loaded** unit carried an `ExecReload` pointing at `/etc/caddy/Caddyfile` while the service ran
+  with `/etc/caddy/caddy_config`, so the reload failed on a path that no longer existed. A
+  `systemctl daemon-reload` plus a restart rewrote the unit; activations now end with `exit 0` and log
+  a successful reload.
+
+What to keep: never classify a failing step as cosmetic because the end state looks fine. Read what
+the failing unit **actually executed**, and compare it with what the service **actually runs with** -
+the two had drifted apart here, and the mismatch was the whole story.
