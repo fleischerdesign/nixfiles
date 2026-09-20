@@ -18,16 +18,41 @@ let
   # finished when the objects exist, not when a file was written.
   blueprintsApplyTimeoutSeconds = 900;
 
-  # Fed to `ak shell`, the application's own management entry point, with the same environment the worker
-  # has. It asserts on `last_applied` rather than on `status` alone: status describes the last attempt, so a
-  # failed apply leaves the previous value behind and a blueprint can read `successful` while the object it
-  # should have created does not exist.
+  # What the feature depends on, checked after every apply. A successful apply is not the same as a world
+  # that matches the declaration: the object permission that lets a consumer read the directory lives in the
+  # database rather than in a blueprint, so a fresh install would come up looking healthy while Jellyfin could
+  # not search. These are the invariants the design rests on, and a deploy that breaks one must fail.
+  blueprintExpectations = {
+    # The LDAP application carries no binding, which is what makes it open to every user
+    # (AppAccessWithoutBindings, default True); a single binding denies everyone it does not name.
+    applicationsWithoutBindings = [ "ldap" ];
+    # The flow the outpost executes runs before any account is authenticated, so a binding cannot match.
+    flowsWithoutBindings = [ "ldap-authentication-flow" ];
+    # The shape of that flow: identification (which carries the password stage), password, and user login.
+    flowStageBindings = {
+      ldap-authentication-flow = 3;
+    };
+    # Every consumer's service account must be able to read the whole directory, or the service it serves
+    # cannot find its users at all.
+    searchFullDirectoryAccounts = map consumerAccountName sortedLdapEndpointNames;
+  };
+
+  # Apply path: queue the task and wait for the effect, then check the invariants above. It asserts on
+  # `last_applied` rather than on `status` alone: status describes the last attempt, so a failed apply leaves
+  # the previous value behind and a blueprint can read `successful` while the object it declares does not
+  # exist.
   blueprintsApplyScript = pkgs.writeText "authentik-apply-blueprints.py" ''
     import sys
     import time
 
     from authentik.blueprints.models import BlueprintInstance
     from authentik.blueprints.v1.tasks import apply_blueprint
+    from authentik.core.models import Application, User
+    from authentik.flows.models import Flow, FlowStageBinding
+    from authentik.policies.models import PolicyBinding
+    from authentik.providers.ldap.models import LDAPProvider
+
+    EXPECTED = ${builtins.toJSON blueprintExpectations}
 
     instances = list(BlueprintInstance.objects.filter(enabled=True))
     if not instances:
@@ -39,28 +64,76 @@ let
         apply_blueprint.send_with_options(args=(instance.pk,), rel_obj=instance)
 
     deadline = time.monotonic() + ${toString blueprintsApplyTimeoutSeconds}
+    waiting = []
     while True:
         time.sleep(3)
         waiting = []
         for instance in instances:
             instance.refresh_from_db()
             if instance.status == "error":
-                print(f"FAILED {instance.name}: status={instance.status}")
+                print(f"FAILED apply: {instance.name} -> status={instance.status}")
                 sys.exit(1)
             previous = before[instance.name]
-            settled = (
+            if not (
                 instance.last_applied is not None
                 and instance.status == "successful"
                 and (previous is None or instance.last_applied > previous)
-            )
-            if not settled:
+            ):
                 waiting.append(instance.name)
         if not waiting:
-            print("applied: " + ", ".join(sorted(before)))
-            sys.exit(0)
+            break
         if time.monotonic() > deadline:
-            print("timeout after ${toString blueprintsApplyTimeoutSeconds}s, still waiting for: " + ", ".join(sorted(waiting)))
+            print("timeout waiting for: " + ", ".join(sorted(waiting)))
             sys.exit(1)
+
+    failures = []
+
+    def expect(description, condition):
+        if not condition:
+            failures.append(description)
+
+    for slug in EXPECTED["applicationsWithoutBindings"]:
+        application = Application.objects.filter(slug=slug).first()
+        expect(
+            f"application {slug} exists",
+            application is not None,
+        )
+        if application is not None:
+            count = PolicyBinding.objects.filter(target=application).count()
+            expect(f"application {slug} has no policy binding (found {count})", count == 0)
+
+    for slug, expected in EXPECTED["flowStageBindings"].items():
+        flow = Flow.objects.filter(slug=slug).first()
+        expect(f"flow {slug} exists", flow is not None)
+        if flow is not None:
+            count = FlowStageBinding.objects.filter(target=flow).count()
+            expect(f"flow {slug} has {expected} stage bindings (found {count})", count == expected)
+
+    for slug in EXPECTED["flowsWithoutBindings"]:
+        flow = Flow.objects.filter(slug=slug).first()
+        if flow is not None:
+            count = PolicyBinding.objects.filter(target=flow).count()
+            expect(f"flow {slug} has no policy binding (found {count})", count == 0)
+
+    provider = LDAPProvider.objects.first()
+    expect("an LDAP provider exists", provider is not None)
+    for username in EXPECTED["searchFullDirectoryAccounts"]:
+        user = User.objects.filter(username=username).first()
+        expect(f"service account {username} exists", user is not None)
+        if user is not None and provider is not None:
+            expect(
+                f"{username} may search the full directory",
+                user.has_perm("search_full_directory", provider)
+                or user.has_perm("authentik_providers_ldap.search_full_directory"),
+            )
+
+    if failures:
+        for failure in failures:
+            print(f"FAILED invariant: {failure}")
+        sys.exit(1)
+
+    print("applied and verified: " + ", ".join(sorted(before)))
+    sys.exit(0)
   '';
 
   # The directory's structure comes from the fleet-wide contract, never from a literal here.
