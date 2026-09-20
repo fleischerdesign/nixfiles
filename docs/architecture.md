@@ -1,378 +1,245 @@
-# VYRX Infrastructure Architecture Specification
+# Architecture
 
-> **Status:** Blueprint & Architecture Roadmap  
-> **Primary Domain:** `vyrx.de`  
-> **Design Goals:** RFC-Konformität, Zero-Trust Ingress, Entkopplung von Services und Hardware, Kollisionsfreie Subnetze, Autonomie & Datenschutz, Clean Architecture & SOLID by Design.
+> **Domain:** `vyrx.de` · **Overlay:** WireGuard `10.10.100.0/24` · **LAN supernet:** `10.10.0.0/16`
+>
+> This document defines the vocabulary the others use - host, zone, plane, contract, scope. It states
+> how the system is, not how it was meant to be; where a statement is measured, the measurement is
+> named, and where it is enforced, the invariant is named.
 
----
+## 1. Principles
 
-## 1. Übersicht & Leitprinzipien
+1. **Services, not machines.** A service owns a DNS name. Which host runs it is a deployment decision
+   that may change without any consumer noticing - `jellyfin.vyrx.de` survived three host migrations.
+   See §6 for the one rule that makes this work: names are derived from contracts, never written.
+2. **Deterministic host names (RFC 1178).** `<location>-<role>-<index>`: `hom-srv-01`, `cld-edge-01`.
+3. **One name, one answer per plane.** A public name resolves to the ingress from outside and to the
+   LAN host from inside - split horizon, not two different names.
+4. **Collision-free addressing.** `10.10.0.0/16` behind `10.10.100.0/24`, chosen so a roaming client
+   can never collide with the network it happens to be attached to.
+5. **The inventory decides.** Addresses, zones, names, firewall rules and DNS records are functions of
+   `my.topology` and the contract projections. Writing an address twice means a derivation is missing.
+6. **Self-hosted identity, no external control plane.** Authentik, ntfy and the WireGuard mesh replace
+   SaaS identity, push and connectivity. There is no vendor in the data path.
+7. **Evidence over intention.** Every claim in this documentation is either measured (the command is
+   named) or asserted (the invariant is named). See [practices.md](practices.md).
 
-Diese Spezifikation definiert die Ziel-Architektur für die vollständige Professionalisierung der Homelab- und Cloud-Infrastruktur. Sie ersetzt das historisch gewachsene System (Hosts nach Musikern, fragmentierte `.ovh`-Subdomains, Default-Subnetz `192.168.178.0/24`).
+## 2. Hosts
 
-### Kernprinzipien:
-1. **Service-First statt Host-First:** Dienste besitzen feste DNS-Endpunkte (`jellyfin.vyrx.de`, `sonarr.lan.vyrx.de`). Sie sind niemals an physische Rechnernamen gekoppelt.
-2. **Deterministisches Host-Naming (RFC 1178):** Rechnernamen kodieren Standort, Funktion und Index (`<location>-<role>-<index>`).
-3. **Strikte Trennung von Public & Internal:** Dienste ohne Notwendigkeit für externen Zugriff verbleiben im Zero-Trust-VPN oder lokalen Subnetz.
-4. **Kollisionsfreie IP-Räume (RFC 1918):** Migration auf `10.10.0.0/16`, um Subnetz-Konflikte bei mobiler VPN-Nutzung weltweit auszuschließen.
-5. **Autarke Datenhoheit & Passwordless Identity:** Self-Hosted SSO (Passkeys/WebAuthn), eigenes Push-Alerting und minimale Abhängigkeiten von Fremd-SaaS.
-6. **Clean Architecture & SOLID by Design:** Service-Module sind strikt agnostisch (keine hardcodierten Host- oder User-Namen). Entkopplung über abstrakte Service-Contracts, Inversion of Control und compile-time Projektionen.
-7. **Deterministische Zustandslosigkeit (Impermanence):** Ephemeres Root-Dateisystem (`tmpfs` oder Snapshot-Rollback) gekoppelt an standardisiertes Storage-Tiering (State, Data, Cache).
+| Host | Role | Zone | Address | Mesh | Runs |
+|---|---|---|---|---|---|
+| `cld-edge-01` | server | `mesh` + public | `173.249.22.211` | `10.10.100.1` | Ingress (Caddy), Authentik core, CrowdSec master, observability stack, primary database, ntfy |
+| `cld-ops-01` | server | `mesh` + public | `37.114.55.91` | `10.10.100.2` | Observability collector, Attic binary cache, OpenClaw gateways, CrowdSec agent |
+| `hom-srv-01` | server | `infra` | `10.10.10.10` | `10.10.100.10` | LAN gateway (DHCP, DNS, NTP, NAT), media stack, Home Assistant, Klipper, local ingress, ESPHome flashing |
+| `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` | Niri desktop, development environment |
+| `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` | Roaming client; reaches the LAN over the mesh |
 
----
+Devices that cannot run NixOS are declared in `my.topology.devices` and reconciled agentlessly; their
+own document is [embedded.md](embedded.md).
 
-## 2. Host-Taxonomie (Enterprise-Schema)
+## 3. Network model
 
-Schema: **`<location>-<role>-<index>`**
+### 3.1 One Layer-2 segment, three zones
 
-- **Location:**
-  - `cld` = Cloud VPS
-  - `hom` = Home / On-Premises Bare-Metal
-  - `mob` = Mobile Client
-- **Role:**
-  - `edge` = Ingress Reverse Proxy, Authentik SSO Gateway, Firewall, WireGuard Hub
-  - `ops`  = Monitoring Master, Binary Cache (Attic), Deployment Automation, AI Gateway
-  - `srv`  = Hypervisor, Storage, Media, Home Automation, Local Ingress
-  - `wrk`  = Workstation Desktop
-  - `nb`   = Notebook / Laptop
-  - `ap`   = Access Point (OpenWrt / Wi-Fi Bridge)
-  - `rt`   = Router / WAN Gateway (AVM FRITZ!Box)
+The house is **one flat Layer-2 segment**. Zones are *addressing and policy*, not separate broadcast
+domains: a zone is a `/24` plus a trust level plus a set of firewall rules. There are no VLANs - the
+hardware for a second segment does not exist yet, and the zone model is honest about that
+([naming.md](naming.md) states this explicitly, because a naming document that implies isolation
+nobody implemented is worse than no document).
 
-### Mapping:
-
-| Alter Name | Neuer Hostname | Typ | Hardware / Provider | Primäre Aufgaben |
+| Zone | CIDR | Gateway | Trust | Contains |
 |---|---|---|---|---|
-| **`mackaye`** | **`cld-edge-01`** | VPS | QEMU / Public Cloud | Ingress Reverse-Proxy (Caddy), Authentik Core, CrowdSec Master, Primary DB, WireGuard Hub, Observability Stack (Prometheus/Grafana/Loki) |
-| **`rollins`** | **`cld-ops-01`**  | VPS | QEMU / Public Cloud | Monitoring Collector (Alloy + Exporters), Attic Cache, OpenClaw AI Gateway |
-| **`strummer`**| **`hom-srv-01`**  | Server | Bare Metal (Intel 4TB+1TB) | Storage, Arr-Stack, Jellyfin, Home-Assistant, Klipper, Subnet-Router, Blocky, Local Ingress Caddy |
-| **`jello`**   | **`hom-wrk-01`**  | Client | PC (Intel, NVMe, Intel GPU) | Desktop Workstation (Niri), OpenClaw Node |
-| **`-`**       | **`hom-ap-01`**   | Embedded | TP-Link RE330 | Wi-Fi Bridge / Access Point (Unified SSID: VYRX), Agentless GitOps (tplinkrouterc6u) via nod switch |
-| **`-`**       | **`hom-rt-01`**   | Embedded | AVM FRITZ!Box | Uplink Gateway / DSL-Modem, Agentless GitOps (TR-064 API) via nod switch |
+| `infra` | `10.10.10.0/24` | `10.10.10.1` (uplink) | highest | `hom-srv-01`, the access point, the router |
+| `corp` | `10.10.20.0/24` | `10.10.20.1` | trusted | workstations, phones, roaming clients |
+| `iot` | `10.10.30.0/24` | `10.10.30.1` | isolated | printer, relays, 3D printer |
+| `guest` | `10.10.99.0/24` | `10.10.99.1` | untrusted | guests, internet only |
+| `mesh` | `10.10.100.0/24` | `10.10.100.1` | trusted transport | the overlay itself |
 
----
+### 3.2 DHCP: the inventory decides the zone
 
-## 3. DNS-Zonen & Routing-Architektur
+`hom-srv-01` runs Kea. All served subnets live in **one shared network**, because Kea's default subnet
+selection for a directly connected client uses the *receiving interface's address* and ignores client
+classification entirely (ARM 8.6) - with an interface that carries an address in every zone, one zone
+would win for everybody. Inside the shared network the class decides:
 
-Alle Services werden unter der Hauptdomain **`vyrx.de`** strukturiert.
+- one class per served zone, matched on the MAC addresses its inventory entries declare
+  (`pkt4.mac == 0x…`);
+- the default zone carries the **complement** class (`not member('infra') and not member('iot')`),
+  because a subnet that names no class accepts every client and naming a class does not make a subnet
+  preferred (ARM 8.4.2);
+- `guest` is deliberately **not** served by this gateway: no host carries that zone.
+
+Measured 2026-09-20: all seven inventarised devices hold the address their entry declares; a device
+that is not in the inventory gets a default-zone lease - which is the rule, not a fallback.
+
+### 3.3 The gateway
+
+`hom-srv-01` is a single-NIC router-on-a-stick (RFC 1812): it is the default router for every zone, the
+DHCP server, the resolver, the NTP server and the NAT for the trusted zones. The uplink is the router at
+`10.10.10.1`, which is a transparent modem - no DHCP, no DNS, no port forwardings.
+
+The zone gateways (`10.10.20.1`, `10.10.30.1`, …) are addresses *on that one interface*. Which zones a
+host serves follows from its role, not from a list: a zone's gateway must live inside the zone, or it
+cannot be installed as a default route at all.
+
+### 3.4 Isolation
+
+Isolation is enforced by the firewall and the trust model, not by segments:
+
+- forwarding is enabled per zone and only for zones whose trust level permits it - `iot` and `guest`
+  never transit;
+- NAT for the uplink carries the trusted zones only;
+- the IoT zone may answer requests from `hom-srv-01` (Home Assistant, Klipper) and reach the internet
+  where it needs to, and nothing else.
+
+## 4. The mesh
+
+Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no database, no vendor.
 
 ```
-                                  INTERNET
-                                     │
-                           ┌─────────▼─────────┐
-                           │  *.vyrx.de (Edge) │  (cld-edge-01 / Ingress)
-                           └─────────┬─────────┘
-                                     │
-                    ┌────────────────┴────────────────┐
-                    ▼                                 ▼
-         Öffentliche Dienste                   Interne Zonen (Zero-Trust)
-         • auth.vyrx.de                        • *.lan.vyrx.de (LAN / On-Prem)
-         • jellyfin.vyrx.de                    • *.mesh.vyrx.de (Mesh VPN)
-         • seerr.vyrx.de                       • *.node.vyrx.de (Host Direct Access)
-         • cache.vyrx.de
-         • hass.vyrx.de
-         • push.vyrx.de (ntfy)
+        cld-edge-01 10.10.100.1  ◄──────►  cld-ops-01 10.10.100.2      both public, both relays
+              ▲                                    ▲
+              │  dual-homed spokes, keepalive 25   │
+      ┌───────┴────────┬───────────────┬───────────┘
+  hom-srv-01      hom-wrk-01       mob-nb-01                     the LAN is behind hom-srv-01
+  10.10.100.10    10.10.100.20     10.10.100.30
 ```
 
-### 3.1 Public Zone: `*.vyrx.de`
-Geroutet über `cld-edge-01` (Caddy) mit Cloudflare DNS-01 ACME Wildcard-Zertifikat. Authentifizierung via Authentik Proxy/Forward-Auth und CrowdSec Ingress Protection. Alle öffentlichen Namen liegen **flach am Apex** — der ausliefernde Host ist niemals Teil des Namens:
-- `auth.vyrx.de` ➔ Authentik SSO Portal & IDP (Passkeys / WebAuthn)
-- `jellyfin.vyrx.de` ➔ Jellyfin Media Streaming (gesichert, geroutet via VPN zu `hom-srv-01`)
-- `seerr.vyrx.de` ➔ Jellyseerr Media Requests
-- `hass.vyrx.de` ➔ Home Assistant Dashboard (Split-Horizon, s. §5)
-- `mealie.vyrx.de` ➔ Mealie Rezeptverwaltung
-- `grafana.vyrx.de` ➔ Grafana / Alertmanager
-- `cache.vyrx.de` ➔ Attic Nix Binary Cache (geroutet zu `cld-ops-01`)
-- `search.vyrx.de` ➔ SearXNG Metasearch
-- `push.vyrx.de` ➔ Zentrale Push-Benachrichtigungen (ntfy.sh Server)
-- `couchdb.vyrx.de` / `livesync.vyrx.de` ➔ Obsidian LiveSync
-- `<name>.ai.vyrx.de` ➔ OpenClaw-Gateways (`philipp.ai`, `katja.ai`, …)
+- **Dual hub.** Every host peers with both cloud hosts. The *primary* hub carries the overlay CIDR for
+  transit; the secondary is reached by its own `/32`. A hub can be taken out without reconfiguring a
+  spoke.
+- **Longest-prefix cryptokey routing.** A peer's `allowedIPs` is its overlay address plus whatever it
+  delivers (§ below). Traffic to a host's own `/32` goes direct; traffic to a prefix goes to whoever
+  announced it.
+- **The LAN reaches roaming clients.** The host that routes the home LAN declares which zones it
+  delivers (`lanGateway` in the topology, by zone *name* - the CIDRs are read from `my.topology`).
+  Every other host routes those CIDRs to it, and a host that sits inside a zone installs no route for
+  it, because it already has the LAN directly. Measured 2026-09-20: `10.10.10.10` and `10.10.30.11`
+  are reachable from a roaming client over `wg0` only.
+- **The mesh is the last resort.** The interface carries route metric 1000 against NetworkManager's
+  600: a prefix the host can reach directly always wins, and the tunnel is used only when the LAN is
+  elsewhere. Without it, a client at home would send LAN traffic out through the cloud and back.
+- **IPv6 by design.** Alongside `10.10.100.0/24` the mesh spans `fd10:1000:100::/64` (RFC 4193 ULA).
+- **MSS clamping** on both directions of the interface, so TCP handshakes survive mobile uplinks.
 
-> **Normativ:** Die vollständige, maschinell erzeugte Liste ist `my.contracts.projections.fqdns`;
-> die Ableitungsregeln stehen in `naming.md`. Diese Aufzählung ist illustrativ.
+Two invariants hold the assumptions: at most one host may deliver a zone (cryptokey routing has exactly
+one owner per prefix), and every delivered zone must be a `/24`, because membership is decided on the
+network part.
 
-### 3.2 Internal Zone: `*.lan.vyrx.de` / `*.mesh.vyrx.de`
-Ausschließlich aus dem Heimnetzwerk (`10.10.0.0/16`) oder über das Mesh-VPN erreichbar. Diese Zonen existieren **nur** im lokalen Resolver (Blocky) und werden **niemals** in Cloudflare veröffentlicht:
-- `sonarr.lan.vyrx.de` / `radarr.lan.vyrx.de` / `prowlarr.lan.vyrx.de`
-- `sabnzbd.lan.vyrx.de` / `bazarr.lan.vyrx.de`
-- `paperless.lan.vyrx.de`
-- `mainsail.lan.vyrx.de` / `moonraker.lan.vyrx.de` / `cam.moonraker.lan.vyrx.de` (Klipper)
+## 5. DNS and certificates
 
-> `mealie` und `mon` (Grafana) sind **public** (§3.1) — die frühere Einordnung unter `.lan` war
-> veraltet. `mon.lan.vyrx.de` wird durch den Split-Horizon von `grafana.vyrx.de` ersetzt.
+### 5.1 Planes
 
-### 3.3 Node Management: `*.node.vyrx.de`
-Feste CNAMEs auf die jeweiligen VPN-IPs für SSH- und Administrationszugriffe:
-- `cld-edge-01.node.vyrx.de`, `cld-ops-01.node.vyrx.de`, `hom-srv-01.node.vyrx.de`, etc.
-
----
-
-## 4. IP-Netzwerk-Segmentierung & Smart Home Isolation
-
-Ablösung des Standard-Subnetzes `192.168.178.0/24` durch das kollisionsfreie Supernet **`10.10.0.0/16`**.
-
-### 4.1 VLAN / Subnetz-Aufteilung
-
-| Subnetz | VLAN | Name / Zone | Richtlinie & Firewall |
+| Plane | Names | Published where | Answers |
 |---|---|---|---|
-| `10.10.10.0/24` | 10 | **INFRA / SVR** | Server (`hom-srv-01`), Managed Switches, Access Points, Router |
-| `10.10.20.0/24` | 20 | **CORP / WRK** | Vertrauenswürdige Arbeitsgeräte (`hom-wrk-01`, `mob-nb-01`, Smartphones) |
-| `10.10.30.0/24` | 30 | **IOT / LAB**  | 3D-Drucker (Klipper), ESPHome, Smart Devices (Strikt isoliert, kein LAN-Zugriff) |
-| `10.10.99.0/24` | 99 | **GUEST**      | Gäste-WLAN (Reiner Internetzugang, Client-Isolation) |
+| public | `<service>.vyrx.de` | Cloudflare | the ingress |
+| internal | `<service>.lan.vyrx.de`, `<service>.mesh.vyrx.de` | Blocky only, never Cloudflare | the LAN host, over the mesh for remote clients |
+| node | `<host>.node.vyrx.de` | Cloudflare | the host's overlay address |
+| user public | `*.pub.<user>.ai.vyrx.de`, `<user>.ai.vyrx.de` | Cloudflare | the user's OpenClaw gateway |
 
-### 4.2 Feste IP-Adressen (Infrastruktur)
-- `10.10.10.1`: Default Gateway / Router (FRITZ!Box Uplink)
-- `10.10.10.10`: `hom-srv-01` (Core Server, Gateway & Storage)
-- `10.10.10.20`: `hom-ap-01` (OpenWrt Wi-Fi Access Point)
-- `10.10.20.10`: `hom-wrk-01` (Desktop Workstation)
-- `10.10.20.100 - 200`: DHCP-Bereich für Clients (`mob-nb-01`, etc.)
-- `10.10.30.50`: 3D-Drucker / Klipper
+Public names are **flat at the apex**: the host that serves a name is never part of it. The normative,
+machine-generated list is `my.contracts.projections.fqdns`; the derivation rules are
+[naming.md](naming.md). Any enumeration in this document is illustrative.
 
-### 4.3 IoT-Isolation & mDNS-Reflector
-- **Zero-Trust für IoT:** Geräte in VLAN 30 dürfen Verbindungen nur ins Internet aufbauen (sofern nötig) oder Anfragen von `hom-srv-01` (Home Assistant) beantworten. Ein Zugriff von VLAN 30 in VLAN 10/20 wird auf der Firewall blockiert.
-- **Avahi / mDNS-Reflector:** `hom-srv-01` agiert als Bridge für Multicast-DNS (`.local`), sodass Streaming (AirPlay, Cast) und Smart-Home-Discovery reibungslos über VLAN-Grenzen hinweg funktionieren, ohne die Netzwerke zu bridgen.
+### 5.2 Split horizon
 
-### 4.4 Single-NIC Gateway & „Dumb Hardware, Smart Server“ (RFC 1812)
-- **„Dumb Hardware, Smart Server“-Axiom:**
-  - FRITZ!Box und Wi-Fi Access Points (TP-Link) werden zu reinen, transparenten Layer-1/2-Durchleitern (Bridges) degradiert.
-  - Sämtliche Netzwerk-Dienste (DHCP, DNS, NTP, Routing, Firewall) werden vollständig aus den Router-/AP-Web-UIs entfernt und zentral auf `hom-srv-01` in NixOS deklariert.
-- **Zentrale Dienste auf `hom-srv-01` (`features/system/networking/gateway`):**
-  - **DHCP-Server (Kea / Dnsmasq):** IP-Vergabe und MAC-Reservierungen speisen sich zu 100% deklarativ aus `my.topology.devices`.
-  - **DNS-Server (Blocky):** Lokale Namensauflösung (`*.lan.vyrx.de`), Split-Horizon und Ad-Blocking.
-  - **NTP-Zeitserver (Chrony):** Autarke Zeit-Verteilung für ESPHome, Klipper und Clients ohne externe WAN-Hits.
-  - **Layer-3 Gateway & Firewall (nftables):** Single-NIC Router-on-a-Stick leitet Pakete zwischen Subnetzen und Internet-Uplink.
-- **0 € Hardware-Zusatzkosten & SOLID-Entkopplung:**
-  - Keine neuen Router oder Switches nötig; bestehende Kabel und Hardware werden optimal ausgenutzt.
-  - Die Routing- und Firewall-Logik ist vollständig von der Hardware entkoppelt (Dependency Inversion). Zusätzliche Netzwerkkarten oder Managed Switches können später nahtlos ohne Code-Refactoring ergänzt werden.
+Blocky on `hom-srv-01` answers a public name with the *LAN* address for clients inside the house, and
+Cloudflare answers it with the ingress for everyone else. One name, one answer per plane - measured for
+`jellyfin`, `mealie`, `hass` and `seerr` from inside the LAN and from outside.
 
----
+### 5.3 Certificates: one per name, issued where it terminates
 
-## 5. Erweiterte Infrastruktur-Säulen
+There is no wildcard certificate here: Cloudflare's own Universal SSL owns the apex and the wildcard,
+and DNS-01 for `_acme-challenge.vyrx.de` is therefore not ours to write (measured: the values are
+published but absent from the zone API). The model is the per-consumer one, not a shared secret:
 
-### 5.1 Natives Kernel-WireGuard Mesh (Stateless, Autark & Anti-Hairpinning)
-- **Vollständig stateless & im Linux-Kernel integriert:** Keine SaaS-Abhängigkeit von Tailscale und kein Single-Point-of-Failure durch fragile Headscale-Control-Planes oder Datenbanken.
-- **Redundante Dual-Hub Active-Relay Topologie:** Sowohl `cld-edge-01` (`173.249.22.211`) als auch `cld-ops-01` (`37.114.55.91`) fungieren als aktive Relay-Hubs.
-  - **Site-to-Site Inter-Hub Link:** Beide Cloud-Hubs sind direkt und bidirektional miteinander gepeert.
-  - **Dual-Peering aller Spokes:** Alle Spoke-Knoten (`hom-srv-01`, `hom-wrk-01`, `mob-nb-01`) unterhalten gleichzeitige, direkte Kernel-WireGuard-Tunnel zu beiden Hubs mit `persistentKeepalive = 25` für NAT-Traversal.
-  - **Longest-Prefix-Cryptokey-Routing (LPM):** Spoke-Traffic zum AI-Gateway (`10.10.100.2` / `fd10:1000:100::2`) auf `cld-ops-01` fließt direkt über den Ops-Relay-Tunnel ohne Umweg über Edge. Mesh-weites Transit-Routing für Roaming-Clients nutzt den Primary-Hub (`cld-edge-01`), welcher bei Wartung nahtlos umschaltbar ist.
-- **Zonen-Affines Routing (Anti-Hairpinning):** Ko-lokierte Knoten im selben lokalen Subnetz (`hom-wrk-01` und `hom-srv-01`) kommunizieren direkt über ihre LAN-Interfaces (`10.10.x.x`) mit voller Switch-Line-Speed (1 Gbit/s / 2.5 Gbit/s). Die WireGuard-Relays im Cloud-Rechenzentrum werden strikt nur für standortübergreifenden Verkehr genutzt.
-- **Dual-Stack IPv4 & RFC 4193 ULA IPv6:** Neben dem IPv4-Overlay (`10.10.100.0/24`) spannt das Mesh ein rein kryptografisches IPv6-Overlay (`fd10:1000:100::/64`) auf. Jeder Host besitzt eine unveränderliche ULA (`fd10:1000:100::<host-id>`). Eliminierung von NAT-Traversal-Problemen und zukunftssichere End-to-End-Konnektivität.
-- **Kernel-Forwarding & TCP-MSS-Clamping:** Deterministische nftables/iptables-Regeln (`iptables` & `ip6tables`) klemmen MSS auf den WireGuard-Interfaces (`clamp-mss-to-pmtu`), um hängende TCP-Handshakes und Paketverlust über mobile DSL/LTE-Uplinks auszuschließen. Auf den Relay-Hubs sind `net.ipv4.ip_forward` und `net.ipv6.conf.all.forwarding` sowie Relay-Interface-Forwarding (`-A FORWARD -i wg0 -o wg0 -j ACCEPT`) aktiv.
-- **100% Deklarativ in NixOS:** Private Keys werden via SOPS injiziert, Public Keys und Peerings deterministisch aus `my.topology` abgeleitet.
+- each name's certificate is issued **on the host that terminates it**, so no key material is copied;
+- the ingress validates with **HTTP-01** (the names resolve to it);
+- hosts behind split horizon use **DNS-01** via the Cloudflare API, with the credential passed as a
+  systemd credential, and the resolver pinned to `1.1.1.1:53` because lego determines the zone from the
+  SOA and the system resolver would answer through the mesh;
+- names outside the public zone fall back to `tls internal`;
+- internal `.lan` names get public certificates too - they are subdomains of the public zone, and the
+  trade-off (they appear in certificate transparency logs) is deliberate.
 
-### 5.2 Split-Horizon / Dual-Horizon DNS & Lokales Ingress
-- Lokaler DNS-Resolver (**Blocky** auf `hom-srv-01`):
-  - **Zuhause (VLAN 10/20):** `jellyfin.vyrx.de` oder `hass.vyrx.de` löst direkt lokal auf `10.10.10.10` auf (volle LAN-Performance, keine Latenz, kein Hairpin-NAT).
-  - **Unterwegs:** Löst über Cloudflare auf `cld-edge-01` auf und wird verschlüsselt via VPN zu `hom-srv-01` getunnelt.
-- **Lokaler Ingress Caddy mit Cloudflare DNS-01 ACME:**
-  - `hom-srv-01` betreibt einen lokalen Caddy-Ingress. Mittels Cloudflare DNS-01 API bezieht er gültige Let's Encrypt Wildcard-Zertifikate für `*.vyrx.de` und `*.lan.vyrx.de`.
-  - **Zero Port-Forwarding:** Es müssen keinerlei Ports (80/443) auf dem Heimrouter geöffnet werden. Volle TLS-Validität ohne Browser-Zertifikatswarnungen.
-- **DNS High-Availability (Tiered Fallback):**
-  - Router DHCP propagiert Primary DNS: `10.10.10.10` (`hom-srv-01` mit Blocky & Ad-Blocking).
-  - Fallback DNS: Router Gateway (`10.10.10.1`) mit Upstream Quad9/Cloudflare – garantiert ununterbrochenen Internetzugriff im Heimnetz bei Server-Wartungsarbeiten.
+Measured 2026-09-20: `hom-srv-01` holds 14 certificates, `cld-ops-01` 12, and the ingress none of its
+own beyond what Caddy obtains automatically.
 
-### 5.3 Zentrales Logging & Security-Observability
-- **Grafana / Prometheus / Loki / Alloy-Stack:**
-  - **Loki:** Zentraler Log-Aggregator auf `cld-edge-01`.
-  - **Alloy Agent:** Installiert auf `cld-edge-01`, `cld-ops-01` und `hom-srv-01` (nicht auf den Desktops). Streamt Systemd-Journals, Caddy-Access-Logs, Arr-Stack-Events und CrowdSec-Auditlogs an Loki.
-  - **CrowdSec Ingress Protection:** Auf `cld-edge-01` und `cld-ops-01`. Bösartige IPs werden global gebannt; Alerts fließen in Echtzeit ins Grafana-Dashboard.
+## 6. Service contracts
 
-### 5.4 3-2-1 Enterprise Backup-Strategie & Disko-Modernisierung
-- **Disko Btrfs-Architektur für `hom-srv-01`:** Ablösung von ext4 auf `hom-srv-01` durch ein deklaratives Disko-Layout mit Btrfs-Subvolumes (`@root`, `@state`, `@data`, `@snapshots`).
-- **Kopie 1 (Lokal):** Atomare Dateisystem-Snapshots (Btrfs) auf `hom-srv-01` (Stundentakt / vor System-Rebuilds via `btrbk`/`sanoid`).
-- **Kopie 2 (Offsite im eigenen Netz):** Restic-Backup nächtlich verschlüsselt von `hom-srv-01` via WireGuard auf `cld-ops-01`.
-- **Kopie 3 (Cold Cloud):** Verschlüsselter Restic-Offsite-Backup kritischer Daten (Dokumente, Paperless, DB-Dumps) nach S3/B2 mit Immutable Retention / Object Lock.
+A service declares what it offers and what it needs; the platform derives the rest. Nothing is written
+twice, and no service module knows its host, its name or its neighbours.
 
-### 5.5 Unified SSO mit Passkeys & WebAuthn
-- **Authentik als zentraler IdP:**
-  - Vollständige Passwordless-Experience mittels FIDO2 / Passkeys (TouchID / YubiKey / Windows Hello).
-  - Native OIDC-Anbindung für: Jellyfin, Grafana, Paperless-ngx, Mealie.
-  - Caddy Forward-Auth Proxy für Anwendungen ohne natives OIDC (Sonarr, Radarr, Prowlarr, Sabnzbd, Bazarr).
+| Declaration | Meaning | Projected to |
+|---|---|---|
+| `my.contracts.provides.<svc>.endpoints` | the interfaces a service exposes: port, protocol, scope (`public` / `internal` / `local`), authentication | DNS records, Caddy vHosts, firewall rules, health probes |
+| `…storage` | persistence needs and their tier | storage contracts, backup sets |
+| `…backup` | what must be restorable, with retention | restic jobs |
+| `…telemetry` | what must be observable | Prometheus scrape targets, alerts |
+| `my.contracts.consumes.<db>` | a database, a user, a bucket | provider resources, declared by the provider engine |
 
-### 5.6 Self-Hosted Notification Pipeline mit `ntfy`
-- Betrieb eines eigenen **`ntfy.sh`** Servers auf `cld-edge-01` (`push.vyrx.de`).
-- **Zentraler Push-Hub für:**
-  - **Home Assistant:** Statusmeldungen, Alarme, Sensorik.
-  - **Alertmanager / Grafana:** Storage, Host-Liveness, Metrik-Anomalien.
-  - **CrowdSec:** Erkannte Brute-Force-Angriffe & IP-Bans.
-  - **Arr-Stack:** Grab- und Download-Events.
-  - **CI/CD:** Pipeline-Fehler und Build-Status.
+Consequences worth knowing:
 
-### 5.7 AI Agent & Automation Mesh (OpenClaw & Hermes)
-- **Zentrales Gateway auf `cld-ops-01`:** Betrieb des OpenClaw Gateways an Port `18789`.
-- **Natives Mesh Peering:** Workstations (`hom-wrk-01`, `mob-nb-01`) und Server verbinden ihre Node-Instanzen direkt über das WireGuard-Mesh (`10.10.100.2:18789`) mit dem Gateway.
-- **Eliminierung von Altlasten:** Vollständige Beseitigung aller fragilen SSH-Loopback-Tunnel zugunsten des nativen VPN-Overlays.
+- a service that declares `scope = "public"` gets a public name, a certificate and a proxy - it does
+  not ask for them;
+- services never reference a host, so moving one is a one-line change in `hosts/`;
+- the FQDNs, the Caddy configuration, the Authentik blueprints and the backup jobs are all *functions*
+  of these declarations, which is why a rename is a derivation change rather than a migration.
 
----
+## 7. Configuration layout
 
-## 6. WLAN SSIDs
+```
+flake.nix        inputs, overlays, one mkSystem call per host
+hosts/<name>/    entry point: role + hardware + host-specific features
+roles/           base → server | pc → desktop | notebook
+features/        auto-discovered modules, each behind an `enable` option
+contracts/       provides / consumes / naming / endpoints / storage / dependencies
+lib/core/        mkSystem, recursive module discovery
+user/<name>/     Home Manager: user packages, shell, editors
+docs/            this specification
+```
 
-- **`VYRX`**: Hauptnetzwerk (VLAN 20 / WPA3-Personal)
-- **`VYRX-IOT`**: Smart Home & Hardware (VLAN 30 / 2.4 GHz only / WPA2)
-- **`VYRX-GUEST`**: Gäste (VLAN 99 / Isoliert)
+Every feature and contract is *loaded* on every host and *active* only where `enable` is set. That is
+what makes `nix flake check` meaningful: a module that does not evaluate is caught for all five hosts at
+once, whether or not any of them enables it.
 
----
+The invariants (`contracts/*`) are evaluation-time assertions, not conventions: a service from the
+public plane without authentication, a name that cannot be derived, an endpoint on a host that does not
+serve it, or a subnet a reservation falls outside - each fails the build rather than the deployment.
 
-## 7. Codebase & NixOS-Architektur (nixfiles 2.0)
+## 8. Observability
 
-Dieses Kapitel definiert die software-architektonischen Prinzipien zur Realisierung einer akademisch sauberen, modularen und wartungsarmen NixOS-Infrastruktur.
+`cld-edge-01` runs the full pipeline (Prometheus, Grafana, Loki, Alertmanager); `cld-ops-01` and
+`hom-srv-01` run collectors (Alloy, node and blackbox exporters). The desktops run none - the ground
+truth for "is the fleet healthy" is the server side, and a laptop that is switched off is not an
+incident.
 
-### 8.1 Service Contract Pattern & Multi-Consumer Projections (SOLID: SRP, ISP, DIP, OCP)
+Alerting goes to the self-hosted ntfy instance (`push.vyrx.de`), which also carries Home Assistant,
+CrowdSec and arr-stack notifications. CrowdSec runs on both cloud hosts and shares a bouncer per host;
+its decisions are global.
 
-Feature-Module sind strikt **agnostisch** und passiv. Ein Modul (z. B. Jellyfin) kennt weder seinen Zielhost, noch Routing-Details, noch die Caddy-Konfiguration.
+## 9. Data, backup, restore
 
-- **Kanonischer Service-Contract (`my.contracts.provides`):**
-  Dienste deklarieren rein ihre Schnittstellen und Anforderungen:
-  ```nix
-  # features/services/jellyfin/default.nix
-  my.contracts.provides = {
-    endpoints.web = {
-      port = 8096;
-      protocol = "tcp";
-      scope = "public";      # "public" | "internal" | "mesh" | "isolated"
-      auth = "none";         # "none" | "authentik" | "proxy-pass"
-      subdomain = "jellyfin";
-    };
-    storage = {
-      stateDirs = [ "/var/lib/jellyfin" ];
-      cacheDirs = [ "/var/cache/jellyfin" ];
-    };
-  };
-  ```
-- **Deklarative Cluster-Platzierung (Inversion of Control):**
-  Welcher Dienst auf welchem Rechner ausgeführt wird, bestimmt ausschließlich die Host-Komposition (z. B. `hosts/hom-srv-01/configuration.nix: my.features.services.jellyfin.enable = true;`).
-- **Multi-Consumer Projection Pattern (Open/Closed Principle):**
-  Spezialisierte Engines projizieren die aggregierten Contracts deterministisch in ihre Zielsysteme, ohne dass Module modifiziert werden müssen:
-  - **Firewall Engine (Host-Lokal):** Projiziert `config.my.contracts.provides.endpoints` des eigenen Rechners direkt in typsichere `networking.firewall.interfaces`-Regeln.
-  - **Ingress Engine (`cld-edge-01`):** Projiziert clusterweit alle `scope = "public"` Endpoints in Caddy-VHosts und WireGuard-Upstreams:
-    $$\text{VHosts} = \Pi_{\text{public}}(\text{ClusterContracts})$$
-  - **DNS Engine (`hom-srv-01`):** Projiziert alle internen Endpoints und Split-Horizon-Rewrites in Blocky-Hosts:
-    $$\text{DNSRecords} = \Pi_{\text{dns}}(\text{ClusterContracts})$$
+Three copies, and the tiers are storage contracts rather than directory conventions:
 
-### 8.2 Secrets 2.0 (Hierarchische Domain-Taxonomie & Host-Agnostik)
-Beseitigung der flachen Namens-Suppe und aller host-spezifischen Key-Namen (`_mackaye`).
+| Copy | Where | How |
+|---|---|---|
+| working set | `hom-srv-01` | per-service state and data tiers |
+| local snapshots | `hom-srv-01` | filesystem snapshots before a rebuild |
+| offsite | Backblaze B2 | `restic`, nightly, encrypted client-side, object lock |
 
-- **Architektur-Garantie:**
-  - `defaultSopsFile` verbleibt zentral in `secrets/secrets.yaml`.
-  - Alle Secrets werden strikt hierarchisch nach Domänen strukturiert:
-    ```yaml
-    # secrets/secrets.yaml
-    infra:
-      cloudflare_dns_token: "..."
-      attic:
-        server_token: "..."
-        client_push_token: "..."
-    services:
-      authentik:
-        core_env: "..."
-        ldap_outpost_token: "..."
-        proxy_outpost_token: "..."
-      media:
-        sonarr_api_key: "..."
-        radarr_api_key: "..."
-        sabnzbd_api_key: "..."
-      storage:
-        restic_env: "..."
-        postgres_default_pw: "..."
-    observability:
-      grafana:
-        oidc_client_secret: "..."
-        secret_key: "..."
-    users:
-      philipp:
-        password_hash: "..."
-        ai:
-          openrouter: "..."
-          deepseek: "..."
-    ```
-- **Vorteile:** Services können im Cluster migriert werden, ohne Secret-Namen anzupassen. Typisierter Zugriff via `sops.secrets."services/authentik/ldap_outpost_token" = {};`.
+Restore is `restic restore` from the same repository; the passphrase lives in SOPS. A failed job is a
+failed backup - `systemctl --failed` is part of the health check, not an optional extra (one run was
+silently lost to a DNS outage and only showed up in that list).
 
-### 8.3 Data Lifecycle & Multi-Tier Backup 2.0
-Systematischer Ausbau zu einer deklarativen 3-2-1 Pipeline mit State-Consistency Garantien.
+## 10. Where the other documents take over
 
-- **Pre-Backup Lifecycle Hooks:** Services mit transaktionalen Datenbanken deklarieren konsistente Snapshot-Hooks:
-  ```nix
-  contracts.storage.preBackupHook = pkgs.writeShellScript "pg-dump" ''
-    ${pkgs.postgresql}/bin/pg_dumpall -U postgres > /var/backup/dump.sql
-  '';
-  ```
-- **3-Tier Backup-Orchestrierung:**
-  - **Tier 1 (Lokal):** Btrfs-Snapshots vor jedem System-Update.
-  - **Tier 2 (Private Mesh):** Nächtlicher Restic-Backup-Push aller Server via WireGuard auf `cld-ops-01`.
-  - **Tier 3 (Offsite Cold):** Verschlüsselter Sync kritischer Nutzdaten (Paperless-Dokumente, Vaultwarden, DB-Dumps) in externen S3/B2-Bucket mit Immutable Object Lock.
-
-### 8.4 Deklarative Topologie-Registry & Mathematisches Trust Lattice
-Zentralisierung aller Netzwerk-Definitionen in `my.topology` zur vollständigen Eliminierung hartcodierter IP-Listen.
-
-- **Formales Sicherheitsmodell (Trust Lattice):**
-  Zonen $\mathcal{Z}$ mit Ordnungsrelation:
-  $$\mathcal{Z} = \{ \text{Guest}, \text{IoT}, \text{Mesh}, \text{Corp}, \text{Infra} \}$$
-  $$\text{Guest} < \text{IoT} < \text{Mesh} \le \text{Corp} < \text{Infra}$$
-- **Deterministische Flow-Matrix:**
-  $$f(A, B) = \begin{cases} 
-  \text{ALLOW (Direct Line-Speed)}, & \text{wenn } A = B \text{ (gleiche Zone/LAN)} \\
-  \text{RESTRICTED (Stateful Pinholes)}, & \text{wenn } A > B \text{ (höheres Vertrauen initiiert)} \\
-  \text{ISOLATED / DROP}, & \text{wenn } A < B \text{ (z. B. IoT } \to \text{ Infra)} \\
-  \text{TUNNEL (WireGuard Mesh)}, & \text{wenn } A \text{ oder } B \in \text{Mesh}
-  \end{cases}$$
-- **Topologie-Struktur:**
-  ```nix
-  my.topology = {
-    domain = "vyrx.de";
-    subnets = {
-      infra = { cidr = "10.10.10.0/24"; vlan = 10; trustLevel = "high"; };
-      corp  = { cidr = "10.10.20.0/24"; vlan = 20; trustLevel = "medium"; };
-      iot   = { cidr = "10.10.30.0/24"; vlan = 30; trustLevel = "zero"; };
-      mesh  = { cidr = "10.10.100.0/24"; vlan = null; trustLevel = "vpn"; };
-    };
-    hosts = {
-      hom-srv-01 = { zone = "infra"; ipv4 = "10.10.10.10"; wireguardIpv4 = "10.10.100.10"; };
-      cld-edge-01 = { zone = "mesh"; ipv4 = "173.249.22.211"; wireguardIpv4 = "10.10.100.1"; };
-      # ...
-    };
-  };
-  ```
-
-### 8.5 State- & Persistence-Katalog (Storage Tiering & Impermanence)
-Standardisierte Trennung von Zustandstypen in Service-Modulen zur sauberen Koppelung an Speicherpfade, Disko-Subvolumes und Backup-Strategien.
-
-- **Mathematisches Axiom des zustandslosen Systems (Impermanence):**
-  $$\text{Node} = \text{Store}_{\text{immutable}} \oplus \text{Root}_{\text{tmpfs}} \oplus \text{Persist}(\text{State} \cup \text{Data})$$
-  - Root (`/`) wird flüchtig im RAM (`tmpfs`) gemountet oder bei jedem Boot auf einen leeren Snapshot zurückgesetzt.
-  - Nur deklarierte Pfade überleben Reboots:
-    - **State (`stateDirs`):** Maschinenlesbare Runtime-Zustände, DBs (`/persist/state/...`).
-    - **Data (`dataDirs`):** Unersetzliche Nutzerinhalte (`/persist/data/...`). Pflicht für Tier-3 Backup.
-    - **Cache (`cacheDirs`):** Reproduzierbare Zwischendateien (`/var/cache/...`), flüchtig.
-
-### 8.6 Profile-basiertes Home-Manager Design (Algebraische Komposition)
-Vollständige Beseitigung von Host-State Leaks (`osConfig.my.role != "server"`) in User-Paketlisten.
-
-- **Algebraische Komposition im System-Builder:**
-  User-Konfigurationen sind modular und rollen-agnostisch. Der System-Builder injiziert atomare Profile als Kompositionsfunktion:
-  $$\text{HomeConfig}(\text{Role}) = \begin{cases}
-  \text{core} \cup \text{graphical}, & \text{wenn Role} \in \{\text{desktop}, \text{notebook}\} \\
-  \text{core} \cup \text{diagnostics}, & \text{wenn Role} = \text{server}
-  \end{cases}$$
-- **Strikte Trennung:** User-Module deklarieren Werkzeuge, keine Verzweigungslogiken.
-
-### 8.7 Service-Discovery & Cluster-weite Verdrahtung
-Entkopplung von abhängigen Diensten über logische Namen.
-
-- **Intent-basiertes Discovery:** Dienste referenzieren Zielservices über logische Namen (`coreEndpoint = "services.authentik";`), statt hartcodierte IPs und Ports einzubinden.
-- **Automatische Auflösung:** Das Modul ermittelt via `my.contracts` den zuständigen Host und Port. Die IP wird über `my.topology` aufgelöst (WireGuard-IP für Out-of-Host Verbindungen, `127.0.0.1` für Co-Location). Wandert ein Dienst, erfolgt das Re-Wiring clusterweit automatisch beim nächsten Build.
-
-### 8.8 Compile-Time Verification & Secret Schema Validation
-Fehlerfrüherkennung bereits bei `nix flake check` / Eval-Zeit statt erst beim Systemstart.
-
-- **Port-Kollisions-Beweis:**
-  $$\forall s_1, s_2 \in \text{Services}(\text{Host}): s_1 \ne s_2 \implies \text{Port}(s_1) \ne \text{Port}(s_2)$$
-- **Dangling Endpoint Assertion:**
-  Generiert der Ingress einen VHost für einen Ziel-Service, validiert eine Assertion, dass der Dienst auf dem Zielknoten auch tatsächlich instanziiert ist.
-- **Compile-Time SOPS Key Validator (`checks.eval-secrets`):**
-  Da SOPS-YAML-Keys im Klartext vorliegen, validiert ein Nix-Check ohne private Age-Keys, dass alle von aktiven Modulen deklarierten Secret-Pfade in `secrets/secrets.yaml` existieren:
-  $$\forall p \in \text{RequiredSecretPaths}(\text{ActiveModules}): p \in \text{Keys}(\text{secrets.yaml})$$
-
-### 8.9 Flake Inputs & Overlay-Hygiene
-Minimierung von Closure-Größen, Build-Zeiten und technischen Schulden.
-
-- **Strikte Input-Harmonisierung:** Alle Flake-Inputs müssen zwingend `inputs.nixpkgs.follows = "nixpkgs-unstable"` deklarieren, um doppelte `nixpkgs`-Instanzen und unnötige Paket-Doppelbauten zu eliminieren.
-- **Overlay-Lifecycle Policy:** Klare Ausmusterungskriterien für Patches unter `packages/overlays/fix/*`. Sobald Fixes im Upstream-Nixpkgs verfügbar sind, werden Overlays entfernt und veraltete Pinned Packages (z. B. insecure pnpm) bereinigt.
+| Topic | Document |
+|---|---|
+| What a name may look like and who owns it | [naming.md](naming.md) |
+| Users, service accounts, authentication flows | [identity.md](identity.md) |
+| The security model, layer by layer | [security.md](security.md) |
+| How a service declares and receives what it needs | [provisioning.md](provisioning.md) |
+| Microcontrollers, access point, router | [embedded.md](embedded.md) |
+| Interfaces, tokens, typography | [design.md](design.md) |
+| Deploy, verify, recover | [operations.md](operations.md) |
+| The engineering bar and the known failure patterns | [practices.md](practices.md) |
