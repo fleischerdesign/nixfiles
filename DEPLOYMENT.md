@@ -582,10 +582,9 @@ What was removed, and how each removal was verified:
 | `cloudflare-dyndns` and its `srv.lan.vyrx.de` record | the service had exactly one consumer - that record - and the record had none |
 | the rollback generations (44/30/18/11 kept on edge/srv/ops/wrk) | pruned to the last three, then `nix-store --gc`. Three is the depth now: enough to roll a bad activation back twice from the bootloader, and the store sizes afterwards are 22G/24G/44G/58G/59G |
 
-The scanner is declared (MAC and an `iot` address) and takes its lease like the relays do. Two
-`192.168.178` literals remain, in the topology schema's `example` fields: documentation, not state, but
-they keep this gate's grep from reaching zero - so they go with the next schema touch rather than being
-hunted separately.
+The scanner is declared (MAC and an `iot` address) and takes its lease like the relays do. **No
+`192.168.178` literal remains anywhere** - the two that used to sit in the topology schema's `example`
+fields went with the `migration` option they documented.
 
 ### 14.2 The steps that were taken — the record
 
