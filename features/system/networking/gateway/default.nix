@@ -25,7 +25,7 @@ let
   dhcpSubnets = map (zone: {
     inherit zone;
     config = topology.subnets.${zone};
-  }) orderedZones;
+  }) servedZones;
 
   # Determine static reservations for DHCP from hosts and devices declared in topology with MAC address
   hostsWithMac = lib.filterAttrs (_name: h: h.mac != null && h.ipv4 != null) topology.hosts;
@@ -57,46 +57,55 @@ let
 
   reservations = lib.concatMap (entry: reservationsIn entry.config) dhcpSubnets;
 
-  # --- Zone selection, by declaration rather than by list order ------------------------------
-  # Kea receives several subnets on one interface. Without a further criterion it takes the first
-  # matching subnet in the order they appear, which made the zone of a device depend on the order of
-  # this list instead of on its inventory entry: devices declared `infra` or `iot` were handed corp
-  # addresses, and the reservations configured inside their own subnets were never reached. Each
-  # served zone therefore becomes a client class matched on the MAC addresses its inventory entries
-  # declare, and its subnet accepts only that class.
-  # The documented direct form: compare the hardware address itself against a hexadecimal literal
-  # (`pkt4.mac == 0x…`, Kea ARM "Client Classification"). The earlier version built a string with
-  # `hexstring(pkt4.mac,'')` and compared it to lowercase hex - Kea accepted it syntactically and
-  # never matched, so every declared device fell through to the default zone. Measured on the wire:
-  # the AP kept a corp address and the six relays received default-zone pool addresses instead of
-  # their iot reservations. Comparing the address itself removes separator and case from the question.
+  # --- Zone selection: one shared network, one class per zone (Kea ARM 8.4 / 8.6) --------------
+  # Three logical subnets share a single physical link here, which is precisely the case Kea's
+  # "shared networks" exist for (ARM 8.4: "more than one logical IP subnet deployed on the same
+  # physical link ... called shared networks in Kea").
+  # This is a correctness requirement, not tidiness. Without a shared network Kea selects exactly
+  # one subnet for a directly connected client - the one its receiving interface's address falls
+  # into (ARM 8.6) - and this interface carries an address of every zone at once, so one zone won
+  # for every client, deterministically and by accident. Measured before this change: the access
+  # point held a corp address and all six relays received corp pool addresses instead of their iot
+  # reservations, no matter how the class tests were written.
+  # Inside the shared network the class decides (ARM 8.4.2, 8.3.10): a subnet that names a class is
+  # offered only to members of that class, and naming a class does *not* make a subnet preferred
+  # over one that names none. Hence one class per served zone, the default zone's being the
+  # complement of the declared ones rather than an absence.
+  # The MAC test is the documented direct comparison against a hexadecimal literal
+  # (`pkt4.mac == 0x…`). The earlier `hexstring(pkt4.mac,'')` string comparison was accepted
+  # syntactically and never matched.
   macMatch = h: "pkt4.mac == 0x${lib.toLower (lib.replaceStrings [ ":" ] [ "" ] h.mac)}";
 
   membersOfZone = zone: lib.filter (h: h.zone == zone) (lib.attrValues allReservations);
 
-  # Only zones with at least one inventarised device are served, plus the default zone. Kea's
-  # expression language has no literal that never matches (measured: `false` is rejected with
-  # "Invalid character: f"), so an empty zone is handled by not serving it: serving it would make its
-  # subnet a second pool that any client can reach - the opposite of what the zone declares.
-  # Order matters, and deliberately so: Kea takes the first subnet a client is eligible for, and a
-  # subnet without a class is eligible for every client. A class-restricted subnet listed after the
-  # default one is therefore unreachable - measured: a relay matched the iot class and still received
-  # a default-zone address, because the unrestricted subnet came first in the list. The default zone
-  # is appended last, and the assertion further down keeps it there.
   servedZones = lib.filter (zone: zone == cfg.defaultZone || membersOfZone zone != [ ]) dhcpZones;
-
-  orderedZones =
-    lib.filter (zone: zone != cfg.defaultZone) servedZones
-    ++ lib.optional (lib.elem cfg.defaultZone servedZones) cfg.defaultZone;
 
   unservedZones = lib.subtractLists servedZones dhcpZones;
 
-  # The default zone is by definition the one without a class; every other served zone has at least
-  # one member (see servedZones), so every test here is non-empty - Kea rejects an empty expression.
-  zoneClasses = map (zone: {
-    inherit zone;
-    test = lib.concatMapStringsSep " or " (h: "(${macMatch h})") (membersOfZone zone);
-  }) (lib.filter (zone: zone != cfg.defaultZone) servedZones);
+  declaredZones = lib.filter (zone: zone != cfg.defaultZone) servedZones;
+
+  # One class per served zone, named after the zone - a subnet names its own class by naming itself,
+  # so no mapping exists to keep in step. Kea evaluates classes in configuration order and
+  # `member()` sees only classes assigned so far, so the declared zones come first and the complement
+  # last: the pattern the ARM shows for `"test": "not member('reserved_class')"` (8.3.10).
+  zoneClasses =
+    map (zone: {
+      name = zone;
+      test = lib.concatMapStringsSep " or " (h: "(${macMatch h})") (membersOfZone zone);
+    }) declaredZones
+    ++ [
+      {
+        # The complement: whatever the inventory does not declare. The default zone cannot stay
+        # classless, because a subnet without a class accepts every client (ARM 8.4.2) and would
+        # then swallow the devices assigned to other zones.
+        name = cfg.defaultZone;
+        test =
+          if declaredZones == [ ] then
+            "member('ALL')"
+          else
+            lib.concatMapStringsSep " and " (zone: "not member('${zone}')") declaredZones;
+      }
+    ];
 in
 {
   options.my.features.system.networking.gateway = {
@@ -149,11 +158,11 @@ in
       type = lib.types.str;
       default = "corp";
       description = ''
-        Zone that receives clients whose MAC the inventory does not declare: the only subnet Kea
-        offers without a client class. Every other served zone is matched by MAC, so a declared
-        device always lands in the zone its inventory entry names. Named explicitly instead of
-        letting the order of the subnet list decide, which is what happened before - and it hid the
-        fact that the declarations were not being honoured.
+        Zone that receives clients whose MAC the inventory does not declare. Its subnet is bound to
+        the complement class - the clients belonging to no other zone - rather than left classless,
+        because a subnet without a client class accepts every client and naming a class does not
+        make a subnet preferred (Kea ARM 8.4.2). A declared device therefore lands in the zone its
+        inventory entry names, whatever the order of the subnets.
       '';
     };
 
@@ -198,10 +207,14 @@ in
         message = "Gateway: defaultZone '${cfg.defaultZone}' is not among the zones served by DHCP (uplinkZone plus routedZones), so undeclared clients would get no address.";
       }
       {
-        # Kea takes the first eligible subnet and an unrestricted subnet is eligible for everyone, so
-        # the default zone has to come last or every class-restricted subnet after it is dead weight.
-        assertion = lib.last (map (entry: entry.zone) dhcpSubnets) == cfg.defaultZone;
-        message = "Gateway: the default zone '${cfg.defaultZone}' must be the last subnet in the served list - Kea picks the first subnet a client is eligible for, and an unrestricted one is eligible for every client.";
+        # A subnet without a class accepts every client, and naming a class does not make a subnet
+        # preferred over one that names none (Kea ARM 8.4.2). A served zone without its own class
+        # would therefore keep answering for devices the inventory assigned elsewhere, which is
+        # exactly the defect this replaces.
+        assertion =
+          lib.sort (a: b: a < b) (map (class: class.name) zoneClasses)
+          == lib.sort (a: b: a < b) (map (entry: entry.zone) dhcpSubnets);
+        message = "Gateway: every served zone needs exactly one client class and nothing else; a subnet without its own class accepts clients of every other zone.";
       }
     ];
 
@@ -305,35 +318,42 @@ in
           }
         ];
 
-        # Zones decide addressing through client classes, not through the order of this list: a
-        # subnet that names a class is offered only to members of that class, and the default zone's
-        # subnet names none - it is the single pool an undeclared client can reach.
+        # One class per served zone. The parameter is the `client-classes` list; the older
+        # `client-class` string is deprecated and Kea reports it on every start
+        # (DHCPSRV_CLIENT_CLASS_DEPRECATED).
         client-classes = map (class: {
-          name = class.zone;
-          test = class.test;
+          inherit (class) name test;
         }) zoneClasses;
 
-        # One subnet per served zone, derived from the topology: the zone's CIDR, a pool taken from
-        # that CIDR, the zone's own router (which by construction lives inside it), the reservations
-        # that fall into it, and the class that limits it to its own devices.
-        subnet4 = lib.imap0 (
-          index: entry:
+        # All served subnets sit in one shared network, because they share one physical link: that is
+        # what makes Kea consider more than one of them for a client, and therefore what makes the
+        # classes decide at all. `interface` at this level is the documented way to say that the
+        # network is reachable directly rather than through relays (Kea ARM 8.4).
+        #
+        # Each subnet then carries the zone's CIDR, a pool inside it, the zone's own router (which by
+        # construction lives inside it), the reservations that fall into it, and its class - every
+        # subnet names one, the default zone included.
+        shared-networks = [
           {
-            id = index + 1;
-            subnet = entry.config.cidr;
-            pools = [
-              { pool = poolIn entry.config; }
-            ];
-            option-data = [
-              {
-                name = "routers";
-                data = entry.config.gateway;
-              }
-            ];
-            reservations = reservationsIn entry.config;
+            name = "shared-${cfg.interface}";
+            interface = cfg.interface;
+            subnet4 = lib.imap0 (index: entry: {
+              id = index + 1;
+              subnet = entry.config.cidr;
+              pools = [
+                { pool = poolIn entry.config; }
+              ];
+              option-data = [
+                {
+                  name = "routers";
+                  data = entry.config.gateway;
+                }
+              ];
+              reservations = reservationsIn entry.config;
+              client-classes = [ entry.zone ];
+            }) dhcpSubnets;
           }
-          // lib.optionalAttrs (entry.zone != cfg.defaultZone) { client-class = entry.zone; }
-        ) dhcpSubnets;
+        ];
       };
     };
 
