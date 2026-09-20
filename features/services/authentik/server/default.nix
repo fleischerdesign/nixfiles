@@ -392,11 +392,12 @@ let
           };
           attrs = {
             base_dn = "DC=vyrx,DC=de";
-            # Code-based MFA is meaningless for a bind account: a service account has no authenticator,
-            # and the documentation is explicit that enabling this makes the bind demand one - a
-            # password-only bind is then rejected, which is what `Invalid credentials (49)` looked like
-            # here while the token in the database demonstrably held the same value as the secret.
-            mfa_support = false;
+            # `mfa_support` is deliberately NOT set here: the field exists in the database but setting
+            # it through this blueprint makes the whole apply fail (measured: the instance went to
+            # `status = error`, so the value never reached the database and the provider kept
+            # `mfa_support = true`). Whether that setting is what rejects a password-only bind is
+            # therefore still open - and it has to be answered by finding a way to change it, not by
+            # writing the field again.
             # No `search_group` and no other access restriction here, for two reasons, both
             # measured: the field does not exist on this version's LDAP provider
             # (authentik_providers_ldap_ldapprovider carries search_mode, bind_mode and the id
@@ -491,48 +492,89 @@ let
     metadata = {
       name = "vyrx-ldap-consumers";
     };
-    entries = lib.concatMap (
-      name:
-      let
-        ep = ldapEndpoints.${name};
-        safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-      in
+    entries =
+      # The `ldap` application is created by the outposts blueprint, and the access binding below
+      # references it. Blueprint application is unordered, so the dependency is declared explicitly -
+      # the same pattern the outpost blueprint itself uses for the flows and the RBAC groups.
       [
         {
-          model = "authentik_rbac.role";
-          id = "role_ldap_consumer_${safeId}";
-          identifiers = {
-            name = "LDAP consumer ${name}";
-          };
+          model = "authentik_blueprints.metaapplyblueprint";
           attrs = {
-            permissions = [ ];
-          };
-        }
-        {
-          model = "authentik_core.user";
-          id = "sa_ldap_consumer_${safeId}";
-          identifiers = {
-            username = "ak-ldap-${name}";
-          };
-          attrs = {
-            name = "LDAP search account for ${name}";
-            type = "service_account";
-            roles = [ (yamlTag "!KeyOf role_ldap_consumer_${safeId}") ];
-          };
-        }
-        {
-          model = "authentik_core.token";
-          identifiers = {
-            identifier = "ldap-consumer-${name}-password";
-          };
-          attrs = {
-            intent = "app_password";
-            user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
-            key = yamlTag "!File ${config.sops.secrets.${ldapConsumerSecretPath name ep}.path}";
+            identifiers = {
+              path = "03-apps/ldap-outposts-generated.yaml";
+            };
           };
         }
       ]
-    ) sortedLdapEndpointNames;
+      # The documentation is explicit that "a user must have access to the LDAP application before they
+      # can bind and search". One group carries that access for every directory consumer; the accounts
+      # are its members, and the binding below is what actually grants it.
+      ++ [
+        {
+          model = "authentik_core.group";
+          id = "group_ldap_consumers";
+          identifiers = {
+            name = "ldap-consumers";
+          };
+          attrs = {
+            is_superuser = false;
+          };
+        }
+      ]
+      ++ lib.concatMap (
+        name:
+        let
+          ep = ldapEndpoints.${name};
+          safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
+        in
+        [
+          {
+            model = "authentik_rbac.role";
+            id = "role_ldap_consumer_${safeId}";
+            identifiers = {
+              name = "LDAP consumer ${name}";
+            };
+            attrs = {
+              permissions = [ ];
+            };
+          }
+          {
+            model = "authentik_core.user";
+            id = "sa_ldap_consumer_${safeId}";
+            identifiers = {
+              username = "ak-ldap-${name}";
+            };
+            attrs = {
+              name = "LDAP search account for ${name}";
+              type = "service_account";
+              roles = [ (yamlTag "!KeyOf role_ldap_consumer_${safeId}") ];
+              groups = [ (yamlTag "!KeyOf group_ldap_consumers") ];
+            };
+          }
+          {
+            model = "authentik_policies.policybinding";
+            identifiers = {
+              target = yamlTag "!Find [authentik_core.application, [slug, ldap]]";
+              group = yamlTag "!KeyOf group_ldap_consumers";
+            };
+            attrs = {
+              order = 0;
+              enabled = true;
+            };
+          }
+          {
+            model = "authentik_core.token";
+            identifiers = {
+              identifier = "ldap-consumer-${name}-password";
+            };
+            attrs = {
+              intent = "app_password";
+              user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
+              key = yamlTag "!File ${config.sops.secrets.${ldapConsumerSecretPath name ep}.path}";
+            };
+          }
+        ]
+      ) sortedLdapEndpointNames;
   };
 
   generatedLdapConsumerBlueprint = toBlueprintYaml "ldap-consumers-generated" ldapConsumerBlueprint;
