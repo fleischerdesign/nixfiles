@@ -671,6 +671,31 @@ let
           # everyone, which is what the stock flow relies on and what this flow needs. The bind flow is
           # different: it runs with the account's credentials, so it keeps its binding.
           {
+            # A flow without stages is an EmptyFlowException, not an implicit allowance: planner.py raises
+            # `if not plan.bindings and not self.allow_empty_flows`. Measured in the core's log while the
+            # bind failed: `f(exec): Flow is empty`, `flow_slug: ldap-authorization-flow`. The stock
+            # consent flow carries exactly one consent stage in implicit mode, which is why it is not
+            # empty; this flow does the same.
+            model = "authentik_stages_consent.consentstage";
+            id = "stage_ldap_authz_consent";
+            identifiers = {
+              name = "Authorize LDAP consumer";
+            };
+            attrs = {
+              mode = "implicit_consent";
+            };
+          }
+          {
+            model = "authentik_flows.flowstagebinding";
+            identifiers = {
+              target = yamlTag "!KeyOf flow_ldap_authz";
+              order = 0;
+            };
+            attrs = {
+              stage = yamlTag "!KeyOf stage_ldap_authz_consent";
+            };
+          }
+          {
             model = "authentik_core.token";
             identifiers = {
               identifier = "ldap-consumer-${name}-password";
