@@ -55,6 +55,25 @@ let
     };
   };
 
+  # Directory (Authentik LDAP) consumer specification. A service that authenticates its
+  # users against the directory declares *who may use it* and *who administers it*. The
+  # policy therefore lives with the service it applies to, not in the directory: the
+  # provider exposes identities, the consumer decides what they may do.
+  ldapConsumerSubmodule = lib.types.submodule {
+    options = {
+      accessGroups = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        description = "Authentik groups whose members may sign in to this service";
+      };
+
+      adminGroups = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Groups whose members are administrators of this service (usually a subset of accessGroups)";
+      };
+    };
+  };
+
   consumerContractSubmodule = lib.types.submodule {
     options = {
       postgresql = lib.mkOption {
@@ -67,6 +86,17 @@ let
         type = lib.types.attrsOf redisConsumerSubmodule;
         default = { };
         description = "Redis instances/databases required by this service";
+      };
+
+      ldap = lib.mkOption {
+        type = lib.types.nullOr ldapConsumerSubmodule;
+        default = null;
+        description = ''
+          Directory this service authenticates against. Setting it does not grant access -
+          it states which identities the service accepts, and is projected into the
+          service's own client configuration. `accessGroups` is required, because a service
+          that authenticates against the directory without saying who may use it has no policy.
+        '';
       };
     };
   };

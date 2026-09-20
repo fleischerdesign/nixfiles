@@ -354,7 +354,12 @@ let
           };
           attrs = {
             base_dn = "DC=vyrx,DC=de";
-            search_group = yamlTag "!Find [authentik_core.group, [name, infra-admins]]";
+            # Deliberately no `search_group`: it would restrict the directory for *every*
+            # consumer, and there is one provider for the whole fleet. Who may use a service
+            # is that service's decision - it declares `my.contracts.consumes.<name>.ldap` and
+            # renders its own filter from it. A provider that encoded one consumer's policy
+            # would silently become the policy of all of them.
+            search_group = null;
             authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
             invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
           };
@@ -385,6 +390,14 @@ let
           };
           attrs = {
             intent = "api";
+            # The token's value comes from SOPS and is read by the outpost from its
+            # environment file. `managed = false` is what keeps those two in step: a managed
+            # token is rotated by Authentik on its own schedule, while a standalone outpost
+            # reads its token once at start - measured 2026-09-20, the stored value was 60
+            # characters against the 48 in the secret, and the outpost answered
+            # "auth_via: unauthenticated" to every config fetch, which is why it never bound
+            # a listener and Jellyfin could not reach it.
+            managed = false;
             user = yamlTag "!KeyOf sa_ldap_${o.safeHost}";
             key = yamlTag "!File ${config.sops.secrets.${o.tokenSecretName}.path}";
           };
