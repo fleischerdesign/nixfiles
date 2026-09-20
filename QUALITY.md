@@ -109,6 +109,7 @@ state — and the ones that cost the most were the ones I produced myself:
 | `systemctl is-active migration-guard.timer` (invented unit name) | `inactive` for a unit that does not exist | "the migration guard is disarmed" |
 | `test -r /var/log/caddy/access.log` (invented filename) | the file does not exist | "crowdsec cannot read the logs" |
 | my own script ending on `echo` | `exit 0` while `nixos-rebuild` had failed | "the deploy succeeded" (twice) |
+| `ip -4 neigh` on `hom-srv-01`, counted with `| wc -l` | 12 lines, 11 of them `FAILED` or `INCOMPLETE` | "11 devices are still on the old subnet" |
 | an imagined context figure, stated twice | — | "I have 88% used" / "I have 17% free" |
 
 The root cause is not carelessness. It is that **a missing tool, a guessed name and a real negative

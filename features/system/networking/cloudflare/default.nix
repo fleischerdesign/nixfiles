@@ -282,9 +282,15 @@ in
       wants = [ "network-online.target" ];
       serviceConfig = {
         Type = "oneshot";
+        # The zone is a pure function of this configuration: a record this engine owns and the
+        # current spec no longer describes is removed. Pruning is ownership-scoped (see sync.py),
+        # so only records carrying this engine's own comment vocabulary, inside the managed zone,
+        # and absent from the desired set can be deleted -- manual entries, ACME DNS-01 records
+        # and other tooling are never touched. The desired set is evaluated across every host's
+        # contracts, so drift in the repository is corrected by deploying it, not by hand.
         ExecStart = "${cfg.package}/bin/cloudflare-sync --token-file ${
           config.sops.secrets.${cfg.apiTokenSecret}.path
-        }";
+        } --prune";
         StandardOutput = "journal";
         StandardError = "journal";
       };

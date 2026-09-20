@@ -169,18 +169,23 @@ let
         description = "Physical MAC address for static DHCP reservation";
       };
       platform = lib.mkOption {
-        type = lib.types.enum [
-          "esp32"
-          "esp8266"
-          "rp2040"
-        ];
-        default = "esp32";
-        description = "Microcontroller platform architecture";
+        type = lib.types.nullOr (
+          lib.types.enum [
+            "esp32"
+            "esp8266"
+            "rp2040"
+          ]
+        );
+        default = null;
+        description = ''
+          Microcontroller platform architecture. Null for devices that are not microcontrollers
+          (printers, access points, media hardware); ESPHome requires it for the devices it manages.
+        '';
       };
       board = lib.mkOption {
-        type = lib.types.str;
-        default = "esp32dev";
-        description = "Hardware board definition target";
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Hardware board definition target, for devices flashed from source";
       };
       description = lib.mkOption {
         type = lib.types.str;
@@ -387,11 +392,11 @@ in
         zone = "infra";
         ipv4 = "10.10.10.1";
         hostType = "embedded";
-        # TEMPORARY (subnet migration): the box still answers on the old LAN address until it
-        # is re-addressed. Reported by I11 and removed at teardown (DEPLOYMENT §14).
-        migration = {
-          addresses = [ "192.168.178.1/24" ];
-        };
+        # The migration block was removed on 2026-09-20, after measurement: the box answers on
+        # 10.10.10.1 (ICMP, 80 and 443 open, and the whole fleet's default route runs through it)
+        # and it no longer answers on its old LAN address. The fritzbox reconciler derives its target
+        # address from this block, so keeping the dead one meant addressing the box where it cannot
+        # be reached; with the block gone the schema default (empty) makes it use the ipv4 above.
       };
 
       hom-ap-01 = {
@@ -399,10 +404,14 @@ in
         ipv4 = "10.10.10.20";
         mac = "7c:f1:7e:6a:b0:82"; # wired MAC: leases the declared address from Kea
         hostType = "embedded";
-        # TEMPORARY (subnet migration): the AP still answers on the old LAN address until it is
-        # re-addressed. Reported by I11 and removed at teardown (DEPLOYMENT §14).
+        # The address half of the migration is finished: the access point leases 10.10.10.20 from
+        # Kea through the infra class and no longer answers on its old LAN address (measured silent). The
+        # tplink-ap reconciler derives its target address from this block, so the dead address is
+        # gone and the reconciler addresses the ipv4 above again. What remains is the WiFi half,
+        # which is not an address at all: the old SSID the ESP firmware still carries as a second
+        # network so the relays survive that rename. It goes when the relays are reflashed without
+        # it.
         migration = {
-          addresses = [ "192.168.178.54/24" ];
           ssid = "Ancoris";
         };
       };
@@ -410,6 +419,14 @@ in
 
     # Default IoT devices conforming to RFC 1178 Enterprise Taxonomy
     my.topology.devices = lib.mkDefault {
+      # Peripheral hardware that is not a microcontroller. No MAC on purpose: a device with MAC and
+      # ipv4 becomes a DHCP reservation, and the gateway asserts that every reservation lies inside
+      # a declared subnet - which this one does not until it moves. The MAC goes in when it does.
+      hom-prn-01 = {
+        zone = "iot";
+        ipv4 = "192.168.178.109";
+        description = "HP Multifunktionsdrucker/Scanner; noch im alten Subnetz (siehe DEPLOYMENT.md 14)";
+      };
       # Enterprise Relais-Aktoren (Sonoff Basic ESP8266 Inline-Relais)
       hom-rly-01 = {
         zone = "iot";

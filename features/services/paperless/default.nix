@@ -136,7 +136,9 @@ in
           environment = {
             PUID = "315";
             PGID = "987";
-            IP = "192.168.178.109";
+            # The address comes from the device inventory (my.topology.devices), which is the single
+            # source for device addresses; the scanner is declared there as hom-prn-01.
+            IP = config.my.topology.devices.hom-prn-01.ipv4;
             LABEL = "paperless";
             TZ = "Europe/Berlin";
             PATTERN = "\"scan\"_dd-mm-yyyy_hh-MM-ss";
