@@ -453,6 +453,41 @@ let
       && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
     ) ep.port
   ) directEndpoints;
+  # Every endpoint that enables directory authentication becomes a consumer with fully resolved values:
+  # the audience it stated, the SOPS path its app password lives at, and the DN it binds as. The provider
+  # that creates those accounts derives the same DN from the same directory contract, so both sides agree
+  # without either reading the other's configuration - they do not even run on the same host, which is
+  # exactly why this lives here and not in the provider's feature.
+  ldapConsumers = builtins.foldl' (acc: svc: acc // ldapConsumerOf svc) { } (
+    builtins.attrNames config.my.contracts.provides
+  );
+
+  # A service may expose several endpoints; the first that enables directory authentication decides.
+  ldapConsumerOf =
+    svc:
+    let
+      ldapEndpoints = builtins.filter (ep: ep.ldap.enable) (
+        builtins.attrValues config.my.contracts.provides.${svc}.endpoints
+      );
+    in
+    if ldapEndpoints == [ ] then
+      { }
+    else
+      let
+        ep = builtins.head ldapEndpoints;
+        directory = config.my.directory.ldap;
+      in
+      {
+        ${svc}.ldap = {
+          inherit (ep.ldap) accessGroups adminGroups;
+          secretPath =
+            if ep.ldap.secretPath != null then
+              ep.ldap.secretPath
+            else
+              "services/authentik/consumers/${svc}-ldap-password";
+          bindDn = "cn=${directory.consumerAccountPrefix}${svc},${directory.usersDn}";
+        };
+      };
 in
 {
   options.my.contracts.provides = lib.mkOption {
@@ -469,6 +504,8 @@ in
 
   # Direct Firewall Projection
   config = {
+    my.contracts.consumes = ldapConsumers;
+
     networking.firewall = {
       allowedTCPPorts = allTcp;
       allowedUDPPorts = allUdp;

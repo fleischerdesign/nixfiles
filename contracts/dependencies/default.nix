@@ -71,6 +71,26 @@ let
         default = [ ];
         description = "Groups whose members are administrators of this service (usually a subset of accessGroups)";
       };
+
+      # Both of the following are resolved by the endpoints contract from the service's own endpoint
+      # declaration; no consumer sets them, and none composes a DN. Compiling a consumer on the host it
+      # runs on is what keeps this possible: neither value has to cross a host boundary.
+      secretPath = lib.mkOption {
+        type = lib.types.str;
+        description = ''
+          SOPS path of the app password this service binds with. The endpoint may name it explicitly,
+          otherwise it derives `services/authentik/consumers/<service>-ldap-password`.
+        '';
+      };
+
+      bindDn = lib.mkOption {
+        type = lib.types.str;
+        description = ''
+          Distinguished name this service binds as, composed from the directory contract. The provider
+          creates the account under the same name, so both sides agree while the consumer stays unaware
+          of the directory's structure.
+        '';
+      };
     };
   };
 
