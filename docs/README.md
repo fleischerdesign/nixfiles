@@ -31,8 +31,9 @@ agentic contributors).
 - **Claims carry their evidence.** Where a statement says "measured", it names the command and the date.
   Where it says "asserted", it names the invariant that enforces it at evaluation time. Statements
   without either are opinions and should be read as such.
-- **Everything in English.** Code, comments, commits and documentation. Some documents still carry
-  German prose from their first draft; translating them is part of finishing them, not a separate task.
+- **Everything in English.** Code, comments, commits and documentation - verified, not intended:
+  no document in this directory contains German prose any more. A specification that changes language
+  mid-draft is one that will be half-updated, and the half that lags is the half nobody notices.
 
 ## Conventions
 
