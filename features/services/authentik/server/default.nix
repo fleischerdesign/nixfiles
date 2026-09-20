@@ -736,6 +736,12 @@ in
           # deterministically. The documented "<2 not recommended" caveat targets
           # throughput on scaled-out replicas; this instance is single-replica.
           "AUTHENTIK_WORKER__THREADS=1"
+          # TEMPORARY (2026-09-20): the blueprint importer reports individual entry failures only at
+          # debug level, so a failed apply reads as `status = error` with no reason anywhere - the
+          # server and worker journals contain the apply, the task and `exc: null`, and nothing else.
+          # Six guesses about which entry was invalid were wrong. This turns the reason on; it comes
+          # out again once the entry is found.
+          "AUTHENTIK_LOG_LEVEL=debug"
           "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
           "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
         ];
