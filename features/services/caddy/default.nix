@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
@@ -323,25 +322,19 @@ in
     # Allow group read access to logs (for CrowdSec and Alloy)
     systemd.services.caddy.serviceConfig.UMask = "0027";
 
-    # Caddy's in-process reload (SIGUSR1 → admin API) blocks on this configuration and ends in
-    # "Reload operation timed out. Killing reload process.", leaving the service listening but
-    # answering nothing until it is restarted - measured on 2026-09-20: every vhost on hom-srv-01
-    # returned no response, from the LAN and through the ingress alike.
+    # Caddy's in-process reload is unreliable here, measured twice on 2026-09-20:
+    #   - it hung ("Reload operation timed out. Killing reload process.") while loading many newly
+    #     bound `tls` files, leaving the service listening but answering nothing - every vhost on
+    #     hom-srv-01, from the LAN and through the ingress alike;
+    #   - the module's own `ExecReload` points at `/etc/caddy/Caddyfile` while the service runs with
+    #     `/etc/caddy/caddy_config`, so it fails with exit 1 - the `exit 4` every activation on this
+    #     host reported.
     #
-    # A restart loads the identical configuration cleanly and immediately, so a reload request is
-    # turned into a restart. `lib.mkForce` is deliberate here: `ExecReload` is a systemd list and a
-    # plain assignment would *append* to the module's `caddy reload ... --force`, leaving the hanging
-    # command in place. The cost is a sub-second interruption on configuration changes; the
-    # alternative is a hang that only shows up when someone notices the services are down.
-    #
-    # NOTE: this also means `Reload failed for Caddy.` no longer appears in the journal, and
-    # `nixos-rebuild` stops returning exit 4 for this host. `Restart` is deliberately left as the
-    # module sets it (`on-failure`): a TERM counts as a failure for systemd, so the process comes
-    # back with the new configuration. Do not "tidy" this into a plain reload without also setting
-    # `Restart`.
-    systemd.services.caddy.serviceConfig.ExecReload = lib.mkForce (
-      "${pkgs.util-linux}/bin/kill -TERM $MAINPID"
-    );
+    # Both are avoided by restarting when the unit changes: a restart loads the identical
+    # configuration cleanly and immediately. Overriding `ExecReload` does not work - `lib.mkForce` on
+    # that list does not displace the module's command, which survives in the rendered unit - so the
+    # switch behaviour is overridden instead.
+    systemd.services.caddy.restartIfChanged = lib.mkForce true;
 
     systemd.tmpfiles.rules = [
       "d /var/log/caddy 0755 caddy caddy -"
