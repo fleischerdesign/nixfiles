@@ -580,6 +580,7 @@ What was removed, and how each removal was verified:
 | the legacy WLAN in the ESP firmware configuration | nothing radiated that name any more (measured by scan); the running firmware keeps it until the next flash |
 | the `192.168.178` policy-routing block | went with the Tailscale feature that introduced it |
 | `cloudflare-dyndns` and its `srv.lan.vyrx.de` record | the service had exactly one consumer - that record - and the record had none |
+| the rollback generations (44/30/18/11 kept on edge/srv/ops/wrk) | pruned to the last three, then `nix-store --gc`. Three is the depth now: enough to roll a bad activation back twice from the bootloader, and the store sizes afterwards are 22G/24G/44G/58G/59G |
 
 The scanner is declared (MAC and an `iot` address) and takes its lease like the relays do. Two
 `192.168.178` literals remain, in the topology schema's `example` fields: documentation, not state, but
