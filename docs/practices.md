@@ -313,3 +313,36 @@ serializer, the Go outpost, the Django policy engine, the importer. The sources 
 (`/nix/store/*-authentik-*/lib/python3.14/site-packages/authentik` and the outpost's Go tree), and the
 documentation is available as a checkout, so none of this needs a hypothesis.
 
+### 6.8 Removal is an entry, not an omission - and the first version of this file said otherwise
+
+An earlier version of this section claimed blueprints cannot delete objects. That was wrong, and the
+structure documentation says so in four lines:
+
+```yaml
+state: present       # creates if missing, updates the fields in attrs, leaves other fields alone
+state: created       # creates if missing and never updates it again
+state: must_created  # fails if it already exists
+state: absent        # deletes it if it exists (Django .delete(), so it may cascade)
+```
+
+So a blueprint is declarative about the entries it **contains**; an object that merely disappears from the
+file stays in the database. Removal has to be declared, as a tombstone that may stay there forever, because
+`absent` on a missing object is a no-op. Deleting a flow cascades to its stage bindings, so one entry replaces
+several.
+
+### 6.9 The apply trigger, and how this repository closes it
+
+Upstream re-reads a blueprint file every 60 minutes and watches the directory for modification events. In
+this repository the directory is an immutable store path that a deploy replaces wholesale, so no file is ever
+modified and the watcher cannot fire - measured as a deploy that changed blueprints, restarted the server and
+the worker, and applied nothing until the next hourly discovery.
+
+The fix uses the mechanism this repository already trusts for "act when the deployment changed":
+`restartTriggers` content-hashes the blueprints directory into a unit, so systemd starts
+`authentik-blueprints-apply` exactly when a deploy produced different blueprints - and on boot, where
+authentik applies nothing by itself. The unit queues the same task the API's apply endpoint queues and then
+waits for every instance to settle, asserting on `last_applied` being **newer** than before **and** on
+`status`, because status alone describes the last attempt rather than this one. A deploy is therefore
+finished when the objects exist, not when a file was written.
+
+

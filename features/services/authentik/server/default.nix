@@ -8,6 +8,56 @@
 let
   cfg = config.my.features.services.authentik.server;
 
+  # Blueprint application is asynchronous upstream: the API's apply endpoint and the hourly discovery both
+  # only queue a task. The unit below queues the same task and then waits for the effect, so a deploy is
+  # finished when the objects exist, not when a file was written.
+  blueprintsApplyTimeoutSeconds = 900;
+
+  # Fed to `ak shell`, the application's own management entry point, with the same environment the worker
+  # has. It asserts on `last_applied` rather than on `status` alone: status describes the last attempt, so a
+  # failed apply leaves the previous value behind and a blueprint can read `successful` while the object it
+  # should have created does not exist.
+  blueprintsApplyScript = pkgs.writeText "authentik-apply-blueprints.py" ''
+    import sys
+    import time
+
+    from authentik.blueprints.models import BlueprintInstance
+    from authentik.blueprints.v1.tasks import apply_blueprint
+
+    instances = list(BlueprintInstance.objects.filter(enabled=True))
+    if not instances:
+        print("no enabled blueprint instances")
+        sys.exit(0)
+
+    before = {i.name: i.last_applied for i in instances}
+    for instance in instances:
+        apply_blueprint.send_with_options(args=(instance.pk,), rel_obj=instance)
+
+    deadline = time.monotonic() + ${toString blueprintsApplyTimeoutSeconds}
+    while True:
+        time.sleep(3)
+        waiting = []
+        for instance in instances:
+            instance.refresh_from_db()
+            if instance.status == "error":
+                print(f"FAILED {instance.name}: status={instance.status}")
+                sys.exit(1)
+            previous = before[instance.name]
+            settled = (
+                instance.last_applied is not None
+                and instance.status == "successful"
+                and (previous is None or instance.last_applied > previous)
+            )
+            if not settled:
+                waiting.append(instance.name)
+        if not waiting:
+            print("applied: " + ", ".join(sorted(before)))
+            sys.exit(0)
+        if time.monotonic() > deadline:
+            print("timeout after ${toString blueprintsApplyTimeoutSeconds}s, still waiting for: " + ", ".join(sorted(waiting)))
+            sys.exit(1)
+  '';
+
   # The directory's structure comes from the fleet-wide contract, never from a literal here.
   directory = config.my.directory.ldap;
 
@@ -588,11 +638,37 @@ let
       name = "vyrx-ldap-consumers";
     };
     entries =
-      # The application access - a group, its membership and a policy binding on the `ldap` application -
-      # stood here and is rolled back on 2026-09-20: with it present this blueprint stopped applying,
-      # which is why the `ldap-consumers` group never appeared. It comes back from the API's error
-      # message, not from another guess about field names.
-      lib.concatMap (
+      # Tombstones. A blueprint declares the entries it contains, so removal is expressed as an entry
+      # with `state: absent`: it deletes the object when it exists and does nothing when it does not.
+      # The upstream structure documentation lists present, created, must_created and absent; an earlier
+      # revision of this feature declared these three objects while the authorization question was being
+      # traced, and the file no longer wants them.
+      #
+      # Deleting a flow cascades to its stage bindings, which is why no binding is listed here.
+      [
+        {
+          model = "authentik_flows.flow";
+          identifiers = {
+            slug = "ldap-authorization-flow";
+          };
+          state = "absent";
+        }
+        {
+          model = "authentik_stages_consent.consentstage";
+          identifiers = {
+            name = "Authorize LDAP consumer";
+          };
+          state = "absent";
+        }
+        {
+          model = "authentik_stages_user_login.userloginstage";
+          identifiers = {
+            name = "Authorize LDAP consumer";
+          };
+          state = "absent";
+        }
+      ]
+      ++ lib.concatMap (
         name:
         let
           ep = ldapEndpoints.${name};
@@ -810,6 +886,50 @@ in
         Restart = "always";
       };
       restartTriggers = [ cfg.blueprintsDir ];
+    };
+
+    # Blueprint application, tied to the deployment.
+    #
+    # The documented trigger for file-based blueprints is a modification event in the blueprint directory;
+    # under Nix that directory is an immutable store path a deploy replaces wholesale, so no file inside it
+    # is ever modified and the watcher cannot fire. Measured: after a deploy that changed the blueprints, the
+    # worker started, applied nothing, and the objects appeared only at the next hourly discovery - which is
+    # why a blueprint could read `successful` for a whole hour while the object it declared did not exist.
+    #
+    # This unit uses the mechanism this repository already relies on for "act when the deployment changed":
+    # restartTriggers content-hashes the blueprints directory into the unit, so systemd starts it exactly
+    # when a deploy produced different blueprints - and on boot, where authentik applies nothing by itself.
+    # It queues the task the API's apply endpoint queues and waits for every instance to settle.
+    systemd.services.authentik-blueprints-apply = {
+      description = "Apply the generated authentik blueprints";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "authentik-worker.service" ];
+      requires = [ "authentik-worker.service" ];
+
+      restartTriggers = [ cfg.blueprintsDir ];
+
+      serviceConfig = {
+        Type = "oneshot";
+        User = "authentik";
+        Group = "authentik";
+        WorkingDirectory = "/var/lib/authentik";
+        TimeoutStartSec = toString (blueprintsApplyTimeoutSeconds + 60);
+        EnvironmentFile = [
+          config.sops.secrets."services/authentik/core_env".path
+          config.sops.templates."authentik_secrets.env".path
+        ];
+        Environment = [
+          "AUTHENTIK_REDIS__HOST=127.0.0.1"
+          "AUTHENTIK_REDIS__PORT=6379"
+          "AUTHENTIK_POSTGRESQL__HOST=/run/postgresql"
+          "AUTHENTIK_POSTGRESQL__NAME=authentik"
+          "AUTHENTIK_POSTGRESQL__USER=authentik"
+          "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
+          "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
+        ];
+        ExecStart = "${lib.getExe authentikPackage} shell";
+        StandardInput = "file:${blueprintsApplyScript}";
+      };
     };
 
     # 4. Inversion of Control: Declare PostgreSQL requirement
