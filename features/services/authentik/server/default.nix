@@ -8,6 +8,11 @@
 let
   cfg = config.my.features.services.authentik.server;
 
+  # Constructors for blueprint entries. They belong to this feature, not to the framework: they encode
+  # authentik's rules, and they exist so that a model name, a reference kind and the placement of a field
+  # cannot be mistyped into an entry that is silently skipped.
+  blueprintLib = import ../lib/blueprint.nix { inherit lib; };
+
   # Blueprint application is asynchronous upstream: the API's apply endpoint and the hourly discovery both
   # only queue a task. The unit below queues the same task and then waits for the effect, so a deploy is
   # finished when the objects exist, not when a file was written.
@@ -632,11 +637,8 @@ let
   # authenticates against the HTTP API only and is rejected by an LDAP bind (measured: `Invalid
   # credentials (49)` with the outpost's API token against a DN that exists) - a role, and the
   # "Search full LDAP directory" object permission on the provider, added above.
-  ldapConsumerBlueprint = {
-    version = 1;
-    metadata = {
-      name = "vyrx-ldap-consumers";
-    };
+  ldapConsumerBlueprint = blueprintLib.blueprint {
+    name = "vyrx-ldap-consumers";
     entries =
       # Tombstones. A blueprint declares the entries it contains, so removal is expressed as an entry
       # with `state: absent`: it deletes the object when it exists and does nothing when it does not.
@@ -646,27 +648,18 @@ let
       #
       # Deleting a flow cascades to its stage bindings, which is why no binding is listed here.
       [
-        {
-          model = "authentik_flows.flow";
-          identifiers = {
-            slug = "ldap-authorization-flow";
-          };
-          state = "absent";
-        }
-        {
-          model = "authentik_stages_consent.consentstage";
-          identifiers = {
-            name = "Authorize LDAP consumer";
-          };
-          state = "absent";
-        }
-        {
-          model = "authentik_stages_user_login.userloginstage";
-          identifiers = {
-            name = "Authorize LDAP consumer";
-          };
-          state = "absent";
-        }
+        (blueprintLib.absent {
+          model = blueprintLib.models.flow;
+          identifiers.slug = "ldap-authorization-flow";
+        })
+        (blueprintLib.absent {
+          model = blueprintLib.models.consentStage;
+          identifiers.name = "Authorize LDAP consumer";
+        })
+        (blueprintLib.absent {
+          model = blueprintLib.models.userLoginStage;
+          identifiers.name = "Authorize LDAP consumer";
+        })
       ]
       ++ lib.concatMap (
         name:
@@ -675,29 +668,17 @@ let
           safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
         in
         [
-          {
-            model = "authentik_rbac.role";
+          (blueprintLib.role {
             id = "role_ldap_consumer_${safeId}";
-            identifiers = {
-              name = "LDAP consumer ${name}";
-            };
-            attrs = {
-              permissions = [ ];
-            };
-          }
-          {
-            model = "authentik_core.user";
+            name = "LDAP consumer ${name}";
+          })
+          (blueprintLib.serviceAccount {
             id = "sa_ldap_consumer_${safeId}";
-            identifiers = {
-              username = consumerAccountName name;
-            };
-            attrs = {
-              name = "LDAP search account for ${name}";
-              type = "service_account";
-              roles = [ (yamlTag "!KeyOf role_ldap_consumer_${safeId}") ];
-            };
-          }
-          # Deliberately no binding on the LDAP application.
+            username = consumerAccountName name;
+            name = "LDAP search account for ${name}";
+            roles = [ (blueprintLib.refs.sameBlueprint "role_ldap_consumer_${safeId}") ];
+          })
+          # Deliberately no binding on the LDAP application and none on the flow the outpost executes.
           #
           # The outpost checks per user whether that user may use the application
           # (providers/ldap/api.py runs PolicyEngine(application, request.user); bind.go answers
@@ -708,19 +689,14 @@ let
           # An application without any binding is accessible to every user: the flag behind it is
           # AppAccessWithoutBindings, key `core_default_app_access`, default True. The directory therefore
           # stays open to bind, and who may use a service is decided where it belongs - in the consumer's
-          # own memberOf filter, projected from its endpoint contract.
-          # No policy binding on the flow the outpost executes, deliberately. The outpost runs it before
-          {
-            model = "authentik_core.token";
-            identifiers = {
-              identifier = "ldap-consumer-${name}-password";
-            };
-            attrs = {
-              intent = "app_password";
-              user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
-              key = yamlTag "!File ${config.sops.secrets.${ldapConsumerSecretPath name ep}.path}";
-            };
-          }
+          # own memberOf filter, projected from its endpoint contract. The same reasoning holds for the
+          # bind flow, which the outpost runs before any account is authenticated.
+          (blueprintLib.token {
+            identifier = "ldap-consumer-${name}-password";
+            intent = "app_password";
+            user = blueprintLib.refs.sameBlueprint "sa_ldap_consumer_${safeId}";
+            key = blueprintLib.refs.file config.sops.secrets.${ldapConsumerSecretPath name ep}.path;
+          })
         ]
       ) sortedLdapEndpointNames;
   };
