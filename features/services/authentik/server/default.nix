@@ -492,7 +492,7 @@ let
             # consumer, while there is one provider for the whole fleet. Who may use a service
             # is that service's decision: it declares `my.contracts.consumes.<name>.ldap` and
             # renders its own filter from it.
-            authorization_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
+            authorization_flow = yamlTag "!KeyOf flow_ldap_authz";
             invalidation_flow = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]";
           };
           permissions = map (o: {
@@ -642,17 +642,34 @@ let
             };
           }
           {
-            # A provider runs two flows: the bind flow authenticates the account, the *authorization*
-            # flow decides whether it may use the LDAP application. Measured in the core's log while a
-            # bind was failing: `f(exec): Flow not applicable to current user`, with
-            # `flow_slug: default-provider-authorization-implicit-consent` and a request to
-            # `/api/v3/flows/executor/default-provider-authorization-implicit-consent/` - the flow that
-            # rejected the account was this one, not the bind flow. The docs name the same requirement:
-            # "The user must also have access to the LDAP application."
+            # A provider runs two flows: the bind flow authenticates the account, and the authorization
+            # flow decides whether it may use the LDAP application. Measured: the core rejected the bind
+            # with `f(exec): Flow not applicable to current user` for
+            # `default-provider-authorization-implicit-consent`, whose `authentication` requirement is
+            # `require_authenticated` - while the outpost calls the flow executor unauthenticated
+            # (`"auth_via": "unauthenticated"`). A policy binding on that stock flow is ignored: the
+            # entry reported blueprint success and created no row, because authentik manages the flow.
+            # The bind flow solves the same problem by requiring `authentication = none`, so the fleet
+            # gets its own authorization flow with that requirement.
+            model = "authentik_flows.flow";
+            id = "flow_ldap_authz";
+            identifiers = {
+              slug = "ldap-authorization-flow";
+            };
+            attrs = {
+              name = "Authorize LDAP consumer";
+              title = "Authorize %(app)s";
+              designation = "authorization";
+              denied_action = "message_continue";
+              layout = "stacked";
+              authentication = "none";
+            };
+          }
+          {
             model = "authentik_policies.policybinding";
             identifiers = {
-              target = yamlTag "!Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]";
-              order = 1;
+              target = yamlTag "!KeyOf flow_ldap_authz";
+              order = 0;
             };
             attrs = {
               user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
