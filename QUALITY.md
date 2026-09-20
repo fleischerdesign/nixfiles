@@ -165,10 +165,16 @@ the next step is instrumentation, not another guess:
    `GET /debug/pprof/goroutine?debug=1` (and `/debug/pprof/` generally). One request during a stall
    yields the exact goroutine that blocks the load. This is the decisive, low-cost measurement.
 2. Enable `services.caddy.enableDebugLogs` so the next attempt logs its stages at debug level.
-3. The supported mitigation, if the in-process reload is not worth chasing further, is the module's own
-   `services.caddy.enableReload = false`: restarts instead of reloads, no admin-endpoint round trip.
-   **Not** an override of `ExecReload` - `lib.mkForce` on that list does not displace the module's
-   command, which survives in the rendered unit (measured).
+3. **Applied 2026-09-20, decided and verified:** `services.caddy.enableReload = false` on all three
+   hosting hosts. The module then renders no reload command at all and uses `restartTriggers`, so a
+   configuration change restarts Caddy. Verified on each host: activation `exit 0`, `caddy` active,
+   zero reload commands in the unit, and `systemctl reload caddy` **refused** in under a second
+   (`rc=3`, "Job type reload is not applicable") with the service still active afterwards - where it
+   used to hang and take every vhost down. All public and internal names answered throughout.
+
+   Not used: overriding `ExecReload`. `lib.mkForce` on that list does not displace the module's
+   command, which survives in the rendered unit (measured), so the override was inert and was
+   reverted rather than left as a claim.
 
 **B1 — root access to `cld-edge-01`.** The edge trusts only the old fleet deploy key, whose private
 half was destroyed when the openclaw tunnel rendered its secret over `~/.ssh/deploy-key`. Recovery
