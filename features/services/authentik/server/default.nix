@@ -665,16 +665,11 @@ let
               authentication = "none";
             };
           }
-          {
-            model = "authentik_policies.policybinding";
-            identifiers = {
-              target = yamlTag "!KeyOf flow_ldap_authz";
-              order = 0;
-            };
-            attrs = {
-              user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
-            };
-          }
+          # No policy binding for the authorization flow, deliberately: it is evaluated *before* the
+          # account is authenticated - the core logs those requests as `"auth_via": "unauthenticated"` -
+          # so a binding that names the service account cannot match. A flow without bindings applies to
+          # everyone, which is what the stock flow relies on and what this flow needs. The bind flow is
+          # different: it runs with the account's credentials, so it keeps its binding.
           {
             model = "authentik_core.token";
             identifiers = {
