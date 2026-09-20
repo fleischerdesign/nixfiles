@@ -606,6 +606,22 @@ let
             };
           }
           {
+            # The documented prerequisite, in the shape the blueprint model reference prescribes:
+            # `target` and `order` identify the binding, and exactly one of policy/group/user goes in
+            # `attrs` - a binding with none or several is a validation error, which is what made the
+            # earlier attempt fail. `user` rather than a group, because the account that needs the
+            # access *is* this service account; a group would be an object that exists for nothing.
+            # Without this the outpost answers `Flow does not apply to current user.`
+            model = "authentik_policies.policybinding";
+            identifiers = {
+              target = yamlTag "!Find [authentik_core.application, [slug, ldap]]";
+              order = 0;
+            };
+            attrs = {
+              user = yamlTag "!KeyOf sa_ldap_consumer_${safeId}";
+            };
+          }
+          {
             model = "authentik_core.token";
             identifiers = {
               identifier = "ldap-consumer-${name}-password";
