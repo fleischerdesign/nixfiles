@@ -279,7 +279,7 @@ the next deploy. The declaration in SOPS is the source of truth; the host is a c
 **Afterwards, deploy the host once.** Servers declare `users.mutableUsers = false` and the secret
 store now holds the correct hash, so the password is enforced from then on and cannot drift again.
 That single activation also restores `ssh root@…` via the operator key, which unblocks the fleet key
-rotation and the fleet-wide rollout (`practices.md` §5).
+rotation and the fleet-wide rollout (`practices.md` §4).
 4. **Wired LAN** from a static-IP client: `ssh root@10.10.10.10` (hom-srv-01), FRITZ!Box UI `http://10.10.10.1`, AP UI `http://10.10.10.20`.
 5. **Physical console** for home hardware.
 

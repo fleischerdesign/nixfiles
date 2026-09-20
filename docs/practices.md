@@ -238,7 +238,7 @@ paths, in order of effort: (a) the old private key still exists somewhere (noteb
 password manager); (b) the old SOPS hash is retrievable from git and candidate passwords can be
 verified against it **without touching the VPS**; (c) the provider console — GRUB is unrestricted, so
 `init=/bin/sh` then `passwd philipp`; (d) the provider's rescue system, then chroot and `passwd`.
-The exact procedure, with the verified disk layout, is in `operations.md` §11.2.
+The exact procedure, with the verified disk layout, is in `operations.md` §8.2.
 
 **B2 — the deploy signal (A1).** Blocked on the one `cscli machines add` for `hom-srv-01` on the
 master, which is also blocked on B1.
