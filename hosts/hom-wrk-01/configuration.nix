@@ -17,6 +17,10 @@
   # from the rendered file (see docs/operations.md).
   my.features.system.networking.wireguard.clientConfigs = [ "mob-ph-01" ];
 
+  # Resolution runs through systemd-resolved and the resolver's doors instead of whatever the
+  # local network hands out (see features/system/networking/resolver). Staged: this host first.
+  my.features.system.networking.resolver.enable = true;
+
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;

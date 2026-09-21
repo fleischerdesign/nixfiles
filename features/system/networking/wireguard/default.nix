@@ -59,23 +59,13 @@ let
 
   announcesLan = ownDeliveredCidrs != [ ];
 
-  # Membership in a zone, decided on the /24 network part - every zone here is a /24, and the
-  # assertion below holds that assumption rather than trusting it.
-  network = address: lib.concatStringsSep "." (lib.take 3 (lib.splitString "." address));
-
-  # A host that has an address in any delivered zone is on the home LAN and reaches the whole of it
-  # directly through its gateway, so it must install no mesh route at all - otherwise every LAN
-  # packet takes the long way out through the hubs and back. This is decided once for the host, not
-  # per zone: hom-wrk-01 sits in corp, and a per-zone test still gave it routes for infra and iot
-  # (caught by the route projection in the deployment script, not assumed).
-  onLan =
-    ownHost != null
-    && ownHost.ipv4 != null
-    && builtins.any (cidr: network ownHost.ipv4 == network cidr) deliveredCidrs;
-
-  # What this host routes over the mesh: everything delivered, but only when the LAN is not reachable
-  # directly. Its own deliveries are local to begin with, so they are never routed to themselves.
-  meshLanRoutes = if onLan then [ ] else lib.subtractLists ownDeliveredCidrs deliveredCidrs;
+  # A spoke routes the node plane, not the home LAN. A home zone is reached by *being* in it -
+  # directly - and everything else through the mesh. Carrying the prefixes instead would send
+  # them the long way out through the hubs and back, so a roaming node sitting in the home LAN
+  # would fetch a home service over the WAN (measured: it carried infra, corp and iot and went
+  # through the relays while at home). The rendered client configurations are built from the same
+  # function, so a phone and a notebook cannot diverge in where they send LAN traffic.
+  meshLanRoutes = [ ];
 
   # What a peer delivers: its own overlay address, plus the zones it announces into the mesh.
   deliveredBy =

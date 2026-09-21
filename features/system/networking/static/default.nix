@@ -63,8 +63,10 @@ in
     # null means "no default route", which is not a state we want to reach silently.
     networking.defaultGateway = gateway;
 
-    # The hosts resolve through Blocky; the uplink is only the fallback.
-    networking.nameservers = config.my.topology.resolvers;
+    # A default, not the answer: the module that owns resolution
+    # (features/system/networking/resolver) replaces this list where it is enabled, and the
+    # declaration is kept as a default so a fleet can move over one host at a time.
+    networking.nameservers = lib.mkDefault config.my.topology.resolvers;
 
     # ...and that declaration has to reach the component that actually owns
     # /etc/resolv.conf. openresolv does (`networking.resolvconf.enable` defaults to true on
