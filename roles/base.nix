@@ -18,6 +18,10 @@
       networking = {
         wireguard.enable = lib.mkDefault true;
         ssh.enable = lib.mkDefault true;
+        # Every host in this fleet is a mesh node and resolves through the resolver in the
+        # inventory, never through whatever a network hands it. Which doors it uses is derived
+        # from its zone, not written here.
+        resolver.enable = lib.mkDefault true;
       };
       security.enable = lib.mkDefault true;
       theme.enable = lib.mkDefault true;
