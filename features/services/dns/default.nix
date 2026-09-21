@@ -141,9 +141,13 @@ let
     ) flakeConfigurations
   );
 
-  # Blocklist state. Knot reads /etc/hosts-format files directly, so the upstream list is
-  # used as-is and blocked names answer 0.0.0.0 - the previous resolver's `zeroIp`.
+  # Blocklist state. The upstream lists are in /etc/hosts format, which Knot reads as
+  # *address* mappings - and those synthesise a reverse PTR per address, which tens of
+  # thousands of blocked names on 0.0.0.0 overflow (measured: the policy loader died with
+  # "records too big ... PTR"). Knot's own documentation points large lists at RPZ, a policy
+  # zone that has no such reverse side, so the fetch converts hosts -> RPZ (`CNAME .`).
   blocklistDir = "/var/lib/knot-resolver";
+  blocklistRpz = "${blocklistDir}/blocklist.rpz";
   blocklistEntries = map (url: {
     inherit url;
     host = lib.head (
@@ -183,8 +187,8 @@ in
       type = lib.types.listOf lib.types.str;
       default = [ "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts" ];
       description = ''
-        Hosts-format blocklists, fetched on a timer into the resolver's state directory. A
-        blocked name resolves to 0.0.0.0.
+        Hosts-format blocklists, fetched on a timer and converted to an RPZ zone in the
+        resolver's state directory; a blocked name answers NXDOMAIN.
       '';
     };
 
@@ -240,21 +244,25 @@ in
 
         local-data = {
           rules = nodeRules ++ deviceRules ++ serviceRules;
-          addresses-files = lib.optionals (cfg.blocklists != [ ]) [
-            "${blocklistDir}/blocklist.hosts"
+          rpz = lib.optionals (cfg.blocklists != [ ]) [
+            {
+              file = blocklistRpz;
+              watchdog = true;
+            }
           ];
         };
       };
     };
 
-    # The blocklist file must exist before the resolver starts - an empty list is valid.
+    # The RPZ file must exist before the resolver starts; an empty one is a valid, empty
+    # policy (measured).
     systemd.tmpfiles.rules = lib.optionals (cfg.blocklists != [ ]) [
       "d ${blocklistDir} 0770 knot-resolver knot-resolver -"
-      "f ${blocklistDir}/blocklist.hosts 0660 knot-resolver knot-resolver -"
+      "f ${blocklistRpz} 0644 knot-resolver knot-resolver -"
     ];
 
     systemd.services.knot-blocklist = lib.mkIf (cfg.blocklists != [ ]) {
-      description = "Refresh the resolver's hosts-format blocklists and reload it";
+      description = "Refresh the resolver's blocklist (hosts -> RPZ) and reload it";
       after = [
         "network-online.target"
         "knot-resolver.service"
@@ -265,22 +273,32 @@ in
         StateDirectory = "knot-resolver";
         RuntimeDirectory = "knot-resolver";
       };
-      # The name is resolved through a resolver from the inventory explicitly: the host's
-      # own resolv.conf is DHCP-managed and lists the uplink router first, which is not
-      # reachable from the zone addresses, so a plain curl would spend its whole timeout
+      # The list's host is resolved through a resolver from the inventory explicitly: the
+      # host's own resolv.conf is DHCP-managed and lists the uplink router first, which is
+      # not reachable from the zone addresses, so a plain curl would spend its whole timeout
       # failing (measured 2026-09-21). `--resolve` then pins that address for the transfer.
       script = ''
         set -eu
         resolver="${lib.head topology.resolvers}"
-        tmp="$(mktemp)"
-        : > "$tmp"
+        raw="$(mktemp)"
+        : > "$raw"
         ${lib.concatMapStrings ({ url, host }: ''
           ip="$(${pkgs.bind.dnsutils}/bin/dig +short +time=5 +tries=1 @"$resolver" '${host}' A | ${pkgs.gnugrep}/bin/grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
-          ${pkgs.curl}/bin/curl --fail --silent --show-error --location --resolve "${host}:443:$ip" '${url}' >> "$tmp"
-          printf '\n' >> "$tmp"
+          ${pkgs.curl}/bin/curl --fail --silent --show-error --location --resolve "${host}:443:$ip" '${url}' >> "$raw"
         '') blocklistEntries}
-        install -m 0660 -o knot-resolver -g knot-resolver "$tmp" "${blocklistDir}/blocklist.hosts"
-        rm -f "$tmp"
+        # /etc/hosts -> RPZ: every name on every line becomes a blocked name.
+        ${pkgs.gawk}/bin/awk '
+          /^[[:space:]]*#/ { next }
+          NF >= 2 {
+            for (i = 2; i <= NF; i++) {
+              d = $i
+              if (d == "localhost" || d == "localhost.localdomain" || d == "broadcast" || d ~ /^ip6-/) next
+              print d ". 60 IN CNAME ."
+            }
+          }
+        ' "$raw" > "${blocklistRpz}.new"
+        install -o knot-resolver -g knot-resolver -m 0644 "${blocklistRpz}.new" "${blocklistRpz}"
+        rm -f "$raw" "${blocklistRpz}.new"
         systemctl reload knot-resolver.service
       '';
     };
