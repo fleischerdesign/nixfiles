@@ -402,8 +402,10 @@ in
           rules = nodeRules ++ deviceRules ++ serviceRules ++ resolverRules;
           rpz = lib.optionals (cfg.blocklists != [ ]) [
             {
+              # No watchdog: it follows the file by inode, and the refresh installs a *new* file and renames
+              # it into place, so the watcher sees the old one vanish and the fresh list never loads. The
+              # effect is triggered explicitly instead, through systemd (see the refresh below).
               file = blocklistRpz;
-              watchdog = true;
             }
           ];
         };
@@ -481,8 +483,13 @@ in
       wants = [ "network-online.target" ];
       serviceConfig = {
         Type = "oneshot";
-        StateDirectory = "knot-resolver";
-        RuntimeDirectory = "knot-resolver";
+        # Deliberately no StateDirectory and no RuntimeDirectory. Both units claimed `/var/lib/knot-resolver`
+        # and `/run/knot-resolver` - and this one runs as root while the resolver runs as `knot-resolver`,
+        # so every refresh re-created them as root and took the running resolver's working directory and
+        # its API socket away from it. Measured: `FileNotFoundError: [Errno 2]` and
+        # `Unable to clean up listening UNIX socket '/run/knot-resolver/kres-api.sock': PermissionError(13)`,
+        # each of them fatal to the manager, and the reason the resolver of the whole house died twice. The
+        # unit writes one file into a directory that exists; it does not need to own it.
       };
       # The list's host is resolved through this host's own resolution path: the resolver module makes
       # every host resolve through our doors, so there is one place that decides how a name is looked
@@ -519,9 +526,11 @@ in
         fi
         install -o knot-resolver -g knot-resolver -m 0644 "${blocklistRpz}.new" "${blocklistRpz}"
         rm -f "$raw" "${blocklistRpz}.new"
-        # No reload here: the RPZ is watched (`watchdog: true`), so the running resolver picks
-        # the new file up itself. `kresctl reload` is not safe for this service - the manager
-        # chdirs into its runtime directory, and a reload removes that directory under it.
+        # The reload is what makes the new list take effect, and it goes through systemd so that it runs as
+        # the user the resolver runs as (`ExecReload=kresctl reload`). Calling the CLI here would run it as
+        # root against a socket it does not own - which is exactly the PermissionError the directories above
+        # used to cause.
+        systemctl reload knot-resolver
       '';
     };
 
