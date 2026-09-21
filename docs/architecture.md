@@ -179,6 +179,15 @@ Measured 2026-09-21: `jellyfin.vyrx.de` -> `10.10.10.10` / `10.10.100.10` / `173
 for a device, the home door the LAN addresses of both; both doors present a Let's Encrypt
 certificate for the resolver's name.
 
+Every host resolves through that resolver. The list is declared once in the inventory
+(`my.topology.resolvers`) and `features/system/networking/static` hands it to **both** consumers:
+`networking.nameservers` (which systemd-resolved and NetworkManager read) and
+`networking.resolvconf.extraConfig` (openresolv, which is what actually owns `/etc/resolv.conf` on
+NixOS and does **not** read the former). Declaring only the first left the file to whatever wrote it
+last - a stale DHCP lease on `hom-srv-01` put the uplink's nameservers first and name resolution
+timed out (measured 2026-09-21). A roaming host is not static, so it keeps the resolver of the
+network it is on.
+
 ### 5.3 Certificates: one per name, issued where it terminates
 
 There is no wildcard certificate here: Cloudflare's own Universal SSL owns the apex and the wildcard,

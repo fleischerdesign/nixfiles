@@ -63,8 +63,17 @@ in
     # null means "no default route", which is not a state we want to reach silently.
     networking.defaultGateway = gateway;
 
-    # Blocky owns the split horizon; the uplink is only the fallback.
+    # The hosts resolve through Blocky; the uplink is only the fallback.
     networking.nameservers = config.my.topology.resolvers;
+
+    # ...and that declaration has to reach the component that actually owns
+    # /etc/resolv.conf. openresolv does (`networking.resolvconf.enable` defaults to true on
+    # NixOS) and it does not read `networking.nameservers` - that option is consumed by
+    # systemd-resolved and NetworkManager only, so on these hosts it was inert and the file
+    # kept whatever wrote it last: a stale DHCP lease left the uplink's nameservers first and
+    # name resolution timed out (measured 2026-09-21 on hom-srv-01, and hom-wrk-01 pointed at
+    # a foreign resolver). Both projections come from the one list in the inventory.
+    networking.resolvconf.extraConfig = "name_servers='${lib.concatStringsSep " " config.my.topology.resolvers}'";
 
     # Exactly one owner per NIC.
     networking.networkmanager.unmanaged = [ interface ];

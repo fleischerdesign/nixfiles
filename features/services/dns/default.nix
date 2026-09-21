@@ -360,11 +360,11 @@ in
       };
     };
 
-    # lego resolves the ACME API host through the system resolver. This host's resolv.conf
-    # is DHCP-managed and lists the uplink router first, which is not reachable from the
-    # zone addresses, so the order times out and only the self-signed placeholder remains
-    # (measured 2026-09-21). The order therefore runs against a resolver from the
-    # inventory - the same one every other lookup here already uses.
+    # The order resolves the ACME API host itself, so it must not depend on whatever owns
+    # /etc/resolv.conf: it gets the resolver from the inventory, the same one every other
+    # lookup here uses. (Before the static module handed its resolvers to openresolv, this
+    # host's file was a stale DHCP lease and the order timed out, leaving only the
+    # self-signed placeholder - measured 2026-09-21.)
     systemd.services."acme-order-renew-${resolverName}" = lib.mkIf hasDoor {
       serviceConfig.BindReadOnlyPaths = [
         "${
@@ -407,10 +407,9 @@ in
         StateDirectory = "knot-resolver";
         RuntimeDirectory = "knot-resolver";
       };
-      # The list's host is resolved through a resolver from the inventory explicitly: the
-      # host's own resolv.conf is DHCP-managed and lists the uplink router first, which is
-      # not reachable from the zone addresses, so a plain curl would spend its whole timeout
-      # failing (measured 2026-09-21). `--resolve` then pins that address for the transfer.
+      # The list's host is resolved through a resolver from the inventory explicitly, so the
+      # fetch does not depend on whatever owns /etc/resolv.conf; `--resolve` then pins that
+      # address for the transfer.
       script = ''
         set -eu
         resolver="${lib.head topology.resolvers}"
