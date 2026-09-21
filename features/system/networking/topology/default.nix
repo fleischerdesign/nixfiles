@@ -193,6 +193,20 @@ in
       description = "Topology host that routes the home LAN.";
     };
 
+    # The hosts that serve DNS. They generate the same zones from this inventory, so a name has one
+    # answer wherever it is asked, and nothing has to be replicated between them at runtime. Each one is
+    # a door for the mesh: a node that is not fixed at home can ask any of them, which is what removes
+    # the single point of failure - and a host that is declared here but does not run the resolver is a
+    # build failure, not a surprise during an outage.
+    resolverHosts = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "hom-srv-01"
+        "cld-edge-01"
+      ];
+      description = "Topology hosts that serve DNS (the home door and the mesh doors)";
+    };
+
     resolvers = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ config.my.topology.hosts.${config.my.topology.lanRouter}.ipv4 ];

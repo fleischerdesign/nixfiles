@@ -51,14 +51,13 @@ let
   ownLanAddress = if ownHost != null && isLanAddress ownHost.ipv4 then ownHost.ipv4 else null;
   ownOverlayAddress = if ownHost != null then ownHost.wireguardIpv4 else null;
 
-  # Plain DNS belongs where a home zone can reach it. The overlay mirror only exists next to a
-  # LAN listener: the mesh nodes get their resolver from `my.topology.resolvers`, so a cloud
-  # host needs no plain listener of its own.
+  # Plain DNS is served wherever a client can reach it: inside a home zone on the LAN address, and in
+  # the mesh on the overlay address. A cloud host has no LAN address and still serves the mesh - which
+  # is what makes the resolver redundant for a node that is not at home, because the zones are generated
+  # from the same inventory on every resolver and nothing has to be replicated at runtime.
   derivedListen =
     lib.optionalAttrs (ownLanAddress != null) { lan = ownLanAddress; }
-    // lib.optionalAttrs (ownLanAddress != null && ownOverlayAddress != null) {
-      overlay = ownOverlayAddress;
-    };
+    // lib.optionalAttrs (ownOverlayAddress != null) { overlay = ownOverlayAddress; };
   effectiveListen = cfg.listenAddresses // derivedListen;
 
   # DoT is served wherever the resolver already binds plain DNS - same reachability, one
@@ -480,16 +479,15 @@ in
         StateDirectory = "knot-resolver";
         RuntimeDirectory = "knot-resolver";
       };
-      # The list's host is resolved through a resolver from the inventory explicitly, so the
-      # fetch does not depend on whatever owns /etc/resolv.conf; `--resolve` then pins that
-      # address for the transfer.
+      # The list's host is resolved through this host's own resolution path: the resolver module makes
+      # every host resolve through our doors, so there is one place that decides how a name is looked
+      # up and no second resolver list to keep in step. `--resolve` pins the address for the transfer.
       script = ''
         set -eu
-        resolver="${lib.head topology.resolvers}"
         raw="$(mktemp)"
         : > "$raw"
         ${lib.concatMapStrings ({ url, host }: ''
-          ip="$(${pkgs.bind.dnsutils}/bin/dig +short +time=5 +tries=1 @"$resolver" '${host}' A | ${pkgs.gnugrep}/bin/grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
+          ip="$(${pkgs.bind.dnsutils}/bin/dig +short +time=5 +tries=1 '${host}' A | ${pkgs.gnugrep}/bin/grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
           ${pkgs.curl}/bin/curl --fail --silent --show-error --location --resolve "${host}:443:$ip" '${url}' >> "$raw"
         '') blocklistEntries}
         # /etc/hosts -> RPZ. Inline comments are stripped first: entries often carry the URL

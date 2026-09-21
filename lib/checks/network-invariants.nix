@@ -26,7 +26,9 @@ let
 
   lanRouter = topology.lanRouter;
   homeDoor = topology.hosts.${lanRouter}.ipv4;
-  meshDoor = topology.hosts.${lanRouter}.wireguardIpv4;
+  meshDoors = map (name: topology.hosts.${name}.wireguardIpv4) (
+    lib.filter (name: topology.hosts ? ${name}) topology.resolverHosts
+  );
   ingress = topology.hosts.${topology.ingressHost}.ipv4;
 
   # A host may be declared in the inventory without being a deploy target (the router and the access
@@ -74,28 +76,48 @@ let
       )
   ) deployed;
 
-  # 3. The doors follow the class: a host fixed at home has the home door, a node that roams has both,
-  #    a host in the mesh zone has the door inside the mesh.
+  # 3. The doors follow the class: a host fixed at home has the home door alone - a mesh door would be a
+  #    liability, because a single failed probe would move its LAN lookups onto the overlay plane. A node
+  #    that is not fixed at home has the home door first, so a node inside the LAN uses the LAN, and then
+  #    every declared resolver's overlay address, which is what makes the resolver survive a home outage.
   doorViolations = lib.concatMap (
     name:
     let
       host = topology.hosts.${name};
       actual = (cfgOf name).networking.nameservers;
-      expected =
-        if !(builtins.elem host.zone lanZones) then
-          [ meshDoor ]
+      sorted = lib.sort (a: b: a < b);
+      inHomeZone = builtins.elem host.zone lanZones;
+      ok =
+        if !inHomeZone then
+          sorted actual == sorted meshDoors
         else if host.ipv4 == null then
-          [
-            homeDoor
-            meshDoor
-          ]
+          (actual != [ ] && builtins.head actual == homeDoor)
+          && sorted actual == sorted ([ homeDoor ] ++ meshDoors)
         else
-          [ homeDoor ];
+          actual == [ homeDoor ];
     in
-    lib.optional (
-      actual != expected
-    ) "doors: ${name} resolves through ${builtins.toJSON actual}, expected ${builtins.toJSON expected}"
+    lib.optional (!ok) (
+      "doors: ${name} resolves through ${builtins.toJSON actual}, expected ${
+        if inHomeZone then "the home door first, then the mesh doors" else "the mesh doors"
+      }"
+    )
   ) deployed;
+
+  # 3b. A declared resolver has to be one: a door nobody serves is worse than no door, because the
+  #     clients are told to use it.
+  resolverHostViolations = lib.concatMap (
+    name:
+    if !(topology.hosts ? ${name}) then
+      [ "resolvers: ${name} is declared as a resolver but is not a host of the inventory" ]
+    else if !(builtins.elem name hostNames) then
+      [ "resolvers: ${name} is declared as a resolver but is not a deploy target" ]
+    else if !(cfgOf name).my.features.services.dns.enable then
+      [ "resolvers: ${name} is declared as a resolver but does not run one" ]
+    else if topology.hosts.${name}.wireguardIpv4 == null then
+      [ "resolvers: ${name} is declared as a resolver but has no overlay address to serve on" ]
+    else
+      [ ]
+  ) topology.resolverHosts;
 
   # 4. Every resolver the inventory hands out belongs to a host of this fleet. One that knows none of
   #    our names would resolve the internet and fail silently on everything internal.
@@ -172,6 +194,7 @@ in
     "the LAN router forwards mesh traffic exactly when it carries a zone"
     "a host inside the home LAN installs no route for a carried zone; a node outside carries all of them"
     "the resolver doors follow the host class, derived from the zone"
+    "every declared resolver runs one, and can be reached where it is announced"
     "every resolver handed to clients belongs to a host of this fleet"
     "a rendered client routes the mesh and the ingress, and no home zone"
     "a device name is answered off the LAN exactly when its zone is carried"
@@ -180,6 +203,7 @@ in
     forwardViolations
     ++ routeViolations
     ++ doorViolations
+    ++ resolverHostViolations
     ++ resolverViolations
     ++ clientViolations
     ++ deviceViolations;

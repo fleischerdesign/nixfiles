@@ -20,32 +20,44 @@ let
   topology = config.my.topology;
   ownHost = topology.hosts.${config.networking.hostName} or null;
 
-  # The host that routes the home LAN is declared once (`my.topology.lanRouter`); its own address is
-  # the home door, its overlay address the mesh door.
+  # The host that routes the home LAN is declared once (`my.topology.lanRouter`); its own address is the
+  # home door. Every host the inventory declares as a resolver serves the same zones - they are generated
+  # from the same inventory - so its overlay address is a door for anyone inside the mesh, and a node
+  # that is not fixed at home survives the home resolver being down.
   deliveryHost = topology.hosts.${topology.lanRouter} or null;
   homeDoor = if deliveryHost == null then null else deliveryHost.ipv4;
-  meshDoor = if deliveryHost == null then null else deliveryHost.wireguardIpv4;
+
+  # The mesh side of every declared resolver, the one that routes the home LAN first: it sits closest to
+  # the zones it delivers. That order is derived from the fact, not taken from the order of a list.
+  meshDoors =
+    let
+      overlayOf = name: (topology.hosts.${name} or { }).wireguardIpv4 or null;
+      doors = lib.filter (d: d != null) (map overlayOf (topology.resolverHosts or [ ]));
+      nearest = if deliveryHost == null then null else deliveryHost.wireguardIpv4;
+    in
+    lib.optionals (nearest != null && builtins.elem nearest doors) [ nearest ]
+    ++ lib.filter (door: door != nearest) doors;
 
   # A host that has its own fixed address in a home zone *is* in the home LAN and stays there, so the
-  # home door is the whole answer. Offering it the mesh door as a second would be a liability rather
-  # than a fallback: systemd-resolved keeps using the server that answered once a first one failed
-  # until its probe sees it again (measured), so one failed probe would move a home host onto the
-  # overlay plane and run its LAN lookups - and the LAN traffic that follows them - out through the
-  # WAN. A host in a home zone *without* a fixed address roams: at home the home door, abroad the
-  # mesh door. A host in the mesh zone (a cloud host) is never at home.
+  # home door is the whole answer. Offering it a mesh door as a second would be a liability rather than a
+  # fallback: systemd-resolved keeps using the server that answered once a first one failed until its
+  # probe sees it again (measured), so one failed probe would move a home host onto the overlay plane and
+  # run its LAN lookups - and the LAN traffic that follows them - out through the WAN. A host in a home
+  # zone *without* a fixed address roams: the home door first, then the mesh, where a resolver that is
+  # not the home one can still answer while the home is unreachable. A host in the mesh zone (a cloud
+  # host) is never at home.
   homeZone = ownHost != null && builtins.elem (ownHost.zone or "") topology.lanZones;
   fixedAtHome = homeZone && (ownHost.ipv4 or null) != null;
   mayRoam = homeZone && !fixedAtHome;
-  doors = lib.filter (d: d != null) (
-    if fixedAtHome then
-      [ homeDoor ]
-    else if mayRoam then
-      [
-        homeDoor
-        meshDoor
-      ]
-    else
-      [ meshDoor ]
+  doors = lib.unique (
+    lib.filter (d: d != null) (
+      if fixedAtHome then
+        [ homeDoor ]
+      else if mayRoam then
+        [ homeDoor ] ++ meshDoors
+      else
+        meshDoors
+    )
   );
 in
 {
