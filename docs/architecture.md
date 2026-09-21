@@ -162,9 +162,22 @@ reaches through its LAN gateway. Blocklists are carried as an RPZ zone, converte
 and refreshed on a timer.
 
 Cloudflare answers the public names with the ingress for everyone who does not ask us, so the family
-path is unchanged. Measured 2026-09-21: `jellyfin.vyrx.de` -> `10.10.10.10` / `10.10.100.10` /
-`173.249.22.211`, `hom-wrk-01.node.vyrx.de` -> `10.10.20.10` / `10.10.100.20`, and
-`hom-prn-01.node.vyrx.de` -> `10.10.30.19` / `NXDOMAIN`.
+path is unchanged.
+
+The same name has two doors. A client at home reaches the resolver over the LAN - the `lan` plane,
+so the answer is a LAN address and the packet stays local - and a client away from home reaches the
+same resolver over DNS-over-TLS at the public door, where the ingress terminates the resolver's own
+name and certificate (`features/services/dns`, the `dot` option). A client therefore configures one
+name (a phone's private DNS setting is `dns.<domain>`) and is answered by the door its network can
+reach. The views also carry `dst-subnet`, so the home plane is the door a query *arrived at*, not
+merely where it came from: a foreign network that happens to use a home prefix is not treated as
+being at home.
+
+Measured 2026-09-21: `jellyfin.vyrx.de` -> `10.10.10.10` / `10.10.100.10` / `173.249.22.211`,
+`hom-wrk-01.node.vyrx.de` -> `10.10.20.10` / `10.10.100.20`, and `hom-prn-01.node.vyrx.de` ->
+`10.10.30.19` / `NXDOMAIN`. Over DoT the public door answers the ingress for a service and NXDOMAIN
+for a device, the home door the LAN addresses of both; both doors present a Let's Encrypt
+certificate for the resolver's name.
 
 ### 5.3 Certificates: one per name, issued where it terminates
 
