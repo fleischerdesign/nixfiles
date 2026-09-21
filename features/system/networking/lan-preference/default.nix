@@ -57,12 +57,18 @@ in
       {
         # 600 is the metric NetworkManager gives a directly connected route, and it has to stay below the
         # wireguard interface's own metric (1000): the two routes have the same prefix, so the metric is
-        # what decides between them.
+        # what decides between them. Every binary is named by its store path, because a dispatcher runs
+        # in an environment with a bare PATH - measured: `ip: command not found`, which would leave the
+        # script silently doing nothing, the one failure mode that looks exactly like success.
         networking.networkmanager.dispatcherScripts = [
           {
             type = "basic";
             source = pkgs.writeShellScript "lan-preference" ''
               set -u
+
+              IP=${pkgs.iproute2}/bin/ip
+              GREP=${pkgs.gnugrep}/bin/grep
+              RESOLVECTL=${pkgs.systemd}/bin/resolvectl
 
               HOME_DOOR=${homeDoor}
               LAN_ZONES="${lanZoneArgs}"
@@ -76,7 +82,7 @@ in
               # The home zones this host currently has an address in, as `zone:cidr:gateway`.
               local_zones() {
                 local entry address
-                for address in $(ip -4 -o addr show | grep -oE '[0-9]+(\.[0-9]+){3}/[0-9]+'); do
+                for address in $("$IP" -4 -o addr show | "$GREP" -oE '[0-9]+(\.[0-9]+){3}/[0-9]+'); do
                   case "$address" in 127.*) continue ;; esac
                   for entry in $LAN_ZONES; do
                     local cidr=''${entry#*:}; cidr=''${cidr%%:*}
@@ -94,16 +100,16 @@ in
                   local cidr=''${entry#*:}; cidr=''${cidr%%:*}
                   for carried in $CARRIED; do
                     if [ "''${carried%%:*}" = "$cidr" ]; then continue 2; fi
-                    ip route replace "''${carried%%:*}" via "''${entry##*:}" metric "$LAN_METRIC"
+                    "$IP" route replace "''${carried%%:*}" via "''${entry##*:}" metric "$LAN_METRIC"
                   done
                 done
               }
 
               away() {
                 local carried
-                resolvectl revert "$DEVICE" 2>/dev/null || true
+                "$RESOLVECTL" revert "$DEVICE" 2>/dev/null || true
                 for carried in $CARRIED; do
-                  ip route del "''${carried%%:*}" metric "$LAN_METRIC" 2>/dev/null || true
+                  "$IP" route del "''${carried%%:*}" metric "$LAN_METRIC" 2>/dev/null || true
                 done
               }
 
@@ -112,9 +118,9 @@ in
                   if [ -n "$(local_zones)" ]; then
                     # The rule of the link is more specific than the global one, so it wins without
                     # depending on which door answered last.
-                    resolvectl dns "$DEVICE" "$HOME_DOOR" 2>/dev/null || true
-                    resolvectl domain "$DEVICE" "~." 2>/dev/null || true
-                    resolvectl flush-caches 2>/dev/null || true
+                    "$RESOLVECTL" dns "$DEVICE" "$HOME_DOOR" 2>/dev/null || true
+                    "$RESOLVECTL" domain "$DEVICE" "~." 2>/dev/null || true
+                    "$RESOLVECTL" flush-caches 2>/dev/null || true
                     at_home
                   else
                     away
