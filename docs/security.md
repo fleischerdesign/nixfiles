@@ -78,6 +78,11 @@ Deterministic, because the two places that matter are both declared:
    the device keeps no access: no mesh peer, no future secret
 ```
 
+For a **roaming client** (a phone) whose private key is escrowed under
+`infra/wireguard/<name>_private_key`, step 3 revokes the peer, and the escrowed key must be rotated or
+deleted in the same change: a lost device that still holds a key is revoked by step 3, but the stale
+private half would otherwise remain usable if it ever resurfaced.
+
 Nothing else grants it access, which is the point of deriving peers from the topology instead of
 maintaining a peer list.
 

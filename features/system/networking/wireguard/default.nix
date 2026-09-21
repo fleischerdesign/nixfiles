@@ -84,6 +84,36 @@ let
     ++ lib.optional (peer.wireguardIpv6 != null) "${peer.wireguardIpv6}/128"
     ++ lanCidrsOf peer;
 
+  # The relay hubs a node that is not itself a relay peers with. `lanRoutes` is what that node routes
+  # into the home LAN over the mesh: empty for a node that sits inside a delivered zone (a tunnel
+  # route would shadow its connected route), and every delivered zone for a roaming node. The NixOS
+  # spokes and the rendered non-NixOS client configurations are both built from this one function, so
+  # the two cannot diverge.
+  relayPeersFor =
+    lanRoutes:
+    lib.mapAttrsToList (name: relay: {
+      publicKey = relay.wireguardPublicKey;
+      endpoint = "${relay.ipv4}:${toString wireguardPort}";
+      allowedIPs =
+        if name == effectivePrimaryHub then
+          # Primary hub carries the entire mesh overlay for transit / inter-node routing, and the
+          # home LAN zones a node without a permanent LAN presence needs.
+          [
+            meshCidr
+          ]
+          ++ lib.optional (topology.subnets ? mesh-ipv6) (
+            topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64"
+          )
+          ++ lanRoutes
+        else
+          # Secondary relay hub is directly reachable via host-specific route (/32 and /128).
+          [
+            "${relay.wireguardIpv4}/32"
+          ]
+          ++ lib.optional (relay.wireguardIpv6 != null) "${relay.wireguardIpv6}/128";
+      persistentKeepalive = 25;
+    }) relayHosts;
+
   # Map peers to NixOS wireguard peer attrsets
   peersConfig =
     if isRelay then
@@ -100,30 +130,7 @@ let
         }
       ) allPeersWithKeys
     else
-      # Spoke connects directly to all declared relay hubs (cld-edge-01, cld-ops-01)
-      lib.mapAttrsToList (name: relay: {
-        publicKey = relay.wireguardPublicKey;
-        endpoint = "${relay.ipv4}:${toString wireguardPort}";
-        allowedIPs =
-          if name == effectivePrimaryHub then
-            # Primary hub carries the entire mesh overlay subnet for transit / inter-spoke routing,
-            # and - for a host without a permanent LAN presence - the home LAN zones too, because the
-            # hub routes them on to the host that delivers them.
-            [
-              meshCidr
-            ]
-            ++ lib.optional (topology.subnets ? mesh-ipv6) (
-              topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64"
-            )
-            ++ meshLanRoutes
-          else
-            # Secondary relay hub is directly reachable via host-specific route (/32 and /128)
-            [
-              "${relay.wireguardIpv4}/32"
-            ]
-            ++ lib.optional (relay.wireguardIpv6 != null) "${relay.wireguardIpv6}/128";
-        persistentKeepalive = 25;
-      }) relayHosts;
+      relayPeersFor meshLanRoutes;
 in
 {
   options.my.features.system.networking.wireguard = {
@@ -152,6 +159,25 @@ in
       default = "infra/wireguard/${config.networking.hostName}_private_key";
       description = "SOPS secret identifier containing the WireGuard private key";
     };
+
+    clientConfigs = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = ''
+        Names of roaming clients in `my.topology.hosts` whose WireGuard configuration this host
+        renders. A device that cannot run `networking.wireguard.interfaces` (a phone, a tablet) still
+        needs the same relays and routes; it gets them as a wg-quick file whose private key
+        `sops.template` injects at activation, because Nix cannot read a SOPS value at build time.
+        The client's public key lives in the topology, so one inventory entry feeds both the relay's
+        peer list and this file.
+      '';
+    };
+
+    clientDns = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = config.my.topology.resolvers;
+      description = "Resolvers handed to a rendered client configuration; they must be reachable over the mesh.";
+    };
   };
 
   config = lib.mkIf (cfg.enable && ownHost != null && ownHost.wireguardIpv4 != null) {
@@ -176,7 +202,14 @@ in
         assertion = builtins.all (cidr: lib.hasSuffix "/24" cidr) deliveredCidrs;
         message = "WireGuard: a delivered zone is not a /24 (${lib.concatStringsSep ", " deliveredCidrs}), but membership in a zone is decided on its /24 network part.";
       }
-    ];
+    ]
+    ++ lib.map (name: {
+      assertion =
+        topology.hosts ? ${name}
+        && topology.hosts.${name}.wireguardPublicKey != null
+        && topology.hosts.${name}.ipv4 == null;
+      message = "WireGuard client config '${name}': it must be a declared node with a public key and no LAN address, because it is provisioned from this file, not configured on the device.";
+    }) cfg.clientConfigs;
 
     # 2. Kernel packet forwarding on relay nodes
     boot.kernel.sysctl = lib.mkIf isRelay {
@@ -215,7 +248,48 @@ in
       ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${cfg.interfaceName} -o ${cfg.interfaceName} -j ACCEPT || true
     '';
 
-    # 5. Assert that SOPS secret is declared
-    sops.secrets.${cfg.privateKeySecretName} = lib.mkDefault { };
+    # 5. Secrets: this host's own WireGuard key and the private key of every client it renders, both
+    # under the same convention `infra/wireguard/<name>_private_key`.
+    sops.secrets = lib.mkMerge [
+      { ${cfg.privateKeySecretName} = lib.mkDefault { }; }
+      (lib.genAttrs (map (name: "infra/wireguard/${name}_private_key") cfg.clientConfigs) (_: { }))
+    ];
+
+    # 6. Render each client's wg-quick configuration. The relay peers and routes come from the same
+    # function the NixOS spokes use; only the private key is injected here (at activation, by
+    # sops-nix), because it must not be read at build time. `qrencode` turns the file into the QR the
+    # WireGuard app scans once.
+    sops.templates = lib.genAttrs' cfg.clientConfigs (
+      name:
+      lib.nameValuePair "wg-${name}.conf" (
+        let
+          client = topology.hosts.${name};
+          addresses = [
+            "${client.wireguardIpv4}/32"
+          ]
+          ++ lib.optional (client.wireguardIpv6 != null) "${client.wireguardIpv6}/128";
+          peers = lib.concatMapStrings (peer: ''
+            [Peer]
+            PublicKey = ${peer.publicKey}
+            Endpoint = ${peer.endpoint}
+            AllowedIPs = ${lib.concatStringsSep ", " peer.allowedIPs}
+            PersistentKeepalive = ${toString peer.persistentKeepalive}
+
+          '') (relayPeersFor deliveredCidrs);
+        in
+        {
+          content = ''
+            [Interface]
+            PrivateKey = ${config.sops.placeholder."infra/wireguard/${name}_private_key"}
+            Address = ${lib.concatStringsSep ", " addresses}
+            DNS = ${lib.concatStringsSep ", " cfg.clientDns}
+            MTU = 1280
+
+            ${peers}'';
+        }
+      )
+    );
+
+    environment.systemPackages = lib.optional (cfg.clientConfigs != [ ]) pkgs.qrencode;
   };
 }

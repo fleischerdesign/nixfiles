@@ -12,6 +12,11 @@
 
   networking.hostName = "hom-wrk-01";
 
+  # The workstation onboards the roaming phone clients: it renders their WireGuard configuration from
+  # the topology and its own SOPS access, so the private key never has to be copied by hand. Scan it
+  # from the rendered file (see docs/operations.md).
+  my.features.system.networking.wireguard.clientConfigs = [ "mob-ph-01" ];
+
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;

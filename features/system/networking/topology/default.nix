@@ -365,6 +365,20 @@ in
         hostType = "client";
       };
 
+      # A phone joins the mesh as a client node, not a managed host: it has an overlay identity and no
+      # NixOS configuration. `mob-nb-01` is the same class of node; this one's WireGuard configuration
+      # is rendered from the topology and its SOPS key instead of `networking.wireguard.interfaces`.
+      # The name follows `<class>-<role>-<nn>` (docs/architecture.md §2), not a person.
+      mob-ph-01 = {
+        zone = "corp";
+        ipv4 = null; # Roaming: no LAN address, so it carries every delivered zone over the mesh.
+        gateway = null;
+        wireguardIpv4 = "10.10.100.40";
+        wireguardIpv6 = "fd10:1000:100::40";
+        wireguardPublicKey = "33yImKTdRMyeM8yYgabBLbZ1xLIMife6CGsSMCicmjo=";
+        hostType = "client";
+      };
+
       # Embedded targets as specified in docs/embedded.md
       hom-rt-01 = {
         zone = "infra";

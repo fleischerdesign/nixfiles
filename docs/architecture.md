@@ -33,8 +33,12 @@
 | `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` | Niri desktop, development environment |
 | `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` | Roaming client; reaches the LAN over the mesh |
 
-Devices that cannot run NixOS are declared in `my.topology.devices` and reconciled agentlessly; their
-own document is [embedded.md](embedded.md).
+Devices that cannot run NixOS but belong to the LAN (printers, relays, access points) are declared in
+`my.topology.devices` and reconciled agentlessly; their own document is [embedded.md](embedded.md). A
+device that cannot run NixOS but needs the **mesh** (a phone, a tablet) is not a LAN device: it has no
+`ipv4`, only an overlay identity, and is declared in `my.topology.hosts` with `hostType = "client"`.
+It is a node like the others; its WireGuard configuration is rendered as a wg-quick file
+(`my.features.system.networking.wireguard.clientConfigs`) instead of a NixOS interface.
 
 ## 3. Network model
 

@@ -124,6 +124,25 @@ The topology "legacy shim" sets `tailscaleIp = h.wireguardIpv4`, so **both resol
 
 `nod switch <host> --dry-run` and `nod plan <host>` are safe and still useful for planning.
 
+### 4.3 Onboarding a roaming client (a phone)
+
+A device that cannot run NixOS joins the mesh as a node with no NixOS configuration: one
+`my.topology.hosts` entry with `hostType = "client"`, an overlay address and its WireGuard public key.
+The relays add it as a `/32` peer; the primary hub carries the mesh and the home LAN zones for it.
+
+Its private key lives in SOPS at `infra/wireguard/<name>_private_key`, like every host's. The host that
+declares `my.features.system.networking.wireguard.clientConfigs = [ "<name>" ]` (currently
+`hom-wrk-01`) renders the wg-quick file from the topology at activation, with the private key injected
+by sops-nix - Nix cannot read a SOPS value at build time. Scan it once:
+
+```bash
+sudo qrencode -t ansiutf8 < /run/secrets/rendered/wg-<name>.conf
+```
+
+The peers, addresses, DNS and routes in that file are derived, not typed: the same `relayPeersFor`
+function builds the NixOS spokes' peers. Revocation is the inverse, plus the key rotation in
+[security.md §3.2](security.md).
+
 ---
 
 ## 5. Pre-flight Checklist (every deploy session)
