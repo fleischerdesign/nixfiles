@@ -146,9 +146,25 @@ machine-generated list is `my.contracts.projections.fqdns`; the derivation rules
 
 ### 5.2 Split horizon
 
-Blocky on `hom-srv-01` answers a public name with the *LAN* address for clients inside the house, and
-Cloudflare answers it with the ingress for everyone else. One name, one answer per plane - measured for
-`jellyfin`, `mealie`, `hass` and `seerr` from inside the LAN and from outside.
+The resolver on `hom-srv-01` (Knot Resolver 6, `features/services/dns`) answers **three planes** and
+picks between them by the *source address* of the query, so one name has one address per plane:
+
+| Plane | Source | What a name resolves to |
+|---|---|---|
+| `lan` | a home zone (`infra`, `corp`, `iot`) | the LAN address, so the packet stays local |
+| `overlay` | the mesh (`10.10.100.0/24`, `fd10:1000:100::/64`) | the overlay address, reachable over `wg0` |
+| `public` | anything else | the ingress for a `public` service, the overlay for a node |
+
+A device has no overlay identity, so it exists in the `lan` plane only; reaching it from elsewhere is
+not a name problem - such a device is *published* as a service. A cloud host's `ipv4` is its public
+address and is never handed to a LAN client: the `lan` plane answers its overlay, which a home client
+reaches through its LAN gateway. Blocklists are carried as an RPZ zone, converted from hosts format
+and refreshed on a timer.
+
+Cloudflare answers the public names with the ingress for everyone who does not ask us, so the family
+path is unchanged. Measured 2026-09-21: `jellyfin.vyrx.de` -> `10.10.10.10` / `10.10.100.10` /
+`173.249.22.211`, `hom-wrk-01.node.vyrx.de` -> `10.10.20.10` / `10.10.100.20`, and
+`hom-prn-01.node.vyrx.de` -> `10.10.30.19` / `NXDOMAIN`.
 
 ### 5.3 Certificates: one per name, issued where it terminates
 
