@@ -109,6 +109,7 @@ in
               away() {
                 local carried
                 "$RESOLVECTL" revert "$DEVICE" 2>/dev/null || true
+                "$RESOLVECTL" reset-server-features 2>/dev/null || true
                 for carried in $CARRIED; do
                   "$IP" route del "''${carried%%:*}" metric "$LAN_METRIC" 2>/dev/null || true
                 done
@@ -124,6 +125,9 @@ in
                     # either door answers alike, which is what makes the sticky server harmless.
                     "$RESOLVECTL" dns "$DEVICE" "$HOME_DOOR" 2>/dev/null || true
                     "$RESOLVECTL" domain "$DEVICE" "~$INTERNAL_DOMAIN" 2>/dev/null || true
+                    # The global scope keeps the door that answered last; resetting the server features makes
+                    # it start from the top of its list again, which is where the home door sits.
+                    "$RESOLVECTL" reset-server-features 2>/dev/null || true
                     "$RESOLVECTL" flush-caches 2>/dev/null || true
                     at_home
                   else

@@ -138,8 +138,13 @@ Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no
   relays (65 ms). `features/system/networking/lan-preference` gives the link that holds an address in
   a home zone the home door as its own resolver with a default routing domain, and puts every carried
   zone the host is not itself inside on a route of the same prefix through that zone's gateway at
-  metric 600. Both are withdrawn when the address is gone. Measured 2026-09-21 after: printer 13 ms,
-  `jellyfin.vyrx.de` -> `10.10.10.10`, `hom-wrk-01.node.vyrx.de` -> `10.10.20.10`.
+  metric 600. The link carries the *internal domain*, not everything: a second `~.` does not win
+  against the global one (measured), while a more specific rule does. The dispatcher also resets
+  systemd-resolved's server preference, because it otherwise keeps the door that answered last - which
+  is what left the notebook attached to the home door while still receiving overlay addresses. Both are
+  withdrawn when the address is gone. Measured 2026-09-21 after: printer 13 ms, `jellyfin.vyrx.de` ->
+  `10.10.10.10`, `hom-wrk-01.node.vyrx.de` -> `10.10.20.10`, and `nix run .#network-audit` reports 20
+  checks, 0 failed, with every host judged on the path it actually uses.
 - **The mesh is the last resort.** The interface carries route metric 1000 against NetworkManager's
   600: a prefix the host can reach directly always wins, and the tunnel is used only when the LAN is
   elsewhere. Without it, a client at home would send LAN traffic out through the cloud and back.

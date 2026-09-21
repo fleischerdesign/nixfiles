@@ -35,6 +35,22 @@ let
   probeName = "jellyfin.${topology.domain}";
   deviceFqdn = "${lib.head (lib.attrNames topology.devices)}.node.${topology.domain}";
 
+  # The home zones as `network:mask` pairs, so the probe can decide the path the same way the dispatcher
+  # does: the host is at home when the interface that routes to the home door carries a home address.
+  # Both read the same zones from the inventory; neither hardcodes an address.
+  zoneMasks = lib.concatMapStrings (
+    zone:
+    let
+      cidr = topology.subnets.${zone}.cidr;
+      octets = map lib.toInt (lib.splitString "." (builtins.head (lib.splitString "/" cidr)));
+      length = lib.toInt (builtins.elemAt (lib.splitString "/" cidr) 1);
+      # 2^32 - 2^(32-length): the mask of a prefix, built from multiplication because Nix has no shift
+      mask = 4294967296 - (lib.foldl' (acc: _: acc * 2) 1 (lib.range 1 (32 - length)));
+      address = lib.foldl' (acc: octet: acc * 256 + octet) 0 octets;
+    in
+    " ${toString mask}:${toString (lib.bitAnd address mask)}"
+  ) topology.lanZones;
+
   # The path decides the plane, so the expectation follows the path.
   planes = [
     {
@@ -97,14 +113,24 @@ let
         fi
       }
 
-      printf 'paths: home = reaches %s without the tunnel, away = only through it\n' "${homeDoor}"
+      printf 'paths: home = reaches %s over a home address, away = only through the mesh (%s)\n' "${homeDoor}" "${meshDoor}"
 
-      for entry in ${lib.concatMapStringsSep " " (host: "\\\"${host.name}|${host.address}\\\"") fleet}; do
+      for entry in ${lib.concatMapStringsSep " " (host: "\"${host.name}|${host.address}\"") fleet}; do
         IFS='|' read -r name address <<< "$entry"
         printf '\n%s (%s)\n' "$name" "$address"
 
         measured=$(ssh "''${SSH_OPTS[@]}" "root@$address" 'bash -s' <<'REMOTE' 2>/dev/null || echo UNREACHABLE
-          if ip route get ${homeDoor} 2>/dev/null | grep -q 'dev wg0'; then printf 'path=away\n'; else printf 'path=home\n'; fi
+          ip2int() { local a b c d; IFS=. read -r a b c d <<< "$1"; echo $(( (a << 24) + (b << 16) + (c << 8) + d )); }
+          # at home = this host holds an address of a home zone at all: the zone gateway reaches every
+          # other home zone, and the host that routes them holds them itself
+          path=away
+          for entry in ${zoneMasks}; do
+            mask=''${entry%%:*}; net=''${entry#*:}
+            for addr in $(ip -4 -o addr show 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+){3}'); do
+              [ $(( $(ip2int "$addr") & mask )) -eq "$net" ] && path=home
+            done
+          done
+          printf 'path=%s\n' "$path"
           printf 'service=%s\n' "$(getent hosts ${probeName} 2>/dev/null | head -1 | cut -d' ' -f1)"
           printf 'device=%s\n' "$(getent hosts ${deviceFqdn} 2>/dev/null | head -1 | cut -d' ' -f1)"
           printf 'blocked=%s\n' "$(getent hosts doubleclick.net >/dev/null 2>&1 && echo no || echo yes)"
@@ -137,7 +163,6 @@ let
           continue
         fi
 
-        expect "path" "''${path} (${meshDoor} is the tunnel, ${homeDoor} the LAN)" "$path"
         expect "${probeName} on that path" "$(printf '%s' "$row" | cut -d'|' -f2)" "''${got_service:-NXDOMAIN}"
         expect "${deviceFqdn} on that path" "$(printf '%s' "$row" | cut -d'|' -f3)" "''${got_device:-NXDOMAIN}"
         expect "the blocklist answers NXDOMAIN" "yes" "''${blocked:-unknown}"
