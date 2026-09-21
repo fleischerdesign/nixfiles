@@ -161,6 +161,13 @@ Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no
   levels that may reach it (`directAccess.from`). The administrative path declares itself the same
   way and names two, `infra` and `corp`. Measured 2026-09-21: a cloud node can no longer open SSH on
   a home host while the operator's path and every declared service stay reachable.
+- **What the mesh carries, it carries as an allow-list.** The zones the mesh routes into the home LAN
+  (`announcedZones`) hold devices that cannot speak for themselves, so their policy is declared where
+  they live: `my.topology.devices.<name>.endpoints` names a port and the trust levels that may use it,
+  and the host that routes the zone forwards exactly that. A blanket `ip saddr <mesh> accept` in front of
+  it made the routing decision and the permission decision one decision, so every member reached every
+  device on every port - measured: the printer answered on 80, 443 and 631, the relays on 6053. Measured
+  after: the printer's IPP answers, its web interface and the relays' API do not.
 - **The mesh is the last resort.** The interface carries route metric 1000 against NetworkManager's
   600: a prefix the host can reach directly always wins, and the tunnel is used only when the LAN is
   elsewhere. Without it, a client at home would send LAN traffic out through the cloud and back.

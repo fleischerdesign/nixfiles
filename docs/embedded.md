@@ -35,7 +35,7 @@ that is why the printer carried no MAC until it was given one that belongs in th
 | `hom-ap-01` | TP-Link RE330 access point | `infra` | `10.10.10.20` | vendor web API via `tplinkrouterc6u` |
 | `hom-rt-01` | AVM FRITZ!Box | `infra` | `10.10.10.1` | TR-064 (SOAP over HTTPS) |
 | `hom-rly-01` … `hom-rly-08` | Sonoff Basic (ESP8266) | `iot` | `10.10.30.11` … `.18` | ESPHome firmware, flashed over OTA |
-| `hom-prn-01` | HP multifunction printer | `iot` | `10.10.30.19` | none - a DHCP reservation and nothing else |
+| `hom-prn-01` | HP multifunction printer | `iot` | `10.10.30.19` | none - a DHCP reservation, plus a declared IPP endpoint (below) |
 
 Nothing else exists. There are no Zigbee bridges, no managed switches, no ESP32 sensors and no WLED
 strips in this fleet; the previous version of this document specified three of them.
@@ -95,8 +95,27 @@ over the air by `esphome-sync-<device>`.
 - **The firmware carries one network.** It used to carry a second, legacy SSID as a fallback; that name
   is not radiated any more (measured by scan), so it was removed from the configuration. Running devices
   keep it until the next flash, which changes nothing at runtime.
+- **They declare no endpoint, and that is the decision.** A device in a carried zone is reachable from
+  the mesh, so its policy has to be written down somewhere - and nowhere is more honest than the device
+  itself (`my.topology.devices.<name>.endpoints`). The relays offer nothing a member of the mesh needs:
+  the ESPHome tooling that talks to them runs on `hom-srv-01`, which shares their segment, so its traffic
+  is never routed. Their API (`6053`) was reachable from every mesh node before that rule existed;
+  measured after, it is closed.
 
-## 6. The DNS zone as a target
+## 6. What the mesh may use
+
+The printer is the one device in this fleet that a roaming member legitimately needs, so it declares
+one endpoint: IPP on `631`, for the trust levels `infra` and `corp`. The host that routes the zone
+(`hom-srv-01`) turns that declaration into firewall rules - the same lattice the fleet's own services
+use, applied to forwarding instead of input - and everything else on the device stays closed from the
+mesh. Its web interface is a good example of why that matters: it is a full administration surface with
+no authentication worth the name, and inside the LAN it is reachable anyway (one flat segment), while
+from the mesh it is now not.
+
+The audit holds both halves: a declared port has to answer from the hub a roaming client uses, and a
+port nobody declared has to refuse. A refusal is the only evidence that the closed default is real.
+
+## 7. The DNS zone as a target
 
 Cloudflare is not a device, but it is reconciled the same way: the zone is a function of the
 configuration.
@@ -110,7 +129,7 @@ configuration.
   not create.
 - Records are `proxied: false`: the mesh, SSH and CrowdSec bans all depend on the real address.
 
-## 7. What follows from a single declaration
+## 8. What follows from a single declaration
 
 Declaring a device is enough - the rest is projection:
 

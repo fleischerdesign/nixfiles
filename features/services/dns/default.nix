@@ -138,21 +138,29 @@ let
     ) config.my.contracts.projections.hostFqdnOf
   );
 
-  # A device has no overlay identity, so its LAN address is the only address it has and the only one
-  # the `lan` plane answers. A node that is not in the LAN reaches it over the mesh exactly when the
-  # device's zone is carried there (`my.topology.announcedZones`), so the `overlay` plane answers the
-  # same address for a carried zone and stays silent otherwise: a name that resolves to an address
-  # nothing routes is worse than no answer at all.
+  # A device has no overlay identity, so its LAN address is the only address it has and the only one the
+  # `lan` plane answers. A node that is not in the LAN reaches it over the mesh exactly when the device's
+  # zone is carried there (`my.topology.announcedZones`), so the `overlay` plane answers the same address
+  # for a carried zone and stays silent otherwise: a name that resolves to an address nothing routes is
+  # worse than no answer at all.
+  #
+  # The `public` plane answers it too, for the same reason one step further out: a client that is not in
+  # the LAN resolves through a door it can reach, and a roaming client's door *is* the public one - its
+  # private DNS name resolves to the public address, and its queries arrive on the public plane. Withhold
+  # the name there and mobile printing stays unreachable by name while the mesh would carry it perfectly
+  # well. The record is published where the clients that can act on it look; outside the overlay the
+  # address is unrouted, which is what keeps it from being an offer.
   deviceRules = lib.concatLists (
     lib.mapAttrsToList (
       devName: fqdn:
+      let
+        carried = builtins.elem topology.devices.${devName}.zone topology.announcedZones;
+        address = topology.devices.${devName}.ipv4;
+      in
       mkRules [ fqdn ] {
-        lan = topology.devices.${devName}.ipv4;
-        overlay =
-          if builtins.elem topology.devices.${devName}.zone topology.announcedZones then
-            topology.devices.${devName}.ipv4
-          else
-            null;
+        lan = address;
+        overlay = if carried then address else null;
+        public = if carried then address else null;
       }
     ) config.my.contracts.projections.deviceFqdnOf
   );

@@ -105,11 +105,67 @@ let
   # elsewhere, and listing them as undeclared would be noise rather than a question.
   localProtocols = "5353 5355 1900";
 
+  # --- device access over the mesh -------------------------------------------------------------------
+  # A declaration is half a proof: it says what *should* be reachable, and the rule that carries it lives
+  # on another host, inserted into a chain nobody reads. So the audit asks the hub a roaming client would
+  # use - for every declared port, and for ports nobody declared. The second half is what shows the
+  # default is closed rather than merely undocumented.
+  primaryHub = (cfgOf (builtins.head hostNames)).my.features.system.networking.wireguard.primaryHub;
+  hubAddress =
+    if topology.hosts.${primaryHub}.wireguardIpv4 != null then
+      topology.hosts.${primaryHub}.wireguardIpv4
+    else
+      topology.hosts.${primaryHub}.ipv4;
+  # The level the probe speaks from. It decides what a *declared* port has to do: a device that declares
+  # `from = ["infra" "corp"]` must answer a member of those levels and refuse everyone else, so a probe
+  # from a `mesh` host is expected to be refused. Whether a *declaring* level reaches the device over the
+  # mesh is a different question, and the phone answers it: it is a `corp` node off the LAN.
+  hubTrustLevel =
+    (topology.subnets.${topology.hosts.${primaryHub}.zone} or { }).trustLevel
+      or topology.hosts.${primaryHub}.zone;
+  carriedDevices = lib.filterAttrs (
+    _: device: builtins.elem device.zone topology.announcedZones
+  ) topology.devices;
+
+  undeclaredProbePorts = [
+    80
+    443
+    22
+    6053
+    9100
+  ];
+  deviceProbeTable =
+    lib.concatMapStringsSep " "
+      (entry: "\"${entry.label}|${entry.address}|${toString entry.port}|${entry.expectation}\"")
+      (
+        lib.concatLists (
+          lib.mapAttrsToList (
+            deviceName: device:
+            let
+              declared = map (endpoint: endpoint.port) (lib.attrValues device.endpoints);
+            in
+            map (endpoint: {
+              label = "${deviceName}:${toString endpoint.port}/declared";
+              address = device.ipv4;
+              inherit (endpoint) port;
+              expectation = if builtins.elem hubTrustLevel endpoint.from then "open" else "closed";
+            }) (lib.attrValues device.endpoints)
+            ++ map (port: {
+              label = "${deviceName}:${toString port}/undeclared";
+              address = device.ipv4;
+              inherit port;
+              expectation = "closed";
+            }) (lib.filter (port: !(builtins.elem port declared)) undeclaredProbePorts)
+          ) carriedDevices
+        )
+      );
+
   network = pkgs.writeShellApplication {
     name = "network-audit";
     excludeShellChecks = [
       "SC2016" # the remote part is quoted on purpose: nothing may expand locally
       "SC2086" # word splitting inside the remote part is deliberate
+      "SC2029" # the device probe is built locally on purpose: the address and port must expand here
     ];
     runtimeInputs = with pkgs; [
       openssh
@@ -117,6 +173,9 @@ let
       gnugrep
       gnused
       coreutils
+      bash
+      iproute2
+      ndisc6
     ];
     text = ''
       set -uo pipefail
@@ -195,6 +254,49 @@ let
         expect "the blocklist answers NXDOMAIN" "yes" "''${blocked:-unknown}"
         expect "the tunnel has peers" "yes" "$([ "''${peers:-0}" -ge 1 ] && echo yes || echo no)"
       done
+
+      # --- device access over the mesh ----------------------------------------------------------
+      # Asked where a roaming client asks from. A port declared for the prober's trust level has to
+      # answer, and a port that was not declared for it - or not declared at all - has to refuse. A
+      # refusal is the only evidence that the closed default is real; the *grant* side is what the phone
+      # proves, because it is the only `corp` node that is off the LAN.
+      printf '\nDevice access over the mesh (asked from ${primaryHub}, level ${hubTrustLevel}):\n'
+      for entry in ${deviceProbeTable}; do
+        IFS='|' read -r label address port expectation <<< "$entry"
+        got=$(ssh "''${SSH_OPTS[@]}" "root@${hubAddress}" "timeout 3 bash -c 'exec 3<>/dev/tcp/$address/$port' 2>/dev/null && echo open || echo closed" 2>/dev/null || echo unreachable)
+        expect "$label" "$expectation" "$got"
+      done
+
+      # --- what the home segment is told --------------------------------------------------------
+      # Every device keeps a resolver a network once taught it (measured: a phone held the uplink
+      # router's address for hours after it stopped announcing itself), so the way to keep a foreign
+      # resolver out is that it is never announced. The probe is a router solicitation: on a segment we
+      # route, nobody may answer it - the resolver's doors are the only resolvers that know our names.
+      printf '\nAnnouncements on the home segment:\n'
+      ip2int() { local a b c d; IFS=. read -r a b c d <<< "$1"; echo $(( (a << 24) + (b << 16) + (c << 8) + d )); }
+      lan_iface() {
+        local _ dev _ cidr _ addr entry mask net
+        while read -r _ dev _ cidr _; do
+          [ -n "''${cidr:-}" ] || continue
+          addr=''${cidr%/*}
+          for entry in ${zoneMasks}; do
+            mask=''${entry%%:*}; net=''${entry#*:}
+            if [ $(( $(ip2int "$addr") & mask )) -eq "$net" ]; then echo "$dev"; return; fi
+          done
+        done < <(ip -4 -o addr show scope global 2>/dev/null)
+      }
+      iface=$(lan_iface)
+      if [ -n "''${iface:-}" ]; then
+        solicitation=$(timeout 8 rdisc6 -1 "$iface" 2>&1 || true)
+        if printf '%s' "$solicitation" | grep -q 'from '; then
+          printf '  FAIL  %-40s %s\n' "router advertisements on $iface" "somebody answered"
+          checks=$((checks + 1)); fails=$((fails + 1))
+        else
+          expect "router advertisements on $iface" "nobody answers" "nobody answers"
+        fi
+      else
+        printf '  skip  %-40s %s\n' "router advertisements" "this machine holds no address in a home zone"
+      fi
 
       printf '\n%s checks, %s failed\n' "$checks" "$fails"
       [ "$fails" -eq 0 ]

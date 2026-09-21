@@ -45,19 +45,28 @@ an undocumented rule is a document describing a violation that no longer exists.
 | lan | `"internal"` | `lan.vyrx.de` | Blocky (split DNS) | **no** | home LAN |
 | mesh | `"mesh"` | `mesh.vyrx.de` | Blocky + our overlay DNS | **no** | WireGuard mesh |
 | iot | — *(device inventory, not an endpoint scope)* | `iot.vyrx.de` | Blocky | **no** | IoT segment |
-| node | — *(host plane, from `my.topology.hosts`)* | `node.vyrx.de` | Cloudflare | **yes** | CNAME → overlay (VPN) address; SSH/admin only (§2) |
+| node | — *(host plane from `my.topology.hosts`, device plane from `my.topology.devices`)* | `node.vyrx.de` | Cloudflare | **yes** | CNAME → overlay (VPN) address; SSH/admin only (§2) |
 | isolated | `"isolated"` | — | — | no | direct address/port only |
 
 The `scope` enum is the **existing** contract enum (`contracts/endpoints/default.nix`):
 `public | internal | mesh | isolated` (default `internal`). This specification does **not**
 change it — it only maps it to suffixes (§3). `iot` is deliberately *not* an endpoint scope:
-IoT names come from the device inventory (`my.topology.devices[].domain`, e.g.
-`rly-01.iot.vyrx.de`).
+IoT names come from the device inventory and use the same `node` plane the hosts use
+(`deviceFqdn(device) = "${name}.node.${domain}"`, e.g. `hom-prn-01.node.vyrx.de`).
+
+A device in a zone the mesh **carries** (`my.topology.announcedZones`) is a different case from a
+host: it has one address and no overlay identity, and a member that is not in the LAN reaches it
+through the mesh. Its name is therefore published and answered like a host's - on the `node` plane,
+with that one address - and it is answered in the `public` plane as well, because a roaming client's
+resolver *is* the public door (its private-DNS name resolves to the public address and its queries
+arrive there). The address stays unrouted outside the overlay, so the record is a location for
+members, not an offer. A device whose zone is not carried is published nowhere but the LAN.
 
 Rules:
 
 * The suffix is the **only** thing that encodes visibility. It never encodes a host.
-* `lan`/`mesh`/`iot` exist **only** in Blocky and must never be published (§5.1).
+* `lan`/`mesh` exist **only** on our own resolvers and must never be published (§5.1); a `node` name is
+  published, and for a carried device it names the LAN address a member reaches through the mesh.
 * `mesh` is **our** overlay namespace, carried by WireGuard. Tailscale was retired on 2026-09-20; the
   `mesh` plane is authoritative in our own DNS — **no MagicDNS dependency**.
 

@@ -119,6 +119,21 @@ let
     ) topology.hosts
   );
 
+  # A device in a carried zone is reachable over the mesh, so its name belongs on the same `node` plane
+  # as the hosts - with the one address the device has. This is the same kind of record as `nodeRecords`
+  # above: a private address in public DNS. It tells a member where the device is and tells everyone else
+  # nothing they can act on, because the address is unrouted outside the overlay. The predicate is the
+  # zone, not the access: a carried device is published whether or not it declares a port, because the
+  # question this answers is "where is it", and access is declared per port on the device itself.
+  deviceRecords = lib.concatLists (
+    lib.mapAttrsToList (
+      deviceName: device:
+      lib.optional (builtins.elem device.zone topology.announcedZones) (
+        mkRecord "Carried device ${deviceName}" "${deviceName}.node" "A" device.ipv4
+      )
+    ) topology.devices
+  );
+
   # Every `public` endpoint resolves to the *ingress*, which terminates TLS and proxies to the
   # provider over the WireGuard mesh (docs/architecture.md §7.1). The provider host does **not**
   # need a public address -- that is the whole point of the ingress engine.
@@ -156,7 +171,7 @@ let
       map (r: {
         name = "${r.type}:${if r.name == cfg.domain then "@" else r.name}";
         value = r;
-      }) (ingressRecords ++ nodeRecords ++ endpointRecords ++ extraRecords)
+      }) (ingressRecords ++ nodeRecords ++ deviceRecords ++ endpointRecords ++ extraRecords)
     )
   );
 

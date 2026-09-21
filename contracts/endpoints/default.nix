@@ -12,6 +12,12 @@
 let
   cfg = config.my.contracts;
 
+  # Two things are shared rather than repeated: the firewall's one insertion pattern (head of the chain,
+  # guarded against duplication), and the lattice's vocabulary - both come from the modules that own
+  # them, so a policy here and the same policy on another chain cannot drift apart.
+  firewall = import ../../lib/firewall.nix { inherit lib pkgs; };
+  levels = config.my.topology.trustLevels;
+
   # Submodule for Endpoint Contract
   endpointContractSubmodule = lib.types.submodule (submod: {
     options = {
@@ -266,22 +272,8 @@ let
         };
 
         from = lib.mkOption {
-          type = lib.types.listOf (
-            lib.types.enum [
-              "infra"
-              "corp"
-              "mesh"
-              "iot"
-              "guest"
-            ]
-          );
-          default = [
-            "infra"
-            "corp"
-            "mesh"
-            "iot"
-            "guest"
-          ];
+          type = lib.types.listOf (lib.types.enum levels);
+          default = levels;
           description = ''
             Trust levels whose nodes may reach this port over the mesh. It restricts, never opens: the
             port is opened by `interface`, and this says who of the mesh may actually use it. A port that
@@ -505,27 +497,11 @@ let
   ) directEndpoints;
 
   # --- the identity policy ---------------------------------------------------------------------------
-  # Which mesh node belongs to which trust level, read from the inventory: the sources are derived, the
-  # policy is written in levels. A node without an overlay address is not on the mesh and has no say here.
-  trustLevels = [
-    "infra"
-    "corp"
-    "mesh"
-    "iot"
-    "guest"
-  ];
-
-  meshSourcesByTrust = builtins.foldl' (
-    acc: host:
-    let
-      level = (config.my.topology.subnets.${host.zone} or { }).trustLevel or host.zone;
-      sources = [
-        "${host.wireguardIpv4}/32"
-      ]
-      ++ lib.optional (host.wireguardIpv6 != null) "${host.wireguardIpv6}/128";
-    in
-    acc // { ${level} = (acc.${level} or [ ]) ++ sources; }
-  ) { } (lib.filter (host: host.wireguardIpv4 != null) (lib.attrValues config.my.topology.hosts));
+  # Which address belongs to which trust level is an inventory fact, and it lives in the topology
+  # (`sourcesByTrust`): the input policy here, the device policy on the LAN router and whatever policy
+  # this repository grows next read one map instead of each deriving its own. The levels come from the
+  # same place, because a vocabulary that exists twice is a vocabulary that drifts.
+  trustLevels = levels;
 
   # An endpoint may say which trust levels reach it over the mesh. What is denied there becomes a rule of
   # our own, at a priority *ahead* of the firewall's filter chain, because a port opened for the local
@@ -548,15 +524,21 @@ let
     ep:
     let
       denied = lib.subtractLists ep.directAccess.from trustLevels;
-      sources = lib.unique (lib.concatMap (level: meshSourcesByTrust.${level} or [ ]) denied);
+      sources = lib.unique (
+        lib.concatMap (level: config.my.topology.sourcesByTrust.${level} or [ ]) denied
+      );
       proto = if ep.directAccess.protocol == "udp" then "udp" else "tcp";
       dport = toString ep.port;
+      # The rule matches the mesh interface on purpose: the source map now also holds the address a host
+      # carries inside its zone, and that address must *not* be judged here - a LAN packet never arrives
+      # on wg0, so the rule simply never matches it. One map, one rule, both paths.
       forSource =
         binary: source:
-        let
+        firewall.guardedInsert {
+          inherit binary;
+          chain = "INPUT";
           match = "-i wg0 -s ${source} -p ${proto} --dport ${dport} -m comment --comment identity-policy -j DROP";
-        in
-        "{ ${pkgs.iptables}/bin/${binary} -C INPUT ${match} 2>/dev/null; } || { ${pkgs.iptables}/bin/${binary} -I INPUT 1 ${match}; }";
+        };
       v4 = map (forSource "iptables") (lib.filter (address: !(lib.hasInfix ":" address)) sources);
       v6 = map (forSource "ip6tables") (lib.filter (address: lib.hasInfix ":" address) sources);
     in

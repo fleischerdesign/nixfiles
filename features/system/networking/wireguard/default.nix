@@ -14,6 +14,7 @@ let
   cfg = config.my.features.system.networking.wireguard;
   topology = config.my.topology;
   ownHostname = config.networking.hostName;
+  firewall = import ../../../../lib/firewall.nix { inherit lib pkgs; };
   ownHost = topology.hosts.${ownHostname} or null;
 
   isRelay = ownHost != null && (ownHost.wireguardRelay or false);
@@ -48,6 +49,78 @@ let
   # one that may claim it, because cryptokey routing has exactly one owner per prefix.
   isLanRouter = ownHostname == topology.lanRouter;
   announcedCidrs = map (zone: topology.subnets.${zone}.cidr) topology.announcedZones;
+
+  # --- the device policy ---------------------------------------------------------------------------
+  # The carried zones exist so that a node outside the LAN can reach the devices in them. Reaching them
+  # is not the same as being allowed to use them: this used to be one blanket rule - `ip saddr <mesh>
+  # accept` - which made the routing decision and the permission decision the same decision, so every
+  # mesh member reached every device on every port (measured: the printer answered on 80, 443 and 631,
+  # the relays on 6053). A device now declares what it offers and who may use it
+  # (`my.topology.devices.<name>.endpoints`), the trust lattice says which addresses carry which level
+  # (`my.topology.sourcesByTrust`), and the LAN router forwards exactly that - inserted at the head of
+  # the forward chain and guarded, the way the input lattice already is. Everything else stays closed:
+  # a port nobody declared is a port nobody reaches, which is the only shape that remains true when the
+  # next mesh-reachable device is added.
+  #
+  # Only IPv4 sources are used. A device has one address and it is an IPv4 one, so a v6 rule could only
+  # ever match nothing - and a rule that matches nothing is the failure mode this whole projection
+  # exists to make visible.
+  devicePolicy = lib.concatLists (
+    lib.mapAttrsToList (
+      deviceName: device:
+      lib.concatLists (
+        lib.mapAttrsToList (
+          endpointName: endpoint:
+          let
+            sources = lib.unique (
+              lib.filter (address: !(lib.hasInfix ":" address)) (
+                lib.concatMap (level: topology.sourcesByTrust.${level} or [ ]) endpoint.from
+              )
+            );
+            protocols =
+              if endpoint.protocol == "both" then
+                [
+                  "tcp"
+                  "udp"
+                ]
+              else
+                [ endpoint.protocol ];
+          in
+          lib.flatten (
+            map (
+              proto:
+              map (
+                source:
+                firewall.guardedInsert {
+                  binary = "iptables";
+                  chain = "FORWARD";
+                  match = "-s ${source} -d ${device.ipv4} -p ${proto} --dport ${toString endpoint.port} -m comment --comment device-policy-${deviceName}-${endpointName} -j ACCEPT";
+                }
+              ) sources
+            ) protocols
+          )
+        ) device.endpoints
+      )
+    ) (lib.filterAttrs (_: device: builtins.elem device.zone topology.announcedZones) topology.devices)
+  );
+
+  # And the zones stay closed for everything nobody declared. Without this the policy is an allow-list in
+  # front of a chain whose policy is ACCEPT - measured: with only the allow rules in place, the relays'
+  # 6053 and the printer's web interface stayed reachable from the hub, because nothing ever denied them.
+  # The deny is *appended*, so every declared allow (inserted at the head) wins, and it sits behind the
+  # firewall's own established/related accept, so it only ever affects new connections.
+  #
+  # One rule per carried zone and not per device: the zones are IPv4 today, and a zone is a prefix, so
+  # the deny says "nothing here unless it was accepted" without listing what is there.
+  deviceDefaultDeny = map (
+    zone:
+    firewall.guardedInsert {
+      binary = "iptables";
+      chain = "FORWARD";
+      position = "tail";
+      match = "-d ${topology.subnets.${zone}.cidr} -m comment --comment device-policy-default -j DROP";
+    }
+  ) topology.announcedZones;
 
   meshCidr = topology.subnets.mesh.cidr or "10.10.100.0/24";
 
@@ -185,11 +258,10 @@ in
       # path is declared where SSH lives. Measured before: every mesh node reached every listening port of
       # every other node, including the databases and the monitoring exporters.
       checkReversePath = "loose";
-      # The host that routes the home LAN has to be allowed to forward mesh traffic into the zones it
-      # carries; without this the packets stop at it, because reaching its own addresses is input, not
-      # forward. Which zones it carries is a consequence of the inventory, and the rule below is the
-      # same derivation the routes are built from.
-      extraForwardRules = lib.optionalString isLanRouter "ip saddr ${meshCidr} accept\n";
+      # No blanket rule for the carried zones. The host that routes the home LAN forwards what the
+      # devices there declare and whoever the inventory says may ask (`devicePolicy`, projected into the
+      # forward chain below): routing says where a packet may go, this says who may send it, and a rule
+      # that answers both questions with "everyone" is not a policy.
     };
 
     assertions = [
@@ -252,6 +324,13 @@ in
       # Relay interface forwarding for inter-peer mesh transit
       ${pkgs.iptables}/bin/iptables -A FORWARD -i ${cfg.interfaceName} -o ${cfg.interfaceName} -j ACCEPT || true
       ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${cfg.interfaceName} -o ${cfg.interfaceName} -j ACCEPT || true
+    ''
+    + lib.optionalString (isLanRouter && topology.announcedZones != [ ]) ''
+      # The device policy: the carried zones' devices, exactly what they declare and who may ask.
+      ${lib.concatStringsSep "\n" devicePolicy}
+
+      # … and closed for everything nobody declared.
+      ${lib.concatStringsSep "\n" deviceDefaultDeny}
     '';
 
     # 5. Secrets: this host's own WireGuard key and the private key of every client it renders, both
@@ -275,14 +354,13 @@ in
           ]
           ++ lib.optional (client.wireguardIpv6 != null) "${client.wireguardIpv6}/128";
 
-          # What a rendered client routes through the mesh. The ingress is a node, and a
-          # client that resolves per network - a phone's private DNS - must be able to reach
-          # the resolver's public door *inside* the VPN: the name resolves to the ingress's
-          # public address, and Android then requires that address to be routable there.
-          # Our clients reach the ingress through the mesh, so its address is simply part of
-          # what they route: one /32, not the internet.
+          # What a rendered client routes through the mesh: the ingress - a node, whose public address a
+          # client that resolves per network must be able to reach from inside the VPN - and every zone
+          # the mesh carries. The carried zones are what makes a device in them reachable at all, and a
+          # client that is not at home has no other path to them: the relay it peers with carries them,
+          # so the client must route them there.
           ingressAddress = (topology.hosts.${topology.ingressHost} or { }).ipv4 or null;
-          clientRoutes = lib.optional (ingressAddress != null) "${ingressAddress}/32";
+          clientRoutes = lib.optional (ingressAddress != null) "${ingressAddress}/32" ++ announcedCidrs;
           peers = lib.concatMapStrings (peer: ''
             [Peer]
             PublicKey = ${peer.publicKey}

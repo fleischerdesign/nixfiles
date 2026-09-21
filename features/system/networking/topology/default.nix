@@ -9,6 +9,19 @@
 let
   cfg = config.my.topology;
 
+  # The trust levels of the lattice, in one place: they are the vocabulary every policy in this
+  # repository is written in - an endpoint's `from`, a device's reachability, the source map below -
+  # so the list must not exist more than once. A level is not a zone: zones are addressed, levels are
+  # judged, and the mapping between them is a fact of the inventory (`subnets.<zone>.trustLevel`).
+  trustLevelNames = [
+    "infra"
+    "corp"
+    "mesh"
+    "iot"
+    "guest"
+  ];
+  trustLevel = lib.types.enum trustLevelNames;
+
   # Submodule for individual subnet definition
   subnetSubmodule = lib.types.submodule {
     options = {
@@ -27,13 +40,7 @@ let
         '';
       };
       trustLevel = lib.mkOption {
-        type = lib.types.enum [
-          "infra"
-          "corp"
-          "mesh"
-          "iot"
-          "guest"
-        ];
+        type = trustLevel;
         description = "Trust level within the Bell-LaPadula security lattice";
       };
       description = lib.mkOption {
@@ -48,13 +55,7 @@ let
   hostSubmodule = lib.types.submodule {
     options = {
       zone = lib.mkOption {
-        type = lib.types.enum [
-          "infra"
-          "corp"
-          "mesh"
-          "iot"
-          "guest"
-        ];
+        type = trustLevel;
         description = "Subnet zone membership of the host";
       };
       ipv4 = lib.mkOption {
@@ -120,13 +121,7 @@ let
   deviceSubmodule = lib.types.submodule {
     options = {
       zone = lib.mkOption {
-        type = lib.types.enum [
-          "infra"
-          "corp"
-          "mesh"
-          "iot"
-          "guest"
-        ];
+        type = trustLevel;
         default = "iot";
         description = "Subnet zone membership of the device";
       };
@@ -162,6 +157,48 @@ let
         type = lib.types.str;
         default = "";
         description = "Human-readable description of device function";
+      };
+
+      # What this device offers to the fleet, and who may use it over the mesh. A device has no
+      # configuration of its own - this *is* its firewall, projected onto the host that routes its
+      # zone - so a port that is not declared here is a port no mesh member reaches. `from` is required
+      # and cannot be empty: a declaration without a source would be a port nobody may use, which is a
+      # hole in the inventory rather than in the network.
+      endpoints = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule {
+            options = {
+              port = lib.mkOption {
+                type = lib.types.port;
+                description = "Port the device serves on its one address";
+              };
+              protocol = lib.mkOption {
+                type = lib.types.enum [
+                  "tcp"
+                  "udp"
+                  "both"
+                ];
+                default = "tcp";
+                description = "Transport protocol of that port";
+              };
+              from = lib.mkOption {
+                type = lib.types.nonEmptyListOf trustLevel;
+                description = ''
+                  Trust levels whose members may reach this port over the mesh. Written in levels, not
+                  in addresses, because the same device is asked from a phone on the mesh and, once the
+                  segment is split, from another zone - and the answer must not depend on the path.
+                '';
+              };
+              description = lib.mkOption {
+                type = lib.types.str;
+                default = "";
+                description = "Why this port is reachable from outside the device's own zone";
+              };
+            };
+          }
+        );
+        default = { };
+        description = "Ports this device offers, and the trust levels that may reach them over the mesh";
       };
     };
   };
@@ -216,6 +253,14 @@ in
         none of our names, so a client that fell back to it would resolve the public internet and fail
         silently on everything internal. A client resolves through our doors or not at all.
       '';
+    };
+
+    # The lattice's vocabulary as data, so a policy can be written in levels without repeating the
+    # list: the enums in this file, an endpoint's `from`, a device's reachability all read it.
+    trustLevels = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      readOnly = true;
+      description = "The trust levels of the lattice, most trusted first";
     };
 
     subnets = lib.mkOption {
@@ -274,6 +319,17 @@ in
       type = lib.types.listOf lib.types.str;
       readOnly = true;
       description = "Zones that make up the home LAN: every subnet that is neither the mesh nor guest";
+    };
+
+    # Which addresses carry which trust level, derived from the inventory. Both addresses of every host
+    # are in here - the one it holds inside its zone and the one it holds on the mesh - because a
+    # question about trust is a question about *who is asking*, and the answer must not change with the
+    # path: the same phone on the home WLAN and on the mesh is the same trust level. Devices are not
+    # sources: their traffic reaches another zone through the uplink router, never through ours.
+    sourcesByTrust = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.listOf lib.types.str);
+      readOnly = true;
+      description = "Trust level -> the addresses whose traffic is judged at that level";
     };
   };
 
@@ -426,8 +482,27 @@ in
         mac = "80:ce:62:8a:7c:06"; # HP MFP, hostname hp8a7c05; leases its iot address from Kea
         ipv4 = "10.10.30.19";
         description = "HP Multifunktionsdrucker/Scanner (hp8a7c05), iot-Zone";
+        # The one thing a mesh member may use on this device: IPP. Its web interface (80/443) is
+        # deliberately *not* declared - it stays reachable inside the LAN, where the segment is flat and
+        # no rule of ours applies anyway, and it is closed from the mesh, which is where the exposure
+        # would otherwise grow without anyone deciding it. Printing is the household's use case: the
+        # servers and the family's own devices, not the cloud.
+        endpoints.ipp = {
+          port = 631;
+          protocol = "tcp";
+          from = [
+            "infra"
+            "corp"
+          ];
+          description = "Drucken aus dem Mesh (Server und Haushalt) - nicht aus der Cloud-Zone";
+        };
       };
       # Enterprise Relais-Aktoren (Sonoff Basic ESP8266 Inline-Relais)
+      #
+      # They declare no endpoint, and that is a decision rather than an omission: the ESPHome dashboard
+      # that talks to them runs on `hom-srv-01`, which shares their segment, so its traffic is never
+      # routed; and a relay's API reachable over the mesh would be reachable by every member. Nothing
+      # needs it, so nothing may use it.
       hom-rly-01 = {
         zone = "iot";
         ipv4 = "10.10.30.11";
@@ -496,8 +571,22 @@ in
       && lib.any (device: device.zone == zone && device.ipv4 != null) (lib.attrValues cfg.devices)
     ) (lib.attrNames cfg.subnets);
 
+    my.topology.trustLevels = trustLevelNames;
+
     my.topology.lanZones = lib.attrNames (
       lib.filterAttrs (_: subnet: subnet.trustLevel != "mesh" && subnet.trustLevel != "guest") cfg.subnets
     );
+
+    my.topology.sourcesByTrust = builtins.foldl' (
+      acc: host:
+      let
+        level = (cfg.subnets.${host.zone} or { }).trustLevel or host.zone;
+        sources =
+          lib.optional (host.ipv4 != null) "${host.ipv4}/32"
+          ++ lib.optional (host.wireguardIpv4 != null) "${host.wireguardIpv4}/32"
+          ++ lib.optional (host.wireguardIpv6 != null) "${host.wireguardIpv6}/128";
+      in
+      acc // { ${level} = (acc.${level} or [ ]) ++ sources; }
+    ) { } (lib.attrValues cfg.hosts);
   };
 }
