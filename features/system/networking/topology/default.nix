@@ -195,14 +195,12 @@ in
 
     resolvers = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [
-        "10.10.10.10"
-        "10.10.10.1"
-      ];
+      default = [ config.my.topology.hosts.${config.my.topology.lanRouter}.ipv4 ];
       description = ''
-        Authoritative resolvers handed to hosts and DHCP clients: the local Blocky instance
-        first (it owns the split horizon), the uplink router as fallback. Never public
-        resolvers - they would bypass split horizon and the internal zones.
+        The resolvers handed to hosts and DHCP clients, starting with the home door of the resolver on
+        the host that routes the home LAN. The uplink router is deliberately not in this list: it knows
+        none of our names, so a client that fell back to it would resolve the public internet and fail
+        silently on everything internal. A client resolves through our doors or not at all.
       '';
     };
 

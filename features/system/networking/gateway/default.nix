@@ -123,12 +123,6 @@ in
       description = "Next-hop router/modem IP for WAN uplink (e.g. FRITZ!Box)";
     };
 
-    dnsServer = lib.mkOption {
-      type = lib.types.str;
-      default = "10.10.10.10";
-      description = "Primary DNS server handed out via DHCP (typically hom-srv-01 Blocky instance)";
-    };
-
     routedZones = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
@@ -306,7 +300,9 @@ in
         option-data = [
           {
             name = "domain-name-servers";
-            data = "${cfg.dnsServer}, ${cfg.uplinkGateway}";
+            # Derived, and ours alone: no uplink fallback, because a client that fell back to the
+            # router's resolver would get public answers and silently miss everything internal.
+            data = lib.concatStringsSep ", " topology.resolvers;
           }
           {
             name = "domain-name";
@@ -314,7 +310,7 @@ in
           }
           {
             name = "ntp-servers";
-            data = cfg.dnsServer;
+            data = topology.hosts.${topology.lanRouter}.ipv4;
           }
         ];
 

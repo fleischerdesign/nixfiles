@@ -22,6 +22,9 @@
         # inventory, never through whatever a network hands it. Which doors it uses is derived
         # from its zone, not written here.
         resolver.enable = lib.mkDefault true;
+        # A node that finds itself inside the home LAN uses it, for names and for addresses - the
+        # module decides whether that can apply to this host from its zone.
+        lan-preference.enable = lib.mkDefault true;
       };
       security.enable = lib.mkDefault true;
       theme.enable = lib.mkDefault true;
