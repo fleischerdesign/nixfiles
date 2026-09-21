@@ -68,16 +68,23 @@ let
       host.wireguardIpv4;
   overlayAddress = host: if host == null then null else host.wireguardIpv4;
 
-  # One rule per (name, plane). Names containing a wildcard are skipped: `local-data` does
-  # not expand wildcards, and such names are minted at runtime and resolve upstream.
+  # One rule per (name, plane). `records` (zonefile form) is used rather than `address`:
+  # an `address` mapping also synthesises a reverse PTR for that address, and every public
+  # endpoint resolves to the ingress, so the aggregated PTR exceeded Knot's 512 B record
+  # limit and the policy loader refused to start (measured 2026-09-21). Names containing a
+  # wildcard are skipped: `local-data` does not expand wildcards, and such names are minted
+  # at runtime and resolve upstream.
   mkRules =
     names: addresses:
     lib.flatten (
       lib.map (
         name:
+        let
+          fqdn = if lib.hasSuffix "." name then name else "${name}.";
+        in
         lib.optional (!(lib.hasInfix "*" name)) (
           lib.mapAttrsToList (plane: address: {
-            inherit name address;
+            records = "${fqdn} 60 IN A ${address}";
             tags = [ plane ];
           }) (lib.filterAttrs (_: address: address != null) addresses)
         )
