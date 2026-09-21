@@ -58,6 +58,19 @@ in
 
     # 4. Service Contract for Ingress & Storage
     my.contracts.provides.couchdb = {
+      # Erlang's port mapper, which CouchDB starts next to itself. Nothing outside this host talks to it -
+      # a single-node CouchDB resolves its own nodes through it. It is declared rather than left undefined
+      # so the exposure inventory can tell "a port nobody decided about" from "a port nobody needs".
+      endpoints.epmd = {
+        port = 4369;
+        protocol = "tcp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
+      };
       endpoints.web = {
         port = 5984;
         protocol = "tcp";

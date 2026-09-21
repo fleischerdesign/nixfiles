@@ -78,6 +78,19 @@ in
     ];
 
     my.contracts.provides.jellyfin = {
+      # Jellyfin's client discovery answers broadcasts on the local link. It is a listening socket, so it
+      # is declared - and it is local, because a discovery protocol that leaves the link is a protocol
+      # nobody uses.
+      endpoints.discovery = {
+        port = 7359;
+        protocol = "udp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "udp";
+        };
+      };
       endpoints.web = {
         port = 8096;
         protocol = "tcp";

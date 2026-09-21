@@ -336,6 +336,13 @@ in
         protocol = "tcp";
         scope = "internal";
         auth = "none";
+        # Queried by Grafana on the same host and through the local ingress; nothing off this host talks
+        # to the collector's own API directly.
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
         monitoring = {
           tcp.enable = true;
           tcp.group = "Infrastructure";

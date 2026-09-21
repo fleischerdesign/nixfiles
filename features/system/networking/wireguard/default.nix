@@ -159,10 +159,26 @@ in
   };
 
   config = lib.mkIf (cfg.enable && ownHost != null && ownHost.wireguardIpv4 != null) {
+    # The mesh's own listening socket, declared like every other listener instead of being opened here: a
+    # host that accepts incoming handshakes (a relay, or a host with a public address) has it open, a
+    # spoke keeps it to itself - it dials out and is never dialled. One place decides exposure, and the
+    # exposure inventory can see the socket.
+    my.contracts.provides.wireguard = {
+      endpoints.transport = {
+        port = cfg.port;
+        protocol = "udp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = if isRelay || (ownHost != null && ownHost.ipv4 != null) then "all" else "local";
+          protocol = "udp";
+        };
+      };
+    };
+
     # 1. Firewall rules
     networking.firewall = {
-      # Listen on the public UDP port if the host is a public relay or has a public IP
-      allowedUDPPorts = lib.optional (isRelay || ownHost.ipv4 != null) cfg.port;
+      # The transport port is opened by the contract projection above, not here.
       # No trusted interface. Arriving over the mesh is a transport fact, not a permission: what a host
       # serves there it declares. The endpoints contract projects onto this interface the ports an ingress
       # proxies (a named endpoint) and the ones declared for the mesh explicitly, and the administrative

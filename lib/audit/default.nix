@@ -1,14 +1,13 @@
-# lib/audit/default.nix - measures the fleet against what the inventory promises.
+# lib/audit/default.nix - two measurements against what the inventory promises.
 #
-# The static check (`checks.network-invariants`) proves that the configurations agree with each other.
-# This proves that the running hosts do what their configurations say, and the difference is not
-# academic: a name answered from a door other than the one whose path the host is using is exactly how a
-# home client ended up with overlay addresses and reached its printer through the relays.
+# `network` proves that the running hosts answer as their configurations say: which path a host uses to
+# the home door decides which plane the answer must come from, and the resolver's own projection says what
+# that answer is. `exposure` proves that every listening socket is a decision somebody made: a port that
+# is neither declared nor marked local is a question, not an answer.
 #
-# No expectation is written here. The path a host uses is measured (`ip route get <home door>`: the LAN
-# or the tunnel), the planes the resolver answers are read from its own projection, and the two are
-# required to agree. That is location-independent: a node abroad is judged on the path it actually has,
-# not on where it usually sits.
+# No expectation is written here. The projections of the contracts are the expectations, every value is
+# baked in at build time, and the remote part is a quoted heredoc - which cannot expand anything locally,
+# so a command can never run on the wrong machine.
 {
   pkgs,
   lib,
@@ -19,9 +18,6 @@ let
   cfgOf = name: self.nixosConfigurations.${name}.config;
   reference = cfgOf (builtins.head hostNames);
   topology = reference.my.topology;
-
-  homeDoor = topology.hosts.${topology.lanRouter}.ipv4;
-  meshDoor = topology.hosts.${topology.lanRouter}.wireguardIpv4;
 
   resolverHost = lib.findFirst (name: (cfgOf name).my.features.services.dns.enable) null hostNames;
   answers = (cfgOf resolverHost).my.features.services.dns.answers;
@@ -35,23 +31,6 @@ let
   probeName = "jellyfin.${topology.domain}";
   deviceFqdn = "${lib.head (lib.attrNames topology.devices)}.node.${topology.domain}";
 
-  # The home zones as `network:mask` pairs, so the probe can decide the path the same way the dispatcher
-  # does: the host is at home when the interface that routes to the home door carries a home address.
-  # Both read the same zones from the inventory; neither hardcodes an address.
-  zoneMasks = lib.concatMapStrings (
-    zone:
-    let
-      cidr = topology.subnets.${zone}.cidr;
-      octets = map lib.toInt (lib.splitString "." (builtins.head (lib.splitString "/" cidr)));
-      length = lib.toInt (builtins.elemAt (lib.splitString "/" cidr) 1);
-      # 2^32 - 2^(32-length): the mask of a prefix, built from multiplication because Nix has no shift
-      mask = 4294967296 - (lib.foldl' (acc: _: acc * 2) 1 (lib.range 1 (32 - length)));
-      address = lib.foldl' (acc: octet: acc * 256 + octet) 0 octets;
-    in
-    " ${toString mask}:${toString (lib.bitAnd address mask)}"
-  ) topology.lanZones;
-
-  # The path decides the plane, so the expectation follows the path.
   planes = [
     {
       path = "home";
@@ -66,16 +45,67 @@ let
   ];
 
   deployed = lib.filter (name: topology.hosts ? ${name}) hostNames;
-  fleet = map (name: {
-    inherit name;
-    address =
-      if topology.hosts.${name}.wireguardIpv4 != null then
-        topology.hosts.${name}.wireguardIpv4
-      else
-        topology.hosts.${name}.ipv4;
-  }) deployed;
+  addressOf =
+    name:
+    if topology.hosts.${name}.wireguardIpv4 != null then
+      topology.hosts.${name}.wireguardIpv4
+    else
+      topology.hosts.${name}.ipv4;
 
-  audit = pkgs.writeShellApplication {
+  fleetTable = lib.concatMapStringsSep " " (host: "\"${host.name}|${host.address}\"") (
+    map (name: {
+      inherit name;
+      address = addressOf name;
+    }) deployed
+  );
+
+  # The home zones as `mask:network` pairs, so the path question ("does this host hold an address of a
+  # home zone?") is answered the same way the dispatcher answers it: from the inventory, not from a list.
+  zoneMasks = lib.concatMapStrings (
+    zone:
+    let
+      cidr = topology.subnets.${zone}.cidr;
+      octets = map lib.toInt (lib.splitString "." (builtins.head (lib.splitString "/" cidr)));
+      length = lib.toInt (builtins.elemAt (lib.splitString "/" cidr) 1);
+      # 2^32 - 2^(32-length): the mask of a prefix, built by multiplication because Nix has no shift
+      mask = 4294967296 - (lib.foldl' (acc: _: acc * 2) 1 (lib.range 1 (32 - length)));
+      address = lib.foldl' (acc: octet: acc * 256 + octet) 0 octets;
+    in
+    " ${toString mask}:${toString (lib.bitAnd address mask)}"
+  ) topology.lanZones;
+
+  # What each host declared it serves, per protocol and interface. This is the expectation the exposure
+  # report compares a live socket against: the firewall's rendered sets are the ports that are *open*,
+  # and the contracts' `local` declarations are the listeners that are deliberately not.
+  declaredOf =
+    name:
+    let
+      fw = (cfgOf name).networking.firewall;
+      provides = (cfgOf name).my.contracts.provides or { };
+      endpoints = lib.concatLists (
+        map (contract: lib.attrValues (contract.endpoints or { })) (lib.attrValues provides)
+      );
+    in
+    {
+      tcp = lib.unique (fw.allowedTCPPorts ++ (fw.interfaces.wg0.allowedTCPPorts or [ ]));
+      udp = lib.unique (fw.allowedUDPPorts ++ (fw.interfaces.wg0.allowedUDPPorts or [ ]));
+      local = lib.unique (
+        map (ep: ep.port) (
+          lib.filter (ep: ep.directAccess.enable && ep.directAccess.interface == "local") endpoints
+        )
+      );
+    };
+  declaredTable = lib.concatMapStrings (
+    name:
+    "\"${name}|${addressOf name}|${join (declaredOf name).tcp}|${join (declaredOf name).udp}|${join (declaredOf name).local}\" "
+  ) deployed;
+  join = ports: lib.concatStringsSep "," (map toString ports);
+
+  # Protocols whose whole purpose is the local link. They are not services somebody could use from
+  # elsewhere, and listing them as undeclared would be noise rather than a question.
+  localProtocols = "5353 5355 1900";
+
+  network = pkgs.writeShellApplication {
     name = "network-audit";
     excludeShellChecks = [
       "SC2016" # the remote part is quoted on purpose: nothing may expand locally
@@ -94,7 +124,6 @@ let
       KEY="''${NETWORK_AUDIT_KEY:-$HOME/.ssh/nixfiles-deploy-key}"
       SSH_OPTS=(-i "$KEY" -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
 
-      # <path>|<what ${probeName} must answer on that path>|<what ${deviceFqdn} must answer>
       PLANES=(
       ${
         lib.concatMapStrings (plane: "        \"${plane.path}|${plane.service}|${plane.device}\"\n") planes
@@ -113,16 +142,14 @@ let
         fi
       }
 
-      printf 'paths: home = reaches %s over a home address, away = only through the mesh (%s)\n' "${homeDoor}" "${meshDoor}"
+      printf 'paths: home = holds an address of a home zone, away = only the mesh\n'
 
-      for entry in ${lib.concatMapStringsSep " " (host: "\"${host.name}|${host.address}\"") fleet}; do
+      for entry in ${fleetTable}; do
         IFS='|' read -r name address <<< "$entry"
         printf '\n%s (%s)\n' "$name" "$address"
 
         measured=$(ssh "''${SSH_OPTS[@]}" "root@$address" 'bash -s' <<'REMOTE' 2>/dev/null || echo UNREACHABLE
           ip2int() { local a b c d; IFS=. read -r a b c d <<< "$1"; echo $(( (a << 24) + (b << 16) + (c << 8) + d )); }
-          # at home = this host holds an address of a home zone at all: the zone gateway reaches every
-          # other home zone, and the host that routes them holds them itself
           path=away
           for entry in ${zoneMasks}; do
             mask=''${entry%%:*}; net=''${entry#*:}
@@ -163,8 +190,8 @@ let
           continue
         fi
 
-        expect "${probeName} on that path" "$(printf '%s' "$row" | cut -d'|' -f2)" "''${got_service:-NXDOMAIN}"
-        expect "${deviceFqdn} on that path" "$(printf '%s' "$row" | cut -d'|' -f3)" "''${got_device:-NXDOMAIN}"
+        expect "${probeName} answered on that path" "$(printf '%s' "$row" | cut -d'|' -f2)" "''${got_service:-NXDOMAIN}"
+        expect "${deviceFqdn} answered on that path" "$(printf '%s' "$row" | cut -d'|' -f3)" "''${got_device:-NXDOMAIN}"
         expect "the blocklist answers NXDOMAIN" "yes" "''${blocked:-unknown}"
         expect "the tunnel has peers" "yes" "$([ "''${peers:-0}" -ge 1 ] && echo yes || echo no)"
       done
@@ -173,5 +200,110 @@ let
       [ "$fails" -eq 0 ]
     '';
   };
+
+  exposure = pkgs.writeShellApplication {
+    name = "exposure-audit";
+    runtimeInputs = with pkgs; [
+      openssh
+      gnugrep
+      gnused
+      coreutils
+    ];
+    text = ''
+      set -uo pipefail
+
+      # Without --strict this is an inventory: it prints every listening socket that is not bound to
+      # loopback and whether it is a decision somebody made. With --strict it fails on the ones that are
+      # not - which is the gate that keeps a new service from being exposed by accident.
+      strict=no
+      [ "''${1:-}" = "--strict" ] && strict=yes
+
+      KEY="''${NETWORK_AUDIT_KEY:-$HOME/.ssh/nixfiles-deploy-key}"
+      SSH_OPTS=(-i "$KEY" -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
+      LOCAL_PROTOCOLS="${localProtocols}"
+
+      undeclared_total=0
+
+      for entry in ${declaredTable}; do
+        IFS='|' read -r name address tcp udp local <<< "$entry"
+        printf '\n%s (%s)\n' "$name" "$address"
+        printf '  declared: open tcp={%s} udp={%s}  local={%s}\n' "$tcp" "$udp" "$local"
+
+        measured=$(ssh "''${SSH_OPTS[@]}" "root@$address" 'bash -s' <<'REMOTE' 2>/dev/null || echo UNREACHABLE
+          ss -lntupH 2>/dev/null | while read -r proto _ _ _ local peer rest; do
+            # A socket on loopback or on a link-local address is reachable from nowhere else, and a UDP
+            # socket that has a real peer is somebody's client connection, not a service. Neither is a
+            # question about exposure, so both are skipped before they become noise.
+            case "$local" in
+              127.*|\[::1\]*|\[fe80::*|169.254.*) continue ;;
+            esac
+            port="''${local##*:}"
+            proc="$rest"
+            proc="''${proc#*users:((\"}"
+            proc="''${proc%%\"*}"
+            if [ "$proto" = "udp" ]; then
+              case "$peer" in
+                0.0.0.0:*|\[::\]:*|\*:\*) ;;
+                *) continue ;;
+              esac
+              # An unconnected UDP socket on an ephemeral port is as often a client of something else as it
+              # is a service; a service binds a port somebody would recognise and declares it, and a
+              # declared port is classified before this rule is reached.
+              if [ "$port" -ge 32768 ] 2>/dev/null; then continue; fi
+            fi
+            printf '%s %s %s %s\n' "$proto" "''${local%:*}" "$port" "$proc"
+          done
+      REMOTE
+        )
+
+        # The host is addressed by name from the inventory above; the ssh target needs the address.
+        if [ "$measured" = "UNREACHABLE" ]; then
+          printf '  MISSING  the host did not answer over the mesh\n'
+          undeclared_total=$((undeclared_total + 1))
+          continue
+        fi
+
+        while read -r proto bind port proc; do
+          [ -n "''${port:-}" ] || continue
+          case "$proto" in
+            tcp) declared="$tcp" ;;
+            udp) declared="$udp" ;;
+            *) continue ;;
+          esac
+          case ",$declared," in
+            *",$port,"*)
+              printf '  ok        %-5s %-16s %-6s %s (open)\n' "$proto" "$bind" "$port" "''${proc:-?}"
+              ;;
+            *)
+              case ",$local," in
+                *",$port,"*)
+                  printf '  local     %-5s %-16s %-6s %s (declared local)\n' "$proto" "$bind" "$port" "''${proc:-?}"
+                  ;;
+                *)
+                  case " $LOCAL_PROTOCOLS " in
+                    *" $port "*)
+                      printf '  local     %-5s %-16s %-6s %s (link-local protocol)\n' "$proto" "$bind" "$port" "''${proc:-?}"
+                      ;;
+                    *)
+                      printf '  QUESTION  %-5s %-16s %-6s %s (listening, undeclared)\n' "$proto" "$bind" "$port" "''${proc:-?}"
+                      undeclared_total=$((undeclared_total + 1))
+                      ;;
+                  esac
+                  ;;
+              esac
+              ;;
+          esac
+        done <<< "$measured"
+      done
+
+      printf '\n%s listening sockets outside loopback that nobody declared\n' "$undeclared_total"
+      if [ "$strict" = yes ] && [ "$undeclared_total" -gt 0 ]; then
+        printf 'strict: they are closed over the mesh today, but they are not decisions - declare them or mark them local\n'
+        exit 1
+      fi
+    '';
+  };
 in
-audit
+{
+  inherit network exposure;
+}

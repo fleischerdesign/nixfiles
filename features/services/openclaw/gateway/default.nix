@@ -1121,6 +1121,28 @@ in
           };
         }
       ) (lib.attrNames enabledInstances)
+      # The permission check the gateway itself calls on loopback (its own comment below says so), which is
+      # bound wide - declaring it local is the correction. It is the only listener of the agent runtime left
+      # on this host: the health bridge a Hermes skill used to start next to it (a `health_bridge.py` on
+      # 8090, copied into the store without a deriver and left behind after its skill directory was deleted)
+      # was removed rather than declared.
+      ++ [
+        {
+          name = "openclaw-helper";
+          value = {
+            endpoints.permission-check = {
+              port = 18099;
+              protocol = "tcp";
+              scope = "isolated";
+              directAccess = {
+                enable = true;
+                interface = "local";
+                protocol = "tcp";
+              };
+            };
+          };
+        }
+      ]
     );
 
     # Declarative Caddy virtual hosts for dynamic self-publishing via Unix domain sockets.

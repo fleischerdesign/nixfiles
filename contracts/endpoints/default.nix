@@ -5,6 +5,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 
@@ -263,6 +264,31 @@ let
           default = "all";
           description = "Network interface to bind the firewall rule to (all, wireguard, or local)";
         };
+
+        from = lib.mkOption {
+          type = lib.types.listOf (
+            lib.types.enum [
+              "infra"
+              "corp"
+              "mesh"
+              "iot"
+              "guest"
+            ]
+          );
+          default = [
+            "infra"
+            "corp"
+            "mesh"
+            "iot"
+            "guest"
+          ];
+          description = ''
+            Trust levels whose nodes may reach this port over the mesh. It restricts, never opens: the
+            port is opened by `interface`, and this says who of the mesh may actually use it. A port that
+            belongs to the local network but not to the fleet's infrastructure (the administrative path)
+            names the levels it is for.
+          '';
+        };
       };
 
       healthProbePath = lib.mkOption {
@@ -477,6 +503,65 @@ let
       && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
     ) ep.port
   ) directEndpoints;
+
+  # --- the identity policy ---------------------------------------------------------------------------
+  # Which mesh node belongs to which trust level, read from the inventory: the sources are derived, the
+  # policy is written in levels. A node without an overlay address is not on the mesh and has no say here.
+  trustLevels = [
+    "infra"
+    "corp"
+    "mesh"
+    "iot"
+    "guest"
+  ];
+
+  meshSourcesByTrust = builtins.foldl' (
+    acc: host:
+    let
+      level = (config.my.topology.subnets.${host.zone} or { }).trustLevel or host.zone;
+      sources = [
+        "${host.wireguardIpv4}/32"
+      ]
+      ++ lib.optional (host.wireguardIpv6 != null) "${host.wireguardIpv6}/128";
+    in
+    acc // { ${level} = (acc.${level} or [ ]) ++ sources; }
+  ) { } (lib.filter (host: host.wireguardIpv4 != null) (lib.attrValues config.my.topology.hosts));
+
+  # An endpoint may say which trust levels reach it over the mesh. What is denied there becomes a rule of
+  # our own, at a priority *ahead* of the firewall's filter chain, because a port opened for the local
+  # network (`interface = "all"`) is otherwise open on every interface - and "the local network is one
+  # trusted segment, the mesh is judged by who is asking" is exactly what the trust lattice is for. A
+  # drop is final in nftables, so the rule holds no matter what else opens the port; it can only ever
+  # restrict, never open, which is why it is safe to derive.
+  # An endpoint may say which trust levels reach it over the mesh. What is denied there becomes a rule of
+  # our own, at the **head** of the input chain: measured, the firewall accepts a port before anything
+  # appended later can speak, so the rule is inserted with `-I INPUT 1` - ahead of every accept - and
+  # guarded with `-C`, because `extraCommands` accumulate across activations otherwise (the module's own
+  # comment records that lesson from an earlier MASQUERADE rule).
+  #
+  # The backend in use is the iptables one. The nftables backend rejects the MSS-clamping commands the
+  # wireguard module needs (measured: "extraCommands is incompatible with the nftables based firewall"),
+  # and it is the only backend that renders the declarative `extraInputRules` - which is why that option
+  # had no effect at all when it was tried. A DROP at the head holds whatever else opens the port, so the
+  # rule can only ever restrict, never open, and it is safe to derive.
+  identityRules = lib.concatMap (
+    ep:
+    let
+      denied = lib.subtractLists ep.directAccess.from trustLevels;
+      sources = lib.unique (lib.concatMap (level: meshSourcesByTrust.${level} or [ ]) denied);
+      proto = if ep.directAccess.protocol == "udp" then "udp" else "tcp";
+      dport = toString ep.port;
+      forSource =
+        binary: source:
+        let
+          match = "-i wg0 -s ${source} -p ${proto} --dport ${dport} -m comment --comment identity-policy -j DROP";
+        in
+        "{ ${pkgs.iptables}/bin/${binary} -C INPUT ${match} 2>/dev/null; } || { ${pkgs.iptables}/bin/${binary} -I INPUT 1 ${match}; }";
+      v4 = map (forSource "iptables") (lib.filter (address: !(lib.hasInfix ":" address)) sources);
+      v6 = map (forSource "ip6tables") (lib.filter (address: lib.hasInfix ":" address) sources);
+    in
+    lib.optionals (ep.directAccess.enable && denied != [ ]) (v4 ++ v6)
+  ) localEndpointsList;
   # Every endpoint that enables directory authentication becomes a consumer with fully resolved values:
   # the audience it stated, the SOPS path its app password lives at, and the DN it binds as. The provider
   # that creates those accounts derives the same DN from the same directory contract, so both sides agree
@@ -538,5 +623,13 @@ in
         allowedUDPPorts = wireguardUdp;
       };
     };
+
+    # The trust lattice, applied. The rules go into the firewall's own input chain *ahead* of the port
+    # accepts, which is what `extraInputRules` is for - a separate nftables table would be a second
+    # firewall, and enabling it switches the whole firewall to the nftables implementation, which then
+    # rejects the MSS-clamping commands the wireguard module needs (measured). One firewall, one place.
+    # The trust lattice, applied at the head of the input path. See `identityRules` for why this is a
+    # command rather than a declarative rule: the backend in use ignores the declarative form.
+    networking.firewall.extraCommands = lib.concatStringsSep "\n" identityRules;
   };
 }

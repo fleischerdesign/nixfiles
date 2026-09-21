@@ -683,6 +683,42 @@ in
 
     # 5. Reverse Proxy & Monitoring via Service Contract
     my.contracts.provides.authentik = {
+      # The server's own listeners. The ingress proxies to `web` on this host, so they are the local
+      # network's business and nobody else's - declared local, which is what the exposure inventory reads
+      # as "a decision", not as "forgotten".
+      # The server's own HTTP and HTTPS faces. The ingress reaches the service through `web` (9055) on this
+      # host, so nothing outside talks to these two; authentik listens on them regardless. Declared local,
+      # which is what the exposure inventory reads as a decision.
+      endpoints.http = {
+        port = 9000;
+        protocol = "tcp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
+      };
+      endpoints.https = {
+        port = 9443;
+        protocol = "tcp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
+      };
+      endpoints.metrics = {
+        port = 9300;
+        protocol = "tcp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
+      };
       endpoints.web = {
         port = listenHttpPort;
         protocol = "tcp";

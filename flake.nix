@@ -165,13 +165,28 @@
         network-audit = {
           type = "app";
           program = "${
-            import ./lib/audit/default.nix {
+            (import ./lib/audit/default.nix {
               inherit pkgs hostNames self;
               lib = nixpkgs-unstable.lib;
-            }
+            }).network
           }/bin/network-audit";
           meta = {
             description = "Measure the fleet against what the inventory promises";
+          };
+        };
+
+        # An inventory of every listening socket outside loopback and whether it is a decision somebody
+        # made. `--strict` turns it into the gate that keeps a new service from being exposed by accident.
+        exposure-audit = {
+          type = "app";
+          program = "${
+            (import ./lib/audit/default.nix {
+              inherit pkgs hostNames self;
+              lib = nixpkgs-unstable.lib;
+            }).exposure
+          }/bin/exposure-audit";
+          meta = {
+            description = "List every listening socket and whether it was declared";
           };
         };
       };

@@ -118,10 +118,30 @@ in
     systemd.services.crowdsec-firewall-bouncer.serviceConfig.DynamicUser = lib.mkForce false;
 
     my.contracts.provides.crowdsec = lib.mkIf isMaster {
+      # The local API, and the single port in this file that belongs on the mesh: every host's
+      # firewall bouncer and agent registers against it (`api_url = http://${masterIP}:8085/`), and
+      # `${masterIP}` is an overlay address. Leaving it undeclared is what closing the mesh broke -
+      # measured: the master listened on 8085 and nothing could reach it, silently.
+      endpoints.lapi = {
+        port = 8085;
+        protocol = "tcp";
+        scope = "mesh";
+        directAccess = {
+          enable = true;
+          interface = "wireguard";
+          protocol = "tcp";
+        };
+      };
       endpoints.web = {
         port = 6060;
         protocol = "tcp";
         scope = "internal";
+        # The metrics of the local API, scraped by the collector on this host.
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
         monitoring = {
           http.enable = false;
           scrape.enable = true;

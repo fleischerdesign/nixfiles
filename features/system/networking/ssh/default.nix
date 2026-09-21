@@ -54,6 +54,31 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # The administrative path declares itself like every other endpoint, and it is the one that names the
+    # trust levels it is for: the local network and the trusted zones may reach it, a node of the mesh
+    # zone may not. That is what keeps a compromised public relay out of this host - measured before:
+    # every mesh node could open SSH here, and nobody ever did except the desktop, the notebook and the
+    # phone (all trusted). The port itself is opened by the contract projection, not by the module
+    # default, so there is one place that decides exposure.
+    my.contracts.provides.ssh = {
+      endpoints.ssh = {
+        port = 22;
+        protocol = "tcp";
+        scope = "isolated";
+        displayName = "Secure Shell";
+        directAccess = {
+          enable = true;
+          interface = "all";
+          from = [
+            "infra"
+            "corp"
+          ];
+        };
+      };
+    };
+
+    services.openssh.openFirewall = lib.mkForce false;
+
     systemd.services.sshd = {
       after = [ "network-online.target" ] ++ overlayUnits;
       wants = [ "network-online.target" ] ++ overlayUnits;
