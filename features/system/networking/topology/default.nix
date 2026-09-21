@@ -98,18 +98,6 @@ let
         default = false;
         description = "Whether this host acts as a public WireGuard mesh relay hub";
       };
-      lanGateway = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = [ ];
-        description = ''
-          Zones this host delivers into the mesh, written as zone names - the CIDRs are read from
-          `my.topology.subnets`, so an address is never written twice. The mesh carries the overlay
-          on its own, so a roaming client needs this announcement to reach anything behind it. A
-          zone may be delivered by one host only: cryptokey routing has exactly one owner per
-          prefix. A host that sits inside a zone installs no mesh route for it, because it reaches
-          that zone directly.
-        '';
-      };
       hostType = lib.mkOption {
         type = lib.types.enum [
           "server"
@@ -195,6 +183,16 @@ in
       description = "Topology host that terminates public ingress traffic.";
     };
 
+    # The host that routes the home LAN, declared the way the ingress host is. It is the next hop for
+    # a node that reaches a home zone from outside, the home door of the resolver, and the host that
+    # has to allow forwarding into those zones. Which zones it carries follows from the inventory
+    # (`announcedZones`), so no zone list is maintained next to this declaration.
+    lanRouter = lib.mkOption {
+      type = lib.types.str;
+      default = "hom-srv-01";
+      description = "Topology host that routes the home LAN.";
+    };
+
     resolvers = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
@@ -241,6 +239,29 @@ in
       type = lib.types.listOf lib.types.str;
       default = [ ];
       description = "Subnets with elevated trust level, synthesized for firewall and IPS whitelisting";
+    };
+
+    # The home zones the mesh carries. Not declared but derived, because the reason to carry a zone is
+    # a fact about the inventory: a zone is carried when it holds a device that has no overlay
+    # identity of its own. Such a device - a printer, a relay, a microcontroller - has one address and
+    # no second one, so a node outside the LAN reaches it only when its zone is routed there. A host
+    # zone is never carried: its hosts have an overlay address, and carrying the zone would put every
+    # device behind it within reach of every mesh node. The guest zone is never carried: it is not
+    # ours. A host decides whether it sits inside a zone by its own zone membership, which is why the
+    # carried zones - not their /24 arithmetic - are what the wireguard and DNS modules read.
+    announcedZones = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      readOnly = true;
+      description = "Home zones carried into the mesh: those holding a device without an overlay identity";
+    };
+
+    # The zones that make up the home LAN: every subnet that is neither the overlay nor the guest
+    # zone. Derived, so the modules that have to tell "at home" from "away" (`wireguard`,
+    # `resolver`) read one rule instead of naming zones - the rule is the trust level, not a list.
+    lanZones = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      readOnly = true;
+      description = "Zones that make up the home LAN: every subnet that is neither the mesh nor guest";
     };
   };
 
@@ -331,15 +352,6 @@ in
         wireguardIpv6 = "fd10:1000:100::10";
         wireguardPublicKey = "j80spw+2+Ojz51aKAytPdCZwFOc64yNOR05rAcXOESE=";
         hostType = "server";
-        # This host routes the home LAN, so it is the one that delivers those zones into the mesh
-        # (docs/docs/architecture.md). The announcement replaced Tailscale's subnet router; without it a
-        # roaming client reaches the mesh but none of the services behind it. `guest` is absent on
-        # purpose: no host carries that zone, so announcing it would route traffic into a hole.
-        lanGateway = [
-          "infra"
-          "corp"
-          "iot"
-        ];
       };
 
       hom-wrk-01 = {
@@ -464,6 +476,16 @@ in
       lib.mapAttrsToList (_: subnet: subnet.cidr) (
         lib.filterAttrs (_: s: s.trustLevel != "guest" && s.trustLevel != "iot") cfg.subnets
       )
+    );
+
+    my.topology.announcedZones = lib.filter (
+      zone:
+      zone != "guest"
+      && lib.any (device: device.zone == zone && device.ipv4 != null) (lib.attrValues cfg.devices)
+    ) (lib.attrNames cfg.subnets);
+
+    my.topology.lanZones = lib.attrNames (
+      lib.filterAttrs (_: subnet: subnet.trustLevel != "mesh" && subnet.trustLevel != "guest") cfg.subnets
     );
   };
 }

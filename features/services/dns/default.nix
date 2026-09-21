@@ -38,8 +38,9 @@ let
   ingressHost = topology.hosts.${topology.ingressHost} or null;
   ingressAddress = if ingressHost != null then ingressHost.ipv4 else null;
 
-  # The host that routes the home LAN is the one that can terminate DNS-over-TLS inside it.
-  deliveryHost = lib.findFirst (h: (h.lanGateway or [ ]) != [ ]) null (lib.attrValues topology.hosts);
+  # The host that routes the home LAN is declared once (`my.topology.lanRouter`); it is the one that
+  # terminates DNS-over-TLS inside it, so its own address is the home door of the resolver's name.
+  deliveryHost = topology.hosts.${topology.lanRouter} or null;
 
   # An address is a LAN address when it is on a private home subnet. A cloud host's `ipv4`
   # is its public address and must never be handed to a LAN client.
@@ -138,13 +139,21 @@ let
     ) config.my.contracts.projections.hostFqdnOf
   );
 
-  # A device has no overlay identity: it exists in the LAN plane only. Reaching it from
-  # elsewhere is not a name problem - such a device must be *published* as a service.
+  # A device has no overlay identity, so its LAN address is the only address it has and the only one
+  # the `lan` plane answers. A node that is not in the LAN reaches it over the mesh exactly when the
+  # device's zone is carried there (`my.topology.announcedZones`), so the `overlay` plane answers the
+  # same address for a carried zone and stays silent otherwise: a name that resolves to an address
+  # nothing routes is worse than no answer at all.
   deviceRules = lib.concatLists (
     lib.mapAttrsToList (
       devName: fqdn:
       mkRules [ fqdn ] {
         lan = topology.devices.${devName}.ipv4;
+        overlay =
+          if builtins.elem topology.devices.${devName}.zone topology.announcedZones then
+            topology.devices.${devName}.ipv4
+          else
+            null;
       }
     ) config.my.contracts.projections.deviceFqdnOf
   );

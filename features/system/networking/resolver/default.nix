@@ -20,7 +20,9 @@ let
   topology = config.my.topology;
   ownHost = topology.hosts.${config.networking.hostName} or null;
 
-  deliveryHost = lib.findFirst (h: (h.lanGateway or [ ]) != [ ]) null (lib.attrValues topology.hosts);
+  # The host that routes the home LAN is declared once (`my.topology.lanRouter`); its own address is
+  # the home door, its overlay address the mesh door.
+  deliveryHost = topology.hosts.${topology.lanRouter} or null;
   homeDoor = if deliveryHost == null then null else deliveryHost.ipv4;
   meshDoor = if deliveryHost == null then null else deliveryHost.wireguardIpv4;
 
@@ -31,13 +33,7 @@ let
   # overlay plane and run its LAN lookups - and the LAN traffic that follows them - out through the
   # WAN. A host in a home zone *without* a fixed address roams: at home the home door, abroad the
   # mesh door. A host in the mesh zone (a cloud host) is never at home.
-  homeZone =
-    ownHost != null
-    && builtins.elem (ownHost.zone or "") [
-      "infra"
-      "corp"
-      "iot"
-    ];
+  homeZone = ownHost != null && builtins.elem (ownHost.zone or "") topology.lanZones;
   fixedAtHome = homeZone && (ownHost.ipv4 or null) != null;
   mayRoam = homeZone && !fixedAtHome;
   doors = lib.filter (d: d != null) (

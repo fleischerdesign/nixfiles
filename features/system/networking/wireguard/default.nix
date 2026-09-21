@@ -40,48 +40,33 @@ let
       cfg.primaryHub;
 
   # --- LAN reachability over the mesh ----------------------------------------------------------
-  # The overlay alone is not enough: a roaming client has to reach the home LAN, whose services do
-  # not all have a public name. Which zones a host delivers is declared in the topology as zone names
-  # (`lanGateway`), so no CIDR is written twice; the host that delivers them announces them, every
-  # other host routes them to it through its peer entry, and a host that is itself inside a zone
-  # installs nothing for it - a mesh route for a subnet it is attached to would shadow its connected
-  # route. This is the job Tailscale's subnet router used to do.
-  lanCidrsOf = host: map (zone: topology.subnets.${zone}.cidr) (host.lanGateway or [ ]);
-
-  # Everything any host delivers into the mesh. A CIDR may be delivered once, and the assertion in
-  # `config` holds that: cryptokey routing has exactly one owner per prefix.
-  deliveredCidrs = lib.concatMap lanCidrsOf (lib.attrValues topology.hosts);
-  deliveredZones = lib.concatMap (host: host.lanGateway or [ ]) (lib.attrValues topology.hosts);
-
-  ownDeliveredCidrs = if ownHost == null then [ ] else lanCidrsOf ownHost;
+  # The mesh carries the overlay, plus the home zones that hold devices without an overlay identity.
+  # Which zones those are is derived in the topology (`announcedZones`) and not listed here: a device
+  # with one address and no second one is the only thing a node outside the LAN cannot reach any
+  # other way, and a host zone is never carried, because its hosts answer at their overlay address.
+  # The host that carries them is `my.topology.lanRouter` - the host that routes a zone is the only
+  # one that may claim it, because cryptokey routing has exactly one owner per prefix.
+  isLanRouter = ownHostname == topology.lanRouter;
+  announcedCidrs = map (zone: topology.subnets.${zone}.cidr) topology.announcedZones;
 
   meshCidr = topology.subnets.mesh.cidr or "10.10.100.0/24";
 
-  announcesLan = ownDeliveredCidrs != [ ];
+  # A host with its own address in a home zone *is* in the home LAN: its zone gateway reaches every
+  # other home zone directly, so a tunnel route for one would shadow a shorter path - measured: a
+  # node that carried them while sitting inside the LAN sent its infra and iot traffic out through
+  # the relays and back. A node without such an address roams, and needs the carried zones in its
+  # tunnel: abroad it has no other path to them.
+  insideLan =
+    ownHost != null && ownHost.ipv4 != null && builtins.elem (ownHost.zone or "") topology.lanZones;
 
-  # A host that sits inside a delivered zone reaches that whole LAN directly through its gateway, so
-  # it installs no mesh route for it - a tunnel route for a subnet it is attached to would shadow its
-  # connected route. Everything else is a roaming node and needs the delivered zones in its tunnel:
-  # without them a notebook in a foreign network still resolves its home names, but the addresses
-  # behind them are unreachable (measured: after they were dropped, 10.10.20.10 went out through the
-  # foreign gateway instead of the tunnel, and the operator's ssh to a home host stopped). Membership
-  # is decided on the /24 network part; the assertion below holds that every delivered zone is a /24
-  # rather than trusting it.
-  network = address: lib.concatStringsSep "." (lib.take 3 (lib.splitString "." address));
+  meshLanRoutes = if insideLan then [ ] else announcedCidrs;
 
-  onLan =
-    ownHost != null
-    && ownHost.ipv4 != null
-    && builtins.any (cidr: network ownHost.ipv4 == network cidr) deliveredCidrs;
-
-  meshLanRoutes = if onLan then [ ] else lib.subtractLists ownDeliveredCidrs deliveredCidrs;
-
-  # What a peer delivers: its own overlay address, plus the zones it announces into the mesh.
+  # What a peer delivers: its own overlay address, plus the home zones the LAN router carries.
   deliveredBy =
-    peer:
+    name: peer:
     [ "${peer.wireguardIpv4}/32" ]
     ++ lib.optional (peer.wireguardIpv6 != null) "${peer.wireguardIpv6}/128"
-    ++ lanCidrsOf peer;
+    ++ lib.optionals (name == topology.lanRouter) announcedCidrs;
 
   # The relay hubs a node that is not itself a relay peers with. `lanRoutes` is what that node routes
   # into the home LAN over the mesh: empty for a node that sits inside a delivered zone (a tunnel
@@ -118,10 +103,10 @@ let
     if isRelay then
       # A relay hub peers with all nodes that have declared public keys
       lib.mapAttrsToList (
-        _name: peer:
+        name: peer:
         {
           publicKey = peer.wireguardPublicKey;
-          allowedIPs = deliveredBy peer;
+          allowedIPs = deliveredBy name peer;
           persistentKeepalive = 25;
         }
         // lib.optionalAttrs ((peer.wireguardRelay or false) && peer.ipv4 != null) {
@@ -180,20 +165,28 @@ in
       allowedUDPPorts = lib.optional (isRelay || ownHost.ipv4 != null) cfg.port;
       trustedInterfaces = [ cfg.interfaceName ];
       checkReversePath = "loose";
-      # The host that delivers the LAN has to be allowed to forward mesh traffic into it; without
-      # this the packets reach the gateway and stop there, because reaching the gateway's own
-      # addresses is input, not forward.
-      extraForwardRules = lib.optionalString announcesLan "ip saddr ${meshCidr} accept\n";
+      # The host that routes the home LAN has to be allowed to forward mesh traffic into the zones it
+      # carries; without this the packets stop at it, because reaching its own addresses is input, not
+      # forward. Which zones it carries is a consequence of the inventory, and the rule below is the
+      # same derivation the routes are built from.
+      extraForwardRules = lib.optionalString isLanRouter "ip saddr ${meshCidr} accept\n";
     };
 
     assertions = [
       {
-        assertion = builtins.length deliveredZones == builtins.length (lib.unique deliveredZones);
-        message = "WireGuard: ${lib.concatStringsSep ", " deliveredZones} delivers a zone into the mesh more than once; cryptokey routing has exactly one owner per prefix, so the route would be ambiguous.";
+        assertion = topology.hosts ? ${topology.lanRouter};
+        message = "WireGuard: my.topology.lanRouter names '${topology.lanRouter}', which is not a declared host, so the home zones would be carried by nobody.";
       }
       {
-        assertion = builtins.all (cidr: lib.hasSuffix "/24" cidr) deliveredCidrs;
-        message = "WireGuard: a delivered zone is not a /24 (${lib.concatStringsSep ", " deliveredCidrs}), but membership in a zone is decided on its /24 network part.";
+        # A carried zone is carried because a device in it has no overlay identity - and a device that
+        # DHCP cannot serve is not reachable either, so the route would lead into a hole.
+        assertion = builtins.all (
+          zone:
+          lib.any (device: device.zone == zone && device.ipv4 != null && device.mac != null) (
+            lib.attrValues topology.devices
+          )
+        ) topology.announcedZones;
+        message = "WireGuard: a home zone is carried into the mesh (${lib.concatStringsSep ", " topology.announcedZones}) that holds no inventarised device with an address and a MAC, so the route would lead into a hole.";
       }
     ]
     ++ lib.map (name: {
