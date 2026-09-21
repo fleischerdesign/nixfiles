@@ -136,8 +136,11 @@ declares `my.features.system.networking.wireguard.clientConfigs = [ "<name>" ]` 
 by sops-nix - Nix cannot read a SOPS value at build time. Scan it once:
 
 ```bash
-sudo qrencode -t ansiutf8 < /run/secrets/rendered/wg-<name>.conf
+sudo qrencode -t ansiutf8 -r /run/secrets/rendered/wg-<name>.conf
 ```
+
+Use `-r`, not a shell redirect: the file is root-only, and `< file` would be opened by the operator's
+shell before `qrencode` runs.
 
 The peers, addresses, DNS and routes in that file are derived, not typed: the same `relayPeersFor`
 function builds the NixOS spokes' peers. Revocation is the inverse, plus the key rotation in
