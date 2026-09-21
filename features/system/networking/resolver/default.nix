@@ -24,16 +24,33 @@ let
   homeDoor = if deliveryHost == null then null else deliveryHost.ipv4;
   meshDoor = if deliveryHost == null then null else deliveryHost.wireguardIpv4;
 
-  # A host whose zone is a home zone can be at home and then reaches the home door over the LAN;
-  # a host in the mesh zone (a cloud host) never can and is served by the mesh door alone.
-  mayBeAtHome =
+  # A host that has its own fixed address in a home zone *is* in the home LAN and stays there, so the
+  # home door is the whole answer. Offering it the mesh door as a second would be a liability rather
+  # than a fallback: systemd-resolved keeps using the server that answered once a first one failed
+  # until its probe sees it again (measured), so one failed probe would move a home host onto the
+  # overlay plane and run its LAN lookups - and the LAN traffic that follows them - out through the
+  # WAN. A host in a home zone *without* a fixed address roams: at home the home door, abroad the
+  # mesh door. A host in the mesh zone (a cloud host) is never at home.
+  homeZone =
     ownHost != null
-    && builtins.elem ownHost.zone [
+    && builtins.elem (ownHost.zone or "") [
       "infra"
       "corp"
       "iot"
     ];
-  doors = lib.filter (d: d != null) ((if mayBeAtHome then [ homeDoor ] else [ ]) ++ [ meshDoor ]);
+  fixedAtHome = homeZone && (ownHost.ipv4 or null) != null;
+  mayRoam = homeZone && !fixedAtHome;
+  doors = lib.filter (d: d != null) (
+    if fixedAtHome then
+      [ homeDoor ]
+    else if mayRoam then
+      [
+        homeDoor
+        meshDoor
+      ]
+    else
+      [ meshDoor ]
+  );
 in
 {
   options.my.features.system.networking.resolver = {
