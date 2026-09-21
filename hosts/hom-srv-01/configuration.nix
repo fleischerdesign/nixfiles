@@ -60,10 +60,12 @@
       };
       system = {
         networking = {
-          # TEMPORARY (cutover): the FRITZ!Box still serves DHCP on the old LAN - it rejected the
-          # TR-064 address move (UPnP 402, argument format still to be determined), so it has not
-          # moved yet. Kea must stay off until it has, or two DHCP servers answer on one L2
-          # segment. Flip to true together with the box move (docs/operations.md §10 Step 4).
+          # The cutover is done: the FRITZ!Box's own DHCP is off - verified over TR-064, not
+          # assumed (`DHCP server current=False desired=False`) - so Kea is the only DHCP server
+          # on the segment and serves every zone. The box stays the modem; the fritzbox
+          # reconciler keeps its DHCP toggle, DNS setting and port forwards neutral and never
+          # touches its LAN address or subnet (docs/architecture.md 3.3). The one diff it still
+          # reports is the box's DHCP range, which is inert while its DHCP is off.
           gateway = {
             enable = true;
             enableDhcp = true;

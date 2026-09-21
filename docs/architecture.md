@@ -79,7 +79,13 @@ that is not in the inventory gets a default-zone lease - which is the rule, not 
 
 `hom-srv-01` is a single-NIC router-on-a-stick (RFC 1812): it is the default router for every zone, the
 DHCP server, the resolver, the NTP server and the NAT for the trusted zones. The uplink is the router at
-`10.10.10.1`, which is a transparent modem - no DHCP, no DNS, no port forwardings.
+`10.10.10.1`, which is a transparent modem - no DHCP, no DNS handed to clients, no port forwardings.
+Its DHCP toggle is off (verified over TR-064: `DHCP server current=False`), and the DNS it would
+announce is not settable over TR-064 and reaches nobody while its DHCP is off.
+
+IPv6 is deliberately absent from the LAN: this gateway is IPv4-only (Kea DHCPv4, no DHCPv6 and no
+router advertisements) and the zones declare no IPv6 prefix, so the only IPv6 in the fleet is the
+mesh's ULA (§4). Whatever the uplink announces over IPv6 reaches nothing and is not part of the model.
 
 The zone gateways (`10.10.20.1`, `10.10.30.1`, …) are addresses *on that one interface*. Which zones a
 host serves follows from its role, not from a list: a zone's gateway must live inside the zone, or it

@@ -353,7 +353,7 @@ here: they belong in the commit that resolved them.
 | Both agentless reconcilers reject the `switch` action argument | `nod switch hom-rt-01` / `hom-ap-01` may fail; run the tool directly |
 | The FRITZ!Box's DHCP is **off** in the desired state | enabling Kea before reconciling the box gives you two DHCP servers on one segment, or none |
 | Applying the `tplink-ap` reconciler unifies the SSIDs to `VYRX` on both bands and needs the access point at its current address | it changes the WLAN for everyone, including the microcontrollers that store the fleet SSID |
-| Neither reconciler has ever been run in apply mode | their desired state is verified as a **diff**, not as an applied state — the box's LAN interface, its DNS and its port forwards are still whatever the device already had |
+| The `tplink-ap` reconciler has never been run in apply mode | its desired state is verified as a **diff**, not as an applied state — the access point's SSID and band settings are still whatever the device already had. The `fritzbox` reconciler **has** been applied (2026-09-21): its diff is empty except the DHCP-announced DNS, which this box exposes no TR-064 action for |
 | Authentik's `akadmin` is the only usable break-glass account | family accounts carry no password and are created through the enrollment flow |
 | The remote forward-auth outpost is reached at an overlay address (`10.10.100.1:9055`) | Caddy logins on the LAN hosts break if the mesh is down |
 | OpenClaw gateways require the ingress in `gateway.trustedProxies` | without it every proxy-shaped request is rejected |
