@@ -416,9 +416,14 @@ in
       };
     };
 
-    # The listener's port is opened by the module that creates the listener; the home door
-    # is reached from a home zone, the public door from the internet.
-    networking.firewall.allowedTCPPorts = lib.optional cfg.dot cfg.dotPort;
+    # A resolver opens what it serves: the plain port wherever it binds a plain listener, and the DoT
+    # port where it terminates TLS. Measured on the cloud resolver: it served the mesh on 10.10.100.1
+    # and its firewall dropped every query that arrived there, because only the DoT port was opened.
+    networking.firewall = {
+      allowedTCPPorts =
+        lib.optional cfg.dot cfg.dotPort ++ lib.optional (effectiveListen != { }) cfg.port;
+      allowedUDPPorts = lib.optional (effectiveListen != { }) cfg.port;
+    };
 
     # Knot reads the certificate itself and its watchdog reloads it when it changes, so the
     # certificate is issued where the name terminates - exactly as every other name here.

@@ -172,7 +172,7 @@ machine-generated list is `my.contracts.projections.fqdns`; the derivation rules
 
 ### 5.2 Split horizon
 
-The resolver on `hom-srv-01` (Knot Resolver 6, `features/services/dns`) answers **three planes** and
+The resolvers (`features/services/dns`, Knot Resolver 6) answer **three planes** and
 picks between them by the *source address* of the query, so one name has one address per plane:
 
 | Plane | Source | What a name resolves to |
@@ -208,6 +208,17 @@ the mesh - a device in a zone that is not carried is NXDOMAIN off the LAN rather
 nothing routes. Over DoT the public door answers the ingress for a service and NXDOMAIN
 for a device, the home door the LAN addresses of both; both doors present a Let's Encrypt
 certificate for the resolver's name.
+
+The resolver is not a single point of failure. `my.topology.resolverHosts` declares who serves DNS -
+`hom-srv-01` inside the home LAN and `cld-edge-01` in the cloud - and every one of them generates the
+same zones from the same inventory, so nothing is replicated at runtime. Each announces its overlay
+address as a door; a node that is not fixed at home lists the home door first, so a node inside the LAN
+uses the LAN, and then those mesh doors, so a home outage leaves name resolution working for everything
+that is not in the house. A fixed home host keeps the home door alone: a second door would only tempt it
+onto the overlay plane. Measured 2026-09-21: the cloud door answers the same zones over the mesh - the
+overlay plane, blocklist included - and the home resolver serves the LAN. The cloud door also showed
+that a door has to be opened to be a door: it listened on `10.10.100.1:53` while its firewall allowed
+only the DoT port, so every query to it was dropped.
 
 Every host resolves through that resolver. The list is declared once in the inventory
 (`my.topology.resolvers`) and `features/system/networking/static` hands it to **both** consumers:
