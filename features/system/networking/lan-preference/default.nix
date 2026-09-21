@@ -71,6 +71,7 @@ in
               RESOLVECTL=${pkgs.systemd}/bin/resolvectl
 
               HOME_DOOR=${homeDoor}
+              INTERNAL_DOMAIN=${topology.domain}
               LAN_ZONES="${lanZoneArgs}"
               CARRIED="${carriedArgs}"
               LAN_METRIC=600
@@ -116,10 +117,13 @@ in
               case "''${ACTION:-}" in
                 up|dhcp4-change|connectivity-change)
                   if [ -n "$(local_zones)" ]; then
-                    # The rule of the link is more specific than the global one, so it wins without
-                    # depending on which door answered last.
+                    # The link's rule is the internal domain, not everything: a more specific rule than
+                    # the global one, so it wins. A second `~.` does not - measured: the global scope
+                    # kept the door that had answered last, and the notebook at home still received
+                    # overlay addresses. Names outside the domain keep following the global list, where
+                    # either door answers alike, which is what makes the sticky server harmless.
                     "$RESOLVECTL" dns "$DEVICE" "$HOME_DOOR" 2>/dev/null || true
-                    "$RESOLVECTL" domain "$DEVICE" "~." 2>/dev/null || true
+                    "$RESOLVECTL" domain "$DEVICE" "~$INTERNAL_DOMAIN" 2>/dev/null || true
                     "$RESOLVECTL" flush-caches 2>/dev/null || true
                     at_home
                   else

@@ -162,6 +162,18 @@
             description = "Declarative Cloudflare Edge & DNS GitOps Reconciliation Tool";
           };
         };
+        network-audit = {
+          type = "app";
+          program = "${
+            import ./lib/audit/default.nix {
+              inherit pkgs hostNames self;
+              lib = nixpkgs-unstable.lib;
+            }
+          }/bin/network-audit";
+          meta = {
+            description = "Measure the fleet against what the inventory promises";
+          };
+        };
       };
 
       checks.${system} = {
@@ -194,6 +206,29 @@
               deadnix --fail ${./.}
               touch $out
             '';
+
+        # The promises the network makes, checked against the evaluated fleet. The assertions in the
+        # modules catch a bad declaration; this catches a fleet whose parts contradict each other - a
+        # carried zone without a forward rule, a name that answers with an address nothing routes, a
+        # client that routes a home zone. Every one of them was a real failure before it was a check.
+        network-invariants =
+          let
+            result = import ./lib/checks/network-invariants.nix {
+              lib = nixpkgs-unstable.lib;
+              inherit self hostNames;
+            };
+          in
+          pkgs.runCommandLocal "network-invariants" { } (
+            if result.violations == [ ] then
+              "echo 'ok: ${toString (builtins.length result.invariants)} network invariants hold' > $out"
+            else
+              ''
+                cat >&2 <<'VIOLATIONS'
+                ${nixpkgs-unstable.lib.concatStringsSep "\n" result.violations}
+                VIOLATIONS
+                exit 1
+              ''
+          );
       }
       // nixpkgs-unstable.lib.genAttrs' gatewayHosts (name: {
         name = "openclaw-config-validity-${name}";

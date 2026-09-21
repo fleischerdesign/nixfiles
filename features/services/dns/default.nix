@@ -213,6 +213,34 @@ in
   options.my.features.services.dns = {
     enable = lib.mkEnableOption "Knot Resolver 6 as the fleet resolver (plane-correct views)";
 
+    # What the resolver will answer, as a projection: one entry per (name, plane). It exists so a check
+    # can state an invariant about the answers instead of recomputing the derivation - and the
+    # invariant that matters is the one learnt the hard way: a name must never resolve to an address
+    # nothing routes, which is why a device in a zone the mesh does not carry is not answered off the
+    # LAN at all.
+    answers = lib.mkOption {
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              description = "Name as the resolver stores it, with the trailing dot of a zone file";
+            };
+            plane = lib.mkOption {
+              type = lib.types.str;
+              description = "Plane the answer belongs to: lan, overlay or public";
+            };
+            address = lib.mkOption {
+              type = lib.types.str;
+              description = "The address the resolver answers in that plane";
+            };
+          };
+        }
+      );
+      readOnly = true;
+      description = "The A records the resolver answers, projected from the rules it is built from";
+    };
+
     port = lib.mkOption {
       type = lib.types.port;
       default = 53;
@@ -299,6 +327,23 @@ in
         message = "DNS: DoT needs an address to serve on, and this host declares none in the topology.";
       }
     ];
+
+    # The projection of the same rules the resolver is built from, in the shape a check wants it:
+    # `{ name, plane, address }` per record. A rule reads `"<fqdn> 60 IN A <address>"`, so the name is
+    # its first field and the address its last.
+    my.features.services.dns.answers = lib.unique (
+      lib.map (
+        rule:
+        let
+          parts = lib.splitString " " rule.records;
+        in
+        {
+          name = builtins.head parts;
+          plane = builtins.head rule.tags;
+          address = lib.last parts;
+        }
+      ) (nodeRules ++ deviceRules ++ serviceRules ++ resolverRules)
+    );
 
     # The hosts resolve through `my.topology.resolvers` (the resolver's own zone address),
     # not through 127.0.0.1: the resolver binds the zone addresses, so pointing resolv.conf
