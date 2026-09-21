@@ -6,6 +6,10 @@
 }:
 let
   cfg = config.my.features.services.authentik.outpost.proxy;
+
+  # The core as this host reaches it: the LAN address while both sides are at home, otherwise the overlay
+  # address (lib/addresses.nix).
+  addresses = import ../../../../../lib/addresses.nix { inherit lib; };
 in
 {
   options.my.features.services.authentik.outpost.proxy = {
@@ -17,7 +21,13 @@ in
     };
     coreAddress = lib.mkOption {
       type = lib.types.str;
-      default = "http://${config.my.topology.hosts.cld-edge-01.wireguardIpv4}:9055";
+      default = "http://${
+        addresses.serviceAddress {
+          topology = config.my.topology;
+          consumer = config.my.topology.hosts.${config.networking.hostName} or null;
+          peer = config.my.topology.hosts.cld-edge-01;
+        }
+      }:9055";
       description = "Internal address of the Authentik Core instance.";
     };
     browserUrl = lib.mkOption {

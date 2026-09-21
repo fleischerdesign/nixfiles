@@ -6,8 +6,16 @@
 let
   cfg = config.my.features.services.crowdsec;
   isMaster = cfg.role == "master";
-  # Use topology host definitions for IPs
-  masterIP = config.my.topology.hosts.${cfg.masterHost}.wireguardIpv4;
+
+  # The master as this host reaches it: the LAN address while both are at home, otherwise the overlay
+  # address (lib/addresses.nix). The master normally sits in the cloud, so this is the overlay - and the
+  # rule is stated once instead of here.
+  addresses = import ../../../lib/addresses.nix { inherit lib; };
+  masterIP = addresses.serviceAddress {
+    topology = config.my.topology;
+    consumer = config.my.topology.hosts.${config.networking.hostName} or null;
+    peer = config.my.topology.hosts.${cfg.masterHost};
+  };
 in
 {
   options.my.features.services.crowdsec = {

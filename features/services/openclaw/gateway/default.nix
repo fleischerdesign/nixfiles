@@ -14,13 +14,20 @@ let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.openclaw.gateway;
 
+  # The same rule as everywhere: the LAN address while both sides are at home, otherwise the overlay
+  # address (lib/addresses.nix).
+  addresses = import ../../../../lib/addresses.nix { inherit lib; };
+
   # The public ingress (Caddy + Authentik forward-auth) is the only legitimate proxy in front
   # of a gateway, so its overlay address is the only non-loopback entry allowed in
   # gateway.trustedProxies. Derived from the topology, so a new ingress host needs no edit
   # here (docs/architecture.md §7.1). OpenClaw validates the source address of proxy-shaped traffic
   # and rejects untrusted ones with `proxy_attribution_required`.
-  ingressProxyAddress =
-    (osConfig.my.topology.hosts.${osConfig.my.topology.ingressHost} or { }).wireguardIpv4 or null;
+  ingressProxyAddress = addresses.serviceAddress {
+    topology = osConfig.my.topology;
+    consumer = osConfig.my.topology.hosts.${osConfig.networking.hostName} or null;
+    peer = osConfig.my.topology.hosts.${osConfig.my.topology.ingressHost} or null;
+  };
 
   # Standard baseline toolchain available to OpenClaw execution environments
   defaultBasePackages = [

@@ -10,6 +10,17 @@ let
   hosts = config.my.topology.hosts or { };
   ownHost = config.networking.hostName;
 
+  # The address this host uses to reach a peer: the LAN address while both are at home, otherwise the
+  # overlay address (lib/addresses.nix states the rule once, for every consumer).
+  addresses = import ../../../../lib/addresses.nix { inherit lib; };
+  serviceAddress =
+    peer:
+    addresses.serviceAddress {
+      topology = config.my.topology;
+      consumer = hosts.${ownHost} or null;
+      peer = peer;
+    };
+
   blackboxRelabel = blackboxAddr: [
     {
       source_labels = [ "__address__" ];
@@ -52,7 +63,7 @@ let
 
   blackboxAddrForHost =
     hostName:
-    if hostName == ownHost then "127.0.0.1:9115" else "${hosts.${hostName}.wireguardIpv4}:9115";
+    if hostName == ownHost then "127.0.0.1:9115" else "${serviceAddress hosts.${hostName}}:9115";
 
   # Collect all direct Prometheus scrape targets across hosts
   allScrapeServices = lib.concatLists (
@@ -158,7 +169,7 @@ in
                 if t.hostName == ownHost then
                   "127.0.0.1:${toString t.svc.monitoring.scrape.port}"
                 else
-                  "${hosts.${t.hostName}.wireguardIpv4}:${toString t.svc.monitoring.scrape.port}"
+                  "${serviceAddress hosts.${t.hostName}}:${toString t.svc.monitoring.scrape.port}"
               )
             ];
             labels = {
@@ -265,7 +276,7 @@ in
               metrics_path = "/probe";
               params.module = [ "icmp" ];
               static_configs = lib.mapAttrsToList (name: host: {
-                targets = [ host.wireguardIpv4 ];
+                targets = [ (serviceAddress host) ];
                 labels = {
                   target_host = name;
                   probe_type = "icmp_mesh";

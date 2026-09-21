@@ -27,14 +27,17 @@ let
       "${config.networking.hostName}" = config;
     };
   isIngress = config.networking.hostName == config.my.topology.ingressHost;
-  overlayAddress =
+
+  # The address the ingress uses to reach a service host: on an internal request the two are at home and
+  # the LAN address keeps the traffic in the house, otherwise the overlay carries it (lib/addresses.nix).
+  addresses = import ../../../lib/addresses.nix { inherit lib; };
+  serviceAddress =
     host:
-    if host == null then
-      null
-    else if host.wireguardIpv4 != null then
-      host.wireguardIpv4
-    else
-      host.ipv4;
+    addresses.serviceAddress {
+      topology = config.my.topology;
+      consumer = config.my.topology.hosts.${config.networking.hostName} or null;
+      peer = host;
+    };
   terminatedEndpoints =
     lib.concatMap (
       contract:
@@ -122,7 +125,7 @@ in
                 lib.mapAttrsToList (
                   hostName: hostConfig:
                   let
-                    address = overlayAddress (config.my.topology.hosts.${hostName} or null);
+                    address = serviceAddress (config.my.topology.hosts.${hostName} or null);
                   in
                   lib.optionals (hostName != config.networking.hostName && address != null) (
                     lib.concatLists (

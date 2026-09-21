@@ -13,6 +13,10 @@ let
   # cannot be mistyped into an entry that is silently skipped.
   blueprintLib = import ../lib/blueprint.nix { inherit lib; };
 
+  # The core as this host reaches it: the LAN address while both sides are at home, otherwise the overlay
+  # address (lib/addresses.nix).
+  addresses = import ../../../../lib/addresses.nix { inherit lib; };
+
   # Blueprint application is asynchronous upstream: the API's apply endpoint and the hourly discovery both
   # only queue a task. The unit below queues the same task and then waits for the effect, so a deploy is
   # finished when the objects exist, not when a file was written.
@@ -470,7 +474,13 @@ in
         if serverHost == null || serverHost == config.networking.hostName then
           "127.0.0.1:${toString listenHttpPort}"
         else
-          "${config.my.topology.hosts.${serverHost}.wireguardIpv4}:${toString listenHttpPort}";
+          "${
+            addresses.serviceAddress {
+              topology = config.my.topology;
+              consumer = config.my.topology.hosts.${config.networking.hostName} or null;
+              peer = config.my.topology.hosts.${serverHost};
+            }
+          }:${toString listenHttpPort}";
       description = "Address of the central embedded outpost as reachable from this host.";
     };
     blueprintsDir = lib.mkOption {
