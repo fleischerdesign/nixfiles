@@ -88,7 +88,6 @@ in
               set -u
 
               IP=${pkgs.iproute2}/bin/ip
-              GREP=${pkgs.gnugrep}/bin/grep
               RESOLVECTL=${pkgs.systemd}/bin/resolvectl
 
               HOME_DOOR=${homeDoor}
@@ -96,30 +95,82 @@ in
               LAN_ZONES="${lanZoneArgs}"
               CARRIED="${carriedArgs}"
               LAN_METRIC=600
+              # The device the override was last given to, so it can be taken back from *that* device:
+              # a link event for a different link must not withdraw the home rule, and one for the tunnel
+              # must not leave the override behind on it.
+              STATE=/run/lan-preference.device
 
               ip2int() { local a b c d; IFS=. read -r a b c d <<< "$1"; echo $(( (a << 24) + (b << 16) + (c << 8) + d )); }
               mask_int() { local len=''${1#*/}; echo $(( (0xffffffff << (32 - len)) & 0xffffffff )); }
               net_int() { local len=''${1#*/}; echo $(( $(ip2int "''${1%/*}") & $(mask_int "$len") )); }
 
-              # The home zones this host currently has an address in, as `zone:cidr:gateway`.
-              local_zones() {
-                local entry address
-                for address in $("$IP" -4 -o addr show | "$GREP" -oE '[0-9]+(\.[0-9]+){3}/[0-9]+'); do
-                  case "$address" in 127.*) continue ;; esac
+              # The home zones this host currently has an address in, as `device:zone:cidr:gateway`. The
+              # device is read off the address, never off the event: NetworkManager reports the tunnel
+              # coming up while the LAN address is already there, and the rule is about the link that
+              # *holds* the address. Measured with the event's device: the notebook got the home door on
+              # wg0, asked it with its overlay source address and timed out - while the same question over
+              # the LAN address was answered.
+              home_addresses() {
+                local device address entry cidr rest
+                "$IP" -4 -o addr show scope global | while read -r _ device _ address rest; do
+                  case "$address" in */*) ;; *) continue ;; esac
                   for entry in $LAN_ZONES; do
-                    local cidr=''${entry#*:}; cidr=''${cidr%%:*}
-                    local mask=''${cidr#*/}
-                    if [ $(( $(ip2int "''${address%/*}") & $(mask_int "$mask") )) -eq "$(net_int "$cidr")" ]; then
-                      echo "$entry"
+                    cidr=''${entry#*:}; cidr=''${cidr%%:*}
+                    if [ $(( $(ip2int "''${address%/*}") & $(mask_int "''${cidr#*/}") )) -eq "$(net_int "$cidr")" ]; then
+                      echo "$device:$entry"
                     fi
                   done
                 done
               }
 
-              at_home() {
+              home_device() {
                 local entry
+                for entry in $(home_addresses); do echo "''${entry%%:*}"; return; done
+              }
+
+              local_zones() {
+                local entry
+                for entry in $(home_addresses); do echo "''${entry#*:}"; done
+              }
+
+              # One question, asked on every link event: does this host hold an address in a home zone,
+              # and on which link? The tunnel coming up, the LAN coming back and an activation all reach
+              # the same answer, and the override is taken back from the device it was given to - so a
+              # link event with nothing to do with the home LAN cannot disturb it in either direction.
+              reconcile() {
+                local device previous entry cidr carried
+                device=$(home_device)
+                previous=
+                [ -f "$STATE" ] && read -r previous < "$STATE"
+
+                if [ -n "$previous" ] && [ "$previous" != "$device" ]; then
+                  "$RESOLVECTL" revert "$previous" 2>/dev/null || true
+                  "$RESOLVECTL" reset-server-features 2>/dev/null || true
+                  : > "$STATE"
+                fi
+
+                if [ -z "$device" ]; then
+                  for carried in $CARRIED; do
+                    "$IP" route del "''${carried%%:*}" metric "$LAN_METRIC" 2>/dev/null || true
+                  done
+                  return
+                fi
+
+                # The link's rule is the internal domain, not everything: a more specific rule than
+                # the global one, so it wins. A second `~.` does not - measured: the global scope
+                # kept the door that had answered last, and the notebook at home still received
+                # overlay addresses. Names outside the domain keep following the global list, where
+                # either door answers alike, which is what makes the sticky server harmless.
+                "$RESOLVECTL" dns "$device" "$HOME_DOOR" 2>/dev/null || true
+                "$RESOLVECTL" domain "$device" "~$INTERNAL_DOMAIN" 2>/dev/null || true
+                # The global scope keeps the door that answered last; resetting the server features makes
+                # it start from the top of its list again, which is where the home door sits.
+                "$RESOLVECTL" reset-server-features 2>/dev/null || true
+                "$RESOLVECTL" flush-caches 2>/dev/null || true
+                echo "$device" > "$STATE"
+
                 for entry in $(local_zones); do
-                  local cidr=''${entry#*:}; cidr=''${cidr%%:*}
+                  cidr=''${entry#*:}; cidr=''${cidr%%:*}
                   for carried in $CARRIED; do
                     if [ "''${carried%%:*}" = "$cidr" ]; then continue 2; fi
                     "$IP" route replace "''${carried%%:*}" via "''${entry##*:}" metric "$LAN_METRIC"
@@ -127,37 +178,8 @@ in
                 done
               }
 
-              away() {
-                local carried
-                "$RESOLVECTL" revert "$DEVICE" 2>/dev/null || true
-                "$RESOLVECTL" reset-server-features 2>/dev/null || true
-                for carried in $CARRIED; do
-                  "$IP" route del "''${carried%%:*}" metric "$LAN_METRIC" 2>/dev/null || true
-                done
-              }
-
               case "''${ACTION:-}" in
-                up|dhcp4-change|connectivity-change)
-                  if [ -n "$(local_zones)" ]; then
-                    # The link's rule is the internal domain, not everything: a more specific rule than
-                    # the global one, so it wins. A second `~.` does not - measured: the global scope
-                    # kept the door that had answered last, and the notebook at home still received
-                    # overlay addresses. Names outside the domain keep following the global list, where
-                    # either door answers alike, which is what makes the sticky server harmless.
-                    "$RESOLVECTL" dns "$DEVICE" "$HOME_DOOR" 2>/dev/null || true
-                    "$RESOLVECTL" domain "$DEVICE" "~$INTERNAL_DOMAIN" 2>/dev/null || true
-                    # The global scope keeps the door that answered last; resetting the server features makes
-                    # it start from the top of its list again, which is where the home door sits.
-                    "$RESOLVECTL" reset-server-features 2>/dev/null || true
-                    "$RESOLVECTL" flush-caches 2>/dev/null || true
-                    at_home
-                  else
-                    away
-                  fi
-                  ;;
-                down|pre-down)
-                  away
-                  ;;
+                up|dhcp4-change|connectivity-change|down|pre-down) reconcile ;;
               esac
             '';
           }
