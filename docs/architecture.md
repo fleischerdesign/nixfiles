@@ -118,13 +118,19 @@ Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no
   transit; the secondary is reached by its own `/32`. A hub can be taken out without reconfiguring a
   spoke.
 - **Longest-prefix cryptokey routing.** A peer's `allowedIPs` is its overlay address plus whatever it
-  delivers (§ below). Traffic to a host's own `/32` goes direct; traffic to a prefix goes to whoever
-  announced it.
-- **The LAN reaches roaming clients.** The host that routes the home LAN declares which zones it
-  delivers (`lanGateway` in the topology, by zone *name* - the CIDRs are read from `my.topology`).
-  Every other host routes those CIDRs to it, and a host that sits inside a zone installs no route for
-  it, because it already has the LAN directly. Measured 2026-09-20: `10.10.10.10` and `10.10.30.11`
-  are reachable from a roaming client over `wg0` only.
+  carries (§ below). Traffic to a host's own `/32` goes direct; traffic to a prefix goes to whoever
+  carries it.
+- **The mesh carries the zones that need it - and the inventory says which.** Not declared but
+  derived: a zone is carried when it holds a device that has no overlay identity of its own. A
+  printer, a relay or a microcontroller has one address and no second one, so a node outside the LAN
+  reaches it only when its zone is routed. A host zone is never carried: its hosts answer at their
+  overlay address, and carrying the zone would put every device behind them within reach of every
+  mesh node. `my.topology.lanRouter` names the host that carries them, the way `ingressHost` names
+  the ingress; `my.topology.announcedZones` is what it carries. Measured 2026-09-21: from a cloud
+  node the printer resolves to its LAN address and `ping` and IPP reach it over `wg0`, while
+  `hom-srv-01.node` answers its overlay address.
+- **A host with its own address in a home zone installs no route for a carried zone**: its zone
+  gateway reaches every other home zone directly, so a tunnel route would shadow that path.
 - **The mesh is the last resort.** The interface carries route metric 1000 against NetworkManager's
   600: a prefix the host can reach directly always wins, and the tunnel is used only when the LAN is
   elsewhere. Without it, a client at home would send LAN traffic out through the cloud and back.
@@ -161,8 +167,10 @@ picks between them by the *source address* of the query, so one name has one add
 | `overlay` | the mesh (`10.10.100.0/24`, `fd10:1000:100::/64`) | the overlay address, reachable over `wg0` |
 | `public` | anything else | the ingress for a `public` service, the overlay for a node |
 
-A device has no overlay identity, so it exists in the `lan` plane only; reaching it from elsewhere is
-not a name problem - such a device is *published* as a service. A cloud host's `ipv4` is its public
+A device has no overlay identity, so the `lan` plane answers its only address. A node outside the LAN
+reaches it exactly when its zone is carried into the mesh (`announcedZones`), so the `overlay` plane
+answers the same address then and stays silent otherwise: a name that resolves to an address nothing
+routes would be worse than no answer. A cloud host's `ipv4` is its public
 address and is never handed to a LAN client: the `lan` plane answers its overlay, which a home client
 reaches through its LAN gateway. Blocklists are carried as an RPZ zone, converted from hosts format
 and refreshed on a timer.
@@ -181,7 +189,9 @@ being at home.
 
 Measured 2026-09-21: `jellyfin.vyrx.de` -> `10.10.10.10` / `10.10.100.10` / `173.249.22.211`,
 `hom-wrk-01.node.vyrx.de` -> `10.10.20.10` / `10.10.100.20`, and `hom-prn-01.node.vyrx.de` ->
-`10.10.30.19` / `NXDOMAIN`. Over DoT the public door answers the ingress for a service and NXDOMAIN
+`10.10.30.19` in the `lan` and the `overlay` plane alike, because that device's zone is carried into
+the mesh - a device in a zone that is not carried is NXDOMAIN off the LAN rather than an address
+nothing routes. Over DoT the public door answers the ingress for a service and NXDOMAIN
 for a device, the home door the LAN addresses of both; both doors present a Let's Encrypt
 certificate for the resolver's name.
 

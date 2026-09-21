@@ -29,9 +29,9 @@ This document is the **execution + safety guide**. It is deliberately explicit a
    - Physical console / keyboard for home hardware; LAN web UI for FRITZ!Box and RE330
 2. **The mesh is the transport.** Tailscale was removed on 2026-09-20; the four cutover criteria of
    §10 were measured first (every host on 2.0, handshakes on both hubs, `10.10.100.x` reachable, deploy
-   targets resolving to reachable WG addresses). The home LAN reaches roaming clients because
-   `hom-srv-01` delivers its zones into the mesh — one declaration in the topology (`lanGateway`), not a
-   second router.
+   targets resolving to reachable WG addresses). The home LAN reaches roaming clients for the zones
+   that hold devices without an overlay identity (`announcedZones`, derived from the inventory);
+   `my.topology.lanRouter` names the host that carries them - not a second router.
 3. **Exactly one DHCP server per L2 segment.** Never run FRITZ!Box DHCP and `hom-srv-01` Kea DHCP at the same time on the same subnet.
 4. **Never point DNS at a host that is not serving DNS yet.** FRITZ!Box DNS may only be set to `10.10.10.10` (Blocky) after Blocky answers queries.
 5. **The FRITZ!Box is the WAN modem.** The declarative engine only manages its **DNS, DHCP toggle and port forwards** — *never* its LAN IP, subnet or Wi-Fi. Do not change those.
