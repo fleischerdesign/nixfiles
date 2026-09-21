@@ -31,13 +31,10 @@
         sonarr.enable = true;
         jellyfin.enable = true;
         recyclarr.enable = true;
-        blocky.enable = true;
-        # Staging: the live resolver (blocky) keeps port 53 until this one has been proven
-        # against the real names on 5353. The listeners are derived from the topology.
-        dns = {
-          enable = true;
-          port = 5353;
-        };
+        # The resolver with plane-correct views replaced blocky and serves port 53 itself.
+        # Blocky stays in the tree, disabled, as the rollback.
+        blocky.enable = false;
+        dns.enable = true;
         bazarr.enable = true;
         jellyseerr.enable = true;
         klipper.enable = true;
