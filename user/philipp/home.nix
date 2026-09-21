@@ -48,7 +48,7 @@
     apps = {
       openclaw = {
         displayName = "OpenClaw";
-        url = "https://ai.ops.${osConfig.my.topology.domain}";
+        url = "https://philipp.ai.${osConfig.my.topology.domain}";
         icon = ../../media/openclaw.png;
         comment = "OpenClaw AI Gateway";
         categories = [
