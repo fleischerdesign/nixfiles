@@ -50,6 +50,12 @@ in
         port = 9115;
         protocol = "tcp";
         scope = "internal";
+        # Probed from the collector on another host, so the port belongs on the mesh.
+        directAccess = {
+          enable = true;
+          interface = "wireguard";
+          protocol = "tcp";
+        };
         monitoring = {
           tcp.enable = true;
           tcp.group = "Infrastructure";

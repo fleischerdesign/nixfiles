@@ -48,6 +48,12 @@ in
         port = 3100;
         protocol = "tcp";
         scope = "internal";
+        # Logs are shipped here from every other host, so the port belongs on the mesh.
+        directAccess = {
+          enable = true;
+          interface = "wireguard";
+          protocol = "tcp";
+        };
         monitoring = {
           http.enable = false;
           tcp.enable = true;

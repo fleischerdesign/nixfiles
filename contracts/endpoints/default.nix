@@ -450,13 +450,25 @@ let
     ) ep.port
   ) directEndpoints;
 
-  wireguardTcp = lib.concatMap (
+  # A named endpoint - one that carries a canonical domain - is proxied by an ingress, and both ingresses
+  # (the public one on the ingress host and the local one on the delivery host) reach the serving host over
+  # the mesh. So the mesh carries exactly the ports a proxy needs; an endpoint without a name is reached
+  # directly or not at all, and has to say so itself.
+  proxiedTcp = lib.concatMap (
     ep:
-    lib.optional (
-      ep.directAccess.interface == "wireguard"
-      && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
-    ) ep.port
-  ) directEndpoints;
+    lib.optional (ep.canonicalDomain != null && (ep.protocol == "tcp" || ep.protocol == "both")) ep.port
+  ) localEndpointsList;
+
+  wireguardTcp = lib.unique (
+    proxiedTcp
+    ++ lib.concatMap (
+      ep:
+      lib.optional (
+        ep.directAccess.interface == "wireguard"
+        && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
+      ) ep.port
+    ) directEndpoints
+  );
 
   wireguardUdp = lib.concatMap (
     ep:

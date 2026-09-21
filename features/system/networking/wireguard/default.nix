@@ -163,7 +163,11 @@ in
     networking.firewall = {
       # Listen on the public UDP port if the host is a public relay or has a public IP
       allowedUDPPorts = lib.optional (isRelay || ownHost.ipv4 != null) cfg.port;
-      trustedInterfaces = [ cfg.interfaceName ];
+      # No trusted interface. Arriving over the mesh is a transport fact, not a permission: what a host
+      # serves there it declares. The endpoints contract projects onto this interface the ports an ingress
+      # proxies (a named endpoint) and the ones declared for the mesh explicitly, and the administrative
+      # path is declared where SSH lives. Measured before: every mesh node reached every listening port of
+      # every other node, including the databases and the monitoring exporters.
       checkReversePath = "loose";
       # The host that routes the home LAN has to be allowed to forward mesh traffic into the zones it
       # carries; without this the packets stop at it, because reaching its own addresses is input, not
