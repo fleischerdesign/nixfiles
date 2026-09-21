@@ -50,6 +50,16 @@ hardware for a second segment does not exist yet, and the zone model is honest a
 ([naming.md](naming.md) states this explicitly, because a naming document that implies isolation
 nobody implemented is worse than no document).
 
+Because the segment is flat, **everything on it can be asked, not just reached through us.** The box
+is the clearest case: it is the IPv4 gateway, and while its IPv6 stack was on it was also a second
+resolver on the segment - it announced itself over RDNSS and DHCPv6 and answered on `10.10.10.1` with
+the **public** address of our own names. No firewall rule of ours could have stopped that, because a
+device asking a neighbour never passes our router. Since 2026-09-21 the box's IPv6 is off (see
+[embedded.md](embedded.md) §4): the segment carries IPv4 only, the router advertisements are gone, and
+what remains is a rule the segment does not need - a device configured by hand to use the box as its
+resolver still can. **The remedy for that is a second segment, not a rule** - VLANs per zone, the box
+on an uplink port - which the hardware does not support yet.
+
 | Zone | CIDR | Gateway | Trust | Contains |
 |---|---|---|---|---|
 | `infra` | `10.10.10.0/24` | `10.10.10.1` (uplink) | highest | `hom-srv-01`, the access point, the router |

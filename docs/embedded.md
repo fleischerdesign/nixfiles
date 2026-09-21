@@ -58,13 +58,16 @@ render. The reconciler speaks the encrypted web API (RSA/AES handshake) through 
 ## 4. Router
 
 The FRITZ!Box is a modem with a LAN interface: uplink and nothing else. It is configured over TR-064
-from `hom-srv-01`, never through its web interface.
+from `hom-srv-01`. Where the API has no action - the announced DNS and the IPv6 settings - the value
+is set in the web interface and the table below records it; the API's silence is a fact about the
+device, not a licence to change it by hand later.
 
 | Setting | Declared | Why |
 |---|---|---|
 | DHCP | **off** | `hom-srv-01` is the only DHCP server on the segment; two would be a race |
 | port forwardings | **none** | nothing is published from the home directly - ingress happens at the edge, and the LAN is reached over the mesh |
 | DNS | not settable by the API | the fleet's resolvers are handed out by Kea instead |
+| IPv6 in the home network | **off** - no router advertisements, no DHCPv6 (set by hand 2026-09-21) | while it was on, the box announced itself as a resolver over RDNSS (RFC 5006) and DHCPv6, so a device at home learned a second resolver - one that answers our public names with the **public** address, and that no rule can reach while the box sits on the same flat segment. The LAN is IPv4-only by decision and the IPv6 uplink was never usable (measured: an IPv6 curl from a LAN host has never succeeded). Measured after the change: a router solicitation is answered by nobody, and the hosts keep `10.10.10.10` as their only resolver |
 | Wi-Fi | the box radiates nothing the fleet uses | the access point is the single Wi-Fi plane |
 
 The engine is **diff-only for anything but these**: it reports what the device has and writes the
