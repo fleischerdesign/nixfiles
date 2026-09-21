@@ -40,6 +40,18 @@ let
         description = "Ingress exposure scope (public wildcard, internal LAN, wireguard mesh, or isolated)";
       };
 
+      ingress = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Whether the HTTP ingress terminates this endpoint - a Caddy virtual host and the
+          certificate that goes with it. An endpoint another component terminates itself (a
+          resolver's DNS-over-TLS listener) sets this to false: its name is still projected
+          into public DNS and its port into the host firewall, but no virtual host and no
+          ingress certificate are created for it.
+        '';
+      };
+
       auth = lib.mkOption {
         type = lib.types.enum [
           "none"

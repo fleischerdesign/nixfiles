@@ -37,7 +37,8 @@ let
       host.ipv4;
   terminatedEndpoints =
     lib.concatMap (
-      contract: lib.filter (ep: ep.canonicalDomain != null) (lib.attrValues contract.endpoints)
+      contract:
+      lib.filter (ep: ep.ingress && ep.canonicalDomain != null) (lib.attrValues contract.endpoints)
     ) (lib.attrValues (config.my.contracts.provides or { }))
     ++ lib.optionals isIngress (
       lib.concatLists (
@@ -45,7 +46,8 @@ let
           hostName: hostConfig:
           lib.optionals (hostName != config.networking.hostName) (
             lib.concatMap (
-              contract: lib.filter (ep: ep.canonicalDomain != null) (lib.attrValues contract.endpoints)
+              contract:
+              lib.filter (ep: ep.ingress && ep.canonicalDomain != null) (lib.attrValues contract.endpoints)
             ) (lib.attrValues (hostConfig.config.my.contracts.provides or { }))
           )
         ) flakeConfigurations
@@ -106,9 +108,9 @@ in
           localEndpoints = lib.concatLists (
             lib.mapAttrsToList (
               _svcName: contract:
-              lib.filter (ep: (ep.scope == "public" || ep.scope == "internal") && ep.canonicalDomain != null) (
-                lib.attrValues contract.endpoints
-              )
+              lib.filter (
+                ep: ep.ingress && (ep.scope == "public" || ep.scope == "internal") && ep.canonicalDomain != null
+              ) (lib.attrValues contract.endpoints)
             ) config.my.contracts.provides
           );
 
@@ -128,7 +130,7 @@ in
                         _svcName: contract:
                         lib.concatMap (
                           ep:
-                          lib.optional (ep.scope == "public" && ep.canonicalDomain != null) {
+                          lib.optional (ep.ingress && ep.scope == "public" && ep.canonicalDomain != null) {
                             inherit (ep)
                               canonicalDomain
                               extraDomains

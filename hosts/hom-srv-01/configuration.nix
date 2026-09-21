@@ -34,7 +34,12 @@
         # The resolver with plane-correct views replaced blocky and serves port 53 itself.
         # Blocky stays in the tree, disabled, as the rollback.
         blocky.enable = false;
-        dns.enable = true;
+        dns = {
+          enable = true;
+          # The home door: DNS-over-TLS, so a client that follows the resolver by name (a
+          # phone's private DNS setting) is answered here while it is at home.
+          dot = true;
+        };
         bazarr.enable = true;
         jellyseerr.enable = true;
         klipper.enable = true;

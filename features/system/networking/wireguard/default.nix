@@ -172,12 +172,6 @@ in
         peer list and this file.
       '';
     };
-
-    clientDns = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = config.my.topology.resolvers;
-      description = "Resolvers handed to a rendered client configuration; they must be reachable over the mesh.";
-    };
   };
 
   config = lib.mkIf (cfg.enable && ownHost != null && ownHost.wireguardIpv4 != null) {
@@ -275,14 +269,13 @@ in
             AllowedIPs = ${lib.concatStringsSep ", " peer.allowedIPs}
             PersistentKeepalive = ${toString peer.persistentKeepalive}
 
-          '') (relayPeersFor deliveredCidrs);
+          '') (relayPeersFor [ ]);
         in
         {
           content = ''
             [Interface]
             PrivateKey = ${config.sops.placeholder."infra/wireguard/${name}_private_key"}
             Address = ${lib.concatStringsSep ", " addresses}
-            DNS = ${lib.concatStringsSep ", " cfg.clientDns}
             MTU = 1280
 
             ${peers}'';

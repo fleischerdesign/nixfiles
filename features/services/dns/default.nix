@@ -1,17 +1,22 @@
 # features/services/dns/default.nix - Knot Resolver 6 with plane-correct views
 #
-# One resolver answers three planes, selected by the *source address* of the query:
+# One resolver answers three planes, selected by the *source address* of the query and, for
+# the home zone, by the door it came in through:
 #
 #   lan      a client on a home zone        -> the LAN address (the packet stays local)
 #   overlay  a client on the mesh           -> the overlay address (reachable over wg0)
 #   public   a client anywhere else         -> the ingress (services) / overlay (nodes)
 #
-# A name has one address per plane and the plane is a property of where the question came
-# from, not of the answer. See docs/architecture.md 5.2. Every record is a projection of
-# `my.topology`, the naming contract and the endpoint contracts - nothing is restated.
+# A name has one address per plane and the plane is a property of the question, not of the
+# answer. Every record is a projection of `my.topology`, the naming contract and the endpoint
+# contracts - nothing is restated.
 #
-# This module is deliberately *not* enabled anywhere yet: replacing the live resolver is a
-# staged, measured migration (docs/operations.md), not a side effect of adding the module.
+# Two doors serve the same name:
+#   * the home door (this resolver's own address inside a home zone, plain DNS and DoT), and
+#   * the public door (the ingress, DoT only - a plain public resolver answers nobody's need).
+# `dns.<domain>` resolves to the door of whoever asks: a home client reaches its own door
+# over the LAN, everyone else the ingress. The views therefore also carry `dst-subnet`, so a
+# foreign network that happens to use a home /24 is not treated as being at home.
 {
   config,
   lib,
@@ -27,18 +32,43 @@ let
       "${config.networking.hostName}" = config;
     };
 
+  domain = topology.domain;
+  resolverName = "${cfg.subdomain}.${domain}";
+
   ingressHost = topology.hosts.${topology.ingressHost} or null;
   ingressAddress = if ingressHost != null then ingressHost.ipv4 else null;
 
-  # The resolver answers on its own addresses. They are read from the inventory, so a host
-  # never restates them; the option below only adds or overrides.
+  # An address is a LAN address when it is on a private home subnet. A cloud host's `ipv4`
+  # is its public address and must never be handed to a LAN client.
+  isLanAddress =
+    address: address != null && (lib.hasPrefix "10.10." address || lib.hasPrefix "192.168." address);
+
   ownHost = topology.hosts.${config.networking.hostName} or null;
+  ownLanAddress = if ownHost != null && isLanAddress ownHost.ipv4 then ownHost.ipv4 else null;
+  ownOverlayAddress = if ownHost != null then ownHost.wireguardIpv4 else null;
+
+  # Plain DNS belongs where a home zone can reach it. The overlay mirror only exists next to a
+  # LAN listener: the mesh nodes get their resolver from `my.topology.resolvers`, so a cloud
+  # host needs no plain listener of its own.
   derivedListen =
-    lib.optionalAttrs (ownHost != null && ownHost.ipv4 != null) { lan = ownHost.ipv4; }
-    // lib.optionalAttrs (ownHost != null && ownHost.wireguardIpv4 != null) {
-      overlay = ownHost.wireguardIpv4;
+    lib.optionalAttrs (ownLanAddress != null) { lan = ownLanAddress; }
+    // lib.optionalAttrs (ownLanAddress != null && ownOverlayAddress != null) {
+      overlay = ownOverlayAddress;
     };
   effectiveListen = cfg.listenAddresses // derivedListen;
+
+  # The door this host serves DoT on: its own address, whichever plane it lives in (the LAN
+  # address inside, the public address at the ingress). Never the overlay address - a client
+  # reaching the resolver over the tunnel is an overlay client, so it would get overlay
+  # answers and send every home service out through the hubs and back.
+  dotAddresses = lib.optional (cfg.dot && ownHost != null && ownHost.ipv4 != null) ownHost.ipv4;
+
+  # Knot refuses a configuration without at least one listener, so a host that has none yet
+  # - the public door before DoT is switched on - runs no resolver at all.
+  hasListener = effectiveListen != { } || dotAddresses != [ ];
+
+  # A host that publishes the resolver's name, or terminates it inside a home zone.
+  hasDoor = ownLanAddress != null || cfg.publicEntry;
 
   # Planes. The mesh subnets are the overlay; the remaining trusted zones are the LAN. The
   # guest zone is not a plane of ours: a guest client falls through to the public view.
@@ -51,13 +81,6 @@ let
     ) topology.subnets
   );
 
-  # An address is a LAN address when it is on a private home subnet. A cloud host's `ipv4`
-  # is its public address and must never be handed to a LAN client.
-  isLanAddress =
-    address: address != null && (lib.hasPrefix "10.10." address || lib.hasPrefix "192.168." address);
-
-  # The address of a node in the LAN plane: its own LAN address if it has one, otherwise
-  # the overlay - a home client reaches a cloud node through its LAN gateway.
   lanPlaneAddress =
     host:
     if host == null then
@@ -68,8 +91,8 @@ let
       host.wireguardIpv4;
   overlayAddress = host: if host == null then null else host.wireguardIpv4;
 
-  # One rule per (name, plane). `records` (zonefile form) is used rather than `address`:
-  # an `address` mapping also synthesises a reverse PTR for that address, and every public
+  # One rule per (name, plane). `records` (zonefile form) is used rather than `address`: an
+  # `address` mapping also synthesises a reverse PTR for that address, and every public
   # endpoint resolves to the ingress, so the aggregated PTR exceeded Knot's 512 B record
   # limit and the policy loader refused to start (measured 2026-09-21). Names containing a
   # wildcard are skipped: `local-data` does not expand wildcards, and such names are minted
@@ -116,9 +139,9 @@ let
     ) config.my.contracts.projections.deviceFqdnOf
   );
 
-  # A service is named once; the plane decides which address terminates it. In the LAN
-  # plane it is the serving host; in the public plane it is the ingress, the only
-  # component that terminates public TLS.
+  # A service is named once; the plane decides which address terminates it. In the LAN plane
+  # it is the serving host; in the public plane it is the ingress, the only component that
+  # terminates public TLS.
   serviceRules = lib.concatLists (
     lib.mapAttrsToList (
       hostName: hostConfig:
@@ -141,11 +164,14 @@ let
     ) flakeConfigurations
   );
 
-  # Blocklist state. The upstream lists are in /etc/hosts format, which Knot reads as
-  # *address* mappings - and those synthesise a reverse PTR per address, which tens of
-  # thousands of blocked names on 0.0.0.0 overflow (measured: the policy loader died with
-  # "records too big ... PTR"). Knot's own documentation points large lists at RPZ, a policy
-  # zone that has no such reverse side, so the fetch converts hosts -> RPZ (`CNAME .`).
+  # The resolver's own name, so the door a client should use is what its own resolver tells
+  # it: the home door inside a home zone, the ingress everywhere else.
+  resolverRules = mkRules [ resolverName ] {
+    lan = ownLanAddress;
+    overlay = ownOverlayAddress;
+    public = ingressAddress;
+  };
+
   blocklistDir = "/var/lib/knot-resolver";
   blocklistRpz = "${blocklistDir}/blocklist.rpz";
   blocklistEntries = map (url: {
@@ -169,6 +195,49 @@ in
       '';
     };
 
+    subdomain = lib.mkOption {
+      type = lib.types.str;
+      default = "dns";
+      description = "Subdomain below the zone that names this resolver, e.g. `dns` -> dns.<domain>.";
+    };
+
+    dot = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Serve DNS-over-TLS on this host's own address, using the certificate for the
+        resolver's name. A phone's private DNS setting speaks DoT and nothing else, so this
+        is what lets a client keep using our resolver away from home without the tunnel
+        having to carry a home prefix.
+      '';
+    };
+
+    dotPort = lib.mkOption {
+      type = lib.types.port;
+      default = 853;
+      description = "TCP port for DNS-over-TLS.";
+    };
+
+    publicEntry = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        This host is the public door: it declares the resolver's name as a public endpoint,
+        which projects the DNS record and the firewall rule. Exactly one host may do so -
+        the naming invariant allows one owner per name.
+      '';
+    };
+
+    rateLimit = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 200;
+      description = ''
+        Per-client rate limit for the public door. DoT runs over TCP, so it is not an
+        amplification vector; the limit is a floor against a runaway client, not the
+        primary defence.
+      '';
+    };
+
     listenAddresses = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
@@ -176,11 +245,7 @@ in
         lan = "10.10.10.10";
         overlay = "10.10.100.10";
       };
-      description = ''
-        Addresses the resolver answers plain DNS on, keyed by plane name. The plane of an
-        answer is decided by the query's source, so the keys are documentation rather than
-        behaviour; encrypted transports are added once the resolver's certificate exists.
-      '';
+      description = "Overrides for the derived plain-DNS listeners; the default reads the host's own inventory entry.";
     };
 
     blocklists = lib.mkOption {
@@ -202,8 +267,8 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = effectiveListen != { };
-        message = "DNS: no listen address (the host has neither an `ipv4` nor a `wireguardIpv4` in the topology); the resolver would only answer on localhost.";
+        assertion = !cfg.dot || (ownHost != null && ownHost.ipv4 != null);
+        message = "DNS: DoT needs an address to serve on, and this host declares none in the topology.";
       }
     ];
 
@@ -213,19 +278,38 @@ in
     networking.resolvconf.useLocalResolver = lib.mkForce false;
 
     services.knot-resolver = {
-      enable = true;
+      enable = hasListener;
       settings = {
-        network.listen = lib.mapAttrsToList (_: address: {
-          interface = address;
-          port = cfg.port;
-          kind = "dns";
-        }) effectiveListen;
+        network = {
+          listen =
+            lib.mapAttrsToList (_: address: {
+              interface = address;
+              port = cfg.port;
+              kind = "dns";
+            }) effectiveListen
+            ++ map (address: {
+              interface = address;
+              port = cfg.dotPort;
+              kind = "dot";
+            }) dotAddresses;
+        }
+        // lib.optionalAttrs cfg.dot {
+          tls = {
+            cert-file = "/var/lib/acme/${resolverName}/fullchain.pem";
+            key-file = "/var/lib/acme/${resolverName}/key.pem";
+          };
+        };
 
         views = [
-          {
-            subnets = lanCidrs;
-            tags = [ "lan" ];
-          }
+          (
+            {
+              subnets = lanCidrs;
+              tags = [ "lan" ];
+            }
+            // lib.optionalAttrs (ownLanAddress != null) {
+              dst-subnet = ownLanAddress;
+            }
+          )
           {
             subnets = overlayCidrs;
             tags = [ "overlay" ];
@@ -243,7 +327,7 @@ in
         ];
 
         local-data = {
-          rules = nodeRules ++ deviceRules ++ serviceRules;
+          rules = nodeRules ++ deviceRules ++ serviceRules ++ resolverRules;
           rpz = lib.optionals (cfg.blocklists != [ ]) [
             {
               file = blocklistRpz;
@@ -251,17 +335,67 @@ in
             }
           ];
         };
+      }
+      // lib.optionalAttrs cfg.publicEntry {
+        rate-limiting = {
+          enable = true;
+          rate-limit = cfg.rateLimit;
+        };
       };
     };
 
+    # The listener's port is opened by the module that creates the listener; the home door
+    # is reached from a home zone, the public door from the internet.
+    networking.firewall.allowedTCPPorts = lib.optional cfg.dot cfg.dotPort;
+
+    # Knot reads the certificate itself and its watchdog reloads it when it changes, so the
+    # certificate is issued where the name terminates - exactly as every other name here.
+    # It is declared as soon as the host has a door, *not* when it starts serving DoT: the
+    # resolver refuses to start if the file is missing, so the certificate has to exist
+    # first (the rollout enables DoT in a second step for the same reason).
+    security.acme.certs = lib.optionalAttrs hasDoor {
+      ${resolverName} = {
+        domain = resolverName;
+        group = "knot-resolver";
+      };
+    };
+
+    # lego resolves the ACME API host through the system resolver. This host's resolv.conf
+    # is DHCP-managed and lists the uplink router first, which is not reachable from the
+    # zone addresses, so the order times out and only the self-signed placeholder remains
+    # (measured 2026-09-21). The order therefore runs against a resolver from the
+    # inventory - the same one every other lookup here already uses.
+    systemd.services."acme-order-renew-${resolverName}" = lib.mkIf hasDoor {
+      serviceConfig.BindReadOnlyPaths = [
+        "${
+          pkgs.writeText "acme-resolv.conf" (lib.concatMapStrings (r: "nameserver ${r}\n") topology.resolvers)
+        }:/etc/resolv.conf"
+      ];
+    };
+
+    # The certificate is issued for the resolver's group, and that group belongs to the
+    # resolver service - which a host may not run yet, because the public door declares the
+    # name and the certificate before DoT is switched on. Declared here, next to the
+    # certificate that needs it.
+    users.groups.knot-resolver = lib.mkIf hasDoor { };
+
+    # The manager chdirs into its runtime directory. If systemd removes that directory while
+    # the service is restarted or reloaded, the manager's working directory disappears and it
+    # aborts with a FileNotFoundError (measured 2026-09-21).
+    systemd.services.knot-resolver.serviceConfig.RuntimeDirectoryPreserve = "yes";
+
+    systemd.services.knot-resolver.after = lib.optional (
+      cfg.dot && hasListener
+    ) "acme-${resolverName}.service";
+
     # The RPZ file must exist before the resolver starts; an empty one is a valid, empty
     # policy (measured).
-    systemd.tmpfiles.rules = lib.optionals (cfg.blocklists != [ ]) [
+    systemd.tmpfiles.rules = lib.optionals (cfg.blocklists != [ ] && hasListener) [
       "d ${blocklistDir} 0770 knot-resolver knot-resolver -"
       "f ${blocklistRpz} 0644 knot-resolver knot-resolver -"
     ];
 
-    systemd.services.knot-blocklist = lib.mkIf (cfg.blocklists != [ ]) {
+    systemd.services.knot-blocklist = lib.mkIf (cfg.blocklists != [ ] && hasListener) {
       description = "Refresh the resolver's blocklist (hosts -> RPZ) and reload it";
       after = [
         "network-online.target"
@@ -310,29 +444,50 @@ in
         fi
         install -o knot-resolver -g knot-resolver -m 0644 "${blocklistRpz}.new" "${blocklistRpz}"
         rm -f "$raw" "${blocklistRpz}.new"
-        systemctl reload knot-resolver.service
+        # No reload here: the RPZ is watched (`watchdog: true`), so the running resolver picks
+        # the new file up itself. `kresctl reload` is not safe for this service - the manager
+        # chdirs into its runtime directory, and a reload removes that directory under it.
       '';
     };
 
-    systemd.timers.knot-blocklist = lib.mkIf (cfg.blocklists != [ ]) {
+    systemd.timers.knot-blocklist = lib.mkIf (cfg.blocklists != [ ] && hasListener) {
       wantedBy = [ "timers.target" ];
       timerConfig = {
         OnCalendar = cfg.blocklistRefresh;
+        # A fresh host has no blocklist yet, and waiting up to a day for the first one would
+        # leave it unblocked for exactly that long.
+        OnStartupSec = "2min";
         Persistent = true;
       };
     };
 
     my.contracts.provides.dns = {
-      endpoints.dns = {
-        port = cfg.port;
-        protocol = "both";
-        scope = "internal";
-        directAccess = {
-          enable = true;
+      endpoints = {
+        dns = {
+          port = cfg.port;
           protocol = "both";
-          interface = "all";
+          scope = "internal";
+          directAccess = {
+            enable = true;
+            protocol = "both";
+            interface = "all";
+          };
+          monitoring.http.enable = false;
         };
-        monitoring.http.enable = false;
+      }
+      // lib.optionalAttrs cfg.publicEntry {
+        # The public door: one name, one owner. `ingress = false` because no HTTP vhost
+        # terminates it - the resolver does - while the name is still projected into
+        # public DNS and its port into the firewall.
+        ${cfg.subdomain} = {
+          inherit (cfg) subdomain;
+          port = cfg.dotPort;
+          protocol = "tcp";
+          scope = "public";
+          ingress = false;
+          publicExempt = "DNS has no authentication layer; it is an open resolver by design.";
+          monitoring.http.enable = false;
+        };
       };
     };
   };

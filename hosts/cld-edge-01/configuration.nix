@@ -48,6 +48,14 @@
 
   my.features.services.vyrx-landing.enable = true;
   my.features.services.portfolio.enable = true;
+  # The public door of the resolver: this host declares the resolver's name as a public
+  # endpoint (DNS record + firewall) and terminates DNS-over-TLS for roaming clients.
+  my.features.services.dns = {
+    enable = true;
+    publicEntry = true;
+    # The public door terminates DNS-over-TLS itself, on the ingress address.
+    dot = true;
+  };
   my.features.services.obsidian-livesync.enable = true;
 
   my.features.services.ntfy.enable = true;
