@@ -145,6 +145,12 @@ Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no
   withdrawn when the address is gone. Measured 2026-09-21 after: printer 13 ms, `jellyfin.vyrx.de` ->
   `10.10.10.10`, `hom-wrk-01.node.vyrx.de` -> `10.10.20.10`, and `nix run .#network-audit` reports 20
   checks, 0 failed, with every host judged on the path it actually uses.
+- **The mesh admits what a host declares.** Arriving over `wg0` is a transport fact, not a
+  permission: the endpoints contract projects onto that interface the ports an ingress proxies (a
+  named endpoint) and the ports declared for the mesh explicitly, and an endpoint may name the trust
+  levels that may reach it (`directAccess.from`). The administrative path declares itself the same
+  way and names two, `infra` and `corp`. Measured 2026-09-21: a cloud node can no longer open SSH on
+  a home host while the operator's path and every declared service stay reachable.
 - **The mesh is the last resort.** The interface carries route metric 1000 against NetworkManager's
   600: a prefix the host can reach directly always wins, and the tunnel is used only when the LAN is
   elsewhere. Without it, a client at home would send LAN traffic out through the cloud and back.
@@ -247,6 +253,24 @@ published but absent from the zone API). The model is the per-consumer one, not 
 Measured 2026-09-20: `hom-srv-01` holds 14 certificates, `cld-ops-01` 12, and the ingress none of its
 own beyond what Caddy obtains automatically.
 
+### 5.4 How a host resolves, and which address a service uses
+
+Two rules keep resolution and service addressing from being decided twice:
+
+- **A host resolves through the resolver's doors, never through what a network hands it.** The doors
+  are derived (`features/system/networking/resolver`): a host with its own fixed address in a home
+  zone has the home door alone, a host in a home zone *without* one has the home door first and the
+  mesh doors after it, and a host in the mesh zone has the mesh doors. `FallbackDNS` is empty on
+  purpose - a fallback that knows none of our names would resolve the public internet and fail
+  silently on everything internal - and `Domains=~.` keeps a link's DHCP-provided resolver out of the
+  path. The DHCP answer hands out `my.topology.resolvers` and nothing else: ours, or none.
+- **A service uses an address the far side can actually reach** (`lib/addresses.nix`): the LAN address
+  while both sides are in a home zone, the overlay address otherwise, because a cloud host cannot
+  reach a home zone at all. That one rule replaced five modules that each decided for themselves.
+
+Measured 2026-09-21: `jellyfin.vyrx.de` answers `10.10.10.10` from the LAN and `10.10.100.10` over the
+mesh, and `nix run .#network-audit` checks every host's answer against the door it actually asked.
+
 ## 6. Service contracts
 
 A service declares what it offers and what it needs; the platform derives the rest. Nothing is written
@@ -318,6 +342,23 @@ incident.
 Alerting goes to the self-hosted ntfy instance (`push.vyrx.de`), which also carries Home Assistant,
 CrowdSec and arr-stack notifications. CrowdSec runs on both cloud hosts and shares a bouncer per host;
 its decisions are global.
+
+### 8.1 What can fail loudly
+
+Three instruments state the network's promises and are able to disagree with it:
+
+- **`checks.network-invariants`** (part of `nix flake check`) holds the promises against the *evaluated*
+  fleet: the LAN router forwards mesh traffic exactly when it carries a zone, a host inside the home LAN
+  installs no route for a carried zone, the resolver doors follow the host class, every handed-out
+  resolver belongs to a host of this fleet, a rendered client routes the mesh and the ingress and no
+  home zone, and a device is answered off the LAN exactly when its zone is carried. It was verified by
+  breaking it on purpose, not by passing.
+- **`nix run .#network-audit`** measures the *running* fleet: it asks each host which path it uses to the
+  home door, and requires the answer to come from that plane. It holds wherever a node happens to be.
+- **`nix run .#exposure-audit -- --strict`** lists every listening socket outside loopback and says
+  whether it is a decision - open, declared local, a link-local protocol - or a question. It found the
+  port that closing the mesh had cut (CrowdSec's local API) and the health bridge an agent skill had
+  left behind.
 
 ## 9. Data, backup, restore
 

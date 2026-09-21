@@ -357,6 +357,8 @@ here: they belong in the commit that resolved them.
 | Authentik's `akadmin` is the only usable break-glass account | family accounts carry no password and are created through the enrollment flow |
 | The remote forward-auth outpost is reached at an overlay address (`10.10.100.1:9055`) | Caddy logins on the LAN hosts break if the mesh is down |
 | OpenClaw gateways require the ingress in `gateway.trustedProxies` | without it every proxy-shaped request is rejected |
+| The resolver's blocklist refresh must not claim the resolver's directories | declaring `RuntimeDirectory`/`StateDirectory` = `knot-resolver` in `knot-blocklist.service` makes systemd re-own `/run/knot-resolver` and `/var/lib/knot-resolver` **as root**, which killed both resolvers twice on 2026-09-21 (`FileNotFoundError` on the manager's working directory, then `PermissionError` on its API socket). The refresh writes one file and reloads through systemd (`systemctl reload knot-resolver`, which runs as the user the resolver runs as). Any second caller of that directory breaks DNS for the whole house - and a `watchdog: true` on the RPZ is not an alternative, because the refresh replaces the file and the watchdog follows the inode |
+| Nothing **forces** a device to use our resolver | DHCP offers only ours and the fleet hosts are configured for it, but a device with a hard-coded public resolver (printer, TV, a guest's phone) can still resolve around us. Outbound 53/853 to non-fleet destinations is not blocked yet, and DoH over 443 cannot be closed without breaking TLS |
 
 ## 11. Appendix — Files, Secrets, Commands
 
