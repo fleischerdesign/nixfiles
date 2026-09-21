@@ -275,7 +275,7 @@ in
         tmp="$(mktemp)"
         : > "$tmp"
         ${lib.concatMapStrings ({ url, host }: ''
-          ip="$(${pkgs.bind.dnsutils}/bin/host -W 5 -t A '${host}' "$resolver" | ${pkgs.gawk}/bin/awk '/has address/ { print $4; exit }')"
+          ip="$(${pkgs.bind.dnsutils}/bin/dig +short +time=5 +tries=1 @"$resolver" '${host}' A | ${pkgs.gnugrep}/bin/grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
           ${pkgs.curl}/bin/curl --fail --silent --show-error --location --resolve "${host}:443:$ip" '${url}' >> "$tmp"
           printf '\n' >> "$tmp"
         '') blocklistEntries}
