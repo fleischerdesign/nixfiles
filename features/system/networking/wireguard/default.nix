@@ -262,6 +262,15 @@ in
             "${client.wireguardIpv4}/32"
           ]
           ++ lib.optional (client.wireguardIpv6 != null) "${client.wireguardIpv6}/128";
+
+          # What a rendered client routes through the mesh. The ingress is a node, and a
+          # client that resolves per network - a phone's private DNS - must be able to reach
+          # the resolver's public door *inside* the VPN: the name resolves to the ingress's
+          # public address, and Android then requires that address to be routable there.
+          # Our clients reach the ingress through the mesh, so its address is simply part of
+          # what they route: one /32, not the internet.
+          ingressAddress = (topology.hosts.${topology.ingressHost} or { }).ipv4 or null;
+          clientRoutes = lib.optional (ingressAddress != null) "${ingressAddress}/32";
           peers = lib.concatMapStrings (peer: ''
             [Peer]
             PublicKey = ${peer.publicKey}
@@ -269,7 +278,7 @@ in
             AllowedIPs = ${lib.concatStringsSep ", " peer.allowedIPs}
             PersistentKeepalive = ${toString peer.persistentKeepalive}
 
-          '') (relayPeersFor [ ]);
+          '') (relayPeersFor clientRoutes);
         in
         {
           content = ''
