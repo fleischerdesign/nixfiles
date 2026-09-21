@@ -144,6 +144,12 @@ let
   # Blocklist state. Knot reads /etc/hosts-format files directly, so the upstream list is
   # used as-is and blocked names answer 0.0.0.0 - the previous resolver's `zeroIp`.
   blocklistDir = "/var/lib/knot-resolver";
+  blocklistEntries = map (url: {
+    inherit url;
+    host = lib.head (
+      lib.splitString "/" (lib.removePrefix "https://" (lib.removePrefix "http://" url))
+    );
+  }) cfg.blocklists;
 in
 {
   options.my.features.services.dns = {
@@ -167,10 +173,9 @@ in
         overlay = "10.10.100.10";
       };
       description = ''
-        Addresses the resolver answers plain DNS on (port 53), keyed by plane name. The
-        plane of an answer is decided by the query's source, so the keys are documentation
-        rather than behaviour; encrypted transports are added once the resolver's certificate
-        exists.
+        Addresses the resolver answers plain DNS on, keyed by plane name. The plane of an
+        answer is decided by the query's source, so the keys are documentation rather than
+        behaviour; encrypted transports are added once the resolver's certificate exists.
       '';
     };
 
@@ -249,26 +254,34 @@ in
     ];
 
     systemd.services.knot-blocklist = lib.mkIf (cfg.blocklists != [ ]) {
-      description = "Refresh the resolver's hosts-format blocklists";
-      after = [ "network-online.target" ];
+      description = "Refresh the resolver's hosts-format blocklists and reload it";
+      after = [
+        "network-online.target"
+        "knot-resolver.service"
+      ];
       wants = [ "network-online.target" ];
       serviceConfig = {
         Type = "oneshot";
-        User = "knot-resolver";
-        Group = "knot-resolver";
         StateDirectory = "knot-resolver";
         RuntimeDirectory = "knot-resolver";
       };
+      # The name is resolved through a resolver from the inventory explicitly: the host's
+      # own resolv.conf is DHCP-managed and lists the uplink router first, which is not
+      # reachable from the zone addresses, so a plain curl would spend its whole timeout
+      # failing (measured 2026-09-21). `--resolve` then pins that address for the transfer.
       script = ''
         set -eu
+        resolver="${lib.head topology.resolvers}"
         tmp="$(mktemp)"
         : > "$tmp"
-        ${lib.concatMapStrings (url: ''
-          ${pkgs.curl}/bin/curl --fail --silent --show-error --location '${url}' >> "$tmp"
+        ${lib.concatMapStrings ({ url, host }: ''
+          ip="$(${pkgs.bind.dnsutils}/bin/host -W 5 -t A '${host}' "$resolver" | ${pkgs.gawk}/bin/awk '/has address/ { print $4; exit }')"
+          ${pkgs.curl}/bin/curl --fail --silent --show-error --location --resolve "${host}:443:$ip" '${url}' >> "$tmp"
           printf '\n' >> "$tmp"
-        '') cfg.blocklists}
-        install -m 0660 "$tmp" "${blocklistDir}/blocklist.hosts"
+        '') blocklistEntries}
+        install -m 0660 -o knot-resolver -g knot-resolver "$tmp" "${blocklistDir}/blocklist.hosts"
         rm -f "$tmp"
+        systemctl reload knot-resolver.service
       '';
     };
 
