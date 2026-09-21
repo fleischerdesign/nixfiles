@@ -59,13 +59,22 @@ let
 
   announcesLan = ownDeliveredCidrs != [ ];
 
-  # A spoke routes the node plane, not the home LAN. A home zone is reached by *being* in it -
-  # directly - and everything else through the mesh. Carrying the prefixes instead would send
-  # them the long way out through the hubs and back, so a roaming node sitting in the home LAN
-  # would fetch a home service over the WAN (measured: it carried infra, corp and iot and went
-  # through the relays while at home). The rendered client configurations are built from the same
-  # function, so a phone and a notebook cannot diverge in where they send LAN traffic.
-  meshLanRoutes = [ ];
+  # A host that sits inside a delivered zone reaches that whole LAN directly through its gateway, so
+  # it installs no mesh route for it - a tunnel route for a subnet it is attached to would shadow its
+  # connected route. Everything else is a roaming node and needs the delivered zones in its tunnel:
+  # without them a notebook in a foreign network still resolves its home names, but the addresses
+  # behind them are unreachable (measured: after they were dropped, 10.10.20.10 went out through the
+  # foreign gateway instead of the tunnel, and the operator's ssh to a home host stopped). Membership
+  # is decided on the /24 network part; the assertion below holds that every delivered zone is a /24
+  # rather than trusting it.
+  network = address: lib.concatStringsSep "." (lib.take 3 (lib.splitString "." address));
+
+  onLan =
+    ownHost != null
+    && ownHost.ipv4 != null
+    && builtins.any (cidr: network ownHost.ipv4 == network cidr) deliveredCidrs;
+
+  meshLanRoutes = if onLan then [ ] else lib.subtractLists ownDeliveredCidrs deliveredCidrs;
 
   # What a peer delivers: its own overlay address, plus the zones it announces into the mesh.
   deliveredBy =
