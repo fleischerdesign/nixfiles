@@ -60,11 +60,18 @@ let
     };
   effectiveListen = cfg.listenAddresses // derivedListen;
 
-  # The door this host serves DoT on: its own address, whichever plane it lives in (the LAN
-  # address inside, the public address at the ingress). Never the overlay address - a client
-  # reaching the resolver over the tunnel is an overlay client, so it would get overlay
-  # answers and send every home service out through the hubs and back.
-  dotAddresses = lib.optional (cfg.dot && ownHost != null && ownHost.ipv4 != null) ownHost.ipv4;
+  # DoT is served wherever the resolver already binds plain DNS - same reachability, one
+  # transport added - plus this host's public door when it is the public entry. A client that
+  # learned an address from us must always be able to reach it, and a client whose tunnel is
+  # up reaches the overlay listener inside the tunnel even where the uplink blocks port 853.
+  dotAddresses =
+    if !cfg.dot then
+      [ ]
+    else
+      lib.unique (
+        lib.attrValues effectiveListen
+        ++ lib.optional (ownHost != null && ownHost.ipv4 != null) ownHost.ipv4
+      );
 
   # Knot refuses a configuration without at least one listener, so a host that has none yet
   # - the public door before DoT is switched on - runs no resolver at all.
@@ -174,14 +181,13 @@ let
     ) flakeConfigurations
   );
 
-  # The resolver's own name has to name a door that actually terminates DNS-over-TLS: the
-  # home door (plain DNS and DoT on the delivery point's address) inside a home zone, and the
-  # public door (the ingress) everywhere else - including the overlay, because an overlay
-  # client reaches the ingress over the internet, while an overlay address has no DoT listener
-  # by design (answering one would send a client at home out through the hubs and back).
+  # The resolver's own name answers with a door that terminates DoT. Inside a home zone that
+  # is the delivery point's LAN address; from the mesh it is the resolver's overlay address,
+  # so the lookup and the query both stay inside the tunnel (which also keeps it working on
+  # uplinks that block port 853); everyone else gets the ingress.
   resolverRules = mkRules [ resolverName ] {
     lan = if deliveryHost == null then null else deliveryHost.ipv4;
-    overlay = ingressAddress;
+    overlay = if deliveryHost == null then null else deliveryHost.wireguardIpv4;
     public = ingressAddress;
   };
 
