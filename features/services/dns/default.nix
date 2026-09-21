@@ -38,6 +38,9 @@ let
   ingressHost = topology.hosts.${topology.ingressHost} or null;
   ingressAddress = if ingressHost != null then ingressHost.ipv4 else null;
 
+  # The host that routes the home LAN is the one that can terminate DNS-over-TLS inside it.
+  deliveryHost = lib.findFirst (h: (h.lanGateway or [ ]) != [ ]) null (lib.attrValues topology.hosts);
+
   # An address is a LAN address when it is on a private home subnet. A cloud host's `ipv4`
   # is its public address and must never be handed to a LAN client.
   isLanAddress =
@@ -153,22 +156,32 @@ let
           _svcName: contract:
           lib.concatMap (
             ep:
-            mkRules (lib.optionals (ep.canonicalDomain != null) [ ep.canonicalDomain ] ++ ep.extraDomains) {
-              lan = lanPlaneAddress host;
-              overlay = overlayAddress host;
-              public = if ep.scope == "public" then ingressAddress else null;
-            }
+            # The resolver's own name is answered by `resolverRules`, which knows which doors
+            # terminate DoT; here it would get the serving host's overlay address instead -
+            # an address where no DoT listener exists (measured 2026-09-21).
+            mkRules
+              (lib.filter (n: n != resolverName) (
+                lib.optionals (ep.canonicalDomain != null) [ ep.canonicalDomain ] ++ ep.extraDomains
+              ))
+              {
+                lan = lanPlaneAddress host;
+                overlay = overlayAddress host;
+                public = if ep.scope == "public" then ingressAddress else null;
+              }
           ) (lib.attrValues contract.endpoints)
         ) (hostConfig.config.my.contracts.provides or { })
       )
     ) flakeConfigurations
   );
 
-  # The resolver's own name, so the door a client should use is what its own resolver tells
-  # it: the home door inside a home zone, the ingress everywhere else.
+  # The resolver's own name has to name a door that actually terminates DNS-over-TLS: the
+  # home door (plain DNS and DoT on the delivery point's address) inside a home zone, and the
+  # public door (the ingress) everywhere else - including the overlay, because an overlay
+  # client reaches the ingress over the internet, while an overlay address has no DoT listener
+  # by design (answering one would send a client at home out through the hubs and back).
   resolverRules = mkRules [ resolverName ] {
-    lan = ownLanAddress;
-    overlay = ownOverlayAddress;
+    lan = if deliveryHost == null then null else deliveryHost.ipv4;
+    overlay = ingressAddress;
     public = ingressAddress;
   };
 
