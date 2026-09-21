@@ -277,6 +277,12 @@ Two rules keep resolution and service addressing from being decided twice:
 - **A service uses an address the far side can actually reach** (`lib/addresses.nix`): the LAN address
   while both sides are in a home zone, the overlay address otherwise, because a cloud host cannot
   reach a home zone at all. That one rule replaced five modules that each decided for themselves.
+- **A rendered client is told a door instead of handed one.** Its wg-quick file carries no `DNS =`
+  line on purpose: a mesh door answers a client at home with overlay addresses, so every home service
+  would leave through a hub and return. The resolver reaches such a device as a setting of its own -
+  the name of the public DoT door, as private DNS - which is a precondition rather than a derivation,
+  and the one place our resolution model depends on a setting inside somebody else's device
+  ([operations.md](operations.md) §4.3).
 
 Measured 2026-09-21: `jellyfin.vyrx.de` answers `10.10.10.10` from the LAN and `10.10.100.10` over the
 mesh, and `nix run .#network-audit` checks every host's answer against the door it actually asked.

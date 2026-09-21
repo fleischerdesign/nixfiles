@@ -142,6 +142,16 @@ sudo qrencode -t ansiutf8 -r /run/secrets/rendered/wg-<name>.conf
 Use `-r`, not a shell redirect: the file is root-only, and `< file` would be opened by the operator's
 shell before `qrencode` runs.
 
+The profile deliberately carries **no `DNS =` line**: a mesh door would answer a client at home with
+overlay addresses, so every home service would leave through a hub and come back. A roaming device
+gets its resolver from a setting of its own instead - **Android: Settings → Network → Private DNS →
+hostname `dns.vyrx.de`** (iOS needs a configuration profile, `wg-quick` on Linux takes `DNS =` per
+interface). It is a precondition, not an automatism: one setting per device, invisible if it silently
+turns off (measured 2026-09-21: it had), and the only mechanism that gives a roaming client our
+resolver on *any* network. Verify it on the device, not in the config: a blocked name must answer
+`127.0.0.1` (`00000.uno`) where a public resolver answers a real address, and `cld-edge-01` must show
+the client on port 853.
+
 The peers, addresses, DNS and routes in that file are derived, not typed: the same `relayPeersFor`
 function builds the NixOS spokes' peers. Revocation is the inverse, plus the key rotation in
 [security.md §3.2](security.md).
