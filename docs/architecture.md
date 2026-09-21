@@ -131,6 +131,15 @@ Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no
   `hom-srv-01.node` answers its overlay address.
 - **A host with its own address in a home zone installs no route for a carried zone**: its zone
   gateway reaches every other home zone directly, so a tunnel route would shadow that path.
+- **A host that is at home uses the home LAN, even where the tunnel carries the same prefix.**
+  Measured: systemd-resolved keeps answering through the door that answered last, and a carried `/24`
+  beats a host's own default route by longest prefix - a route metric only orders equal prefixes. A
+  roaming node therefore resolved LAN names to overlay addresses and reached the printer through the
+  relays (65 ms). `features/system/networking/lan-preference` gives the link that holds an address in
+  a home zone the home door as its own resolver with a default routing domain, and puts every carried
+  zone the host is not itself inside on a route of the same prefix through that zone's gateway at
+  metric 600. Both are withdrawn when the address is gone. Measured 2026-09-21 after: printer 13 ms,
+  `jellyfin.vyrx.de` -> `10.10.10.10`, `hom-wrk-01.node.vyrx.de` -> `10.10.20.10`.
 - **The mesh is the last resort.** The interface carries route metric 1000 against NetworkManager's
   600: a prefix the host can reach directly always wins, and the tunnel is used only when the LAN is
   elsewhere. Without it, a client at home would send LAN traffic out through the cloud and back.
