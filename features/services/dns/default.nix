@@ -286,17 +286,28 @@ in
           ip="$(${pkgs.bind.dnsutils}/bin/dig +short +time=5 +tries=1 @"$resolver" '${host}' A | ${pkgs.gnugrep}/bin/grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"
           ${pkgs.curl}/bin/curl --fail --silent --show-error --location --resolve "${host}:443:$ip" '${url}' >> "$raw"
         '') blocklistEntries}
-        # /etc/hosts -> RPZ: every name on every line becomes a blocked name.
+        # /etc/hosts -> RPZ. Inline comments are stripped first: entries often carry the URL
+        # they came from, and those words would otherwise become owners (measured: a zone
+        # parse error "owner is invalid" on '#.' and a Wikipedia URL).
         ${pkgs.gawk}/bin/awk '
-          /^[[:space:]]*#/ { next }
+          { sub(/#.*/, "") }
           NF >= 2 {
             for (i = 2; i <= NF; i++) {
-              d = $i
-              if (d == "localhost" || d == "localhost.localdomain" || d == "broadcast" || d ~ /^ip6-/) next
+              d = tolower($i)
+              if (d ~ /^[0-9.]+$/) continue
+              if (d ~ /^(localhost|local|broadcasthost|broadcast|ip6-)/) continue
+              if (d !~ /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/) continue
               print d ". 60 IN CNAME ."
             }
           }
-        ' "$raw" > "${blocklistRpz}.new"
+        ' "$raw" | ${pkgs.coreutils}/bin/sort -u > "${blocklistRpz}.new"
+        # Never install a file the resolver cannot parse: an invalid RPZ makes the policy
+        # loader abort, and a resolver that refuses to start is worse than a stale list.
+        if ${pkgs.gnugrep}/bin/grep -qvE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+\.[[:space:]]+60[[:space:]]+IN[[:space:]]+CNAME[[:space:]]+\.$' "${blocklistRpz}.new"; then
+          echo "blocklist: refusing to install a malformed RPZ" >&2
+          rm -f "$raw" "${blocklistRpz}.new"
+          exit 1
+        fi
         install -o knot-resolver -g knot-resolver -m 0644 "${blocklistRpz}.new" "${blocklistRpz}"
         rm -f "$raw" "${blocklistRpz}.new"
         systemctl reload knot-resolver.service
