@@ -55,6 +55,27 @@ in
   config =
     lib.mkIf (cfg.enable && canBeAtHome && homeDoor != null && topology.announcedZones != [ ])
       {
+        # A dispatch fires on link events, and a deploy produces none: measured, the notebook sat with
+        # the door of the *old* script (`~.` on the link) after two deploys and answered the same name
+        # from two different planes depending on which server resolved it first. So the same script runs
+        # once at activation as well - one script, two triggers, no second copy of the rule.
+        systemd.services.lan-preference = {
+          description = "Apply the at-home preference at activation";
+          wantedBy = [ "multi-user.target" ];
+          wants = [ "NetworkManager.service" ];
+          after = [ "NetworkManager.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          script = ''
+            for path in /sys/class/net/*; do
+              device=$(basename "$path")
+              [ "$device" = "lo" ] || ACTION=up DEVICE="$device" ${(lib.head config.networking.networkmanager.dispatcherScripts).source} || true
+            done
+          '';
+        };
+
         # 600 is the metric NetworkManager gives a directly connected route, and it has to stay below the
         # wireguard interface's own metric (1000): the two routes have the same prefix, so the metric is
         # what decides between them. Every binary is named by its store path, because a dispatcher runs
