@@ -30,6 +30,16 @@ let
   ingressHost = topology.hosts.${topology.ingressHost} or null;
   ingressAddress = if ingressHost != null then ingressHost.ipv4 else null;
 
+  # The resolver answers on its own addresses. They are read from the inventory, so a host
+  # never restates them; the option below only adds or overrides.
+  ownHost = topology.hosts.${config.networking.hostName} or null;
+  derivedListen =
+    lib.optionalAttrs (ownHost != null && ownHost.ipv4 != null) { lan = ownHost.ipv4; }
+    // lib.optionalAttrs (ownHost != null && ownHost.wireguardIpv4 != null) {
+      overlay = ownHost.wireguardIpv4;
+    };
+  effectiveListen = cfg.listenAddresses // derivedListen;
+
   # Planes. The mesh subnets are the overlay; the remaining trusted zones are the LAN. The
   # guest zone is not a plane of ours: a guest client falls through to the public view.
   overlayCidrs = lib.mapAttrsToList (_: subnet: subnet.cidr) (
@@ -132,6 +142,16 @@ in
   options.my.features.services.dns = {
     enable = lib.mkEnableOption "Knot Resolver 6 as the fleet resolver (plane-correct views)";
 
+    port = lib.mkOption {
+      type = lib.types.port;
+      default = 53;
+      description = ''
+        TCP/UDP port for plain DNS. Staging runs the resolver on a different port so the
+        generated configuration can be proven against real names before the live resolver
+        is replaced.
+      '';
+    };
+
     listenAddresses = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
@@ -166,8 +186,8 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = cfg.listenAddresses != { };
-        message = "DNS: listenAddresses is empty; the resolver would only answer on localhost.";
+        assertion = effectiveListen != { };
+        message = "DNS: no listen address (the host has neither an `ipv4` nor a `wireguardIpv4` in the topology); the resolver would only answer on localhost.";
       }
     ];
 
@@ -181,9 +201,9 @@ in
       settings = {
         network.listen = lib.mapAttrsToList (_: address: {
           interface = address;
-          port = 53;
+          port = cfg.port;
           kind = "dns";
-        }) cfg.listenAddresses;
+        }) effectiveListen;
 
         views = [
           {
@@ -255,7 +275,7 @@ in
 
     my.contracts.provides.dns = {
       endpoints.dns = {
-        port = 53;
+        port = cfg.port;
         protocol = "both";
         scope = "internal";
         directAccess = {

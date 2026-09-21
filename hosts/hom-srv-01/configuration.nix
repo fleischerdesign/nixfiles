@@ -32,6 +32,12 @@
         jellyfin.enable = true;
         recyclarr.enable = true;
         blocky.enable = true;
+        # Staging: the live resolver (blocky) keeps port 53 until this one has been proven
+        # against the real names on 5353. The listeners are derived from the topology.
+        dns = {
+          enable = true;
+          port = 5353;
+        };
         bazarr.enable = true;
         jellyseerr.enable = true;
         klipper.enable = true;
