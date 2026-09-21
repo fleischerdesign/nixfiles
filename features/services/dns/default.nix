@@ -171,6 +171,11 @@ in
       }
     ];
 
+    # The hosts resolve through `my.topology.resolvers` (the resolver's own zone address),
+    # not through 127.0.0.1: the resolver binds the zone addresses, so pointing resolv.conf
+    # at localhost would ask an address nothing listens on.
+    networking.resolvconf.useLocalResolver = lib.mkForce false;
+
     services.knot-resolver = {
       enable = true;
       settings = {
