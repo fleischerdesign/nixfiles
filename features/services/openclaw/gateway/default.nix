@@ -17,6 +17,7 @@ let
   # The same rule as everywhere: the LAN address while both sides are at home, otherwise the overlay
   # address (lib/addresses.nix).
   addresses = import ../../../../lib/addresses.nix { inherit lib; };
+  endpointLib = import ../../../../lib/endpoints.nix { inherit lib; };
 
   # The public ingress (Caddy + Authentik forward-auth) is the only legitimate proxy in front
   # of a gateway, so its overlay address is the only non-loopback entry allowed in
@@ -1058,7 +1059,12 @@ in
                 protocol = "tcp";
                 scope = "public";
                 auth = if inst.auth then "authentik" else "none";
-                accessGroups = [ "family" ];
+                # Each instance is its own audience. Every member of a role that may use one gateway
+                # could otherwise open every other person's agent at the ingress - the app's own
+                # `adminUsers` repaired that one layer too deep (rejected with 403 after login instead
+                # of before it). The group is derived from the endpoint, so it names no person, and the
+                # compiler creates it; who is in it is a membership decision in the interface.
+                accessGroups = [ (endpointLib.audienceGroup inst._endpointName) ];
                 subdomain = inst.subdomain;
                 domain = inst.domain;
                 # Dynamically minted self-publishing hosts are the only names that

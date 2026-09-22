@@ -157,6 +157,104 @@ let
     else
       true;
 
+  # An audience group this compiler is the author of, because its name derives from an endpoint
+  # (`lib/endpoints.nix`, the reserved prefix). It is declared in the same blueprint as the binding that
+  # uses it, so a binding can never point at a group nobody creates - which was the one gap both the
+  # role and the own-audience model shared: `!Find` resolves against the database, and a group that no
+  # document declares is a dangling reference that evaluates, applies and leaves the service
+  # unreachable for everyone.
+  safeAudienceId = groupName: builtins.replaceStrings [ "-" "." ] [ "_" "_" ] groupName;
+
+  audienceGroupEntries =
+    name: ep:
+    map (
+      groupName:
+      blueprintLib.entry {
+        id = "audience_${safeAudienceId groupName}";
+        model = blueprintLib.models.group;
+        identifiers.name = groupName;
+        attrs.attributes.description = "Own audience of ${name}; membership is an interface decision, as for every other group.";
+      }
+    ) (lib.filter endpointLib.isAudienceGroup ep.accessGroups);
+
+  # The role groups are declared exactly once, in the RBAC document, which is hand-written. Reading the
+  # names from it keeps that one declaration instead of restating them here. The guard is the point: a
+  # change of the document's shape must fail the evaluation, because an empty set would quietly turn the
+  # check below into a no-op that passes everything.
+  rbacRoleGroupNames =
+    let
+      document = builtins.readFile ./blueprints/01-rbac/users-and-groups.yaml;
+      nameOfBlock =
+        block:
+        let
+          # The block's own `name:` follows its `identifiers:` key. Everything after the first
+          # `identifiers:` is this group's slice; the users that trail the last group block come later,
+          # so the first `name:` inside the slice is the group's.
+          after = builtins.elemAt (lib.splitString "identifiers:" block) 1;
+          # `builtins.match` answers with the capture groups, not with the match: one group here, so the
+          # name is the head of the head. Reading it as a plain string made every role look undeclared.
+          captures = builtins.filter (found: found != null) (
+            map (line: builtins.match "[[:space:]]+name: \"(.*)\"" line) (lib.splitString "\n" after)
+          );
+        in
+        if captures == [ ] then null else builtins.head (builtins.head captures);
+      names = builtins.filter (found: found != null) (
+        map nameOfBlock (lib.drop 1 (lib.splitString "- model: authentik_core.group" document))
+      );
+    in
+    if names == [ ] then
+      throw "Authentik compiler error: 01-rbac/users-and-groups.yaml yielded no group names - the document's shape changed, and every audience check would pass vacuously"
+    else
+      names;
+
+  # Three ways to name an audience that exists only in the declaration, each one silent until now: a
+  # misspelt role (the binding points at nothing, the service becomes unreachable for everyone, and the
+  # deploy reports success), an own-audience name that belongs to no endpoint, and an admin group
+  # outside the access group it administers - which the schema describes as a rule but never enforced.
+  audiencePolicyCheck =
+    let
+      endpointNames = map (item: item.name) allClusterEndpointsList;
+      audiences = lib.concatMap (
+        item:
+        map (groupName: {
+          name = item.name;
+          inherit groupName;
+        }) item.ep.accessGroups
+      ) allClusterEndpointsList;
+      report = x: "${x.name}:${x.groupName}";
+      undeclaredRole = lib.unique (
+        map report (
+          lib.filter (
+            x: !endpointLib.isAudienceGroup x.groupName && !(builtins.elem x.groupName rbacRoleGroupNames)
+          ) audiences
+        )
+      );
+      ownerlessAudience = lib.unique (
+        map report (
+          lib.filter (
+            x:
+            endpointLib.isAudienceGroup x.groupName
+            && !(builtins.elem (lib.removePrefix endpointLib.audienceGroupPrefix x.groupName) endpointNames)
+          ) audiences
+        )
+      );
+      adminOutsideAccess = lib.unique (
+        map (item: item.name) (
+          lib.filter (
+            item: !(lib.all (groupName: builtins.elem groupName item.ep.accessGroups) item.ep.adminGroups)
+          ) allClusterEndpointsList
+        )
+      );
+    in
+    if undeclaredRole != [ ] then
+      throw "Authentik compiler error: ${lib.concatStringsSep ", " undeclaredRole} names an audience group that neither the RBAC document declares nor this compiler derives from an endpoint"
+    else if ownerlessAudience != [ ] then
+      throw "Authentik compiler error: ${lib.concatStringsSep ", " ownerlessAudience} derives an own audience from an endpoint name that does not exist"
+    else if adminOutsideAccess != [ ] then
+      throw "Authentik compiler error: ${lib.concatStringsSep ", " adminOutsideAccess} names an admin group that is not in its own accessGroups"
+    else
+      true;
+
   # A group binding per declared audience, on the application the endpoint projects. The target is the
   # application's PolicyBindingModel, never the application's own pk: `PolicyBinding.target_id` is the
   # `pbm_uuid` (blueprint.nix `policyTargetBySlug`).
@@ -166,7 +264,13 @@ let
       groupName:
       blueprintLib.groupBinding {
         target = blueprintLib.refs.policyTargetBySlug "application" name;
-        group = blueprintLib.refs.byName blueprintLib.models.group groupName;
+        # The group this compiler declares is referenced by its id in this same blueprint; a role group
+        # is authored by the RBAC document and looked up in the database. One author per name, always.
+        group =
+          if endpointLib.isAudienceGroup groupName then
+            blueprintLib.refs.sameBlueprint "audience_${safeAudienceId groupName}"
+          else
+            blueprintLib.refs.byName blueprintLib.models.group groupName;
         order = 0;
       }
     ) ep.accessGroups;
@@ -230,6 +334,7 @@ let
   # proxy outposts.
   proxyBlueprint =
     assert ingressPolicyCheck;
+    assert audiencePolicyCheck;
     blueprintLib.blueprint {
       name = "vyrx-apps-proxy";
       entries =
@@ -261,6 +366,7 @@ let
               openInNewTab = true;
             })
           ]
+          ++ audienceGroupEntries name ep
           ++ audienceBindings name ep
         ) sortedEndpointNames)
         ++ [
@@ -293,6 +399,7 @@ let
   # Declarative model-driven blueprint compiling all OIDC endpoints into Authentik OAuth2Providers and Applications
   oidcBlueprint =
     assert ingressPolicyCheck;
+    assert audiencePolicyCheck;
     blueprintLib.blueprint {
       name = "vyrx-apps-oidc";
       entries =
@@ -343,6 +450,7 @@ let
               openInNewTab = true;
             })
           ]
+          ++ audienceGroupEntries name ep
           ++ audienceBindings name ep
         ) sortedOidcEndpointNames;
     };
