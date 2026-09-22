@@ -251,6 +251,14 @@ the old name stays behind and can still grant access.
 second mechanism next to the group filter — and two mechanisms are two truths. A service declares which groups
 it accepts; a human is put into one of them.
 
+**And it is enforced at the ingress, not only described.** Every endpoint that authenticates through authentik
+declares `accessGroups` at the endpoint; the compiler projects them into a `PolicyBinding` per group on the
+generated application and refuses to build a gated service that names no audience (`blueprints.nix`,
+`ingressPolicyCheck`). Until 2026-09-22 the generated applications carried no binding at all, so authentik's
+`AppAccessWithoutBindings` opened every service to any authenticated user - measured before: zero bindings on
+all 17 applications, and a user in no group passed every one. Measured after: `philipp` passes `grafana`,
+`katja` does not, and a freshly created user with no groups passes nothing.
+
 ### 11.4 The kinds of fact, and what each one does
 
 | Kind | Owner | Behaviour |
@@ -312,7 +320,13 @@ This is the inventory that closes that last row. Every row here has been measure
 - **Direct SQL writes stay invisible.** No event, no blueprint. The rule "the database is not a change path"
   plus the event arm of the drift report are the only countermeasures.
 - **Objects created in the interface that nobody declares are not reclaimed.** They are reported as foreign,
-  which is the intended behaviour, not a gap.
+  which is the intended behaviour, not a gap. Measured 2026-09-22: `esphome` carries an application and no
+  binding while no endpoint in the repository declares it - a stale object that survives because a blueprint
+  deletes only what it tombstones.
+- **`akadmin` is break-glass, not a member.** Superusers do not bypass application policy bindings, so the
+  bootstrap admin reaches no service unless a group grants it - measured 2026-09-22: `akadmin` failed every
+  application, `philipp` passed through his groups. Access is granted by membership; the bootstrap credential
+  exists only to repair that from the interface.
 - **A seed is not a migration.** An account that already exists is never updated, and a value seeded with a
   typo can never be corrected by the repository - the same property a SQL column `DEFAULT` has for rows that
   already exist. Changing an existing person's fields is an interface action, by design; a new seeded value

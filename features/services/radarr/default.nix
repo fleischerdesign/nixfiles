@@ -84,6 +84,7 @@ in
             protocol = "tcp";
             scope = "internal";
             auth = "authentik";
+            accessGroups = [ "media-users" ];
             subdomain = "radarr";
             healthProbePath = "/ping";
             dashboard = {

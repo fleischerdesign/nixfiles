@@ -316,6 +316,7 @@ in
         protocol = "tcp";
         scope = "public";
         auth = "oidc";
+        accessGroups = [ "infra-admins" ];
         subdomain = "grafana";
         extraDomains = [ ];
         # The legacy aliases `grafana.ops.…` and `mon.lan.…` were removed: they encoded a

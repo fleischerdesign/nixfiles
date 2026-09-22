@@ -31,6 +31,7 @@ let
     metaApplyBlueprint = "authentik_blueprints.metaapplyblueprint";
     role = "authentik_rbac.role";
     user = "authentik_core.user";
+    group = "authentik_core.group";
     token = "authentik_core.token";
     application = "authentik_core.application";
     flow = "authentik_flows.flow";
@@ -415,6 +416,25 @@ let
       inherit permissions;
     };
 
+  # A group binding on an application: the ingress gate. Authentik's own blueprints put every
+  # identifying field in `identifiers` - the subject, the target and the order - because identifiers
+  # are the lookup key. Two bindings that differed only in `group` would otherwise match each other and
+  # the importer would overwrite one with the other, which is exactly what a `target`+`order` key does.
+  groupBinding =
+    {
+      target,
+      group,
+      order,
+      negate ? null,
+    }:
+    entry {
+      model = models.policyBinding;
+      identifiers = {
+        inherit group order target;
+      };
+      attrs = lib.optionalAttrs (negate != null) { inherit negate; };
+    };
+
   blueprint =
     {
       name,
@@ -452,6 +472,7 @@ in
     oauth2Provider
     ldapProvider
     outpost
+    groupBinding
     blueprint
     ;
 }

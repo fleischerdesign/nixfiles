@@ -75,6 +75,7 @@ in
             protocol = "tcp";
             scope = "internal";
             auth = "authentik";
+            accessGroups = [ "media-users" ];
             subdomain = "prowlarr";
             healthProbePath = "/ping";
             dashboard = {

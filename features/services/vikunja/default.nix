@@ -106,6 +106,7 @@ in
             protocol = "tcp";
             scope = "public";
             auth = "oidc";
+            accessGroups = [ "family" ];
             subdomain = "vikunja";
             extraDomains = [
               "tasks.lan.${config.my.topology.domain}"

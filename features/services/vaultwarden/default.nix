@@ -65,6 +65,7 @@ in
             protocol = "tcp";
             scope = "public";
             auth = "oidc";
+            accessGroups = [ "family" ];
             subdomain = "vault";
             extraDomains = [
               "vault.${topologyDomain}"

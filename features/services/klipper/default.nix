@@ -146,6 +146,7 @@ in
           protocol = "tcp";
           scope = "internal";
           auth = "authentik";
+          accessGroups = [ "family" ];
           subdomain = "mainsail";
           directAccess = {
             enable = true;
@@ -180,6 +181,7 @@ in
           protocol = "tcp";
           scope = "internal";
           auth = "authentik";
+          accessGroups = [ "family" ];
           subdomain = "moonraker";
           directAccess = {
             enable = true;

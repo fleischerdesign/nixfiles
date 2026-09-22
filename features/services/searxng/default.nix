@@ -208,6 +208,7 @@ in
         # and the switch invisible.
         scope = if cfg.public then "public" else "isolated";
         auth = if cfg.auth then "authentik" else "none";
+        accessGroups = [ "family" ];
         subdomain = "search";
         directAccess = {
           enable = cfg.openMeshFirewall;

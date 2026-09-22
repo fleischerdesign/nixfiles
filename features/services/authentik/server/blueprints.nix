@@ -140,6 +140,35 @@ let
   sortedEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames authEndpoints);
   sortedOidcEndpointNames = lib.sort (a: b: a < b) (builtins.attrNames oidcEndpoints);
 
+  # Every application this compiler generates is gated by its endpoint's `accessGroups`. An endpoint that
+  # authenticates through the ingress but names no audience has no policy, and authentik's
+  # `AppAccessWithoutBindings` default would open it to every authenticated user - precisely the state
+  # this compiler replaces. Refuse it rather than build an open door.
+  ingressPolicyCheck =
+    let
+      unstated = map (item: item.name) (
+        lib.filter (item: item.ep.accessGroups == [ ]) (rawAuthEndpointsList ++ rawOidcEndpointsList)
+      );
+    in
+    if unstated != [ ] then
+      throw "Authentik compiler error: ${lib.concatStringsSep ", " unstated} is published through the ingress without naming accessGroups - a service without a stated audience has no access policy"
+    else
+      true;
+
+  # A group binding per declared audience, on the application the endpoint projects. The target is the
+  # application's PolicyBindingModel, never the application's own pk: `PolicyBinding.target_id` is the
+  # `pbm_uuid` (blueprint.nix `policyTargetBySlug`).
+  audienceBindings =
+    name: ep:
+    map (
+      groupName:
+      blueprintLib.groupBinding {
+        target = blueprintLib.refs.policyTargetBySlug "application" name;
+        group = blueprintLib.refs.byName blueprintLib.models.group groupName;
+        order = 0;
+      }
+    ) ep.accessGroups;
+
   # Blueprints must be *.yaml: authentik's discovery and the blueprint migration only scan for that
   # extension, while everything else about the encoding lives in the constructors.
   toBlueprintYaml =
@@ -197,118 +226,124 @@ let
   # authentik server. It authenticates with the core secret key (no managed token),
   # so every host's Caddy can forward auth to the same server without per-host
   # proxy outposts.
-  proxyBlueprint = blueprintLib.blueprint {
-    name = "vyrx-apps-proxy";
-    entries =
-      providerFlowDependencies
-      ++ (lib.replicate 2 orphanedAuthorizationFlowBinding)
-      ++ (lib.concatMap (
-        name:
-        let
-          ep = authEndpoints.${name};
-          displayName = if ep.displayName != null then ep.displayName else name;
-          group = if ep.group != null then ep.group else "Services";
-          safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-        in
-        [
-          (blueprintLib.proxyProvider {
-            id = "provider_proxy_${safeId}";
-            name = "Provider for ${displayName}";
-            mode = "forward_single";
-            externalHost = "https://${ep.canonicalDomain}";
-            authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
-            invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
-          })
-          (blueprintLib.application {
-            slug = name;
-            name = displayName;
-            provider = blueprintLib.refs.sameBlueprint "provider_proxy_${safeId}";
-            group = group;
-            metaLaunchUrl = "https://${ep.canonicalDomain}";
-            openInNewTab = true;
-          })
-        ]
-      ) sortedEndpointNames)
-      ++ [
-        # The outpost embedded in the server itself. authentik creates it on startup with `type = proxy` and
-        # the managed marker; we declare both so the entry is reproducible on a fresh database instead of
-        # depending on the reconcile having run first. `type` is required on create, and `managed` is the
-        # marker the reconcile looks up - without it a create races the reconcile into a duplicate-name
-        # error. It has no service connection: it runs inside the server process.
-        (blueprintLib.entry {
-          id = "embedded_outpost";
-          model = blueprintLib.models.outpost;
-          identifiers.name = "authentik Embedded Outpost";
-          attrs = {
-            type = "proxy";
-            managed = "goauthentik.io/outposts/embedded";
-            providers = map (
-              name:
-              blueprintLib.refs.sameBlueprint "provider_proxy_${builtins.replaceStrings [ "-" ] [ "_" ] name}"
-            ) sortedEndpointNames;
-            config = {
-              authentik_host = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
-              authentik_host_browser = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
-              authentik_host_insecure = false;
+  proxyBlueprint =
+    assert ingressPolicyCheck;
+    blueprintLib.blueprint {
+      name = "vyrx-apps-proxy";
+      entries =
+        providerFlowDependencies
+        ++ (lib.replicate 2 orphanedAuthorizationFlowBinding)
+        ++ (lib.concatMap (
+          name:
+          let
+            ep = authEndpoints.${name};
+            displayName = if ep.displayName != null then ep.displayName else name;
+            group = if ep.group != null then ep.group else "Services";
+            safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
+          in
+          [
+            (blueprintLib.proxyProvider {
+              id = "provider_proxy_${safeId}";
+              name = "Provider for ${displayName}";
+              mode = "forward_single";
+              externalHost = "https://${ep.canonicalDomain}";
+              authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
+              invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
+            })
+            (blueprintLib.application {
+              slug = name;
+              name = displayName;
+              provider = blueprintLib.refs.sameBlueprint "provider_proxy_${safeId}";
+              group = group;
+              metaLaunchUrl = "https://${ep.canonicalDomain}";
+              openInNewTab = true;
+            })
+          ]
+          ++ audienceBindings name ep
+        ) sortedEndpointNames)
+        ++ [
+          # The outpost embedded in the server itself. authentik creates it on startup with `type = proxy` and
+          # the managed marker; we declare both so the entry is reproducible on a fresh database instead of
+          # depending on the reconcile having run first. `type` is required on create, and `managed` is the
+          # marker the reconcile looks up - without it a create races the reconcile into a duplicate-name
+          # error. It has no service connection: it runs inside the server process.
+          (blueprintLib.entry {
+            id = "embedded_outpost";
+            model = blueprintLib.models.outpost;
+            identifiers.name = "authentik Embedded Outpost";
+            attrs = {
+              type = "proxy";
+              managed = "goauthentik.io/outposts/embedded";
+              providers = map (
+                name:
+                blueprintLib.refs.sameBlueprint "provider_proxy_${builtins.replaceStrings [ "-" ] [ "_" ] name}"
+              ) sortedEndpointNames;
+              config = {
+                authentik_host = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
+                authentik_host_browser = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
+                authentik_host_insecure = false;
+              };
             };
-          };
-        })
-      ];
-  };
+          })
+        ];
+    };
 
   # Declarative model-driven blueprint compiling all OIDC endpoints into Authentik OAuth2Providers and Applications
-  oidcBlueprint = blueprintLib.blueprint {
-    name = "vyrx-apps-oidc";
-    entries =
-      providerFlowDependencies
-      ++ lib.concatMap (
-        name:
-        let
-          ep = oidcEndpoints.${name};
-          displayName = if ep.displayName != null then ep.displayName else name;
-          group = if ep.group != null then ep.group else "Applications";
-          safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-          secretAttr =
-            if ep.oidc.clientSecretEnv != null then
-              blueprintLib.refs.env ep.oidc.clientSecretEnv
-            else if ep.oidc.clientSecret != null then
-              ep.oidc.clientSecret
-            else
-              blueprintLib.refs.env "AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
-          launchUrl =
-            if ep.publicUrl != null then
-              ep.publicUrl
-            else if ep.canonicalDomain != null then
-              "https://${ep.canonicalDomain}"
-            else
-              null;
-        in
-        [
-          (blueprintLib.oauth2Provider {
-            id = "provider_${safeId}";
-            name = "Provider for ${displayName}";
-            clientId = ep.oidc.clientId;
-            clientSecret = secretAttr;
-            authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
-            invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
-            redirectUris = map (uri: {
-              matching_mode = "strict";
-              url = uri;
-            }) ep.oidc.redirectUris;
-            subMode = ep.oidc.subMode;
-            includeClaimsInIdToken = ep.oidc.includeClaimsInIdToken;
-          })
-          (blueprintLib.application {
-            slug = name;
-            name = displayName;
-            provider = blueprintLib.refs.sameBlueprint "provider_${safeId}";
-            group = group;
-            metaLaunchUrl = launchUrl;
-            openInNewTab = true;
-          })
-        ]
-      ) sortedOidcEndpointNames;
-  };
+  oidcBlueprint =
+    assert ingressPolicyCheck;
+    blueprintLib.blueprint {
+      name = "vyrx-apps-oidc";
+      entries =
+        providerFlowDependencies
+        ++ lib.concatMap (
+          name:
+          let
+            ep = oidcEndpoints.${name};
+            displayName = if ep.displayName != null then ep.displayName else name;
+            group = if ep.group != null then ep.group else "Applications";
+            safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
+            secretAttr =
+              if ep.oidc.clientSecretEnv != null then
+                blueprintLib.refs.env ep.oidc.clientSecretEnv
+              else if ep.oidc.clientSecret != null then
+                ep.oidc.clientSecret
+              else
+                blueprintLib.refs.env "AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
+            launchUrl =
+              if ep.publicUrl != null then
+                ep.publicUrl
+              else if ep.canonicalDomain != null then
+                "https://${ep.canonicalDomain}"
+              else
+                null;
+          in
+          [
+            (blueprintLib.oauth2Provider {
+              id = "provider_${safeId}";
+              name = "Provider for ${displayName}";
+              clientId = ep.oidc.clientId;
+              clientSecret = secretAttr;
+              authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
+              invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
+              redirectUris = map (uri: {
+                matching_mode = "strict";
+                url = uri;
+              }) ep.oidc.redirectUris;
+              subMode = ep.oidc.subMode;
+              includeClaimsInIdToken = ep.oidc.includeClaimsInIdToken;
+            })
+            (blueprintLib.application {
+              slug = name;
+              name = displayName;
+              provider = blueprintLib.refs.sameBlueprint "provider_${safeId}";
+              group = group;
+              metaLaunchUrl = launchUrl;
+              openInNewTab = true;
+            })
+          ]
+          ++ audienceBindings name ep
+        ) sortedOidcEndpointNames;
+    };
 
   generatedProxyBlueprint = toBlueprintYaml "proxy-apps-generated" proxyBlueprint;
   generatedOidcBlueprint = toBlueprintYaml "oidc-apps-generated" oidcBlueprint;

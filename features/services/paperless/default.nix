@@ -155,6 +155,7 @@ in
             protocol = "tcp";
             scope = "internal";
             auth = "oidc";
+            accessGroups = [ "family" ];
             subdomain = "paperless";
             extraDomains = [
               "docs.lan.${topologyDomain}"

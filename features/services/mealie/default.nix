@@ -98,6 +98,7 @@ in
         protocol = "tcp";
         scope = "public";
         auth = "oidc";
+        accessGroups = [ "family" ];
         subdomain = "mealie";
         # Ingress reaches this over the WireGuard mesh (invariant I10).
         directAccess = {

@@ -126,26 +126,40 @@ let
         };
       };
 
+      # Who may use this endpoint. One declaration per service, projected three ways: the ingress gate
+      # (an Authentik policy binding on the application for `auth = "authentik"` or `"oidc"`), the
+      # directory filter (an LDAP consumer's memberOf), and the portal (vyrx.de shows a user only what
+      # these groups allow). Deliberately no default: a service published through the ingress without
+      # naming its audience has no policy, and the compiler refuses to build it.
+      accessGroups = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Authentik groups whose members may use this endpoint.";
+      };
+
+      adminGroups = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Groups whose members administer this endpoint (usually a subset of accessGroups).";
+      };
+
       # Directory authentication, parallel to `oidc` and on the same axis: `auth` says who gets through
       # the ingress, this says where the application's users come from. LDAP is not an ingress concern
-      # - the proxy speaks no LDAP - so it does not belong in the `auth` enum.
+      # - the proxy speaks no LDAP - so it does not belong in the `auth` enum. Its audience is the
+      # endpoint's, so it does not restate it.
       ldap = {
         enable = lib.mkEnableOption "Authenticate this endpoint's users against the Authentik LDAP directory";
 
         accessGroups = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          default = [ ];
-          description = ''
-            Authentik groups whose members may sign in to this service. Deliberately has no default:
-            a service that authenticates against a directory without naming its audience has no
-            access policy, and the compiler refuses to build it.
-          '';
+          default = submod.config.accessGroups;
+          description = "Inherited from the endpoint's `accessGroups`; the directory filter is a projection of it.";
         };
 
         adminGroups = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          default = [ ];
-          description = "Groups whose members are administrators of this service (usually a subset of accessGroups)";
+          default = submod.config.adminGroups;
+          description = "Inherited from the endpoint's `adminGroups`.";
         };
 
         baseDn = lib.mkOption {

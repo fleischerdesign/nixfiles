@@ -1058,6 +1058,7 @@ in
                 protocol = "tcp";
                 scope = "public";
                 auth = if inst.auth then "authentik" else "none";
+                accessGroups = [ "family" ];
                 subdomain = inst.subdomain;
                 domain = inst.domain;
                 # Dynamically minted self-publishing hosts are the only names that
