@@ -50,6 +50,11 @@ let
         wireguardIpv4 = host.wireguardIpv4 or null;
         relay = host.wireguardRelay or false;
         ingress = name == topology.ingressHost;
+        # Whether anything probes this host at all. A host without monitoring is not "unknown" - the
+        # portal knows it is unmonitored, and says so instead of inventing a state.
+        monitored = lib.any (ep: ep.monitoring.scrape.enable) (
+          lib.concatLists (lib.mapAttrsToList (_: c: lib.attrValues c.endpoints) provides)
+        );
         services = lib.sort (a: b: a < b) (builtins.attrNames provides);
       }
     ) (builtins.attrNames flakeConfigurations)
@@ -146,6 +151,14 @@ let
       # the portal and the alerting therefore agree by construction instead of by convention.
       handle /api/status {
         rewrite * /api/v1/query?query=probe_success
+        reverse_proxy ${prometheusAddress}:9090
+        header Cache-Control "public, max-age=10"
+      }
+
+      # Host liveness. `up` carries the scrape targets, and a direct scrape labels `instance` with the
+      # host name; the page keeps only the instances the registry knows, so no service name is named here.
+      handle /api/hosts {
+        rewrite * /api/v1/query?query=up
         reverse_proxy ${prometheusAddress}:9090
         header Cache-Control "public, max-age=10"
       }
