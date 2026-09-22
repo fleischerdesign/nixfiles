@@ -6,23 +6,33 @@
 }:
 let
   cfg = config.my.features.services.authentik.outpost.proxy;
+
+  # The core as this host reaches it: the LAN address while both sides are at home, otherwise the overlay
+  # address (lib/addresses.nix).
+  addresses = import ../../../../../lib/addresses.nix { inherit lib; };
 in
 {
   options.my.features.services.authentik.outpost.proxy = {
     enable = lib.mkEnableOption "Authentik Proxy Outpost";
     tokenSecretName = lib.mkOption {
       type = lib.types.str;
-      default = "authentik_outpost_proxy_token";
+      default = "services/authentik/proxy_token";
       description = "The name of the secret in sops containing the Authentik proxy token.";
     };
     coreAddress = lib.mkOption {
       type = lib.types.str;
-      default = "http://${config.my.features.system.networking.topology.hosts.mackaye.tailscaleIp}:9055";
+      default = "http://${
+        addresses.serviceAddress {
+          topology = config.my.topology;
+          consumer = config.my.topology.hosts.${config.networking.hostName} or null;
+          peer = config.my.topology.hosts.cld-edge-01;
+        }
+      }:9055";
       description = "Internal address of the Authentik Core instance.";
     };
     browserUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh";
+      default = "https://auth.vyrx.de";
       description = "Public browser facing URL of the Authentik Core instance.";
     };
   };
@@ -30,7 +40,7 @@ in
   config = lib.mkIf cfg.enable {
     # 1. Secrets Setup
     sops.secrets."${cfg.tokenSecretName}" = {
-      owner = "authentik-outpost";
+      owner = lib.mkDefault "authentik-outpost";
       # Restart service when secret changes
       restartUnits = [ "authentik-outpost-proxy.service" ];
     };
@@ -67,8 +77,8 @@ in
           "AUTHENTIK_HOST_BROWSER=${cfg.browserUrl}"
           "AUTHENTIK_INSECURE_SKIP_VERIFY=true"
           # Listen on localhost:9000
-          "AUTHENTIK_HTTP_ADDRESS=127.0.0.1:9000"
-          "AUTHENTIK_METRICS_ADDRESS=127.0.0.1:9300"
+          "AUTHENTIK_LISTEN__HTTP=127.0.0.1:9000"
+          "AUTHENTIK_LISTEN__METRICS=127.0.0.1:9303"
         ];
 
         Restart = "always";

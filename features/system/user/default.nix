@@ -91,6 +91,12 @@ in
       default = "/home/${config.my.user.primary}/.config/sops/age/keys.txt";
       description = "Path to the user's Age key file for SOPS CLI.";
     };
+
+    profiles = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "core" ];
+      description = "Active Home-Manager atomic profiles for primary user (e.g. core, graphical).";
+    };
   };
 
   config = lib.mkMerge (

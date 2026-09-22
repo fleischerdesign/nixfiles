@@ -29,12 +29,12 @@ in
         users.groups.prowlarr = { };
 
         # SOPS Secret for API Key
-        sops.secrets.prowlarr_api_key = {
+        sops.secrets."services/media/prowlarr_api_key" = {
           owner = "prowlarr";
         };
         sops.templates."prowlarr.env" = {
           owner = "prowlarr";
-          content = "PROWLARR__AUTH__APIKEY=${config.sops.placeholder.prowlarr_api_key}";
+          content = "PROWLARR__AUTH__APIKEY=${config.sops.placeholder."services/media/prowlarr_api_key"}";
         };
 
         services.prowlarr = {
@@ -69,10 +69,31 @@ in
           ];
         };
 
-        # Register with Caddy Feature
-        my.endpoints.prowlarr = {
-          host = config.networking.hostName;
-          port = 9696;
+        my.contracts.provides.prowlarr = {
+          endpoints.web = {
+            port = 9696;
+            protocol = "tcp";
+            scope = "internal";
+            auth = "authentik";
+            accessGroups = [ "media-users" ];
+            subdomain = "prowlarr";
+            healthProbePath = "/ping";
+            dashboard = {
+              description = {
+                de = "Indexer-Verwaltung für den Medien-Stack.";
+                en = "Indexer management for the media stack.";
+              };
+              show = true;
+              displayName = "Prowlarr";
+              category = "Media";
+              icon = "prowlarr";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/prowlarr" ];
+            dataDirs = [ ];
+            cacheDirs = [ ];
+          };
         };
       }
     ]

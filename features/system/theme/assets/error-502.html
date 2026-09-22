@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>502 · Upstream Unavailable | VYRX</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090B;
+      --card: #121215;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --accent: #6366F1;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --text-sub: #64748B;
+      --red: #EF4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Geist', -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 540px;
+      padding: 2.25rem;
+      box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.04em;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-family: 'Geist Mono', monospace;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--red);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--red);
+    }
+
+    .error-code {
+      font-family: 'Geist Mono', monospace;
+      font-size: 2.5rem;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    .error-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+
+    .error-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      margin-bottom: 1.75rem;
+    }
+
+    .diagnostics {
+      background: #0D0D10;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .diag-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .diag-row:last-child {
+      border-bottom: none;
+    }
+
+    .diag-label {
+      color: var(--text-sub);
+    }
+
+    .diag-value {
+      color: var(--text);
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      flex: 1;
+      text-align: center;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--text);
+      color: var(--bg);
+      border: 1px solid var(--text);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.92;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="brand">vyrx</div>
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Status: Error
+      </div>
+    </div>
+
+    <div class="error-code">502</div>
+    <div class="error-title">Upstream Service Unavailable</div>
+    <p class="error-desc">
+      The edge ingress gateway was unable to establish a connection to the designated backend service node.
+    </p>
+
+    <div class="diagnostics">
+      <div class="diag-row">
+        <span class="diag-label">Gateway Node:</span>
+        <span class="diag-value">cld-edge-01 (WireGuard Mesh)</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Network Tier:</span>
+        <span class="diag-value">RFC 1918 (10.10.100.0/24)</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Audit Telemetry:</span>
+        <span class="diag-value">Vector -> Loki (cld-ops-01)</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="javascript:location.reload()" class="btn btn-primary">Try Again</a>
+      <a href="https://ops.vyrx.de" class="btn btn-secondary">Cluster Status</a>
+    </div>
+  </div>
+</body>
+</html>

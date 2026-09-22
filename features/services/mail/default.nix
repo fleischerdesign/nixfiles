@@ -14,17 +14,17 @@ in
     enable = lib.mkEnableOption "Stalwart Mail Server";
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "mail.ancoris.ovh";
+      default = "mail.${config.my.topology.domain}";
       description = "Full domain name of the mail server.";
     };
     baseDomain = lib.mkOption {
       type = lib.types.str;
-      default = "ancoris.ovh";
+      default = config.my.topology.domain;
       description = "Base domain name.";
     };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/stalwart/";
+      default = "https://auth.${config.my.topology.domain}/application/o/stalwart/";
       description = "SSO Authority/Issuer URL.";
     };
   };
@@ -194,8 +194,8 @@ in
               protocol = "http";
               oidc = {
                 issuer = cfg.ssoAuthority;
-                client-id = "%{file:${config.sops.secrets.stalwart_oidc_id.path}}%";
-                client-secret = "%{file:${config.sops.secrets.stalwart_oidc_secret.path}}%";
+                client-id = "%{file:${config.sops.secrets."services/mail/stalwart_oidc_id".path}}%";
+                client-secret = "%{file:${config.sops.secrets."services/mail/stalwart_oidc_secret".path}}%";
                 scopes = [
                   "openid"
                   "profile"
@@ -236,15 +236,15 @@ in
 
             authentication.fallback-admin = {
               user = "admin";
-              secret = "%{file:${config.sops.secrets.mail_admin_password.path}}%";
+              secret = "%{file:${config.sops.secrets."services/mail/admin_password".path}}%";
             };
           };
 
           credentials = {
-            "brevo_user" = config.sops.secrets.brevo_smtp_user.path;
-            "brevo_secret" = config.sops.secrets.brevo_smtp_key.path;
-            "ldap_password" = config.sops.secrets.stalwart_ldap_password.path;
-            "db_password" = config.sops.secrets.stalwart_db_password.path;
+            "brevo_user" = config.sops.secrets."services/mail/brevo_smtp_user".path;
+            "brevo_secret" = config.sops.secrets."services/mail/brevo_smtp_key".path;
+            "ldap_password" = config.sops.secrets."services/mail/stalwart_ldap_password".path;
+            "db_password" = config.sops.secrets."services/mail/stalwart_db_password".path;
           };
         };
 
@@ -260,7 +260,9 @@ in
           };
           script = ''
             ${config.services.postgresql.package}/bin/psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='stalwart'" | grep -q 1 || exit 0
-            ${config.services.postgresql.package}/bin/psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${config.sops.secrets.stalwart_db_password.path})';"
+            ${config.services.postgresql.package}/bin/psql -c "ALTER USER stalwart WITH PASSWORD '$(cat ${
+              config.sops.secrets."services/mail/stalwart_db_password".path
+            })';"
           '';
         };
 
@@ -283,22 +285,29 @@ in
           '';
         };
 
-        services.postgresql = {
-          ensureDatabases = [ "stalwart" ];
-          ensureUsers = [
-            {
-              name = "stalwart";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.mail.postgresql.main = {
+          database = "stalwart";
+          user = "stalwart";
+          ensureDBOwnership = true;
         };
 
-        my.endpoints.mail = {
-          host = config.networking.hostName;
-          port = 9081;
-          proxy = {
-            enable = true;
+        my.contracts.provides.mail = {
+          endpoints.web = {
+            port = 9081;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
             inherit (cfg) domain;
+            dashboard = {
+              show = true;
+              displayName = "Stalwart Mail";
+              category = "Productivity";
+              icon = "mail";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/stalwart-mail" ];
           };
         };
 
@@ -308,25 +317,25 @@ in
           "d /var/lib/stalwart-mail/logs 0750 stalwart-mail stalwart-mail -"
         ];
 
-        sops.secrets.brevo_smtp_user = {
+        sops.secrets."services/mail/brevo_smtp_user" = {
           owner = "stalwart-mail";
         };
-        sops.secrets.brevo_smtp_key = {
+        sops.secrets."services/mail/brevo_smtp_key" = {
           owner = "stalwart-mail";
         };
-        sops.secrets.mail_admin_password = {
+        sops.secrets."services/mail/admin_password" = {
           owner = "stalwart-mail";
         };
-        sops.secrets.stalwart_oidc_id = {
+        sops.secrets."services/mail/stalwart_oidc_id" = {
           owner = "stalwart-mail";
         };
-        sops.secrets.stalwart_oidc_secret = {
+        sops.secrets."services/mail/stalwart_oidc_secret" = {
           owner = "stalwart-mail";
         };
-        sops.secrets.stalwart_ldap_password = {
+        sops.secrets."services/mail/stalwart_ldap_password" = {
           owner = "stalwart-mail";
         };
-        sops.secrets.stalwart_db_password = {
+        sops.secrets."services/mail/stalwart_db_password" = {
           owner = "postgres";
         };
       }

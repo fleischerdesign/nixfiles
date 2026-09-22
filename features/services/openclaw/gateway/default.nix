@@ -4,7 +4,7 @@
 # configuration file, database, log file, and separate trust boundary (secrets, GitHub PAT, etc.).
 #
 # Instances are exposed via Caddy and Authentik forward-auth as:
-#   <subdomain>.<baseDomain> (e.g. philipp.ai.rls.ancoris.ovh)
+#   https://<subdomain>.<domain> (e.g. https://philipp.ai.vyrx.de)
 {
   lib,
   pkgs,
@@ -13,6 +13,21 @@
 let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.openclaw.gateway;
+
+  # The same rule as everywhere: the LAN address while both sides are at home, otherwise the overlay
+  # address (lib/addresses.nix).
+  addresses = import ../../../../lib/addresses.nix { inherit lib; };
+
+  # The public ingress (Caddy + Authentik forward-auth) is the only legitimate proxy in front
+  # of a gateway, so its overlay address is the only non-loopback entry allowed in
+  # gateway.trustedProxies. Derived from the topology, so a new ingress host needs no edit
+  # here (docs/architecture.md §7.1). OpenClaw validates the source address of proxy-shaped traffic
+  # and rejects untrusted ones with `proxy_attribution_required`.
+  ingressProxyAddress = addresses.serviceAddress {
+    topology = osConfig.my.topology;
+    consumer = osConfig.my.topology.hosts.${osConfig.networking.hostName} or null;
+    peer = osConfig.my.topology.hosts.${osConfig.my.topology.ingressHost} or null;
+  };
 
   # Standard baseline toolchain available to OpenClaw execution environments
   defaultBasePackages = [
@@ -127,6 +142,9 @@ let
 
       mcpAppsConfig = lib.optionalAttrs inst.sandbox.enable {
         mcp.apps = {
+          # Required: without this switch OpenClaw never starts the sandbox listener, so the
+          # public sandbox origin would answer 502 (verified live).
+          enabled = true;
           sandboxPort = inst.sandbox.port;
           sandboxOrigin = sandboxOrigin;
         };
@@ -235,7 +253,8 @@ let
             trustedProxies = [
               "127.0.0.1"
               "::1"
-            ];
+            ]
+            ++ lib.optional (ingressProxyAddress != null) ingressProxyAddress;
             auth = {
               mode = "trusted-proxy";
               identityScopes = lib.genAttrs inst.adminUsers (_: [ "operator.admin" ]);
@@ -342,7 +361,7 @@ let
 
         domain = lib.mkOption {
           type = lib.types.str;
-          default = osConfig.my.features.services.caddy.baseDomain or "";
+          default = osConfig.my.topology.domain;
           description = "Base domain for reverse proxy.";
         };
 
@@ -517,14 +536,14 @@ let
 
         autoApproveCidrs = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          default = osConfig.my.features.system.networking.topology.trustedSubnets or [ ];
+          default = osConfig.my.topology.trustedSubnets or [ ];
           description = "CIDR ranges from which node pairings are auto-approved.";
         };
 
-        openTailscaleFirewall = lib.mkOption {
+        openMeshFirewall = lib.mkOption {
           type = lib.types.bool;
           default = true;
-          description = "Open instance port on Tailscale firewall interface.";
+          description = "Open the instance port on the WireGuard mesh interface so the ingress can reach it.";
         };
 
         browser = {
@@ -648,7 +667,7 @@ let
 
           credentialsSecret = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = "ai/openclaw/google_credentials";
             description = "SOPS secret containing the Google OAuth desktop app credentials.json (client_id & client_secret).";
           };
         };
@@ -686,19 +705,19 @@ let
         secrets = {
           deepseek = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = "ai/deepseek_api_key";
             description = "SOPS secret for DEEPSEEK_API_KEY.";
           };
 
           openai = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = "ai/openai_api_key";
             description = "SOPS secret for OPENAI_API_KEY.";
           };
 
           password = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = "ai/openclaw/gateway_password";
             description = "SOPS secret for OPENCLAW_GATEWAY_PASSWORD.";
           };
 
@@ -730,7 +749,7 @@ let
 
           tokenSecret = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = "openclaw_gateway_token";
+            default = "ai/openclaw/a2a/${name}";
             description = "SOPS secret used for A2A peer authentication.";
           };
 
@@ -740,11 +759,11 @@ let
                 options = {
                   url = lib.mkOption {
                     type = lib.types.str;
-                    description = "Target peer URL (e.g. https://katja.ai.rls.ancoris.ovh).";
+                    description = "Target peer URL (e.g. https://katja.ai.ops.vyrx.de).";
                   };
                   tokenSecret = lib.mkOption {
                     type = lib.types.nullOr lib.types.str;
-                    default = "openclaw_gateway_token";
+                    default = null;
                     description = "SOPS secret containing bearer token for this peer.";
                   };
                 };
@@ -830,6 +849,27 @@ in
   options.my.features.services.openclaw.gateway = {
     enable = lib.mkEnableOption "OpenClaw multi-tenant gateway service";
 
+    # A gateway is the SSH *server* end of the node loopback tunnels: it authorizes the node
+    # keys for root. The node side renders the matching private key (see the node feature's
+    # tunnelPrivateKeySecret), so exactly one side owns each half of the credential.
+    trustedNodeKeys = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBIIoWHt6VqxvAOIXkZXZdNiNzoQ32a2PoEvjM3oaDEj openclaw-node-tunnel"
+      ];
+      description = "SSH public keys allowed to open node tunnels on this gateway.";
+    };
+
+    # Accounts that may reach every instance in addition to the person it belongs to (the operator
+    # who supports them). Usernames, not mail addresses: an address list mixes a person's additional
+    # logins into one string (`kugelblitz82@gmx.de` next to `kai@vyrx.de`), and the audience check
+    # refuses a group named after a username the directory does not seed.
+    operators = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Usernames that may reach every instance, in addition to its own account.";
+    };
+
     instances = lib.mkOption {
       type = lib.types.attrsOf (lib.types.submodule instanceSubmodule);
       default = { };
@@ -838,6 +878,10 @@ in
   };
 
   config = lib.mkIf (cfg.enable && enabledInstances != { }) {
+    # Authorize the node tunnel keys. List options merge, so this adds to the fleet deploy
+    # keys set by the ssh feature without replacing them.
+    users.users.root.openssh.authorizedKeys.keys = cfg.trustedNodeKeys;
+
     # Validate plugins on all enabled instances
     assertions = lib.concatMap (
       name:
@@ -1008,29 +1052,49 @@ in
       ) (lib.attrNames enabledInstances)
     );
 
-    # Register each instance and its isolated sandbox into the central endpoint registry for Caddy and Firewall
-    my.endpoints = lib.listToAttrs (
-      lib.concatMap (
+    # Register each instance into the central service catalog for Caddy, Firewall, and Monitoring
+    my.contracts.provides = lib.listToAttrs (
+      lib.map (
         name:
         let
           inst = enabledInstances.${name};
         in
-        [
-          {
-            name = inst._endpointName;
-            value = {
-              host = osConfig.networking.hostName;
-              port = inst.port;
-              directAccess = {
-                enable = inst.openTailscaleFirewall;
+        {
+          name = inst._endpointName;
+          value = {
+            endpoints = {
+              web = {
+                port = inst.port;
                 protocol = "tcp";
-                interface = "tailscale";
-              };
-              proxy = {
-                enable = true;
+                scope = "public";
+                auth = if inst.auth then "authentik" else "none";
+                # Each instance is its own audience, named by the instance: the key (`kai`, `rieke`, ...)
+                # is the account, so its group holds exactly the person the gateway belongs to. Every
+                # member of a role that may use one gateway could otherwise open every other person's
+                # agent at the ingress - the app's own `adminUsers` repaired that one layer too deep
+                # (403 after login, not before it). The contract turns the username into its own group
+                # and the compiler declares the membership, so a deploy leaves no empty audience
+                # behind. Deliberately not derived from `adminUsers`: those are mail addresses, and at
+                # least three of them (`kugelblitz82@...`, `fleischerkatja74@...`, `lillytobei@...`)
+                # have nothing to do with the username. The audience assertion rejects exactly that
+                # join, which is why the operator's cross-instance access now needs a declaration of
+                # its own instead of riding along in an address list.
+                # Deliberately not derived from `adminUsers`: that list carries every address a person
+                # signs in with, so its local parts are no usernames at all (`kugelblitz82@gmx.de` next
+                # to `kai@vyrx.de`). The instance key is the account, and `operators` names the people
+                # who may reach every instance - both declared, both checked against the seeded
+                # usernames, so a deploy never leaves an audience empty and the ingress audience is
+                # exactly what the application already enforced.
+                accessUsers = lib.unique ([ name ] ++ cfg.operators);
+                # Until today every instance was gated by the role `family`, so every member of it could
+                # open any agent. Taking the group out of the declaration does not remove the binding
+                # that is already in the database; naming it here does.
+                retiredAccessGroups = [ "family" ];
                 subdomain = inst.subdomain;
                 domain = inst.domain;
-                auth = inst.auth;
+                # Dynamically minted self-publishing hosts are the only names that
+                # cannot be enumerated, so the wildcard is declared here (SSOT).
+                extraDomains = lib.optional inst.publishing.enable "*.${inst.publishing.subdomain}.${inst.domain}";
                 unauthenticatedPaths = [
                   "/j/*"
                   "/__openclaw__/worker*"
@@ -1039,43 +1103,78 @@ in
                   "/a2a/*"
                 ];
                 machineClientsBypassAuth = true;
+                directAccess = {
+                  enable = inst.openMeshFirewall;
+                  protocol = "tcp";
+                  interface = "wireguard";
+                };
+                dashboard = {
+                  show = true;
+                  displayName =
+                    if inst.agentName != null then "OpenClaw (${inst.agentName})" else "OpenClaw (${name})";
+                  category = "AI & Agents";
+                  icon = "bot";
+                };
+                monitoring = {
+                  http.enable = false;
+                  tcp = {
+                    enable = true;
+                    group = "AI";
+                  };
+                };
               };
-              monitoring = {
-                http.enable = false;
-                tcp = {
-                  enable = true;
-                  group = "AI";
+            }
+            // lib.optionalAttrs inst.sandbox.enable {
+              sandbox = {
+                port = inst.sandbox.port;
+                protocol = "tcp";
+                scope = "public";
+                auth = "none";
+                publicExempt = "sandbox surface guarded by the gateway token - REVIEW whether it must be public";
+                subdomain = inst.sandbox.subdomain;
+                domain = inst.domain;
+                directAccess = {
+                  enable = inst.openMeshFirewall;
+                  protocol = "tcp";
+                  interface = "wireguard";
+                };
+                monitoring = {
+                  http = {
+                    enable = true;
+                    group = "AI-Sandbox";
+                    path = "/mcp-app-sandbox";
+                  };
                 };
               };
             };
-          }
-        ]
-        ++ lib.optional inst.sandbox.enable {
-          name = "${inst._endpointName}-sandbox";
-          value = {
-            host = osConfig.networking.hostName;
-            port = inst.sandbox.port;
-            directAccess = {
-              enable = inst.openTailscaleFirewall;
-              protocol = "tcp";
-              interface = "tailscale";
-            };
-            proxy = {
-              enable = true;
-              subdomain = inst.sandbox.subdomain;
-              domain = inst.domain;
-              auth = false;
-            };
-            monitoring = {
-              http = {
-                enable = true;
-                group = "AI-Sandbox";
-                path = "/mcp-app-sandbox";
-              };
+            storage = {
+              stateDirs = [ inst._stateDir ];
             };
           };
         }
       ) (lib.attrNames enabledInstances)
+      # The permission check the gateway itself calls on loopback (its own comment below says so), which is
+      # bound wide - declaring it local is the correction. It is the only listener of the agent runtime left
+      # on this host: the health bridge a Hermes skill used to start next to it (a `health_bridge.py` on
+      # 8090, copied into the store without a deriver and left behind after its skill directory was deleted)
+      # was removed rather than declared.
+      ++ [
+        {
+          name = "openclaw-helper";
+          value = {
+            endpoints.permission-check = {
+              port = 18099;
+              protocol = "tcp";
+              scope = "isolated";
+              directAccess = {
+                enable = true;
+                interface = "local";
+                protocol = "tcp";
+              };
+            };
+          };
+        }
+      ]
     );
 
     # Declarative Caddy virtual hosts for dynamic self-publishing via Unix domain sockets.

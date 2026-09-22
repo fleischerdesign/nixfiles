@@ -1,16 +1,13 @@
 {
   config,
-  options,
   lib,
   features,
   ...
 }:
 let
   cfg = config.my.features.services.paperless;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
-  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
 in
 {
   options.my.features.services.paperless = {
@@ -32,13 +29,13 @@ in
         my.features.services.redis.enable = true;
 
         # 1. SOPS Secrets
-        sops.secrets.paperless_oidc_secret = { };
-        sops.secrets.paperless_secret_key = { };
+        sops.secrets."services/apps/paperless_oidc_secret" = { };
+        sops.secrets."services/apps/paperless_secret_key" = { };
 
         # 2. Template for the sensitive JSON Auth variable
         sops.templates."paperless.env" = {
           content = ''
-            PAPERLESS_SECRET_KEY=${config.sops.placeholder.paperless_secret_key}
+            PAPERLESS_SECRET_KEY=${config.sops.placeholder."services/apps/paperless_secret_key"}
             PAPERLESS_SOCIALACCOUNT_PROVIDERS=${
               builtins.toJSON {
                 openid_connect = {
@@ -47,7 +44,7 @@ in
                       provider_id = "authentik";
                       name = "Authentik";
                       client_id = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
-                      secret = config.sops.placeholder.paperless_oidc_secret;
+                      secret = config.sops.placeholder."services/apps/paperless_oidc_secret";
                       settings = {
                         server_url = cfg.ssoServerUrl;
                         token_auth_method = "client_secret_basic";
@@ -95,9 +92,9 @@ in
             PAPERLESS_DBUSER = "paperless";
             PAPERLESS_URL =
               let
-                d = config.my.endpoints.paperless.proxy.subdomain;
+                ep = config.my.contracts.provides.paperless.endpoints.web;
               in
-              lib.mkIf (d != null) "https://${d}.${config.my.endpoints.paperless.proxy.domain}";
+              lib.mkIf (ep.publicUrl != null) ep.publicUrl;
             PAPERLESS_TIME_ZONE = "Europe/Berlin";
             PAPERLESS_OCR_LANGUAGE = "deu+eng";
 
@@ -114,15 +111,11 @@ in
           };
         };
 
-        # Ensure PostgreSQL database and user exist for Paperless
-        services.postgresql = {
-          ensureDatabases = [ "paperless" ];
-          ensureUsers = [
-            {
-              name = "paperless";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.paperless.postgresql.main = {
+          database = "paperless";
+          user = "paperless";
+          ensureDBOwnership = true;
         };
 
         # Systemd overrides
@@ -143,7 +136,9 @@ in
           environment = {
             PUID = "315";
             PGID = "987";
-            IP = "192.168.178.109";
+            # The address comes from the device inventory (my.topology.devices), which is the single
+            # source for device addresses; the scanner is declared there as hom-prn-01.
+            IP = config.my.topology.devices.hom-prn-01.ipv4;
             LABEL = "paperless";
             TZ = "Europe/Berlin";
             PATTERN = "\"scan\"_dd-mm-yyyy_hh-MM-ss";
@@ -153,10 +148,47 @@ in
           ];
         };
 
-        # Register with Caddy Feature
-        my.endpoints.paperless = {
-          host = config.networking.hostName;
-          port = 28981;
+        # Register with Caddy & Firewall via Service Contract
+        my.contracts.provides.paperless = {
+          endpoints.web = {
+            port = 28981;
+            protocol = "tcp";
+            scope = "internal";
+            auth = "oidc";
+            accessGroups = [ "family" ];
+            subdomain = "paperless";
+            extraDomains = [
+              "docs.lan.${topologyDomain}"
+            ];
+            oidc = {
+              enable = true;
+              clientId = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
+              clientSecretEnv = "AUTHENTIK_OIDC_PAPERLESS_SECRET";
+              secretPath = "services/apps/paperless_oidc_secret";
+              redirectPaths = [ "/accounts/authentik/login/callback/" ];
+              subMode = "hashed_user_id";
+              includeClaimsInIdToken = true;
+            };
+            healthProbePath = "/";
+            dashboard = {
+              description = {
+                de = "Belegarchiv mit Texterkennung.";
+                en = "Document archive with OCR.";
+              };
+              show = true;
+              displayName = "Paperless-ngx";
+              category = "Productivity";
+              icon = "paperless";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/paperless" ];
+            dataDirs = [
+              "/data/storage/docs"
+              "/var/lib/paperless/media"
+            ];
+            cacheDirs = [ ];
+          };
         };
       }
     ]

@@ -1,259 +1,86 @@
-# NixOS Konfiguration
+# Working in this repository
 
-Nix-Flake-basierte NixOS-Konfiguration für 5 Hosts (jello, mackaye, rollins, strummer, yorke) mit Home-Manager-Integration, SOPS-Secret-Management und deploy-rs-Deployment.
+Agent-facing instructions. Everything substantive lives in [`docs/`](docs/README.md); this file says
+what an agent must know before touching anything, and nothing twice.
 
-## Host-Übersicht
+## What this is
 
-| Host | Rolle | Hardware | Besonderheit |
-|---|---|---|---|
-| jello | desktop | PC (Intel, NVMe, Intel GPU) | Niri-Desktop |
-| yorke | notebook | Laptop (AMD, NVMe) | Niri-Desktop |
-| mackaye | server | VPS (QEMU, GRUB/BIOS) | Full-Stack: auth, DB, monitoring master |
-| rollins | server | VPS (QEMU, GRUB/BIOS) | Monitoring-Collector, Hermes Agent, Attic Server |
-| strummer | server | Bare Metal (Intel, 4TB+1TB disks) | Media-Server (arr-Stack, Jellyfin, Home-Assistant, 3D-Drucker) |
+Declarative NixOS + Home Manager configuration for five hosts, a WireGuard mesh, SOPS secrets, modular
+service contracts and agentless reconcilers for devices that cannot run NixOS. The
+[architecture](docs/architecture.md) defines the vocabulary - zone, plane, contract, scope, mesh - that
+this file uses without redefining.
 
-## Build, Test, Lint
-
-**Pre-commit (automatisch):**
-```bash
-git config core.hooksPath .githooks    # einmalig aktivieren
-```
-Pipeline: `nixfmt` → `deadnix --fail` → `statix check` (auf `.nix`-Dateien). `set -e` — jeder Fehler bricht ab.
-
-**Manuelle Checks:**
-```bash
-nix flake check                     # eval-hosts (alle 5 Hosts) + statix + deadnix
-nix fmt                             # nixfmt auf das gesamte Repo
-nixos-rebuild dry-run --flake .#<host>
-```
-
-**Reihenfolge nach Code-Änderungen:**
-1. `nixfmt <dateien>` — formatiert in-place
-2. `deadnix --fail` — entfernt unbenutzten Code
-3. `statix check <datei>` — lintet (nur `repeated_keys` disabled)
-4. `nix flake check` — validiert alle Hosts evaluieren korrekt
-
-## Projektstruktur
-
-```
-/etc/nixos/
-├── flake.nix               # 15 Flake-Inputs, Overlay-Liste, mkSystem-Aufruf pro Host
-├── flake.lock
-├── hosts/<name>/
-│   ├── configuration.nix   # Einstiegspunkt: imports role + hardware + host-spezifische Features
-│   ├── hardware-configuration.nix  # Generiert oder manuell (VPS: QEMU-Gast)
-│   ├── hardware-specific.nix       # Zusätzliche Hardware (Intel GPU, Bluetooth, Extra-Disks, GRUB-Override)
-│   └── disk-config.nix     # Nur Server mit Disko (GPT-Partitionierung)
-├── roles/
-│   ├── base.nix            # Alle Hosts: common, bootloader, kernel, fish-shell, topology, security, ssh
-│   ├── pc.nix              # PC/Desktop: audio, wayland, printing, containers, codium, nixvim, gaming, spotify
-│   ├── desktop.nix         # my.role = "desktop"
-│   ├── notebook.nix        # my.role = "notebook"
-│   └── server.nix          # my.role = "server": caddy, monitoring, tailscale, static-ip, nixvim
-├── user/philipp/
-│   ├── home.nix            # Root: imports sub-module, direnv, Nixcord, home packages
-│   ├── metadata.nix        # Statische User-Daten (Name, Email, SSH-Keys) — importiert von features/system/user
-│   ├── packages.nix        # Packages (server-gated: desktop-only = 22 extra packages + Ghostty)
-│   ├── opencode.nix        # programs.opencode + home.file symlinks (server-gated)
-│   └── fish.nix            # Fish-Shell, Aliase, tpl-Funktion (templates bootstrapper)
-├── features/
-│   ├── desktop/{gnome,niri}/       # Desktop Environments (mutual exclusion via assertions)
-│   ├── dev/{android,codium,containers,git,nixvim,opencode/}  # opencode/ hat kein default.nix
-│   ├── endpoints/                  # my.endpoints — zentrale Service-Registry (kein enable-Flag)
-│   ├── media/{gaming,spotify}/
-│   ├── services/{35 Features}      # arr-Stack, Monitoring, Auth, DBs, Automation, Media
-│   └── system/{14 Features}        # audio, bootloader, common, networking, security, user
-├── lib/
-│   ├── default.nix         # Public API: { mkSystem } — akzeptiert { home-manager-unstable }
-│   ├── helper.nix          # Compatibility-Shim → default.nix
-│   ├── features.nix        # { requires } — Feature-Dependency-Manager (mkDefault + assertion)
-│   ├── core/
-│   │   ├── system-builder.nix  # mkSystem: auto-discovers features + users, baut nixosSystem
-│   │   └── module-loader.nix   # findModules: rekursiv alle default.nix unter einem Pfad
-│   └── updaters/
-│       └── update-custom-packages.sh  # GitHub-Release-Updater für packages/custom/*/manifest.json
-├── packages/
-│   ├── custom/
-│   │   ├── default.nix     # Auto-Discovering Overlay: scannt Subdirectories mit default.nix
-│   │   └── <name>/
-│   │       ├── default.nix     # callPackage-Derivation
-│   │       └── manifest.json   # version, srcHash, upstream-Metadaten (vom Updater verwaltet)
-│   └── overlays/fix/
-│       ├── bottles/default.nix
-│       ├── hermes-agent/default.nix  # Akzeptiert inputs (wird in flake.nix als (import ... inputs) geladen)
-│       ├── inline-snapshot/default.nix
-│       ├── patool/default.nix
-│       └── python314-metadata/default.nix
-├── secrets/                # SOPS-verschlüsselte *.yaml — ein Key pro Host
-├── .sops.yaml              # Age-Keys: philipp, strummer, mackaye, rls, jello, yorke, ci
-├── .githooks/pre-commit
-├── .github/
-│   ├── workflows/ci.yml    # Push/PR: flake check → Matrix-Build aller 5 Hosts → Attic Push
-│   ├── workflows/update.yml # Daily-Cron: flake update + custom-package update → Build → Auto-Commit
-│   ├── actions/build-nixos-host/action.yml  # Composite: nix build + attic push pro Host
-│   └── dependabot.yml      # Weekly GitHub Actions Updates
-├── statix.toml             # disabled = ["repeated_keys"]
-└── AGENTS.md               # Diese Datei
-```
-
-## Architektur
-
-### Rollen-Vererbungskette
-
-```
-base.nix                  # Alle Hosts (common, bootloader, kernel, fish-shell, ssh, security, topology)
-├── server.nix            # Server: caddy, monitoring (node-exporter, blackbox-exporter), tailscale, static-ip, nixvim
-└── pc.nix                # Desktop/Notebook: audio, wayland, printing, containers, codium, nixvim, gaming, spotify
-    ├── desktop.nix       # my.role = "desktop"
-    └── notebook.nix      # my.role = "notebook"
-```
-
-Rollen setzen **Defaults** (`lib.mkDefault`), Hosts **überschreiben** (`=` ohne mkDefault).
-
-### Feature-System
-
-- **Auto-Discovery**: `lib/core/module-loader.nix` scanned `features/` rekursiv nach `default.nix`. Jedes Feature wird in **jeden** Host geladen.
-- **Gating**: Feature-Konfiguration steht hinter `lib.mkIf cfg.enable`. Ein Feature ist geladen, aber nur aktiv wenn `enable = true`.
-- **Option-Pfad**: `my.features.<domain>.<feature>` — konsistent mit Verzeichnispfad `features/<domain>/<feature>/default.nix`.
-- **Feature-Dependencies**: `features.requires ["services.redis"] config` → setzt `lib.mkDefault true` + assertion (Build bricht ab wenn explizit disabled).
-- **Architektur-Prinzipien für Feature-Module**:
-  - **Agnostisch & Generisch**: Feature-Module dürfen KEINE hartcodierten User-Namen (`philipp`, `hermes`) oder Host-Namen enthalten. Sie müssen modular, DRY, akademisch sauber und wiederverwendbar sein, sodass auch externe Entwickler sie einbinden können.
-  - **System-Features**: Für systemweite Dienste/Hardware (Services, Networking, Drivers). Werden in Host-Configs/Rollen via `my.features.<domain>.<feature>.enable = true` aktiviert.
-  - **User-Scoped Features**: Für reine User-Tools (Entwicklungsumgebungen, Shells, Dotfiles, OpenCode). Werden in `features/<domain>/<feature>/default.nix` generisch per `home-manager.sharedModules` bereitgestellt und im jeweiligen User-Kontext (`user/<name>/home.nix` bzw. `opencode.nix`) via `my.features.<domain>.<feature>.enable = true` aktiviert.
-
-**Kanonisches System-Feature-Modul:**
-```nix
-# features/<domain>/<feature>/default.nix
-{ config, lib, pkgs, ... }:
-let cfg = config.my.features.<domain>.<feature>;
-in {
-  options.my.features.<domain>.<feature> = {
-    enable = lib.mkEnableOption "description";
-    # weitere typed options...
-  };
-  config = lib.mkIf cfg.enable {
-    # NixOS-Konfiguration...
-  };
-}
-```
-
-**Kanonisches User-Scoped Feature-Modul (Home Manager):**
-```nix
-# features/<domain>/<feature>/default.nix
-{ config, lib, pkgs, ... }:
-let featureDir = ./.;
-in {
-  home-manager.sharedModules = [
-    ({ config, lib, pkgs, osConfig ? {}, ... }:
-    let cfg = config.my.features.<domain>.<feature>;
-    in {
-      options.my.features.<domain>.<feature> = {
-        enable = lib.mkEnableOption "description";
-      };
-      config = lib.mkIf cfg.enable {
-        # Home-Manager Konfiguration für diesen User...
-      };
-    })
-  ];
-}
-```
-
-**Spezial-Module (nicht im features-Namespace):**
-- `features/endpoints/default.nix` → `my.endpoints` (zentrale Service-Registry, kein enable)
-- `features/system/user/default.nix` → `my.user` (User-Identity, kein enable)
-- `features/system/common/default.nix` → auch `my.role` (Enum: `"server"`, `"desktop"`, `"notebook"`)
-
-**Gegenseitiger Ausschluss:** `desktop/gnome` und `desktop/niri` haben Assertions die den jeweils anderen verbieten.
-
-### Host-Konfigurationsmuster
-
-Jeder Host folgt exakt diesem Muster:
-```nix
-# hosts/<name>/configuration.nix
-{ inputs ? null, config ? null, ... }:     # inputs für Disko, config für Cross-Referenzen
-{
-  imports = [
-    inputs.disko.nixosModules.disko    # Nur VPS-Server
-    ./hardware-configuration.nix       # Immer
-    ./hardware-specific.nix            # Immer
-    ./disk-config.nix                  # Nur VPS-Server mit Disko
-    ../../roles/<role>.nix             # Immer
-  ];
-
-  networking.hostName = "<name>";
-
-  # Feature-Konfiguration (nicht mkDefault — überschreibt Rolle)
-  my.features.<domain>.<feature> = { ... };
-
-  system.stateVersion = "<version>";
-}
-```
-
-### User-Module
-
-- **metadata.nix** → plain attrset `{ username, fullName, email, sshKeys }` — wird von `features/system/user/default.nix` importiert, füttert `my.user.*` und `users.users.philipp`.
-- **home.nix** → `{ pkgs, osConfig, inputs, ... }` — root home-manager module. Verwendet `osConfig.my.role` für Server/Desktop-Gating.
-- **osConfig-Bridge**: User-Module lesen NixOS-Konfiguration via `osConfig.my.role`, `osConfig.my.user.name`, `osConfig.my.features.system.networking.topology.*`.
-- **Role-Gating-Pattern**: `lib.optionals (role != "server")`, `lib.mkIf (role != "server")` — opencode und 22 Desktop-Pakete nur auf non-Server.
-
-## Nix-Konventionen
-
-- **Formatter**: `nixfmt` (via `nix fmt` oder direkt)
-- **LSP**: nil
-- **Kein `with`** in Modulen (statix-enforced)
-- **`lib.mkIf`** für bedingte Konfiguration, **`lib.mkMerge`** für Komposition
-- **Overlays**: Zentral in `flake.nix` → eine `pkgs`-Instanz mit allen Overlays komponiert
-- **Fix-Overlays**: `packages/overlays/fix/<name>/default.nix` → manuell in flake.nix registrieren
-- **Custom Packages**: `packages/custom/<name>/default.nix` → auto-discovered via `packages/custom/default.nix`
-- **Manifest.json**: Version-Metadaten für den Updater (`upstream.type: "github-release"` oder `"github-source"`)
-
-## Secrets (SOPS)
+## Commands
 
 ```bash
-sops secrets/<name>.yaml    # Editieren
+nix fmt                            # nixfmt over the tree, in place
+deadnix --fail                     # no unused code
+statix check                       # lint (only repeated_keys disabled, see statix.toml)
+nix flake check                    # every host evaluates + statix + deadnix
+git config core.hooksPath .githooks # pre-commit runs the three above
+nod switch <host>              # the fleet deploy: discovers hosts, builds, transfers, activates
+nixos-rebuild switch --flake .#<host>            # local, single host
+nixos-rebuild switch --flake .#<host> --target-host root@<addr>   # remote, single host
 ```
 
-Keys in `.sops.yaml` für alle 5 Hosts + CI-Age-Key. `secrets/.*\.yaml$` wird mit allen Host-Keys verschlüsselt.
+A shell here is **fish** locally and on the hosts. `VAR=value cmd`, `$?`, `${PIPESTATUS[0]}` and
+`for … do … done` all fail. Wrap anything non-trivial in `bash -c '…'` or `bash -s` with a heredoc,
+and prefer a script file over nested quoting - nested quotes have broken more runs in this repository
+than any real defect.
 
-## CI/CD
+## Non-negotiables
 
-**CI (push/PR auf main):**
-1. `nix flake check` (eval-hosts + statix + deadnix)
-2. Matrix-Build aller 5 Hosts (`nix build .#nixosConfigurations.<host>.config.system.build.toplevel`)
-3. Push Result nach Attic Binary Cache (`https://cache.rls.ancoris.ovh`)
-4. `fail-fast: false` auf Build-Matrix
+1. **Prove the replacement before deleting the original.** Not "it looks right" - a measurement at the
+   level the consumer sees. Two outages came from skipping this, one of them taking a host's DNS with
+   the service that owned `/etc/resolv.conf`.
+2. **A check must be able to fail loudly.** Keep `stderr`, derive the exit code from the checks rather
+   than from the last statement, and never end a script on a bare `echo`. A missing tool, a guessed
+   file name and a real negative look identical at the point of measurement.
+3. **Write the expectation next to the measurement.** It is the only way a number can disagree.
+4. **Verify per host class before applying fleet-wide**, and read the tool's *whole* verdict - warnings
+   included. A deprecation warning that nobody read cost three rounds of wrong diagnosis.
+5. **Documents are specifications of the present.** No migration diaries, no phase plans, no status
+   sections - those belong in commit messages. Where a document and the code disagree, the code is
+   right and the document is a bug.
+6. **English** for code, comments, commits and documentation.
+7. **The inventory decides, not the order of a list.** Zones, addresses, names and firewall rules are
+   derived from `my.topology` and the contract projections. If you find yourself writing an address or
+   a name twice, the derivation is missing.
 
-**Daily Update (Cron `0 0 * * *`):**
-1. `nix flake update` + `nix run .#update-custom-packages`
-2. Kompletter Matrix-Build (mit `max-jobs: 1` für Resource-Sparsamkeit)
-3. Bei Erfolg: Auto-Commit `chore(deps): update flake inputs and custom packages` auf main
+## Layout
 
-**Dependabot:** Weekly GitHub Actions updates (nicht Nix — nur GHA Ecosystem).
-
-## Deployment
-
-```bash
-deploy .#<hostname>     # Remote via deploy-rs über Tailscale SSH
+```
+flake.nix                 15 inputs, overlays, one mkSystem call per host
+hosts/<name>/             entry point: role + hardware + host-specific features
+roles/                    base → server | pc → desktop | notebook
+features/                 auto-discovered modules, each behind `enable`
+  system/  services/  dev/  media/  desktop/
+contracts/                provides (interfaces, storage, backup, telemetry), consumes, naming, endpoints, directory
+lib/core/                 mkSystem, module auto-discovery
+user/<name>/              Home Manager: home.nix, packages, fish, editors
+secrets/                  SOPS-encrypted, one file
+docs/                     the specification, see docs/README.md
 ```
 
-SSH-Key: `~/.ssh/deploy-key` (User: `root`). Tailscale-IPs aus `my.features.system.networking.topology.hosts.<name>.tailscaleIp`.
+## Adding a service
 
-## pi-Integration
+1. `features/services/<name>/default.nix` with an `enable` option.
+2. Declare what it offers and needs: `my.contracts.provides.<name>` (endpoints, storage, backup,
+   telemetry) and `my.contracts.consumes.<name>`. Caddy vHosts, Authentik blueprints and provider
+   resources (databases, users, buckets) are projected from those declarations - never written by hand.
+3. Enable it on the host that should run it. Nothing else: names, certificates, firewall rules and
+   backup jobs follow from the contracts.
 
-Die Pi coding-agent Konfiguration wird als **generisches Feature** in `features/dev/pi/default.nix` deklariert:
-- **Architecture**: `features/dev/pi/default.nix` stellt das Feature per `home-manager.sharedModules` bereit und bindet Plugin-Module dynamisch via `lib/plugins.nix` ein.
-- **Plugin-System**: Jedes Plugin in `features/dev/pi/plugins/<name>/` folgt dem 3-Dateien-Muster (`manifest.json` für Version/Hashes, `package.nix` für Derivation-Build, `module.nix` für NixOS/Home-Manager Optionen).
-- **Auto-Discovery**: `features/dev/pi/lib/plugins.nix` scannt dynamisch nach `package.nix` und `module.nix`, wodurch Plugins ohne manuelle Importlisten geladen werden.
-- **Aktivierung**: In den jeweiligen User-Modulen (`user/philipp/pi.nix`) via `my.features.dev.pi.enable = true`.
-- **Secrets**: Provider API-Keys werden transparent über `osConfig.sops.templates."pi-auth.json"` als Out-of-Store Symlink verlinkt.
+## Hosts
 
-## Custom Package Updater
+| Host | Role | Zone | Address | Mesh |
+|---|---|---|---|---|
+| `cld-edge-01` | server | `mesh` / public | `173.249.22.211` | `10.10.100.1` |
+| `cld-ops-01` | server | `mesh` / public | `37.114.55.91` | `10.10.100.2` |
+| `hom-srv-01` | server | `infra` | `10.10.10.10` | `10.10.100.10` |
+| `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` |
+| `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` |
 
-```bash
-nix run .#update-custom-packages [package-name|"all"]
-```
-
-Liest `packages/custom/*/manifest.json`, prüft GitHub Releases auf neue Versionen, lädt AppImage herunter, berechnet SRI-Hash, updated manifest. Erfordert `GITHUB_TOKEN` für authentifizierte API-Calls.
-
-
-
+Reach a host over the mesh (`root@10.10.100.x`, key `~/.ssh/nixfiles-deploy-key`) or - for the cloud
+hosts, always available - over their public address. `~/.ssh/deploy-key` is the node tunnel secret and
+must never address the fleet. Details in [`docs/operations.md`](docs/operations.md).

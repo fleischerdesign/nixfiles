@@ -6,7 +6,6 @@
 
 let
   cfg = config.my.features.services.ntfy;
-  caddyBaseDomain = config.my.features.services.caddy.baseDomain or null;
 in
 {
   options.my.features.services.ntfy = {
@@ -21,26 +20,27 @@ in
 
   config = lib.mkIf cfg.enable {
     # Secret für den Token (wird von Grafana mitgenutzt)
-    sops.secrets.grafana_ntfy_token = {
+    sops.secrets."services/monitoring/grafana_ntfy_token" = {
       owner = "ntfy-sh";
       group = "grafana";
       mode = "0440"; # Nur Besitzer und Gruppe dürfen lesen
     };
-    sops.secrets.ntfy_users = {
+    sops.secrets."infra/ntfy_users" = {
       owner = "ntfy-sh";
     };
 
     # Template für ntfy env, um Token deklarativ einzubauen
     sops.templates."ntfy.env".content = ''
-      NTFY_AUTH_USERS="${config.sops.placeholder.ntfy_users}"
-      NTFY_AUTH_TOKENS="${cfg.adminUser}:${config.sops.placeholder.grafana_ntfy_token}:Grafana"
+      NTFY_AUTH_USERS="${config.sops.placeholder."infra/ntfy_users"}"
+      NTFY_AUTH_TOKENS="${cfg.adminUser}:${
+        config.sops.placeholder."services/monitoring/grafana_ntfy_token"
+      }:Grafana"
     '';
 
     services.ntfy-sh = {
       enable = true;
       settings = {
-        base-url =
-          if caddyBaseDomain != null then "https://ntfy.${caddyBaseDomain}" else "http://127.0.0.1:8083";
+        base-url = "https://push.vyrx.de";
         listen-http = "127.0.0.1:8083";
         auth-file = "/var/lib/ntfy-sh/auth.db";
         auth-default-access = "deny-all";
@@ -55,12 +55,28 @@ in
 
     systemd.services.ntfy-sh.serviceConfig.CacheDirectory = "ntfy-sh";
 
-    my.endpoints.ntfy = {
-      host = config.networking.hostName;
-      port = 8083;
-      proxy = {
-        enable = true;
-        subdomain = "ntfy";
+    my.contracts.provides.ntfy = {
+      endpoints.web = {
+        port = 8083;
+        protocol = "tcp";
+        scope = "public";
+        auth = "none";
+        subdomain = "push";
+        publicExempt = "enforces its own authentication; push clients cannot perform a browser SSO redirect";
+        dashboard = {
+          description = {
+            de = "Push-Benachrichtigungen aus dem Netz.";
+            en = "Push notifications from the network.";
+          };
+          show = true;
+          displayName = "ntfy";
+          category = "Observability & Tools";
+          icon = "bell";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/ntfy-sh" ];
+        cacheDirs = [ "/var/cache/ntfy-sh" ];
       };
     };
   };

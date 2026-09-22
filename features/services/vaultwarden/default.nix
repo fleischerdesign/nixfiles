@@ -1,6 +1,5 @@
 {
   config,
-  options,
   lib,
   features,
   ...
@@ -8,19 +7,12 @@
 
 let
   cfg = config.my.features.services.vaultwarden;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
-  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
 in
 {
   options.my.features.services.vaultwarden = {
     enable = lib.mkEnableOption "Vaultwarden";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = if caddyBaseDomain != null then "vault.${caddyBaseDomain}" else "vault.ancoris.ovh";
-      description = "Full domain name for Vaultwarden.";
-    };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
       default = "https://${authHost}/application/o/vaultwarden/";
@@ -37,7 +29,7 @@ in
           enable = true;
           dbBackend = "postgresql";
           config = {
-            DOMAIN = "https://${cfg.domain}";
+            DOMAIN = "https://${config.my.contracts.provides.vaultwarden.endpoints.web.canonicalDomain}";
             SIGNUPS_ALLOWED = false;
 
             # OIDC / Authentik
@@ -52,7 +44,7 @@ in
             ROCKET_ADDRESS = "127.0.0.1";
             ROCKET_PORT = 8082;
           };
-          environmentFile = config.sops.secrets.vaultwarden_env.path;
+          environmentFile = config.sops.secrets."services/apps/vaultwarden_env".path;
         };
 
         # Ensure Postgres DB exists
@@ -66,19 +58,46 @@ in
           ];
         };
 
-        # Caddy Reverse Proxy
-        my.endpoints.vaultwarden = {
-          host = config.networking.hostName;
-          port = 8082;
-          proxy = {
-            enable = true;
-            inherit (cfg) domain;
+        # Service Contract for Caddy, Firewall & OIDC
+        my.contracts.provides.vaultwarden = {
+          endpoints.web = {
+            port = 8082;
+            protocol = "tcp";
+            scope = "public";
+            auth = "oidc";
+            accessGroups = [ "family" ];
+            subdomain = "vault";
+            extraDomains = [
+              "vault.${topologyDomain}"
+            ];
+            oidc = {
+              enable = true;
+              clientId = "IW0W9V9cLTDaMbdtXy7lGwHi55Vakio8E2tTSvsg";
+              clientSecretEnv = "AUTHENTIK_OIDC_VAULTWARDEN_SECRET";
+              secretPath = "services/apps/vaultwarden_env";
+              redirectPaths = [ "/identity/connect/oidc-signin" ];
+              subMode = "user_username";
+              includeClaimsInIdToken = true;
+            };
+            dashboard = {
+              description = {
+                de = "Passwort-Tresor im eigenen Netz.";
+                en = "Password vault in your own network.";
+              };
+              show = true;
+              displayName = "Vaultwarden";
+              category = "Security";
+              icon = "vaultwarden";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/vaultwarden" ];
           };
         };
 
         # Secrets
         # Should contain SSO_CLIENT_ID and SSO_CLIENT_SECRET
-        sops.secrets.vaultwarden_env = {
+        sops.secrets."services/apps/vaultwarden_env" = {
           owner = "vaultwarden";
         };
       }

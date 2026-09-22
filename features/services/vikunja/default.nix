@@ -7,7 +7,7 @@
 
 let
   cfg = config.my.features.services.vikunja;
-  authHost = "auth.ancoris.ovh";
+  authHost = "auth.${config.my.topology.domain}";
 in
 {
   options.my.features.services.vikunja = {
@@ -37,13 +37,13 @@ in
       (features.requires [ "services.postgresql" ] config)
 
       {
-        sops.secrets.vikunja_oidc_secret = {
-          sopsFile = ../../../secrets/secrets.yaml;
-        };
+        sops.secrets."services/apps/vikunja_oidc_secret" = { };
 
         sops.templates."vikunja.env" = {
           content = ''
-            VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHENTIK_CLIENTSECRET=${config.sops.placeholder.vikunja_oidc_secret}
+            VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHENTIK_CLIENTSECRET=${
+              config.sops.placeholder."services/apps/vikunja_oidc_secret"
+            }
           '';
         };
 
@@ -54,9 +54,9 @@ in
           frontendScheme = "https";
           frontendHostname =
             let
-              d = config.my.endpoints.vikunja.proxy.subdomain;
+              ep = config.my.contracts.provides.vikunja.endpoints.web;
             in
-            lib.mkIf (d != null) "${d}.${config.my.endpoints.vikunja.proxy.domain}";
+            lib.mkIf (ep.canonicalDomain != null) ep.canonicalDomain;
 
           database = {
             type = "postgres";
@@ -71,9 +71,9 @@ in
             service = {
               publicurl =
                 let
-                  d = config.my.endpoints.vikunja.proxy.subdomain;
+                  ep = config.my.contracts.provides.vikunja.endpoints.web;
                 in
-                lib.mkIf (d != null) "https://${d}.${config.my.endpoints.vikunja.proxy.domain}/";
+                lib.mkIf (ep.publicUrl != null) "${ep.publicUrl}/";
               timezone = "Europe/Berlin";
               enableregistration = cfg.enableRegistration;
             };
@@ -93,22 +93,46 @@ in
           };
         };
 
-        services.postgresql = {
-          ensureDatabases = [ "vikunja" ];
-          ensureUsers = [
-            {
-              name = "vikunja";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.vikunja.postgresql.main = {
+          database = "vikunja";
+          user = "vikunja";
+          ensureDBOwnership = true;
         };
 
-        my.endpoints.vikunja = {
-          host = config.networking.hostName;
-          port = 3456;
-          proxy = {
-            enable = true;
+        my.contracts.provides.vikunja = {
+          endpoints.web = {
+            port = 3456;
+            protocol = "tcp";
+            scope = "public";
+            auth = "oidc";
+            accessGroups = [ "family" ];
             subdomain = "vikunja";
+            extraDomains = [
+              "tasks.lan.${config.my.topology.domain}"
+            ];
+            oidc = {
+              enable = true;
+              clientId = cfg.ssoClientId;
+              clientSecretEnv = "AUTHENTIK_OIDC_VIKUNJA_SECRET";
+              secretPath = "services/apps/vikunja_oidc_secret";
+              redirectPaths = [ "/auth/openid/authentik" ];
+              subMode = "hashed_user_id";
+              includeClaimsInIdToken = true;
+            };
+            dashboard = {
+              description = {
+                de = "Aufgaben, Listen und Projektboards.";
+                en = "Tasks, lists and project boards.";
+              };
+              show = true;
+              displayName = "Vikunja";
+              category = "Productivity";
+              icon = "vikunja";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/vikunja" ];
           };
         };
       }

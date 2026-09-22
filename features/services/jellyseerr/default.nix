@@ -32,9 +32,39 @@ in
       "Z /var/lib/jellyseerr 0750 1000 1000 -"
     ];
 
-    my.endpoints.jellyseerr = {
-      host = config.networking.hostName;
-      port = 5055;
+    my.contracts.provides.jellyseerr = {
+      endpoints.web = {
+        port = 5055;
+        protocol = "tcp";
+        # Public per docs/naming.md §9.4. Seerr authenticates with its own Jellyfin login — exactly
+        # like Home Assistant and Jellyfin — so no forward-auth layer and no double login.
+        # The image in use is an OIDC-capable fork, but its OIDC configuration contract is not
+        # environment based and is undocumented (settings-file based); wiring it declaratively
+        # is a separate follow-up, and declaring auth = "oidc" before that would be a lie.
+        scope = "public";
+        auth = "none";
+        publicExempt = "Seerr enforces its own Jellyfin login; an external forward-auth proxy only adds a second login";
+        subdomain = "seerr";
+        # Ingress reaches this over the WireGuard mesh (invariant I10).
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "wireguard";
+        };
+        dashboard = {
+          description = {
+            de = "Medienwünsche anfragen und freigeben.";
+            en = "Request and approve media.";
+          };
+          show = true;
+          displayName = "Jellyseerr";
+          category = "Media";
+          icon = "jellyseerr";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/jellyseerr" ];
+      };
     };
   };
 }

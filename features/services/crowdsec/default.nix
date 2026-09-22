@@ -6,15 +6,23 @@
 let
   cfg = config.my.features.services.crowdsec;
   isMaster = cfg.role == "master";
-  # Use topology host definitions for IPs
-  masterIP = config.my.features.system.networking.topology.hosts.${cfg.masterHost}.tailscaleIp;
+
+  # The master as this host reaches it: the LAN address while both are at home, otherwise the overlay
+  # address (lib/addresses.nix). The master normally sits in the cloud, so this is the overlay - and the
+  # rule is stated once instead of here.
+  addresses = import ../../../lib/addresses.nix { inherit lib; };
+  masterIP = addresses.serviceAddress {
+    topology = config.my.topology;
+    consumer = config.my.topology.hosts.${config.networking.hostName} or null;
+    peer = config.my.topology.hosts.${cfg.masterHost};
+  };
 in
 {
   options.my.features.services.crowdsec = {
     enable = lib.mkEnableOption "CrowdSec IPS";
     masterHost = lib.mkOption {
       type = lib.types.str;
-      default = "mackaye";
+      default = "cld-edge-01";
       description = "The name of the CrowdSec master host (LAPI server) in the topology.";
     };
     role = lib.mkOption {
@@ -42,7 +50,7 @@ in
           description = "Whitelist internal LAN and Tailscale IPs";
           whitelist = {
             reason = "trusted internal network";
-            cidr = config.my.features.system.networking.topology.trustedSubnets;
+            cidr = config.my.topology.trustedSubnets;
           };
         }
       ];
@@ -95,7 +103,7 @@ in
       # Disable auto-registration, we provide the key via SOPS
       registerBouncer.enable = false;
       # Official NixOS option for the API key path
-      secrets.apiKeyPath = config.sops.secrets.crowdsec_bouncer_key.path;
+      secrets.apiKeyPath = config.sops.secrets."services/crowdsec/bouncer_key".path;
       settings = {
         api_url = "http://${masterIP}:8085/";
         # api_key_file is automatically set by the module if apiKeyPath is used
@@ -109,24 +117,47 @@ in
     ];
     systemd.services.crowdsec-firewall-bouncer.serviceConfig.DynamicUser = lib.mkForce false;
 
-    my.endpoints.crowdsec = lib.mkIf isMaster {
-      host = config.networking.hostName;
-      port = 6060;
-      monitoring = {
-        http.enable = false;
-        scrape.enable = true;
-        scrape.port = 6060;
+    my.contracts.provides.crowdsec = lib.mkIf isMaster {
+      # The local API, and the single port in this file that belongs on the mesh: every host's
+      # firewall bouncer and agent registers against it (`api_url = http://${masterIP}:8085/`), and
+      # `${masterIP}` is an overlay address. Leaving it undeclared is what closing the mesh broke -
+      # measured: the master listened on 8085 and nothing could reach it, silently.
+      endpoints.lapi = {
+        port = 8085;
+        protocol = "tcp";
+        scope = "mesh";
+        directAccess = {
+          enable = true;
+          interface = "wireguard";
+          protocol = "tcp";
+        };
+      };
+      endpoints.web = {
+        port = 6060;
+        protocol = "tcp";
+        scope = "internal";
+        # The metrics of the local API, scraped by the collector on this host.
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
+        monitoring = {
+          http.enable = false;
+          scrape.enable = true;
+          scrape.port = 6060;
+        };
       };
     };
 
     # Secrets
-    sops.secrets.crowdsec_bouncer_key = {
+    sops.secrets."services/crowdsec/bouncer_key" = {
       owner = "root";
       restartUnits = [ "crowdsec-firewall-bouncer.service" ];
     };
 
     # Nur Agents brauchen das Passwort für den Master
-    sops.secrets.crowdsec_agent_password = lib.mkIf (!isMaster) {
+    sops.secrets."services/crowdsec/agent_password" = lib.mkIf (!isMaster) {
       owner = "crowdsec";
     };
 
@@ -136,7 +167,7 @@ in
       content = ''
         url: http://${masterIP}:8085/
         login: ${config.networking.hostName}
-        password: ${config.sops.placeholder.crowdsec_agent_password}
+        password: ${config.sops.placeholder."services/crowdsec/agent_password"}
       '';
     };
   };

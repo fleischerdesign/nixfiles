@@ -9,18 +9,11 @@
 #   - JSON format enabled for machine API search requests.
 {
   config,
-  options,
   lib,
   ...
 }:
 let
   cfg = config.my.features.services.searxng;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then
-      config.my.features.services.caddy.baseDomain
-    else
-      null;
 in
 {
   options.my.features.services.searxng = {
@@ -40,14 +33,18 @@ in
 
     secretKeySecret = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
-      default = "searxng_secret_key";
+      default = "services/apps/searxng_secret_key";
       description = "SOPS secret containing the 32-byte secret key for SearXNG.";
     };
 
-    domain = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = if caddyBaseDomain != null then "search.${caddyBaseDomain}" else null;
-      description = "Public or Tailscale domain for SearXNG.";
+    public = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Publish this service on the public ingress. It replaces the switch that the old `domain`
+        option hid: that option had a non-null default, so "a domain is set" was always true and
+        the isolated branch could never be reached.
+      '';
     };
 
     auth = lib.mkOption {
@@ -56,7 +53,7 @@ in
       description = "Protect web UI behind Authentik forward-auth.";
     };
 
-    openTailscaleFirewall = lib.mkOption {
+    openMeshFirewall = lib.mkOption {
       type = lib.types.bool;
       default = true;
       description = "Allow direct access to SearXNG port over Tailscale interface.";
@@ -115,7 +112,9 @@ in
           port = cfg.port;
           bind_address = cfg.bindAddress;
           secret_key = "@SEARXNG_SECRET@";
-          base_url = lib.optionalString (cfg.domain != null) "https://${cfg.domain}/";
+          base_url = lib.optionalString (
+            config.my.contracts.provides.searxng.endpoints.web.canonicalDomain != null
+          ) "https://${config.my.contracts.provides.searxng.endpoints.web.canonicalDomain}/";
           image_proxy = true;
         };
 
@@ -197,21 +196,35 @@ in
       config.services.searx.settingsPath
     ];
 
-    # Register into central service registry
-    my.endpoints.searxng = {
-      host = config.networking.hostName;
-      port = cfg.port;
-
-      proxy = {
-        enable = cfg.domain != null;
-        inherit (cfg) domain;
-        inherit (cfg) auth;
-      };
-
-      directAccess = {
-        enable = cfg.openTailscaleFirewall;
+    # Register into central service catalog. The name is not declared here: the endpoint's
+    # `subdomain` plus the topology's root domain derive it, and the application reads the derived
+    # value back (one rule, one place).
+    my.contracts.provides.searxng = {
+      endpoints.web = {
+        port = cfg.port;
         protocol = "tcp";
-        interface = "tailscale";
+        # Whether the service is published. This used to be implicit in "a domain is set", which
+        # was always true because the domain had a default - so the isolated branch was dead code
+        # and the switch invisible.
+        scope = if cfg.public then "public" else "isolated";
+        auth = if cfg.auth then "authentik" else "none";
+        accessGroups = [ "family" ];
+        subdomain = "search";
+        directAccess = {
+          enable = cfg.openMeshFirewall;
+          protocol = "tcp";
+          interface = "wireguard";
+        };
+        dashboard = {
+          description = {
+            de = "Metasuche ohne Tracking.";
+            en = "Metasearch without tracking.";
+          };
+          show = true;
+          displayName = "SearXNG Search";
+          category = "Observability & Tools";
+          icon = "searxng";
+        };
       };
     };
   };

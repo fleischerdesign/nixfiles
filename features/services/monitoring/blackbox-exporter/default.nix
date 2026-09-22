@@ -33,16 +33,34 @@ in
               prober = "tcp";
               timeout = "5s";
             };
+            icmp = {
+              prober = "icmp";
+              timeout = "5s";
+              icmp = {
+                preferred_ip_protocol = "ip4";
+              };
+            };
           };
         }
       );
     };
 
-    my.endpoints.blackbox-exporter = {
-      host = config.networking.hostName;
-      port = 9115;
-      monitoring.tcp.enable = true;
-      monitoring.tcp.group = "Infrastructure";
+    my.contracts.provides.blackbox-exporter = {
+      endpoints.web = {
+        port = 9115;
+        protocol = "tcp";
+        scope = "internal";
+        # Probed from the collector on another host, so the port belongs on the mesh.
+        directAccess = {
+          enable = true;
+          interface = "wireguard";
+          protocol = "tcp";
+        };
+        monitoring = {
+          tcp.enable = true;
+          tcp.group = "Infrastructure";
+        };
+      };
     };
   };
 }

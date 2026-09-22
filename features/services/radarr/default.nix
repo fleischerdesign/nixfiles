@@ -29,12 +29,12 @@ in
         users.groups.radarr = { };
 
         # SOPS Secret for API Key
-        sops.secrets.radarr_api_key = {
+        sops.secrets."services/media/radarr_api_key" = {
           owner = "radarr";
         };
         sops.templates."radarr.env" = {
           owner = "radarr";
-          content = "RADARR__AUTH__APIKEY=${config.sops.placeholder.radarr_api_key}";
+          content = "RADARR__AUTH__APIKEY=${config.sops.placeholder."services/media/radarr_api_key"}";
         };
 
         # Ownership management for storage
@@ -78,9 +78,31 @@ in
           UMask = lib.mkForce "0002";
         };
 
-        my.endpoints.radarr = {
-          host = config.networking.hostName;
-          port = 7878;
+        my.contracts.provides.radarr = {
+          endpoints.web = {
+            port = 7878;
+            protocol = "tcp";
+            scope = "internal";
+            auth = "authentik";
+            accessGroups = [ "media-users" ];
+            subdomain = "radarr";
+            healthProbePath = "/ping";
+            dashboard = {
+              description = {
+                de = "Filmbibliothek automatisch verwalten.";
+                en = "Manage the movie library automatically.";
+              };
+              show = true;
+              displayName = "Radarr";
+              category = "Media";
+              icon = "radarr";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/radarr" ];
+            dataDirs = [ "/data/storage/movies" ];
+            cacheDirs = [ ];
+          };
         };
       }
     ]

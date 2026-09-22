@@ -13,7 +13,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    sops.secrets.hass_now_api_token = {
+    sops.secrets."services/home/hass_now_api_token" = {
       owner = "hass";
     };
 
@@ -24,7 +24,7 @@ in
           url: "https://fleischer.design/api/now"
           method: POST
           headers:
-            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+            Authorization: "Bearer ${config.sops.placeholder."services/home/hass_now_api_token"}"
           content_type: "application/json"
           payload: >
             {
@@ -36,7 +36,7 @@ in
           url: "https://fleischer.design/api/now"
           method: POST
           headers:
-            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+            Authorization: "Bearer ${config.sops.placeholder."services/home/hass_now_api_token"}"
           content_type: "application/json"
           payload: >
             {
@@ -48,7 +48,7 @@ in
           url: "https://fleischer.design/api/now"
           method: "POST"
           headers:
-            Authorization: "Bearer ${config.sops.placeholder.hass_now_api_token}"
+            Authorization: "Bearer ${config.sops.placeholder."services/home/hass_now_api_token"}"
           content_type: "application/json"
           payload: >
             {
@@ -119,9 +119,39 @@ in
       };
     };
 
-    my.endpoints.home-assistant = {
-      host = config.networking.hostName;
-      port = 8123;
+    my.contracts.provides.home-assistant = {
+      endpoints.web = {
+        port = 8123;
+        protocol = "tcp";
+        # Public per docs/naming.md §9.4 (decision recorded). Scope and auth must move together.
+        scope = "public";
+        # Home Assistant enforces its own authentication. Its official documentation
+        # (integrations/http, Reverse proxies) defines the trusted-proxy settings but NO set of
+        # paths an external SSO proxy may bypass, and a forward-auth layer in front of HA breaks
+        # the companion app and the WebSocket API. Direct exposure with HA's own auth is the
+        # documented path; the trusted_proxies/use_x_forwarded_for settings are set above.
+        auth = "none";
+        publicExempt = "Home Assistant enforces its own authentication (documented for direct internet exposure); an external forward-auth proxy breaks the companion app and the WebSocket API";
+        subdomain = "hass";
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "all";
+        };
+        dashboard = {
+          description = {
+            de = "Hausautomation und Sensoren.";
+            en = "Home automation and sensors.";
+          };
+          show = true;
+          displayName = "Home Assistant";
+          category = "Smart Home";
+          icon = "home-assistant";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/hass" ];
+      };
     };
   };
 }

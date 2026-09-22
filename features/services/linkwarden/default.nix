@@ -11,14 +11,9 @@ in
 {
   options.my.features.services.linkwarden = {
     enable = lib.mkEnableOption "Linkwarden";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "linkwarden.mky.ancoris.ovh";
-      description = "Domain name for Linkwarden.";
-    };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
-      default = "https://auth.ancoris.ovh/application/o/linkwarden";
+      default = "https://auth.${config.my.topology.domain}/application/o/linkwarden";
       description = "SSO Authority URL for Linkwarden.";
     };
   };
@@ -44,34 +39,57 @@ in
             NEXT_PUBLIC_AUTHENTIK_ENABLED = "true";
             AUTHENTIK_ISSUER = cfg.ssoAuthority;
             # Linkwarden specific: NEXTAUTH_URL must end with /api/v1/auth
-            NEXTAUTH_URL = "https://${cfg.domain}/api/v1/auth";
-            BASE_URL = "https://${cfg.domain}";
+            NEXTAUTH_URL = "https://${config.my.contracts.provides.linkwarden.endpoints.web.canonicalDomain}/api/v1/auth";
+            BASE_URL = "https://${config.my.contracts.provides.linkwarden.endpoints.web.canonicalDomain}";
 
             NEXT_PUBLIC_DISABLE_REGISTRATION = "true";
             NEXT_PUBLIC_CREDENTIALS_ENABLED = "false";
           };
 
-          environmentFile = config.sops.secrets.linkwarden_env.path;
+          environmentFile = config.sops.secrets."services/apps/linkwarden_env".path;
         };
 
-        # Ensure Postgres DB exists
-        services.postgresql = {
-          ensureDatabases = [ "linkwarden" ];
-          ensureUsers = [
-            {
-              name = "linkwarden";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.linkwarden.postgresql.main = {
+          database = "linkwarden";
+          user = "linkwarden";
+          ensureDBOwnership = true;
         };
 
-        # Caddy Reverse Proxy
-        my.endpoints.linkwarden = {
-          host = config.networking.hostName;
-          port = 3010;
-          proxy = {
-            enable = true;
-            inherit (cfg) domain;
+        # Service Contract for Caddy, Firewall & OIDC
+        my.contracts.provides.linkwarden = {
+          endpoints.web = {
+            port = 3010;
+            protocol = "tcp";
+            scope = "public";
+            auth = "oidc";
+            accessGroups = [ "family" ];
+            subdomain = "linkwarden";
+            extraDomains = [
+              "links.lan.${config.my.topology.domain}"
+            ];
+            oidc = {
+              enable = true;
+              clientId = "TBKFgLSIeXirGSZiuCFEXFeaUX3XaYt54FGr4VtM";
+              clientSecretEnv = "AUTHENTIK_OIDC_LINKWARDEN_SECRET";
+              secretPath = "services/apps/linkwarden_env";
+              redirectPaths = [ "/api/v1/auth/callback/authentik" ];
+              subMode = "hashed_user_id";
+              includeClaimsInIdToken = true;
+            };
+            dashboard = {
+              description = {
+                de = "Lesezeichen und Linkarchiv.";
+                en = "Bookmarks and link archive.";
+              };
+              show = true;
+              displayName = "Linkwarden";
+              category = "Productivity";
+              icon = "linkwarden";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/linkwarden" ];
           };
         };
 
@@ -80,7 +98,7 @@ in
         # AUTHENTIK_CLIENT_ID=...
         # AUTHENTIK_CLIENT_SECRET=...
         # NEXTAUTH_SECRET=... (random string)
-        sops.secrets.linkwarden_env = {
+        sops.secrets."services/apps/linkwarden_env" = {
           owner = "linkwarden";
         };
       }

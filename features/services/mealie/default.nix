@@ -1,25 +1,19 @@
 {
   config,
-  options,
   lib,
   ...
 }:
 let
   cfg = config.my.features.services.mealie;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then
-      config.my.features.services.caddy.baseDomain
-    else
-      null;
-  authHost = "auth.ancoris.ovh";
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
 in
 {
   options.my.features.services.mealie = {
     enable = lib.mkEnableOption "Mealie Recipe Manager";
     smtpFromEmail = lib.mkOption {
       type = lib.types.str;
-      default = if caddyBaseDomain != null then "noreply@${caddyBaseDomain}" else "noreply@ancoris.ovh";
+      default = if topologyDomain != null then "noreply@${topologyDomain}" else "noreply@localhost";
       description = "From address for SMTP outgoing mails.";
     };
     ssoConfigurationUrl = lib.mkOption {
@@ -31,29 +25,23 @@ in
 
   config = lib.mkIf cfg.enable {
     # 1. Load individual secrets from sops file
-    sops.secrets.mealie_smtp_password = {
-      sopsFile = ../../../secrets/secrets.yaml;
-    };
-    sops.secrets.mealie_oidc_secret = {
-      sopsFile = ../../../secrets/secrets.yaml;
-    };
-    sops.secrets.mealie_openai_key = {
-      sopsFile = ../../../secrets/secrets.yaml;
-    };
+    sops.secrets."services/apps/mealie_smtp_password" = { };
+    sops.secrets."services/apps/mealie_oidc_secret" = { };
+    sops.secrets."services/apps/mealie_openai_key" = { };
 
     # 2. Create a template file that combines them into ENV format
     sops.templates."mealie.env" = {
       content = ''
-        SMTP_PASSWORD=${config.sops.placeholder.mealie_smtp_password}
-        OIDC_CLIENT_SECRET=${config.sops.placeholder.mealie_oidc_secret}
-        OPENAI_API_KEY=${config.sops.placeholder.mealie_openai_key}
+        SMTP_PASSWORD=${config.sops.placeholder."services/apps/mealie_smtp_password"}
+        OIDC_CLIENT_SECRET=${config.sops.placeholder."services/apps/mealie_oidc_secret"}
+        OPENAI_API_KEY=${config.sops.placeholder."services/apps/mealie_openai_key"}
       '';
     };
 
     services.mealie = {
       enable = true;
       port = 9025;
-      listenAddress = "127.0.0.1";
+      listenAddress = "0.0.0.0";
 
       # 3. Point Mealie to the generated template file
       credentialsFile = config.sops.templates."mealie.env".path;
@@ -63,9 +51,9 @@ in
         TZ = "Europe/Berlin";
         BASE_URL =
           let
-            d = config.my.endpoints.mealie.proxy.subdomain;
+            ep = config.my.contracts.provides.mealie.endpoints.web;
           in
-          lib.mkIf (d != null) "https://${d}.${config.my.endpoints.mealie.proxy.domain}";
+          lib.mkIf (ep.publicUrl != null) ep.publicUrl;
 
         # SMTP Configuration
         SMTP_HOST = "mail.smtp2go.com";
@@ -103,10 +91,50 @@ in
     # TODO: remove when nixpkgs fixes this upstream.
     systemd.services.mealie.environment.HOME = "/var/lib/mealie";
 
-    # Register with Caddy Feature
-    my.endpoints.mealie = {
-      host = config.networking.hostName;
-      port = 9025;
+    # Register with Caddy & Firewall via Service Contract
+    my.contracts.provides.mealie = {
+      endpoints.web = {
+        port = 9025;
+        protocol = "tcp";
+        scope = "public";
+        auth = "oidc";
+        accessGroups = [ "family" ];
+        subdomain = "mealie";
+        # Ingress reaches this over the WireGuard mesh (invariant I10).
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "wireguard";
+        };
+        oidc = {
+          enable = true;
+          clientId = "uwxlwWIofaSVKwAJTyzhzT75kUMDfoCpmlSs4M1E";
+          clientSecretEnv = "AUTHENTIK_OIDC_MEALIE_SECRET";
+          secretPath = "services/apps/mealie_oidc_secret";
+          redirectPaths = [
+            "/login"
+            "/api/auth/callback"
+          ];
+          subMode = "hashed_user_id";
+          includeClaimsInIdToken = true;
+        };
+        healthProbePath = "/api/app/about";
+        dashboard = {
+          description = {
+            de = "Rezepte und Essensplanung.";
+            en = "Recipes and meal planning.";
+          };
+          show = true;
+          displayName = "Mealie";
+          category = "Home";
+          icon = "mealie";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/mealie" ];
+        dataDirs = [ ];
+        cacheDirs = [ ];
+      };
     };
   };
 }

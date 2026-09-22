@@ -41,7 +41,7 @@ in
     (lib.mkIf (config ? sops) {
       sops.secrets = builtins.listToAttrs (
         map (secretName: {
-          name = "github_pat_${secretName}";
+          name = "users/${secretName}/github_pat";
           value = { };
         }) cfg.secrets
       );
@@ -53,7 +53,7 @@ in
             owner = config.my.user.primary or "root";
             group = "users";
             mode = "0440";
-            content = mkHostsYaml cfg.ghUser config.sops.placeholder."github_pat_${secretName}";
+            content = mkHostsYaml cfg.ghUser config.sops.placeholder."users/${secretName}/github_pat";
           };
         }) cfg.secrets
       );

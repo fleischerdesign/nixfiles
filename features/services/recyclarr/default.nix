@@ -13,8 +13,8 @@ in
 
   config = lib.mkIf cfg.enable {
     # 1. Reuse existing SOPS secrets
-    sops.secrets.radarr_api_key = { };
-    sops.secrets.sonarr_api_key = { };
+    sops.secrets."services/media/radarr_api_key" = { };
+    sops.secrets."services/media/sonarr_api_key" = { };
 
     # 2. Create the FULL configuration file via SOPS template
     sops.templates."recyclarr.yml" = {
@@ -23,7 +23,7 @@ in
         radarr:
           radarr-instance:
             base_url: http://localhost:7878
-            api_key: ${config.sops.placeholder.radarr_api_key}
+            api_key: ${config.sops.placeholder."services/media/radarr_api_key"}
             
             quality_definition:
               type: movie
@@ -48,7 +48,7 @@ in
         sonarr:
           sonarr-instance:
             base_url: http://localhost:8989
-            api_key: ${config.sops.placeholder.sonarr_api_key}
+            api_key: ${config.sops.placeholder."services/media/sonarr_api_key"}
 
             quality_definition:
               type: series

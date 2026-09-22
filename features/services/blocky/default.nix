@@ -6,6 +6,56 @@
 }:
 let
   cfg = config.my.features.services.blocky;
+  topology = config.my.topology;
+
+  # Fleet-wide configuration graph (`flake` is injected by lib/core/system-builder.nix).
+  flakeConfigurations =
+    config._module.specialArgs.flake.nixosConfigurations or {
+      "${config.networking.hostName}" = config;
+    };
+
+  # Address a LAN client should use to reach a host: the LAN address when the host lives in
+  # the home network, otherwise the WireGuard overlay address.
+  reachableAddress =
+    host:
+    if host == null then
+      null
+    else if
+      host.ipv4 != null && (lib.hasPrefix "10.10." host.ipv4 || lib.hasPrefix "192.168." host.ipv4)
+    then
+      host.ipv4
+    else if host.wireguardIpv4 != null then
+      host.wireguardIpv4
+    else
+      host.ipv4;
+
+  # Split-horizon projection (docs/architecture.md §5 and §8.1): every named contract endpoint
+  # resolves locally to the host that serves it - the *same* name that resolves publicly to
+  # the ingress. The internal planes (.lan/.vpn/.iot) exist only here.
+  endpointMappings = lib.listToAttrs (
+    lib.concatLists (
+      lib.mapAttrsToList (
+        hostName: hostConfig:
+        let
+          address = reachableAddress (topology.hosts.${hostName} or null);
+        in
+        lib.optionals (address != null) (
+          lib.concatLists (
+            lib.mapAttrsToList (
+              _svcName: contract:
+              lib.concatMap (
+                ep:
+                map (name: {
+                  inherit name;
+                  value = address;
+                }) (lib.optionals (ep.canonicalDomain != null) [ ep.canonicalDomain ] ++ ep.extraDomains)
+              ) (lib.attrValues contract.endpoints)
+            ) (hostConfig.config.my.contracts.provides or { })
+          )
+        )
+      ) flakeConfigurations
+    )
+  );
 in
 {
   options.my.features.services.blocky = {
@@ -40,18 +90,53 @@ in
             # Custom DNS Mapping (Split DNS)
             # Subdomains werden automatisch mit aufgelöst (Blocky-Feature)
             # Heimnetz-Hosts: lokale IP (via LAN oder Subnet-Router)
-            # Externe Hosts (mackaye): Tailscale-IP (lokale IP nicht erreichbar)
+            # Externe Cloud-Hosts: WireGuard-Overlay IP (IPv4 & RFC 4193 ULA IPv6)
+            # IoT-Geräte: statische IP aus my.topology.devices
             customDNS = {
-              mapping = lib.mapAttrs' (_name: host: {
-                name = host.domain;
-                value =
-                  if host.localIp != null && lib.hasPrefix "192.168.178." host.localIp then
-                    host.localIp
-                  else if host.tailscaleIp != null then
-                    host.tailscaleIp
-                  else
-                    host.localIp;
-              }) config.my.features.system.networking.topology.hosts;
+              # Names come from the naming engine, which owns the node plane (<name>.node.<domain>).
+              # The per-record domain field that used to feed this was a second, contradictory
+              # scheme: it called hom-srv-01 "srv.lan.vyrx.de".
+              mapping =
+                (lib.mapAttrs'
+                  (
+                    hostName: fqdn:
+                    let
+                      host = topology.hosts.${hostName};
+                      primaryIp =
+                        if
+                          host.ipv4 != null && (lib.hasPrefix "10.10." host.ipv4 || lib.hasPrefix "192.168." host.ipv4)
+                        then
+                          host.ipv4
+                        else if host.wireguardIpv4 != null then
+                          host.wireguardIpv4
+                        else
+                          host.ipv4;
+                      ipv6 = host.wireguardIpv6 or null;
+                    in
+                    lib.nameValuePair fqdn (if ipv6 != null then "${primaryIp},${ipv6}" else primaryIp)
+                  )
+                  (
+                    lib.filterAttrs (
+                      hostName: _:
+                      let
+                        host = topology.hosts.${hostName};
+                      in
+                      host.ipv4 != null || host.wireguardIpv4 != null
+                    ) config.my.contracts.projections.hostFqdnOf
+                  )
+                )
+                // (lib.mapAttrs'
+                  (devName: fqdn: {
+                    name = fqdn;
+                    value = topology.devices.${devName}.ipv4;
+                  })
+                  (
+                    lib.filterAttrs (
+                      devName: _: topology.devices.${devName}.ipv4 != null
+                    ) config.my.contracts.projections.deviceFqdnOf
+                  )
+                )
+                // endpointMappings;
             };
 
             # Ad-blocking configuration
@@ -88,24 +173,30 @@ in
           };
         };
 
-        my.endpoints.blocky-dns = {
-          host = config.networking.hostName;
-          port = 53;
-          directAccess = {
-            enable = true;
-            protocol = "both";
-            interface = "all";
-          };
-          monitoring.http.enable = false;
-        };
+        my.contracts.provides.blocky = {
+          endpoints = {
+            dns = {
+              port = 53;
+              protocol = "both";
+              scope = "internal";
+              directAccess = {
+                enable = true;
+                protocol = "both";
+                interface = "all";
+              };
+              monitoring.http.enable = false;
+            };
 
-        my.endpoints.blocky = {
-          host = config.networking.hostName;
-          port = 4000;
-          monitoring = {
-            http.enable = false;
-            scrape.enable = true;
-            scrape.port = 4000;
+            api = {
+              port = 4000;
+              protocol = "tcp";
+              scope = "internal";
+              monitoring = {
+                http.enable = false;
+                scrape.enable = true;
+                scrape.port = 4000;
+              };
+            };
           };
         };
       }

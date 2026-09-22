@@ -29,12 +29,12 @@ in
         users.groups.sonarr = { };
 
         # SOPS Secret for API Key
-        sops.secrets.sonarr_api_key = {
+        sops.secrets."services/media/sonarr_api_key" = {
           owner = "sonarr";
         };
         sops.templates."sonarr.env" = {
           owner = "sonarr";
-          content = "SONARR__AUTH__APIKEY=${config.sops.placeholder.sonarr_api_key}";
+          content = "SONARR__AUTH__APIKEY=${config.sops.placeholder."services/media/sonarr_api_key"}";
         };
 
         # Ownership management for storage
@@ -78,9 +78,31 @@ in
           UMask = lib.mkForce "0002";
         };
 
-        my.endpoints.sonarr = {
-          host = config.networking.hostName;
-          port = 8989;
+        my.contracts.provides.sonarr = {
+          endpoints.web = {
+            port = 8989;
+            protocol = "tcp";
+            scope = "internal";
+            auth = "authentik";
+            accessGroups = [ "media-users" ];
+            subdomain = "sonarr";
+            healthProbePath = "/ping";
+            dashboard = {
+              description = {
+                de = "Serienbibliothek automatisch verwalten.";
+                en = "Manage the show library automatically.";
+              };
+              show = true;
+              displayName = "Sonarr";
+              category = "Media";
+              icon = "sonarr";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/sonarr" ];
+            dataDirs = [ "/data/storage/tv" ];
+            cacheDirs = [ ];
+          };
         };
       }
     ]

@@ -6,53 +6,114 @@
 }:
 let
   cfg = config.my.features.system.networking.ssh;
-  hosts = config.my.features.system.networking.topology.hosts;
+  hosts = config.my.topology.hosts;
   ownHost = hosts.${config.networking.hostName} or null;
   listenAddresses = lib.mkIf (ownHost != null) (
-    lib.optional (ownHost.localIp != null) {
-      addr = ownHost.localIp;
+    lib.optional (ownHost.ipv4 != null) {
+      addr = ownHost.ipv4;
       port = 22;
     }
-    ++ lib.optional (ownHost.tailscaleIp != null) {
-      addr = ownHost.tailscaleIp;
+    ++ lib.optional (ownHost.wireguardIpv4 != null) {
+      addr = ownHost.wireguardIpv4;
       port = 22;
     }
+    ++ lib.optional (ownHost.wireguardIpv6 != null) {
+      addr = ownHost.wireguardIpv6;
+      port = 22;
+    }
+  );
+
+  # Overlay units that assign the addresses sshd binds to. sshd binds each
+  # ListenAddress exactly once at startup and never rebinds, so it must start
+  # after these units and wait until every address exists on some interface.
+  overlayUnits = map (name: "wireguard-${name}.service") (
+    lib.attrNames config.networking.wireguard.interfaces
   );
 in
 {
   options.my.features.system.networking.ssh = {
-    enable = lib.mkEnableOption "SSH server, bound to LAN and Tailscale only";
+    enable = lib.mkEnableOption "SSH server, bound to the LAN and the mesh overlay only";
+
+    # The administrative path is `infra` and `corp`, and it deliberately excludes the mesh: a
+    # compromised public relay should not reach into a host. One host needs an exception, and an
+    # exception written down is worth more than a rule widened for everyone: `cld-ops-01` runs the
+    # OpenClaw nodes, and the gateway instances on its sibling reach them through an SSH tunnel. So
+    # that sibling - a member of the `mesh` zone - has to be admitted *there* and nowhere else.
+    admits = lib.mkOption {
+      type = lib.types.listOf (lib.types.enum config.my.topology.trustLevels);
+      default = [ ];
+      description = "Trust levels beyond `infra` and `corp` that this host admits on the SSH endpoint";
+    };
+
     deployKeys = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAUtA5kA9lDxzQjtgfMDKC+RLOaqSuUWF1gSaO8tjGCR deploy-rs"
+        # Operator key. It replaces the fleet deploy key whose private half was destroyed when the
+        # openclaw tunnel rendered its secret over ~/.ssh/deploy-key. That key is not kept here: a
+        # trust anchor nobody can use, but which still grants root if it ever resurfaces, is a
+        # liability rather than a safety net. A fresh fleet key is generated in the rotation.
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+bSErYniJev/+/UxsilaoxHGYW8oVpd3pYMQuuGStw fleis@Yorke"
+        # Fleet deploy key (generated 2026-09-20, lives at ~/.ssh/nixfiles-deploy-key). It separates
+        # two things that were conflated: the credential that *addresses the fleet* and the node
+        # tunnel secret rendered from /run/secrets, whose lifetime belongs to a feature. Until now
+        # ~/.ssh/config pointed every host at the tunnel key, so a service secret was the fleet's
+        # root credential - which is how the previous fleet key was destroyed.
+        # Fingerprint: SHA256:EduFlyoHwWJx3avw46lQsLksum5R0scm6z27OeqBeO4
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGuk66em/pg6jVlG2U6dTLFeQCOWjEzlyGGEWGvSM0hI nixfiles-deploy@vyrx-2.0"
       ];
       description = "Authorized SSH public keys for root deploy-rs access.";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    my.features.system.networking.topology.enable = lib.mkDefault true;
+    # The administrative path declares itself like every other endpoint, and it is the one that names the
+    # trust levels it is for: the local network and the trusted zones may reach it, a node of the mesh
+    # zone may not. That is what keeps a compromised public relay out of this host - measured before:
+    # every mesh node could open SSH here, and nobody ever did except the desktop, the notebook and the
+    # phone (all trusted). The port itself is opened by the contract projection, not by the module
+    # default, so there is one place that decides exposure.
+    my.contracts.provides.ssh = {
+      endpoints.ssh = {
+        port = 22;
+        protocol = "tcp";
+        scope = "isolated";
+        displayName = "Secure Shell";
+        directAccess = {
+          enable = true;
+          interface = "all";
+          from = [
+            "infra"
+            "corp"
+          ]
+          ++ cfg.admits;
+        };
+      };
+    };
+
+    services.openssh.openFirewall = lib.mkForce false;
 
     systemd.services.sshd = {
-      after = [
-        "network-online.target"
-      ]
-      ++ lib.optional config.services.tailscale.enable "tailscaled.service";
-      wants = [ "network-online.target" ];
+      after = [ "network-online.target" ] ++ overlayUnits;
+      wants = [ "network-online.target" ] ++ overlayUnits;
 
-      preStart =
-        lib.mkIf (config.services.tailscale.enable && ownHost != null && ownHost.tailscaleIp != null)
-          ''
-            echo "Waiting for tailscale0 to get IP ${ownHost.tailscaleIp}..."
-            for i in $(seq 1 60); do
-              if ${pkgs.iproute2}/bin/ip addr show tailscale0 2>/dev/null | ${pkgs.gnugrep}/bin/grep -qF "${ownHost.tailscaleIp}"; then
-                echo "tailscale0 has IP ${ownHost.tailscaleIp}, proceeding."
-                break
-              fi
-              sleep 1
-            done
-          '';
+      preStart = lib.mkIf (config.services.openssh.listenAddresses != [ ]) (
+        ''
+          echo "Waiting for SSH listen addresses to be assigned..."
+          for i in $(seq 1 60); do
+            missing=0
+        ''
+        + lib.concatMapStrings (a: ''
+          ${pkgs.iproute2}/bin/ip -o addr show 2>/dev/null | ${pkgs.gnugrep}/bin/grep -qF "${a.addr}/" || missing=1
+        '') config.services.openssh.listenAddresses
+        + ''
+            if [ "$missing" -eq 0 ]; then
+              echo "All SSH listen addresses are assigned."
+              break
+            fi
+            sleep 1
+          done
+        ''
+      );
     };
 
     services.openssh = {

@@ -6,6 +6,21 @@
 }:
 let
   cfg = config.my.features.services.jellyfin;
+
+  # Everything below is read, never restated: this endpoint's contract carries the service's own access
+  # policy, the directory contract carries the DN structure, and the LDAP provider publishes the ports
+  # and the naming prefix of consumer accounts.
+  # The consumes projection resolves what the endpoint left open: it is the compiled form of this
+  # service as a directory consumer, so the module reads the effective values, not the raw options.
+  consumer = config.my.contracts.consumes.jellyfin.ldap;
+  directory = config.my.directory.ldap;
+  ldapService = config.my.contracts.provides.authentik-ldap.endpoints;
+
+  # The LDAP Authentication plugin matches on memberOf, so a group name becomes a filter term.
+  memberOf = group: "(memberOf=cn=${group},${directory.groupsDn})";
+  orFilter = groups: "(|" + lib.concatMapStrings memberOf groups + ")";
+
+  ldapConfigPath = "/var/lib/jellyfin/plugins/configurations/LDAP-Auth.xml";
 in
 {
   options.my.features.services.jellyfin = {
@@ -54,9 +69,115 @@ in
       UMask = lib.mkForce "0002";
     };
 
-    my.endpoints.jellyfin = {
-      host = config.networking.hostName;
-      port = 8096;
+    # The plugin reads its configuration when it loads, and the file is rendered outside the unit, so
+    # nothing else would notice a changed render: restartTriggers ties the two together. Measured
+    # before this existed: restartTriggers was empty ([]), a deploy left the service running with the
+    # previous configuration, and only a manual restart made the new file take effect.
+    systemd.services.jellyfin.restartTriggers = [
+      config.sops.templates."jellyfin-ldap-auth.xml".path
+    ];
+
+    my.contracts.provides.jellyfin = {
+      # Jellyfin's client discovery answers broadcasts on the local link. It is a listening socket, so it
+      # is declared - and it is local, because a discovery protocol that leaves the link is a protocol
+      # nobody uses.
+      endpoints.discovery = {
+        port = 7359;
+        protocol = "udp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "udp";
+        };
+      };
+      endpoints.web = {
+        port = 8096;
+        protocol = "tcp";
+        scope = "public";
+        auth = "none";
+        subdomain = "jellyfin";
+
+        # Who may sign in and who administers. The directory filter and the portal are projections of
+        # this one declaration; Jellyfin keeps its own users, sessions and library permissions.
+        accessGroups = [
+          "media-users"
+          "infra-admins"
+        ];
+        adminGroups = [ "infra-admins" ];
+        ldap = {
+          enable = true;
+        };
+        publicExempt = "enforces its own user authentication; Jellyfin clients cannot perform a browser SSO redirect";
+        # Ingress reaches this over the WireGuard mesh (invariant I10).
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "wireguard";
+        };
+        dashboard = {
+          description = {
+            de = "Filme, Serien und Musik ohne Cloud.";
+            en = "Movies, shows and music without a cloud.";
+          };
+          show = true;
+          displayName = "Jellyfin";
+          category = "Media";
+          icon = "jellyfin";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/jellyfin" ];
+        cacheDirs = [ "/var/cache/jellyfin" ];
+      };
     };
+
+    # LDAP authentication.
+    #
+    # The LDAP Authentication plugin reads its settings from one file inside Jellyfin's state directory,
+    # and that file carries the bind password. It is therefore rendered from SOPS onto tmpfs and
+    # symlinked into place, so the password never enters the store and the rendered file is not part of
+    # Jellyfin's writable state.
+    #
+    # Field names and semantics come from the installed plugin build (LDAP Authentication 24.0.0.0) and
+    # from the running directory, not from the plugin's upstream example, which still points at
+    # dc=ldap,dc=goauthentik,dc=io and port 3389. The DNs, the accounts and the filters are all derived;
+    # the only literal in this file is the plugin's own field vocabulary.
+    sops.secrets.${consumer.secretPath} = { };
+
+    sops.templates."jellyfin-ldap-auth.xml" = {
+      content = ''
+        <?xml version="1.0" encoding="utf-8"?>
+        <PluginConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <LdapServer>127.0.0.1</LdapServer>
+          <LdapPort>${toString ldapService.ldap.port}</LdapPort>
+          <UseSsl>false</UseSsl>
+          <UseStartTls>false</UseStartTls>
+          <SkipSslVerify>false</SkipSslVerify>
+          <LdapBindUser>${consumer.bindDn}</LdapBindUser>
+          <LdapBindPassword>${config.sops.placeholder.${consumer.secretPath}}</LdapBindPassword>
+          <LdapBaseDn>${directory.usersDn}</LdapBaseDn>
+          <LdapSearchFilter>${orFilter consumer.accessGroups}</LdapSearchFilter>
+          <LdapAdminFilter>${orFilter consumer.adminGroups}</LdapAdminFilter>
+          <EnableLdapAdminFilterMemberUid>false</EnableLdapAdminFilterMemberUid>
+          <LdapSearchAttributes>uid, cn, mail, displayName</LdapSearchAttributes>
+          <CreateUsersFromLdap>true</CreateUsersFromLdap>
+          <AllowPassChange>false</AllowPassChange>
+          <LdapUidAttribute>uid</LdapUidAttribute>
+          <LdapUsernameAttribute>cn</LdapUsernameAttribute>
+          <EnableLdapProfileImageSync>false</EnableLdapProfileImageSync>
+          <RemoveImagesNotInLdap>false</RemoveImagesNotInLdap>
+          <EnableAllFolders>true</EnableAllFolders>
+        </PluginConfiguration>
+      '';
+      owner = "jellyfin";
+      mode = "0400";
+    };
+
+    systemd.tmpfiles.rules = [
+      # The plugin directory exists only after Jellyfin's first start.
+      "d /var/lib/jellyfin/plugins/configurations 0755 jellyfin jellyfin - -"
+      "L+ ${ldapConfigPath} - - - - ${config.sops.templates."jellyfin-ldap-auth.xml".path}"
+    ];
   };
 }

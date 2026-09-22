@@ -53,7 +53,7 @@ in
 
             Restart = "always";
             # Load all variables from the .env backup
-            EnvironmentFile = config.sops.secrets.portfolio_env.path;
+            EnvironmentFile = config.sops.secrets."services/apps/portfolio_env".path;
           };
         };
 
@@ -81,18 +81,36 @@ in
         };
         users.groups.portfolio = { };
 
-        # Caddy Reverse Proxy
-        my.endpoints.portfolio = {
-          host = config.networking.hostName;
-          port = 3005;
-          proxy = {
-            enable = true;
-            domain = "fleischer.design";
+        # Caddy Reverse Proxy & Service Contract
+        my.contracts.provides.portfolio = {
+          endpoints.web = {
+            port = 3005;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
+            subdomain = "portfolio";
+            # Served by this host's Caddy, but its DNS lives in the fleischer.design zone and is
+            # therefore NOT managed by the vyrx.de Cloudflare engine (in-zone filtering skips it).
+            extraDomains = [ "fleischer.design" ];
+            publicExempt = "public static site, no user data";
+            dashboard = {
+              description = {
+                de = "Portfolio-Website.";
+                en = "Portfolio website.";
+              };
+              show = true;
+              displayName = "Portfolio";
+              category = "Services";
+              icon = "globe";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/portfolio" ];
           };
         };
 
         # Secrets
-        sops.secrets.portfolio_env = {
+        sops.secrets."services/apps/portfolio_env" = {
           owner = "portfolio";
         };
       }

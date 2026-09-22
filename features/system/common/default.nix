@@ -47,7 +47,7 @@ in
         "@wheel"
       ];
 
-      substituters = [ "https://cache.rls.ancoris.ovh/nixfiles" ];
+      substituters = [ "https://cache.${config.my.topology.domain}/nixfiles" ];
       trusted-public-keys = [ "nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE=" ];
     };
 

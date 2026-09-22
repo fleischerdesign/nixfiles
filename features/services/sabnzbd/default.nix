@@ -55,13 +55,13 @@ in
 
   config = lib.mkIf cfg.enable {
     # 1. SOPS Secrets
-    sops.secrets.newsgroup_ninja_password = {
+    sops.secrets."services/media/newsgroup_ninja_password" = {
       owner = "sabnzbd";
     };
-    sops.secrets.sabnzbd_api_key = {
+    sops.secrets."services/media/sabnzbd_api_key" = {
       owner = "sabnzbd";
     };
-    sops.secrets.sabnzbd_nzb_key = {
+    sops.secrets."services/media/sabnzbd_nzb_key" = {
       owner = "sabnzbd";
     };
 
@@ -70,12 +70,12 @@ in
       owner = "sabnzbd";
       content = ''
         [misc]
-        api_key = ${config.sops.placeholder.sabnzbd_api_key}
-        nzb_key = ${config.sops.placeholder.sabnzbd_nzb_key}
+        api_key = ${config.sops.placeholder."services/media/sabnzbd_api_key"}
+        nzb_key = ${config.sops.placeholder."services/media/sabnzbd_nzb_key"}
 
         [servers]
         [[ninja]]
-        password = ${config.sops.placeholder.newsgroup_ninja_password}
+        password = ${config.sops.placeholder."services/media/newsgroup_ninja_password"}
       '';
     };
 
@@ -93,10 +93,10 @@ in
           port = 8080;
           host = "0.0.0.0";
           host_whitelist = "${
-            if config.my.endpoints.sabnzbd.proxy.subdomain != null then
-              "${config.my.endpoints.sabnzbd.proxy.subdomain}.${config.my.endpoints.sabnzbd.proxy.domain}, "
-            else
-              ""
+            let
+              ep = config.my.contracts.provides.sabnzbd.endpoints.web;
+            in
+            if ep.canonicalDomain != null then "${ep.canonicalDomain}, " else ""
           }localhost, 127.0.0.1";
           inet_exposure = 4;
           download_dir = "${cfg.downloadDir}/incomplete";
@@ -148,10 +148,32 @@ in
       UMask = lib.mkForce "0002";
     };
 
-    # Caddy Integration
-    my.endpoints.sabnzbd = {
-      host = config.networking.hostName;
-      port = 8080;
+    # Caddy & Firewall Integration via Service Contract
+    my.contracts.provides.sabnzbd = {
+      endpoints.web = {
+        port = 8080;
+        protocol = "tcp";
+        scope = "internal";
+        auth = "authentik";
+        accessGroups = [ "media-users" ];
+        subdomain = "sabnzbd";
+        healthProbePath = "/api?mode=version";
+        dashboard = {
+          description = {
+            de = "Usenet-Downloads für den Medien-Stack.";
+            en = "Usenet downloads for the media stack.";
+          };
+          show = true;
+          displayName = "SABnzbd";
+          category = "Media";
+          icon = "sabnzbd";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/sabnzbd" ];
+        dataDirs = [ cfg.downloadDir ];
+        cacheDirs = [ ];
+      };
     };
   };
 }

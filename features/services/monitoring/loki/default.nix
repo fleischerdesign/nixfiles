@@ -43,10 +43,37 @@ in
       };
     };
 
-    my.endpoints.loki = {
-      host = config.networking.hostName;
-      port = 3100;
-      monitoring.http.enable = false;
+    my.contracts.provides.loki = {
+      # Loki's gRPC face: the log pipeline on this host talks to it, nobody else.
+      endpoints.grpc = {
+        port = 9095;
+        protocol = "tcp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
+      };
+      endpoints.web = {
+        port = 3100;
+        protocol = "tcp";
+        scope = "internal";
+        # Logs are shipped here from every other host, so the port belongs on the mesh.
+        directAccess = {
+          enable = true;
+          interface = "wireguard";
+          protocol = "tcp";
+        };
+        monitoring = {
+          http.enable = false;
+          tcp.enable = true;
+          tcp.group = "Observability";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/loki" ];
+      };
     };
   };
 }

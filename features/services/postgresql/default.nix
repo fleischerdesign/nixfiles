@@ -34,12 +34,23 @@ in
       backupAll = true;
     };
 
-    my.endpoints.postgresql = {
-      host = config.networking.hostName;
-      port = 5432;
-      monitoring.http.enable = false;
-      monitoring.tcp.enable = true;
-      monitoring.tcp.group = "Infrastructure";
+    my.contracts.provides.postgresql = {
+      endpoints.db = {
+        port = 5432;
+        protocol = "tcp";
+        scope = "internal";
+        monitoring = {
+          http.enable = false;
+          tcp.enable = true;
+          tcp.group = "Infrastructure";
+        };
+      };
+      storage = {
+        stateDirs = [
+          "/var/lib/postgresql"
+          "/var/lib/postgresql/backups"
+        ];
+      };
     };
   };
 }

@@ -11,11 +11,6 @@ in
 {
   options.my.features.services.plausible = {
     enable = lib.mkEnableOption "Plausible Analytics";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "plausible.mky.ancoris.ovh";
-      description = "Domain name for Plausible instance.";
-    };
   };
 
   config = lib.mkIf cfg.enable (
@@ -37,8 +32,8 @@ in
           enable = true;
 
           server = {
-            baseUrl = "https://${cfg.domain}";
-            secretKeybaseFile = config.sops.secrets.plausible_secret_key_base.path;
+            baseUrl = "https://${config.my.contracts.provides.plausible.endpoints.web.canonicalDomain}";
+            secretKeybaseFile = config.sops.secrets."services/apps/plausible_secret_key_base".path;
             port = 8000;
             listenAddress = "127.0.0.1";
             disableRegistration = true;
@@ -58,26 +53,39 @@ in
           "IP_GEOLOCATION_DB=/var/lib/GeoIP/GeoLite2-City.mmdb"
         ];
 
-        # Ensure Postgres DB exists in the central instance
-        services.postgresql = {
-          ensureDatabases = [ "plausible" ];
-          ensureUsers = [
-            {
-              name = "plausible";
-              ensureDBOwnership = true;
-            }
-          ];
+        # Inversion of Control: Declare PostgreSQL requirement
+        my.contracts.consumes.plausible.postgresql.main = {
+          database = "plausible";
+          user = "plausible";
+          ensureDBOwnership = true;
         };
 
-        # Caddy Reverse Proxy
-        my.endpoints.plausible = {
-          host = config.networking.hostName;
-          port = 8000;
-          subdomain = "plausible";
+        # Service Contract for Caddy & Storage
+        my.contracts.provides.plausible = {
+          endpoints.web = {
+            port = 8000;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
+            subdomain = "plausible";
+            dashboard = {
+              description = {
+                de = "Datenschutzfreundliche Web-Statistik.";
+                en = "Privacy-friendly web analytics.";
+              };
+              show = true;
+              displayName = "Plausible";
+              category = "Observability & Tools";
+              icon = "plausible";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/plausible" ];
+          };
         };
 
         # Secrets
-        sops.secrets.plausible_secret_key_base = {
+        sops.secrets."services/apps/plausible_secret_key_base" = {
           owner = "plausible";
         };
       }

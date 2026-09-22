@@ -8,3 +8,7 @@ changelog.txt
 *.out
 .#*
 *.swp
+
+# Python bytecode caches (created by local py_compile or imports of the sync.py helpers)
+__pycache__/
+*.pyc

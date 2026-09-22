@@ -35,6 +35,14 @@ in
         description = "Enable polkit rules for passwordless desktop/systemd actions for wheel users.";
       };
     };
+
+    hardening = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable zero-overhead kernel memory protection and network-stack anti-spoofing hardening.";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -140,6 +148,30 @@ in
           }
         });
       '';
+    };
+
+    # Zero-Overhead Kernel & Network-Stack Hardening Baseline (docs/security.md 4.1)
+    boot = lib.mkIf cfg.hardening.enable {
+      kernelParams = [
+        "slab_nomerge" # Zero-overhead heap protection
+        "page_alloc.shuffle=1" # Randomize page allocation against heap-spraying
+      ];
+
+      kernel.sysctl = {
+        # Address space & reconnaissance protection
+        "kernel.kptr_restrict" = 2;
+        "kernel.dmesg_restrict" = 1;
+        "kernel.unprivileged_bpf_disabled" = 1;
+
+        # Network stack hardening (Anti-spoofing & SYN-flood protection)
+        "net.ipv4.tcp_syncookies" = 1;
+        "net.ipv4.conf.all.rp_filter" = 1;
+        "net.ipv4.conf.default.rp_filter" = 1;
+        "net.ipv4.conf.all.accept_redirects" = 0;
+        "net.ipv4.conf.default.accept_redirects" = 0;
+        "net.ipv4.conf.all.send_redirects" = 0;
+        "net.ipv6.conf.all.accept_redirects" = 0;
+      };
     };
   };
 }

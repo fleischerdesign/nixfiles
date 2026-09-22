@@ -3,8 +3,8 @@
 # and exposes a command surface (system.run, system.which, browser proxy, MCP servers, …)
 # which the gateway invokes through node.invoke.
 #
-# Supports running multiple node instances concurrently (e.g. jello connecting to Philipp's
-# gateway, while shared nodes like strummer can connect instances to multiple user gateways).
+# Supports running multiple node instances concurrently (e.g. hom-wrk-01 connecting to Philipp's
+# gateway, while shared nodes like hom-srv-01 can connect instances to multiple user gateways).
 #
 # Transports:
 #   loopback-tunnel   (Default) The node connects to the gateway via an SSH -L forward
@@ -207,13 +207,16 @@ let
 
           identityFile = lib.mkOption {
             type = lib.types.str;
-            default = "~/.ssh/deploy-key";
+            # Deliberately NOT ~/.ssh/deploy-key: that path belongs to the fleet deploy key, and a
+            # rendered tunnel secret living there silently replaces it - after which every deploy
+            # loses root access to the whole fleet.
+            default = "~/.ssh/node-tunnel-key";
             description = "SSH private key used for the forward; `~` expands to the home of tunnel.serviceUser.";
           };
 
           privateKeySecret = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
-            default = null;
+            default = osConfig.my.features.services.openclaw.node.tunnelPrivateKeySecret;
             example = "openclaw_node_ssh_key";
             description = ''
               SOPS secret holding the SSH private key for the forward. When set, it is
@@ -233,8 +236,8 @@ let
 
         passwordSecret = lib.mkOption {
           type = lib.types.nullOr lib.types.str;
-          default = null;
-          example = "openclaw_gateway_password";
+          default = "ai/openclaw/gateway_password";
+          example = "ai/openclaw/gateway_password";
           description = "Optional SOPS secret rendered into OPENCLAW_GATEWAY_PASSWORD.";
         };
 
@@ -398,6 +401,25 @@ in
       enable = lib.mkEnableOption "allow openclaw to test and switch system configurations (nix trusted-user, sudoers for nod and nixos-rebuild)";
     };
 
+    # Node -> gateway loopback-tunnel credential, declared once instead of per host: every
+    # host that runs a tunnelled node renders this secret automatically, and the gateway
+    # feature authorizes the matching public key on the gateway side only
+    # (my.features.services.openclaw.gateway.trustedNodeKeys).
+    tunnelPrivateKeySecret = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "infra/node_tunnel_key";
+      description = "SOPS secret holding the private key used by loopback tunnels.";
+    };
+
+    tunnelPrivateKeySopsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = ../../../../secrets/node-tunnel.yaml;
+      description = ''
+        SOPS file containing the tunnel private key. Kept separate from the main secret store
+        so it is never encrypted to the CI age key (see .sops.yaml).
+      '';
+    };
+
     instances = lib.mkOption {
       type = lib.types.attrsOf (lib.types.submodule instanceSubmodule);
       default = { };
@@ -446,6 +468,7 @@ in
               path = inst._identityFile;
               owner = inst.tunnel.serviceUser;
               mode = "0400";
+              sopsFile = osConfig.my.features.services.openclaw.node.tunnelPrivateKeySopsFile;
             };
           })
         ]
@@ -537,6 +560,22 @@ in
     ]
     ++ map (name: "d ${enabledInstances.${name}._stateDir} 0700 openclaw openclaw - -") (
       lib.attrNames enabledInstances
+    )
+    # sops-nix can only render the tunnel key if its parent directory exists.
+    ++ lib.unique (
+      map
+        (
+          name:
+          let
+            inst = enabledInstances.${name};
+          in
+          "d ${builtins.dirOf inst._identityFile} 0700 ${inst.tunnel.serviceUser} users - -"
+        )
+        (
+          builtins.filter (name: enabledInstances.${name}.tunnel.privateKeySecret != null) (
+            lib.attrNames enabledInstances
+          )
+        )
     );
 
     systemd.services = lib.listToAttrs (
@@ -552,10 +591,7 @@ in
           value = {
             description = "OpenClaw gateway loopback tunnel (${name})";
             wantedBy = [ "multi-user.target" ];
-            after = [
-              "network-online.target"
-              "tailscaled.service"
-            ];
+            after = [ "network-online.target" ];
             wants = [ "network-online.target" ];
 
             serviceConfig = {
@@ -585,11 +621,7 @@ in
               description = "OpenClaw companion node (${name})";
               wantedBy = [ "multi-user.target" ];
               restartTriggers = lib.optional (inst._mergedConfig != { }) inst._configFile;
-              after = [
-                "network-online.target"
-                "tailscaled.service"
-              ]
-              ++ lib.optional inst._useTunnel "${tunnelServiceName}.service";
+              after = [ "network-online.target" ] ++ lib.optional inst._useTunnel "${tunnelServiceName}.service";
               wants = [ "network-online.target" ];
               requires = lib.optional inst._useTunnel "${tunnelServiceName}.service";
 

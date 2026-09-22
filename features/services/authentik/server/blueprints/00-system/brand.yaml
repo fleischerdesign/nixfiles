@@ -1,0 +1,22 @@
+version: 1
+metadata:
+  name: "vyrx-system-brand"
+  labels:
+    vyrx: "owned"
+entries:
+  # The recovery flow must exist before the brand can point at it, and authentik
+  # does not order blueprints; declare the dependency explicitly.
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        path: 02-flows/recovery.yaml
+
+  - model: authentik_brands.brand
+    identifiers:
+      domain: "auth.vyrx.de"
+    attrs:
+      branding_title: "VYRX"
+      branding_logo: "logo.svg"
+      branding_favicon: "logo.svg"
+      branding_custom_css: "theme.css"
+      flow_recovery: !Find [authentik_flows.flow, [slug, default-recovery-flow]]

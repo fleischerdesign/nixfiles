@@ -9,7 +9,18 @@
 
 let
   cfg = config.my.features.services.monitoring.pipeline;
-  topology = config.my.features.system.networking.topology;
+  topology = config.my.topology;
+
+  # The hub as this host reaches it: the LAN address while both are at home, otherwise the overlay
+  # address (lib/addresses.nix states the rule once, for every consumer).
+  addresses = import ../../../../lib/addresses.nix { inherit lib; };
+  serviceAddress =
+    peer:
+    addresses.serviceAddress {
+      inherit topology;
+      consumer = topology.hosts.${config.networking.hostName} or null;
+      inherit peer;
+    };
 in
 {
   options.my.features.services.monitoring.pipeline = {
@@ -29,7 +40,7 @@ in
 
     hub = lib.mkOption {
       type = lib.types.str;
-      default = "mackaye";
+      default = "cld-edge-01";
       description = "Hostname of the monitoring hub. Used to configure alloy's loki endpoint on collectors.";
     };
   };
@@ -63,8 +74,8 @@ in
             let
               hubTopology = topology.hosts.${cfg.hub} or null;
             in
-            if hubTopology != null && hubTopology.tailscaleIp != null then
-              hubTopology.tailscaleIp
+            if hubTopology != null && hubTopology.wireguardIpv4 != null then
+              serviceAddress hubTopology
             else
               "127.0.0.1"
         );

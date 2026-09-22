@@ -2,7 +2,6 @@
 # Attic binary cache client configuration with optional background auto-push service.
 {
   config,
-  options,
   lib,
   pkgs,
   ...
@@ -62,19 +61,7 @@ in
     };
     endpoint = lib.mkOption {
       type = lib.types.str;
-      default =
-        let
-          caddyOpt = options.my.features.services.caddy.baseDomain or null;
-          caddyBaseDomain =
-            if caddyOpt != null && caddyOpt.isDefined then
-              config.my.features.services.caddy.baseDomain
-            else
-              null;
-        in
-        if caddyBaseDomain != null then
-          "https://cache.${caddyBaseDomain}"
-        else
-          "https://cache.rls.ancoris.ovh";
+      default = "https://cache.${config.my.topology.domain}";
       description = "Attic cache server endpoint URL.";
     };
     autoPush = lib.mkOption {
@@ -92,7 +79,7 @@ in
     {
       environment.systemPackages = [ pkgs.attic-client ];
 
-      sops.secrets.attic_push_token = {
+      sops.secrets."infra/attic/client_push_token" = {
         owner = cfg.user;
         group = cfg.group;
         mode = "0400";
@@ -107,7 +94,7 @@ in
 
           [servers.nixfiles-server]
           endpoint = "${cfg.endpoint}"
-          token = "${config.sops.placeholder.attic_push_token}"
+          token = "${config.sops.placeholder."infra/attic/client_push_token"}"
         '';
       };
 
@@ -120,7 +107,7 @@ in
 
           [servers.nixfiles-server]
           endpoint = "${cfg.endpoint}"
-          token = "${config.sops.placeholder.attic_push_token}"
+          token = "${config.sops.placeholder."infra/attic/client_push_token"}"
         '';
       };
 
@@ -134,14 +121,8 @@ in
       systemd.services.attic-auto-push = lib.mkIf cfg.autoPush {
         description = "Asynchronous Attic Binary Cache Push Service";
         wantedBy = [ "multi-user.target" ];
-        after = [
-          "network-online.target"
-          "tailscaled.service"
-        ];
-        wants = [
-          "network-online.target"
-          "tailscaled.service"
-        ];
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
         serviceConfig = {
           Type = "simple";
           ExecStart = "${pushScript}/bin/attic-auto-push";

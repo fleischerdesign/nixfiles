@@ -1,26 +1,18 @@
 {
   config,
-  options,
   lib,
   ...
 }:
 
 let
   cfg = config.my.features.services.monitoring.grafana;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
-  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
-  ntfyHost = if caddyBaseDomain != null then "ntfy.${caddyBaseDomain}" else "ntfy.mky.ancoris.ovh";
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
+  ntfyHost = "push.${topologyDomain}";
 in
 {
   options.my.features.services.monitoring.grafana = {
     enable = lib.mkEnableOption "Grafana Dashboard";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = if caddyBaseDomain != null then "grafana.${caddyBaseDomain}" else "grafana.mky.ancoris.ovh";
-      description = "FQDN of the Grafana instance.";
-    };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
       default = "https://${authHost}/application/o";
@@ -35,23 +27,27 @@ in
 
   config = lib.mkIf cfg.enable {
     # SOPS Secrets for OIDC and ntfy
-    sops.secrets.grafana_oidc_client_secret = {
+    sops.secrets."services/monitoring/grafana_oidc_client_secret" = {
       owner = "grafana";
     };
-    sops.secrets.grafana_oidc_client_id = {
+    sops.secrets."services/monitoring/grafana_oidc_client_id" = {
       owner = "grafana";
     };
-    sops.secrets.grafana_ntfy_token = { }; # Definition from ntfy/default.nix
-    sops.secrets.grafana_secret_key = {
+    sops.secrets."services/monitoring/grafana_ntfy_token" = { }; # Definition from ntfy/default.nix
+    sops.secrets."services/monitoring/grafana_secret_key" = {
       owner = "grafana";
     };
 
     # Template for Grafana environment variables
     sops.templates."grafana.env".content = ''
-      GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${config.sops.placeholder.grafana_oidc_client_id}
-      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${config.sops.placeholder.grafana_oidc_client_secret}
-      GF_SECURITY_SECRET_KEY=${config.sops.placeholder.grafana_secret_key}
-      NTFY_TOKEN=${config.sops.placeholder.grafana_ntfy_token}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${
+        config.sops.placeholder."services/monitoring/grafana_oidc_client_id"
+      }
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${
+        config.sops.placeholder."services/monitoring/grafana_oidc_client_secret"
+      }
+      GF_SECURITY_SECRET_KEY=${config.sops.placeholder."services/monitoring/grafana_secret_key"}
+      NTFY_TOKEN=${config.sops.placeholder."services/monitoring/grafana_ntfy_token"}
     '';
 
     services.grafana = {
@@ -60,8 +56,8 @@ in
         server = {
           http_addr = "127.0.0.1";
           http_port = 3000;
-          inherit (cfg) domain;
-          root_url = "https://${cfg.domain}";
+          domain = config.my.contracts.provides.grafana.endpoints.web.canonicalDomain;
+          root_url = "https://${config.my.contracts.provides.grafana.endpoints.web.canonicalDomain}";
         };
 
         security = {
@@ -279,6 +275,19 @@ in
           ];
         };
 
+        dashboards.settings.providers = [
+          {
+            name = "vyrx-system-dashboards";
+            type = "file";
+            options = {
+              path = ./dashboards;
+              foldersFromFilesStructure = true;
+            };
+            disableDeletion = false;
+            updateIntervalSeconds = 60;
+          }
+        ];
+
         datasources.settings.datasources = [
           {
             name = "Prometheus";
@@ -301,12 +310,40 @@ in
       config.sops.templates."grafana.env".path
     ];
 
-    my.endpoints.grafana = {
-      host = config.networking.hostName;
-      port = 3000;
-      proxy = {
-        enable = true;
+    my.contracts.provides.grafana = {
+      endpoints.web = {
+        port = 3000;
+        protocol = "tcp";
+        scope = "public";
+        auth = "oidc";
+        accessGroups = [ "infra-admins" ];
         subdomain = "grafana";
+        extraDomains = [ ];
+        # The legacy aliases `grafana.ops.…` and `mon.lan.…` were removed: they encoded a
+        # host and a plane into a service name (Naming spec §0.2). Any OIDC redirect URI or
+        # bookmark that still uses them must be updated in the same change.
+        oidc = {
+          enable = true;
+          clientId = "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k";
+          clientSecretEnv = "AUTHENTIK_OIDC_GRAFANA_SECRET";
+          secretPath = "services/monitoring/grafana_oidc_client_secret";
+          redirectPaths = [ "/login/generic_oauth" ];
+          subMode = "hashed_user_id";
+          includeClaimsInIdToken = true;
+        };
+        dashboard = {
+          description = {
+            de = "Metriken, Dashboards und Logs.";
+            en = "Metrics, dashboards and logs.";
+          };
+          show = true;
+          displayName = "Grafana";
+          category = "Observability";
+          icon = "grafana";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/grafana" ];
       };
     };
   };

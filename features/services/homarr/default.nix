@@ -1,6 +1,5 @@
 {
   config,
-  options,
   lib,
   features,
   ...
@@ -8,19 +7,12 @@
 
 let
   cfg = config.my.features.services.homarr;
-  caddyOpt = options.my.features.services.caddy.baseDomain or null;
-  caddyBaseDomain =
-    if caddyOpt != null && caddyOpt.isDefined then config.my.features.services.caddy.baseDomain else null;
-  authHost = if caddyBaseDomain != null then "auth.${caddyBaseDomain}" else "auth.ancoris.ovh";
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
 in
 {
   options.my.features.services.homarr = {
     enable = lib.mkEnableOption "Homarr Dashboard";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = if caddyBaseDomain != null then caddyBaseDomain else "ancoris.ovh";
-      description = "Domain name for Homarr.";
-    };
     ssoAuthority = lib.mkOption {
       type = lib.types.str;
       default = "https://${authHost}/application/o/homarr/";
@@ -44,20 +36,20 @@ in
 
       {
         # 1. SOPS Secrets
-        sops.secrets.homarr_auth_secret = { };
-        sops.secrets.homarr_encryption_key = { };
-        sops.secrets.homarr_oidc_client_secret = { };
+        sops.secrets."services/apps/homarr_auth_secret" = { };
+        sops.secrets."services/apps/homarr_encryption_key" = { };
+        sops.secrets."services/apps/homarr_oidc_client_secret" = { };
 
         # 2. Template for environment variables based on latest Homarr docs
         sops.templates."homarr.env" = {
           content = ''
             # Security
-            AUTH_SECRET=${config.sops.placeholder.homarr_auth_secret}
-            SECRET_ENCRYPTION_KEY=${config.sops.placeholder.homarr_encryption_key}
+            AUTH_SECRET=${config.sops.placeholder."services/apps/homarr_auth_secret"}
+            SECRET_ENCRYPTION_KEY=${config.sops.placeholder."services/apps/homarr_encryption_key"}
 
             # URLs
-            BASE_URL=https://${cfg.domain}
-            NEXTAUTH_URL=https://${cfg.domain}
+            BASE_URL=https://${config.my.contracts.provides.homarr.endpoints.web.canonicalDomain}
+            NEXTAUTH_URL=https://${config.my.contracts.provides.homarr.endpoints.web.canonicalDomain}
 
             # Redis (Using Mackaye's native redis)
             REDIS_IS_EXTERNAL=true
@@ -69,7 +61,7 @@ in
             AUTH_OIDC_AUTO_LOGIN=true
             AUTH_OIDC_CLIENT_NAME=Authentik
             AUTH_OIDC_CLIENT_ID=XNkHSIqbXSxj4I1s1P5aAjrHWjuKytniOE4uzA6L
-            AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder.homarr_oidc_client_secret}
+            AUTH_OIDC_CLIENT_SECRET=${config.sops.placeholder."services/apps/homarr_oidc_client_secret"}
             AUTH_OIDC_ISSUER=${cfg.ssoAuthority}
             AUTH_OIDC_URI=${cfg.ssoAuthorizeUrl}
             AUTH_OIDC_SCOPE_OVERWRITE=openid email profile groups
@@ -94,13 +86,27 @@ in
           ];
         };
 
-        # 5. Reverse Proxy via Caddy
-        my.endpoints.homarr = {
-          host = config.networking.hostName;
-          port = 7575;
-          proxy = {
-            enable = true;
-            inherit (cfg) domain;
+        # 5. Reverse Proxy & Ingress via Service Contract
+        my.contracts.provides.homarr = {
+          endpoints.web = {
+            port = 7575;
+            protocol = "tcp";
+            scope = "public";
+            auth = "none";
+            subdomain = "homarr";
+            dashboard = {
+              description = {
+                de = "Startseite für alle Dienste.";
+                en = "Start page for all services.";
+              };
+              show = true;
+              displayName = "Homarr";
+              category = "Services";
+              icon = "homarr";
+            };
+          };
+          storage = {
+            stateDirs = [ "/var/lib/homarr" ];
           };
         };
       }

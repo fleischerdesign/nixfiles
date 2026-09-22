@@ -62,7 +62,7 @@ let
         couchdb = {
           url = lib.mkOption {
             type = lib.types.str;
-            default = "https://livesync.mky.ancoris.ovh";
+            default = "https://livesync.${config.my.topology.domain}";
             description = "CouchDB server URL.";
           };
 
@@ -80,7 +80,7 @@ let
 
           passwordSecret = lib.mkOption {
             type = lib.types.str;
-            default = "couchdb_obsidian_password";
+            default = "services/storage/couchdb_obsidian_password";
             description = "SOPS secret key holding the CouchDB user password.";
           };
 
@@ -204,10 +204,7 @@ in
           value = {
             description = "Obsidian LiveSync Bridge (${name})";
             wantedBy = [ "multi-user.target" ];
-            after = [
-              "network-online.target"
-              "tailscaled.service"
-            ];
+            after = [ "network-online.target" ];
             wants = [ "network-online.target" ];
 
             environment = {

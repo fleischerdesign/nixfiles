@@ -15,6 +15,11 @@
     "uinput"
   ];
 
+  my.user.profiles = lib.mkDefault [
+    "core"
+    "graphical"
+  ];
+
   # It enables a baseline set of features common to all graphical systems.
   my.features.system = {
     audio.enable = lib.mkDefault true;

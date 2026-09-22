@@ -17,11 +17,11 @@ in
       enable = true;
       settings = {
         AccountID = 1180469;
-        LicenseKey = config.sops.secrets.geoip_license_key.path;
+        LicenseKey = config.sops.secrets."infra/geoip_license_key".path;
         EditionIDs = [ "GeoLite2-City" ];
       };
     };
 
-    sops.secrets.geoip_license_key = { };
+    sops.secrets."infra/geoip_license_key" = { };
   };
 }

@@ -34,8 +34,9 @@ in
 
     environmentFile = lib.mkOption {
       type = lib.types.str;
+      default = "backups/restic/${config.networking.hostName}";
       description = "Name of the SOPS secret containing environment variables for Restic repository credentials.";
-      example = "restic_environment_strummer";
+      example = "backups/restic/hom-srv-01";
     };
   };
 

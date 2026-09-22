@@ -1,0 +1,89 @@
+version: 1
+metadata:
+  name: "vyrx-rbac-groups-and-users"
+  labels:
+    vyrx: "owned"
+entries:
+  # Groups
+  - model: authentik_core.group
+    id: group_infra_admins
+    identifiers:
+      name: "infra-admins"
+    attrs:
+      is_superuser: true
+      attributes:
+        description: "Cluster Administrators (Root & Global Access)"
+
+  - model: authentik_core.group
+    id: group_media_users
+    identifiers:
+      name: "media-users"
+    attrs:
+      is_superuser: false
+      attributes:
+        description: "Access to Media Streaming & Requests"
+
+  - model: authentik_core.group
+    id: group_family
+    identifiers:
+      name: "family"
+    attrs:
+      is_superuser: false
+      attributes:
+        description: "Family members with home automation & smart home access"
+
+  # Users: Philipp (Admin), Katja, Lilly, Kai, Rieke.
+  #
+  # `state: created` makes these seeds, not declarations: the object is created when it is missing and
+  # its fields are never written again. That is the boundary of docs/identity.md §11 - the repository
+  # seeds existence, and the person owns the name, the address and the credential from the moment the
+  # account exists. Without the state the entry defaults to `present`, and every apply resets a name or
+  # an address changed in the interface (practices.md §6.14).
+  #
+  # Membership is not declared at all: `groups` is deliberately absent, because who is in which group is
+  # the access decision and belongs to the interface (docs/identity.md §11.1). Access runs only through
+  # membership (no per-user application bindings either).
+  - model: authentik_core.user
+    id: user_philipp
+    state: created
+    identifiers:
+      username: "philipp"
+    attrs:
+      name: "Philipp"
+      email: "philipp@vyrx.de"
+
+  - model: authentik_core.user
+    id: user_katja
+    state: created
+    identifiers:
+      username: "katja"
+    attrs:
+      name: "Katja"
+      email: "katja@vyrx.de"
+
+  - model: authentik_core.user
+    id: user_lilly
+    state: created
+    identifiers:
+      username: "lilly"
+    attrs:
+      name: "Lilly"
+      email: "lilly@vyrx.de"
+
+  - model: authentik_core.user
+    id: user_kai
+    state: created
+    identifiers:
+      username: "kai"
+    attrs:
+      name: "Kai"
+      email: "kai@vyrx.de"
+
+  - model: authentik_core.user
+    id: user_rieke
+    state: created
+    identifiers:
+      username: "rieke"
+    attrs:
+      name: "Rieke"
+      email: "rieke@vyrx.de"

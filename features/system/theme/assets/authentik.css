@@ -1,0 +1,70 @@
+/* vyrx-authentik-clean.css */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap');
+
+body {
+  background-color: #09090B !important;
+  background-image: radial-gradient(circle at 50% 10%, rgba(99, 102, 241, 0.08) 0%, transparent 45%) !important;
+  color: #F8FAFC !important;
+  font-family: 'Geist', -apple-system, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Container */
+.pf-c-login__container {
+  background: #121215 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.5) !important;
+  padding: 2.25rem !important;
+  max-width: 420px !important;
+  width: 100% !important;
+}
+
+/* Header & Brand */
+.pf-c-brand {
+  margin-bottom: 1.25rem !important;
+}
+
+.pf-c-title {
+  color: #F8FAFC !important;
+  font-weight: 600 !important;
+  font-size: 1.25rem !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Form Controls */
+.pf-c-form-control {
+  background-color: #18181B !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 8px !important;
+  color: #F8FAFC !important;
+  font-size: 0.9rem !important;
+  padding: 0.6rem 0.85rem !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.pf-c-form-control:focus {
+  border-color: #6366F1 !important;
+  box-shadow: 0 0 0 2px #09090B, 0 0 0 4px rgba(99, 102, 241, 0.35) !important;
+  outline: none !important;
+}
+
+/* Primary Button (Passkey / Sign In) */
+.pf-c-button.pf-m-primary {
+  background-color: #F8FAFC !important;
+  color: #09090B !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  padding: 0.65rem 1rem !important;
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+}
+
+.pf-c-button.pf-m-primary:hover {
+  opacity: 0.92 !important;
+}
+
+.pf-c-button.pf-m-primary:active {
+  transform: scale(0.98);
+}

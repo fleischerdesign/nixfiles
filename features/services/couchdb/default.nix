@@ -11,11 +11,6 @@ in
 {
   options.my.features.services.couchdb = {
     enable = lib.mkEnableOption "CouchDB Server";
-    domain = lib.mkOption {
-      type = lib.types.str;
-      default = "couchdb.mky.ancoris.ovh";
-      description = "Full domain name for CouchDB.";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -44,10 +39,10 @@ in
     };
 
     # 2. SOPS Secrets
-    sops.secrets.couchdb_admin_password = {
+    sops.secrets."services/storage/couchdb_admin_password" = {
       owner = "couchdb";
     };
-    sops.secrets.couchdb_obsidian_password = {
+    sops.secrets."services/storage/couchdb_obsidian_password" = {
       owner = "couchdb";
     };
 
@@ -56,18 +51,36 @@ in
       owner = "couchdb";
       content = ''
         [admins]
-        admin = ${config.sops.placeholder.couchdb_admin_password}
-        obsidian = ${config.sops.placeholder.couchdb_obsidian_password}
+        admin = ${config.sops.placeholder."services/storage/couchdb_admin_password"}
+        obsidian = ${config.sops.placeholder."services/storage/couchdb_obsidian_password"}
       '';
     };
 
-    # 4. Reverse Proxy via Caddy
-    my.endpoints.couchdb = {
-      host = config.networking.hostName;
-      port = 5984;
-      proxy = {
-        enable = true;
-        inherit (cfg) domain;
+    # 4. Service Contract for Ingress & Storage
+    my.contracts.provides.couchdb = {
+      # Erlang's port mapper, which CouchDB starts next to itself. Nothing outside this host talks to it -
+      # a single-node CouchDB resolves its own nodes through it. It is declared rather than left undefined
+      # so the exposure inventory can tell "a port nobody decided about" from "a port nobody needs".
+      endpoints.epmd = {
+        port = 4369;
+        protocol = "tcp";
+        scope = "isolated";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "tcp";
+        };
+      };
+      endpoints.web = {
+        port = 5984;
+        protocol = "tcp";
+        scope = "public";
+        auth = "none";
+        subdomain = "couchdb";
+        publicExempt = "enforces its own authentication; LiveSync clients cannot perform a browser SSO redirect";
+      };
+      storage = {
+        stateDirs = [ "/var/lib/couchdb" ];
       };
     };
   };
