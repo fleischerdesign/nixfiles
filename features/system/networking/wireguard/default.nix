@@ -377,6 +377,13 @@ in
           clientDns = map (resolver: topology.hosts.${resolver}.wireguardIpv4) (
             lib.filter (resolver: topology.hosts.${resolver}.wireguardIpv4 != null) topology.resolverHosts
           );
+
+          # Apps this client keeps outside the tunnel - a per-device declaration, because the key exists
+          # only in the Android implementation of the client. It decides which *network* such an app is
+          # bound to, not which routes it takes: the client's VPN network is a split tunnel without the
+          # `INTERNET` capability, and that is a network an app like Google's push transport refuses to
+          # use - measured as notifications that only arrived once the tunnel was switched off.
+          excludedApplications = client.excludedApplications or [ ];
           peers = lib.concatMapStrings (peer: ''
             [Peer]
             PublicKey = ${peer.publicKey}
@@ -388,13 +395,16 @@ in
         in
         {
           content = ''
-            [Interface]
-            PrivateKey = ${config.sops.placeholder."infra/wireguard/${name}_private_key"}
-            Address = ${lib.concatStringsSep ", " addresses}
-            DNS = ${lib.concatStringsSep ", " clientDns}
-            MTU = 1280
+                        [Interface]
+                        PrivateKey = ${config.sops.placeholder."infra/wireguard/${name}_private_key"}
+                        Address = ${lib.concatStringsSep ", " addresses}
+                        DNS = ${lib.concatStringsSep ", " clientDns}
+                        MTU = 1280
+            ${lib.optionalString (
+              excludedApplications != [ ]
+            ) "ExcludedApplications = ${lib.concatStringsSep ", " excludedApplications}\n"}
 
-            ${peers}'';
+                        ${peers}'';
         }
       )
     );

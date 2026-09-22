@@ -114,6 +114,21 @@ let
         default = null;
         description = "Physical MAC address for static DHCP binding";
       };
+
+      # Apps that a rendered client must keep *outside* the tunnel. It is a per-device fact, not a
+      # fleet-wide one: the key exists only in the Android implementation of the client (verified in
+      # `com.wireguard.config.Interface`: `ExcludedApplications` in `[Interface]`, package names,
+      # comma-separated, and mutually exclusive with `IncludedApplications`), so an iOS client would
+      # refuse the file rather than ignore the line. Measured: Android binds an application to the VPN
+      # network, and a VPN network without `INTERNET` is not used by apps that require that capability -
+      # which is how Google's push transport ends up without a network to rebuild its connection on.
+      # Excluding it is therefore not about routes (its destinations are outside `AllowedIPs` anyway),
+      # but about which network the app is bound to.
+      excludedApplications = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Package names a rendered client must keep outside the tunnel (Android clients)";
+      };
     };
   };
 
@@ -457,6 +472,15 @@ in
         wireguardIpv6 = "fd10:1000:100::40";
         wireguardPublicKey = "33yImKTdRMyeM8yYgabBLbZ1xLIMife6CGsSMCicmjo=";
         hostType = "client";
+        # The push transport, kept off the tunnel: measured 2026-09-22, the phone's VPN network carries
+        # no `INTERNET` capability (it is a split tunnel, so it has routes, not a default route), and an
+        # app that requires that capability does not use such a network - which is how notifications stop
+        # being rebuilt while the tunnel is up and arrive in a burst once it is switched off. The same
+        # exclusion was needed on Tailscale for the same reason.
+        excludedApplications = [
+          "com.google.android.gms"
+          "com.google.android.gsf"
+        ];
       };
 
       # Embedded targets as specified in docs/embedded.md

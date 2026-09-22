@@ -252,6 +252,11 @@ let
           !(lib.hasInfix address (contentOf client))
         ) "client ${client} (rendered on ${name}) does not carry the declared resolver ${address}"
       ) declaredResolvers
+      ++ lib.concatMap (
+        app:
+        lib.optional (!(lib.hasInfix app (contentOf client)))
+          "client ${client} (rendered on ${name}) declares '${app}' as excluded from the tunnel, but the profile does not carry it"
+      ) (topology.hosts.${client}.excludedApplications or [ ])
       ++ lib.optional (
         !(lib.hasInfix meshCidr line)
       ) "client ${client} (rendered on ${name}) does not route the mesh"
