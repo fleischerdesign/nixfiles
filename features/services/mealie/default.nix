@@ -120,6 +120,10 @@ in
         };
         healthProbePath = "/api/app/about";
         dashboard = {
+          description = {
+            de = "Rezepte und Essensplanung.";
+            en = "Recipes and meal planning.";
+          };
           show = true;
           displayName = "Mealie";
           category = "Home";

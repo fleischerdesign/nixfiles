@@ -139,6 +139,10 @@ in
           interface = "all";
         };
         dashboard = {
+          description = {
+            de = "Hausautomation und Sensoren.";
+            en = "Home automation and sensors.";
+          };
           show = true;
           displayName = "Home Assistant";
           category = "Smart Home";

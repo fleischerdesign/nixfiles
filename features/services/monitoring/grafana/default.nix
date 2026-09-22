@@ -332,6 +332,10 @@ in
           includeClaimsInIdToken = true;
         };
         dashboard = {
+          description = {
+            de = "Metriken, Dashboards und Logs.";
+            en = "Metrics, dashboards and logs.";
+          };
           show = true;
           displayName = "Grafana";
           category = "Observability";

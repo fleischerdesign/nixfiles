@@ -88,6 +88,10 @@ in
             subdomain = "radarr";
             healthProbePath = "/ping";
             dashboard = {
+              description = {
+                de = "Filmbibliothek automatisch verwalten.";
+                en = "Manage the movie library automatically.";
+              };
               show = true;
               displayName = "Radarr";
               category = "Media";

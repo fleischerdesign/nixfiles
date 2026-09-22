@@ -116,6 +116,10 @@ in
           interface = "wireguard";
         };
         dashboard = {
+          description = {
+            de = "Filme, Serien und Musik ohne Cloud.";
+            en = "Movies, shows and music without a cloud.";
+          };
           show = true;
           displayName = "Jellyfin";
           category = "Media";

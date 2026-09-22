@@ -69,6 +69,10 @@ in
             auth = "none";
             subdomain = "plausible";
             dashboard = {
+              description = {
+                de = "Datenschutzfreundliche Web-Statistik.";
+                en = "Privacy-friendly web analytics.";
+              };
               show = true;
               displayName = "Plausible";
               category = "Observability & Tools";

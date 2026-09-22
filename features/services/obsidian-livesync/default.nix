@@ -48,6 +48,10 @@ in
             subdomain = "livesync";
             publicExempt = "delegates authentication to CouchDB; LiveSync clients cannot perform a browser SSO redirect";
             dashboard = {
+              description = {
+                de = "Synchronisation der Obsidian-Notizen.";
+                en = "Sync for Obsidian notes.";
+              };
               show = true;
               displayName = "Obsidian LiveSync";
               category = "Productivity";

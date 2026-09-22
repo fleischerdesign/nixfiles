@@ -94,6 +94,10 @@ in
             extraDomains = [ "fleischer.design" ];
             publicExempt = "public static site, no user data";
             dashboard = {
+              description = {
+                de = "Portfolio-Website.";
+                en = "Portfolio website.";
+              };
               show = true;
               displayName = "Portfolio";
               category = "Services";

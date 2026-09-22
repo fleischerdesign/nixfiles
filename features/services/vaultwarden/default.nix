@@ -80,6 +80,10 @@ in
               includeClaimsInIdToken = true;
             };
             dashboard = {
+              description = {
+                de = "Passwort-Tresor im eigenen Netz.";
+                en = "Password vault in your own network.";
+              };
               show = true;
               displayName = "Vaultwarden";
               category = "Security";

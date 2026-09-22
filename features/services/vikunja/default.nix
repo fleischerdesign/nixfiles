@@ -121,6 +121,10 @@ in
               includeClaimsInIdToken = true;
             };
             dashboard = {
+              description = {
+                de = "Aufgaben, Listen und Projektboards.";
+                en = "Tasks, lists and project boards.";
+              };
               show = true;
               displayName = "Vikunja";
               category = "Productivity";

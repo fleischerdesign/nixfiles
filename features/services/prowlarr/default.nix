@@ -79,6 +79,10 @@ in
             subdomain = "prowlarr";
             healthProbePath = "/ping";
             dashboard = {
+              description = {
+                de = "Indexer-Verwaltung für den Medien-Stack.";
+                en = "Indexer management for the media stack.";
+              };
               show = true;
               displayName = "Prowlarr";
               category = "Media";

@@ -88,6 +88,10 @@ in
             subdomain = "sonarr";
             healthProbePath = "/ping";
             dashboard = {
+              description = {
+                de = "Serienbibliothek automatisch verwalten.";
+                en = "Manage the show library automatically.";
+              };
               show = true;
               displayName = "Sonarr";
               category = "Media";

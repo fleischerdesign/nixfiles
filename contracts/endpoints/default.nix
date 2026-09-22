@@ -389,9 +389,20 @@ let
           description = "Dashboard icon identifier";
         };
         description = lib.mkOption {
-          type = lib.types.str;
-          default = "";
-          description = "Short copy shown on the portal tile and in search results";
+          type = lib.types.submodule {
+            options = {
+              de = lib.mkOption {
+                type = lib.types.str;
+                default = "";
+              };
+              en = lib.mkOption {
+                type = lib.types.str;
+                default = "";
+              };
+            };
+          };
+          default = { };
+          description = "Short bilingual copy shown on the portal tile; the portal renders DE and EN.";
         };
       };
 

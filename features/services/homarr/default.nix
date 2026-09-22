@@ -95,6 +95,10 @@ in
             auth = "none";
             subdomain = "homarr";
             dashboard = {
+              description = {
+                de = "Startseite für alle Dienste.";
+                en = "Start page for all services.";
+              };
               show = true;
               displayName = "Homarr";
               category = "Services";

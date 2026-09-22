@@ -29,6 +29,10 @@ in
         subdomain = "bazarr";
         healthProbePath = "/ping";
         dashboard = {
+          description = {
+            de = "Untertitel-Verwaltung für Serien und Filme.";
+            en = "Subtitle management for shows and movies.";
+          };
           show = true;
           displayName = "Bazarr";
           category = "Media";

@@ -52,6 +52,10 @@ in
           interface = "wireguard";
         };
         dashboard = {
+          description = {
+            de = "Medienwünsche anfragen und freigeben.";
+            en = "Request and approve media.";
+          };
           show = true;
           displayName = "Jellyseerr";
           category = "Media";

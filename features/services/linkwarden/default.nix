@@ -78,6 +78,10 @@ in
               includeClaimsInIdToken = true;
             };
             dashboard = {
+              description = {
+                de = "Lesezeichen und Linkarchiv.";
+                en = "Bookmarks and link archive.";
+              };
               show = true;
               displayName = "Linkwarden";
               category = "Productivity";

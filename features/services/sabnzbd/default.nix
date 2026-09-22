@@ -159,6 +159,10 @@ in
         subdomain = "sabnzbd";
         healthProbePath = "/api?mode=version";
         dashboard = {
+          description = {
+            de = "Usenet-Downloads für den Medien-Stack.";
+            en = "Usenet downloads for the media stack.";
+          };
           show = true;
           displayName = "SABnzbd";
           category = "Media";

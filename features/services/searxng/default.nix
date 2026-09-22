@@ -216,6 +216,10 @@ in
           interface = "wireguard";
         };
         dashboard = {
+          description = {
+            de = "Metasuche ohne Tracking.";
+            en = "Metasearch without tracking.";
+          };
           show = true;
           displayName = "SearXNG Search";
           category = "Observability & Tools";

@@ -64,6 +64,10 @@ in
         subdomain = "push";
         publicExempt = "enforces its own authentication; push clients cannot perform a browser SSO redirect";
         dashboard = {
+          description = {
+            de = "Push-Benachrichtigungen aus dem Netz.";
+            en = "Push notifications from the network.";
+          };
           show = true;
           displayName = "ntfy";
           category = "Observability & Tools";

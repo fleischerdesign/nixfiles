@@ -171,6 +171,10 @@ in
             };
             healthProbePath = "/";
             dashboard = {
+              description = {
+                de = "Belegarchiv mit Texterkennung.";
+                en = "Document archive with OCR.";
+              };
               show = true;
               displayName = "Paperless-ngx";
               category = "Productivity";

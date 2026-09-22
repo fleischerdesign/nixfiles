@@ -169,6 +169,10 @@ in
             }
           '';
           dashboard = {
+            description = {
+              de = "3D-Drucker-Steuerung und Druckvorschau.";
+              en = "3D printer control and print preview.";
+            };
             show = true;
             displayName = "Mainsail";
             category = "3D Printing";
