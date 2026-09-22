@@ -165,6 +165,24 @@ let
   # unreachable for everyone.
   safeAudienceId = groupName: builtins.replaceStrings [ "-" "." ] [ "_" "_" ] groupName;
 
+  # Retiring an audience is a declaration, not an omission. The apply adds and updates; it never deletes
+  # a binding that is no longer named, so a migration that merely stops declaring a group leaves the
+  # old binding in the database - with the access the change was meant to end. The endpoint says which
+  # group it stopped accepting and this projects the tombstone.
+  retiredAudienceBindings =
+    name: ep:
+    map (
+      groupName:
+      blueprintLib.absent {
+        model = blueprintLib.models.policyBinding;
+        identifiers = {
+          target = blueprintLib.refs.policyTargetBySlug "application" name;
+          group = blueprintLib.refs.byName blueprintLib.models.group groupName;
+          order = 0;
+        };
+      }
+    ) ep.retiredAccessGroups;
+
   audienceGroupEntries =
     ep:
     map (
@@ -405,6 +423,7 @@ let
             })
           ]
           ++ audienceBindings name ep
+          ++ retiredAudienceBindings name ep
         ) sortedEndpointNames)
         ++ [
           # The outpost embedded in the server itself. authentik creates it on startup with `type = proxy` and
@@ -491,6 +510,7 @@ let
             })
           ]
           ++ audienceBindings name ep
+          ++ retiredAudienceBindings name ep
         ) sortedOidcEndpointNames;
     };
 

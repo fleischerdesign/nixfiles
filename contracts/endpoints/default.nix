@@ -154,6 +154,16 @@ let
         description = "Usernames that may use this endpoint, each through its own audience group.";
       };
 
+      # A group this endpoint accepted before its audience became a declaration. An apply adds and
+      # updates; it does not remove a binding that is no longer named, so retiring an audience takes a
+      # declaration of its own - the tombstone - or the old binding keeps granting what the change was
+      # meant to end (docs/identity.md §11.3).
+      retiredAccessGroups = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Groups this endpoint no longer accepts; each is tombstoned on apply.";
+      };
+
       adminGroups = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];

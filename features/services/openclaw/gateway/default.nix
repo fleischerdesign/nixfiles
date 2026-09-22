@@ -1086,6 +1086,10 @@ in
                 # usernames, so a deploy never leaves an audience empty and the ingress audience is
                 # exactly what the application already enforced.
                 accessUsers = lib.unique ([ name ] ++ cfg.operators);
+                # Until today every instance was gated by the role `family`, so every member of it could
+                # open any agent. Taking the group out of the declaration does not remove the binding
+                # that is already in the database; naming it here does.
+                retiredAccessGroups = [ "family" ];
                 subdomain = inst.subdomain;
                 domain = inst.domain;
                 # Dynamically minted self-publishing hosts are the only names that
