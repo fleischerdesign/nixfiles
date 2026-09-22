@@ -9,7 +9,6 @@
 let
   cfg = config.my.features.services.vyrx-landing;
   vyrxLandingPkg = inputs.vyrx-landing.packages.${pkgs.stdenv.hostPlatform.system}.default;
-  outpost = config.my.features.services.authentik.server.embeddedOutpostAddress;
 
   # The portal's data is a projection of the service contracts, never a second list: the same
   # `accessGroups` the ingress enforces decides which tile a user sees, and the same `displayName` /
@@ -114,62 +113,20 @@ let
     }
   );
 
-  # The static site plus the generated projection, served from one read-only store path.
+  # The built landing: `client/` holds the prerendered pages and their assets, `server/` the Node entry
+  # that answers the API routes. One build, so a page and the endpoint it calls cannot be from different
+  # versions.
   site = pkgs.runCommandLocal "vyrx-landing-portal" { } ''
     mkdir -p "$out"
     cp -r ${vyrxLandingPkg}/. "$out/"
     chmod -R u+w "$out"
-    cp ${portal} "$out/portal.json"
+    cp ${portal} "$out/client/portal.json"
   '';
 
-  # The page is public and one hostname. `/api/me` is the only authenticated route: forward_auth runs
-  # against the embedded outpost and, on success, the copy_headers values are echoed back - the browser
-  # reads them from a same-origin response, so no token ever reaches JavaScript and no second origin is
-  # involved. Without a session the outpost's redirect is left untouched, which `fetch(redirect:'manual')`
-  # sees as "anonymous". `route` forces that order; the directive order inside a handle is not literal.
-  customExtraConfig = ''
-    root * ${site}
+  # The API port. The process serves everything - pages, assets and API - so this is the port the
+  # endpoint declares, not a private one behind a hand-written proxy.
+  portalApiPort = 4317;
 
-    handle /api/me {
-      route {
-        forward_auth ${outpost} {
-          uri /outpost.goauthentik.io/auth/caddy
-          copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name
-          trusted_proxies private_ranges
-        }
-        header X-Portal-Username "{http.request.header.X-Authentik-Username}"
-        header X-Portal-Name "{http.request.header.X-Authentik-Name}"
-        header X-Portal-Groups "{http.request.header.X-Authentik-Groups}"
-        header Cache-Control "no-store"
-        respond "" 200
-      }
-    }
-
-    ${lib.optionalString (prometheusAddress != null) ''
-      # Live status, same-origin. One fixed query and a fixed path: the browser never talks to the
-      # collector, no PromQL is user-controlled, and `probe_success` is the same series the alerts read -
-      # the portal and the alerting therefore agree by construction instead of by convention.
-      handle /api/status {
-        rewrite * /api/v1/query?query=probe_success
-        reverse_proxy ${prometheusAddress}:9090
-        header Cache-Control "public, max-age=10"
-      }
-
-      # Host liveness. `up` carries the scrape targets, and a direct scrape labels `instance` with the
-      # host name; the page keeps only the instances the registry knows, so no service name is named here.
-      handle /api/hosts {
-        rewrite * /api/v1/query?query=up
-        reverse_proxy ${prometheusAddress}:9090
-        header Cache-Control "public, max-age=10"
-      }
-    ''}
-    import authentik
-
-    handle {
-      file_server
-      try_files {path} {path}/index.html =404
-    }
-  '';
 in
 {
   options.my.features.services.vyrx-landing = {
@@ -177,16 +134,45 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # The portal's API and pages are one process. It reaches the collector over the mesh and, later, the
+    # services themselves; what may reach it is decided by the firewall and the ingress, like every other
+    # service in this fleet.
+    systemd.services.vyrx-portal-api = {
+      description = "VYRX portal (landing page and its API)";
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        ExecStart = "${pkgs.nodejs_22}/bin/node ${site}/server/entry.mjs";
+        Environment = [
+          # Loopback, because the ingress proxies to `127.0.0.1:<port>` for its own host - and because it is
+          # stricter: this process trusts the identity headers the proxy forwards, so nothing but the proxy
+          # should be able to reach it. `directAccess` stays off, so the firewall opens nothing either.
+          "HOST=127.0.0.1"
+          "PORT=${toString portalApiPort}"
+        ]
+        ++ lib.optional (
+          prometheusAddress != null
+        ) "PORTAL_PROMETHEUS_URL=http://${prometheusAddress}:9090";
+        Restart = "on-failure";
+        RestartSec = "2s";
+        DynamicUser = true;
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectHome = true;
+        ProtectSystem = "strict";
+      };
+    };
+
     my.contracts.provides.vyrx-landing = {
+      # An ordinary service: one process, one port, one vhost. It serves its own pages, its assets and its
+      # API, so the ingress does exactly what it does for every other service - authenticate, then proxy -
+      # and knows nothing about files, route names or a collector address.
       endpoints.web = {
-        port = 80;
+        port = portalApiPort;
         protocol = "tcp";
         scope = "public";
-        # The page itself is served by `customExtraConfig` and stays public; this value is what
-        # registers a proxy application for `vyrx.de` in authentik, which is what lets the embedded
-        # outpost answer `/api/me` at all (without a matching application it returns 404 for the host).
-        # Publishing the fleet inventory is a deliberate decision, not an oversight: only `/api/me` is
-        # personal, and it answers with the caller's own claims.
+        # This value registers a proxy application for `vyrx.de` in authentik, which is what lets the
+        # embedded outpost answer `/api/me` at all (without a matching application it returns 404 for the
+        # host). Publishing the fleet inventory is a deliberate decision, not an oversight.
         auth = "authentik";
         accessGroups = [
           "family"
@@ -195,7 +181,20 @@ in
         ];
         adminGroups = portalAdminGroups;
         subdomain = "@";
-        inherit customExtraConfig;
+        # What answers without a session: the pages and their assets (a visitor sees the fleet inventory)
+        # and the two status routes that feed the landing's live data. Everything else - above all
+        # `/api/me` - needs a session, which is what makes the identity it reports trustworthy.
+        unauthenticatedPaths = [
+          "/"
+          "/en"
+          "/en/*"
+          "/404.html"
+          "/robots.txt"
+          "/portal.json"
+          "/_astro/*"
+          "/api/status"
+          "/api/hosts"
+        ];
         dashboard = {
           show = false;
         };
