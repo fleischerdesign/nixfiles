@@ -20,12 +20,40 @@ let
       "${config.networking.hostName}" = config;
     };
 
+  endpointLib = import ../../../lib/endpoints.nix { inherit lib; };
+  topology = config.my.topology;
+
   # Live status is read from the collector on this host: the endpoint contracts already generate the
   # probes, and the collector is part of the same deployment. Reaching a collector on another host would
   # mean putting an unauthenticated query API on the mesh for nothing, so if this host does not run the
   # pipeline the route is simply absent - and the page says "unknown" instead of guessing.
   prometheusAddress =
     if config.my.features.services.monitoring.prometheus.enable or false then "127.0.0.1" else null;
+
+  # The fleet view. Every field is a fact from the inventory: the zone and its CIDR, the addresses, the
+  # relay flag, whether this is the ingress, and `hostType` - the role the host is assigned. The service
+  # list is the host's own `provides`, so nothing here is written a second time, and the landing no
+  # longer carries a `mesh.json` at all.
+  portalHosts = lib.sort (a: b: a.name < b.name) (
+    map (
+      name:
+      let
+        host = topology.hosts.${name} or { };
+        provides = flakeConfigurations.${name}.config.my.contracts.provides or { };
+      in
+      {
+        inherit name;
+        type = host.hostType or "server";
+        zone = host.zone or null;
+        cidr = (topology.subnets.${host.zone} or { }).cidr or null;
+        ipv4 = host.ipv4 or null;
+        wireguardIpv4 = host.wireguardIpv4 or null;
+        relay = host.wireguardRelay or false;
+        ingress = name == topology.ingressHost;
+        services = lib.sort (a: b: a < b) (builtins.attrNames provides);
+      }
+    ) (builtins.attrNames flakeConfigurations)
+  );
 
   portalEntries = lib.concatLists (
     map (
@@ -41,7 +69,7 @@ let
               epName: ep:
               lib.optionals (ep.dashboard.show && ep.canonicalDomain != null) [
                 {
-                  id = if epName == "default" || epName == "web" then svcName else "${svcName}-${epName}";
+                  id = endpointLib.endpointName svcName epName;
                   name = if ep.displayName != null then ep.displayName else svcName;
                   description = ep.dashboard.description;
                   url = "https://${ep.canonicalDomain}";
@@ -73,6 +101,8 @@ let
   portal = pkgs.writeText "portal.json" (
     builtins.toJSON {
       adminGroups = portalAdminGroups;
+      locales = config.my.portal.locales;
+      hosts = portalHosts;
       services = builtins.attrValues (
         lib.listToAttrs (map (entry: lib.nameValuePair entry.id entry) portalEntries)
       );

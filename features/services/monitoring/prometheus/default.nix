@@ -13,6 +13,7 @@ let
   # The address this host uses to reach a peer: the LAN address while both are at home, otherwise the
   # overlay address (lib/addresses.nix states the rule once, for every consumer).
   addresses = import ../../../../lib/addresses.nix { inherit lib; };
+  endpointLib = import ../../../../lib/endpoints.nix { inherit lib; };
   serviceAddress =
     peer:
     addresses.serviceAddress {
@@ -50,7 +51,7 @@ let
         lib.mapAttrsToList (
           svcName: contract:
           lib.mapAttrsToList (epName: ep: {
-            name = if epName == "default" || epName == "web" then svcName else "${svcName}-${epName}";
+            name = endpointLib.endpointName svcName epName;
             inherit ep;
           }) contract.endpoints
         ) provides

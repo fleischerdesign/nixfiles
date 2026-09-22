@@ -13,6 +13,8 @@
   blueprintLib,
 }:
 let
+  endpointLib = import ../../../../lib/endpoints.nix { inherit lib; };
+
   authentikPackage = pkgs.authentik;
   directory = config.my.directory.ldap;
   consumerAccountName = name: "${config.my.directory.ldap.consumerAccountPrefix}${name}";
@@ -52,7 +54,7 @@ let
         svcName: contract:
         lib.mapAttrsToList (epName: ep: {
           inherit hostName ep;
-          name = if epName == "default" || epName == "web" then svcName else "${svcName}-${epName}";
+          name = endpointLib.endpointName svcName epName;
         }) contract.endpoints
       ) provides
     )
