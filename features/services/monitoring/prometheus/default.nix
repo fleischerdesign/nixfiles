@@ -336,8 +336,8 @@ in
         protocol = "tcp";
         scope = "internal";
         auth = "none";
-        # Queried by Grafana on the same host and through the local ingress; nothing off this host talks
-        # to the collector's own API directly.
+        # Queried by Grafana and by the portal's status route, both on this host over loopback - the API
+        # carries no auth, so it is not put on an interface at all.
         directAccess = {
           enable = true;
           interface = "local";

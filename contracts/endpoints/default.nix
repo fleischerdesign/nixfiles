@@ -389,20 +389,13 @@ let
           description = "Dashboard icon identifier";
         };
         description = lib.mkOption {
-          type = lib.types.submodule {
-            options = {
-              de = lib.mkOption {
-                type = lib.types.str;
-                default = "";
-              };
-              en = lib.mkOption {
-                type = lib.types.str;
-                default = "";
-              };
-            };
-          };
+          type = lib.types.attrsOf lib.types.str;
           default = { };
-          description = "Short bilingual copy shown on the portal tile; the portal renders DE and EN.";
+          description = ''
+            Short copy per locale tag, e.g. `{ de = "..."; en = "..."; }`. The tag set is
+            `my.portal.locales`, and the assertion below fails evaluation when one is missing - so a
+            third language is data, not a schema change.
+          '';
         };
       };
 
@@ -592,6 +585,18 @@ let
       };
 in
 {
+  options.my.portal.locales = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [
+      "de"
+      "en"
+    ];
+    description = ''
+      Locale tags the portal renders. Contract copy (an endpoint's `dashboard.description`) must carry
+      every one of them; the assertion below enforces it, so a locale is never silently missing.
+    '';
+  };
+
   options.my.contracts.provides = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule {
@@ -606,6 +611,20 @@ in
 
   # Direct Firewall Projection
   config = {
+    assertions = [
+      {
+        assertion = lib.all (
+          svc:
+          lib.all (
+            ep:
+            ep.dashboard.description == { }
+            || lib.all (locale: builtins.hasAttr locale ep.dashboard.description) config.my.portal.locales
+          ) (lib.attrValues svc.endpoints)
+        ) (lib.attrValues config.my.contracts.provides);
+        message = "an endpoint's dashboard.description must name every locale in my.portal.locales";
+      }
+    ];
+
     my.contracts.consumes = ldapConsumers;
 
     # One firewall, one place: what is opened is derived from the endpoints - already scoped to the

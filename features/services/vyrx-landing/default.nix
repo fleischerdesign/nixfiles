@@ -20,6 +20,13 @@ let
       "${config.networking.hostName}" = config;
     };
 
+  # Live status is read from the collector on this host: the endpoint contracts already generate the
+  # probes, and the collector is part of the same deployment. Reaching a collector on another host would
+  # mean putting an unauthenticated query API on the mesh for nothing, so if this host does not run the
+  # pipeline the route is simply absent - and the page says "unknown" instead of guessing.
+  prometheusAddress =
+    if config.my.features.services.monitoring.prometheus.enable or false then "127.0.0.1" else null;
+
   portalEntries = lib.concatLists (
     map (
       hostName:
@@ -45,9 +52,10 @@ let
                   scope = ep.scope;
                   groups = ep.accessGroups;
                   admin = ep.adminGroups;
-                  monitoring = {
-                    inherit (ep.monitoring.http) enable path group;
-                  };
+                  # The collector labels a probe with the same endpoint name this id carries, so the tile
+                  # asks `/api/status` for exactly its own series. Whether it is probed at all is the
+                  # contract's decision (`monitoring.http.enable`), not the page's.
+                  monitored = ep.monitoring.http.enable;
                 }
               ]
             ) contract.endpoints
@@ -102,6 +110,16 @@ let
       }
     }
 
+    ${lib.optionalString (prometheusAddress != null) ''
+      # Live status, same-origin. One fixed query and a fixed path: the browser never talks to the
+      # collector, no PromQL is user-controlled, and `probe_success` is the same series the alerts read -
+      # the portal and the alerting therefore agree by construction instead of by convention.
+      handle /api/status {
+        rewrite * /api/v1/query?query=probe_success
+        reverse_proxy ${prometheusAddress}:9090
+        header Cache-Control "public, max-age=10"
+      }
+    ''}
     import authentik
 
     handle {
@@ -121,11 +139,11 @@ in
         port = 80;
         protocol = "tcp";
         scope = "public";
-        # The page itself is served by `customExtraConfig` and stays public. The value is what
-        # registers a proxy application for `vyrx.de` in authentik, which is what makes the embedded
-        # outpost able to authorize `/api/me`: without a matching application it answers 404 for the
-        # host. The application's audience is the portal's audience - the same groups the ingress and
-        # the tile list use.
+        # The page itself is served by `customExtraConfig` and stays public; this value is what
+        # registers a proxy application for `vyrx.de` in authentik, which is what lets the embedded
+        # outpost answer `/api/me` at all (without a matching application it returns 404 for the host).
+        # Publishing the fleet inventory is a deliberate decision, not an oversight: only `/api/me` is
+        # personal, and it answers with the caller's own claims.
         auth = "authentik";
         accessGroups = [
           "family"
