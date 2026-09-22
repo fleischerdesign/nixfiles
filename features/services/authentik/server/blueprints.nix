@@ -166,7 +166,7 @@ let
   safeAudienceId = groupName: builtins.replaceStrings [ "-" "." ] [ "_" "_" ] groupName;
 
   audienceGroupEntries =
-    name: ep:
+    ep:
     map (
       groupName:
       blueprintLib.entry {
@@ -174,7 +174,7 @@ let
         model = blueprintLib.models.group;
         identifiers.name = groupName;
         attrs = {
-          attributes.description = "Own audience declared by ${name}. Its member is the account its name derives from.";
+          attributes.description = "Audience declared by the contracts; its member is the account its name derives from.";
           # The membership is declared here, which is what makes a deploy leave no empty group behind:
           # an audience group that nobody is in binds its application shut for everyone, including the
           # person it was created for.
@@ -376,6 +376,7 @@ let
       name = "vyrx-apps-proxy";
       entries =
         providerFlowDependencies
+        ++ lib.unique (lib.concatMap (name: audienceGroupEntries authEndpoints.${name}) sortedEndpointNames)
         ++ (lib.replicate 2 orphanedAuthorizationFlowBinding)
         ++ (lib.concatMap (
           name:
@@ -403,7 +404,6 @@ let
               openInNewTab = true;
             })
           ]
-          ++ audienceGroupEntries name ep
           ++ audienceBindings name ep
         ) sortedEndpointNames)
         ++ [
@@ -441,6 +441,9 @@ let
       name = "vyrx-apps-oidc";
       entries =
         providerFlowDependencies
+        ++ lib.unique (
+          lib.concatMap (name: audienceGroupEntries oidcEndpoints.${name}) sortedOidcEndpointNames
+        )
         ++ lib.concatMap (
           name:
           let
@@ -487,7 +490,6 @@ let
               openInNewTab = true;
             })
           ]
-          ++ audienceGroupEntries name ep
           ++ audienceBindings name ep
         ) sortedOidcEndpointNames;
     };

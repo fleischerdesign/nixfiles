@@ -860,6 +860,16 @@ in
       description = "SSH public keys allowed to open node tunnels on this gateway.";
     };
 
+    # Accounts that may reach every instance in addition to the person it belongs to (the operator
+    # who supports them). Usernames, not mail addresses: an address list mixes a person's additional
+    # logins into one string (`kugelblitz82@gmx.de` next to `kai@vyrx.de`), and the audience check
+    # refuses a group named after a username the directory does not seed.
+    operators = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Usernames that may reach every instance, in addition to its own account.";
+    };
+
     instances = lib.mkOption {
       type = lib.types.attrsOf (lib.types.submodule instanceSubmodule);
       default = { };
@@ -1069,7 +1079,13 @@ in
                 # have nothing to do with the username. The audience assertion rejects exactly that
                 # join, which is why the operator's cross-instance access now needs a declaration of
                 # its own instead of riding along in an address list.
-                accessUsers = [ name ];
+                # Deliberately not derived from `adminUsers`: that list carries every address a person
+                # signs in with, so its local parts are no usernames at all (`kugelblitz82@gmx.de` next
+                # to `kai@vyrx.de`). The instance key is the account, and `operators` names the people
+                # who may reach every instance - both declared, both checked against the seeded
+                # usernames, so a deploy never leaves an audience empty and the ingress audience is
+                # exactly what the application already enforced.
+                accessUsers = lib.unique ([ name ] ++ cfg.operators);
                 subdomain = inst.subdomain;
                 domain = inst.domain;
                 # Dynamically minted self-publishing hosts are the only names that

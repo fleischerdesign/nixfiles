@@ -72,6 +72,9 @@
     in
     {
       enable = true;
+      # The operator reaches every instance in addition to its own account. Declared here rather than
+      # riding along in `adminUsers`, and checked against the seeded usernames like every audience.
+      operators = [ "philipp" ];
       instances = {
         philipp = {
           enable = true;
