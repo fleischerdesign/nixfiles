@@ -15,6 +15,7 @@ let
   # lattice's vocabulary, both coming from the modules that own them - so a policy here and the same
   # policy projected elsewhere cannot drift apart.
   nft = import ../../lib/nftables.nix { inherit lib; };
+  endpointLib = import ../../lib/endpoints.nix { inherit lib; };
   levels = config.my.topology.trustLevels;
 
   # Submodule for Endpoint Contract
@@ -134,7 +135,23 @@ let
       accessGroups = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
-        description = "Authentik groups whose members may use this endpoint.";
+        # `apply` is the desugaring, and it is one line on purpose: `accessUsers` is a spelling of an
+        # audience, not a second audience. The ingress binding, the directory filter and the portal all
+        # read `accessGroups`, so none of them can miss the derived groups - which is the failure a
+        # second field would have produced: an LDAP filter naming no group locks everyone out while the
+        # deploy stays green.
+        apply =
+          groups: groups ++ map (username: endpointLib.audienceGroup username) submod.config.accessUsers;
+        description = "Authentik groups whose members may use this endpoint, plus one group per declared `accessUsers`.";
+      };
+
+      # An audience named by people instead of by role. Each username becomes its own group
+      # (`lib/endpoints.nix` `audienceGroup`) and the compiler declares its membership, so this is the
+      # same mechanism as a role group - only with one member, and declared.
+      accessUsers = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Usernames that may use this endpoint, each through its own audience group.";
       };
 
       adminGroups = lib.mkOption {

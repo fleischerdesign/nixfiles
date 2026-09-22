@@ -17,7 +17,6 @@ let
   # The same rule as everywhere: the LAN address while both sides are at home, otherwise the overlay
   # address (lib/addresses.nix).
   addresses = import ../../../../lib/addresses.nix { inherit lib; };
-  endpointLib = import ../../../../lib/endpoints.nix { inherit lib; };
 
   # The public ingress (Caddy + Authentik forward-auth) is the only legitimate proxy in front
   # of a gateway, so its overlay address is the only non-loopback entry allowed in
@@ -1059,12 +1058,18 @@ in
                 protocol = "tcp";
                 scope = "public";
                 auth = if inst.auth then "authentik" else "none";
-                # Each instance is its own audience. Every member of a role that may use one gateway
-                # could otherwise open every other person's agent at the ingress - the app's own
-                # `adminUsers` repaired that one layer too deep (rejected with 403 after login instead
-                # of before it). The group is derived from the endpoint, so it names no person, and the
-                # compiler creates it; who is in it is a membership decision in the interface.
-                accessGroups = [ (endpointLib.audienceGroup inst._endpointName) ];
+                # Each instance is its own audience, named by the instance: the key (`kai`, `rieke`, ...)
+                # is the account, so its group holds exactly the person the gateway belongs to. Every
+                # member of a role that may use one gateway could otherwise open every other person's
+                # agent at the ingress - the app's own `adminUsers` repaired that one layer too deep
+                # (403 after login, not before it). The contract turns the username into its own group
+                # and the compiler declares the membership, so a deploy leaves no empty audience
+                # behind. Deliberately not derived from `adminUsers`: those are mail addresses, and at
+                # least three of them (`kugelblitz82@...`, `fleischerkatja74@...`, `lillytobei@...`)
+                # have nothing to do with the username. The audience assertion rejects exactly that
+                # join, which is why the operator's cross-instance access now needs a declaration of
+                # its own instead of riding along in an address list.
+                accessUsers = [ name ];
                 subdomain = inst.subdomain;
                 domain = inst.domain;
                 # Dynamically minted self-publishing hosts are the only names that

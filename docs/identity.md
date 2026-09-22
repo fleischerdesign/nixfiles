@@ -222,8 +222,10 @@ created`: a default for a new object, never enforced, never drift). The two neve
 - **Users** — name, address, password, avatar, and everything the person sets afterwards. People are not
   configuration. Existence is deliberately not in this list: the repository seeds the account, so it exists
   again after the next apply even if the interface deletes it (§11.5).
-- **Group membership** — who is in which group. Membership is the assignment of people to policy, and it is
-  the access decision: a service accepts a group, a human decides who is in it.
+- **Which roles a person has** — who is in which role group. That membership is the assignment of people to
+  policy, and it is the access decision: a service accepts a group, a human decides who is in it. An audience
+  the repository declares *about a resource* (`accessUsers`) is the other half and is not this — it says who a
+  resource belongs to, which is §11.2's test answered with yes, and it is declared (§11.3).
 - **Own credentials and devices** — app passwords, TOTP, WebAuthn, sessions. Nobody else can hold these; the
   bootstrap admin password exists here only as a hash.
 - **Invitations** — an invitation link is a document, not system state.
@@ -250,6 +252,15 @@ the old name stays behind and can still grant access.
 **Access runs only through membership.** There are no per-user application bindings, because that would be a
 second mechanism next to the group filter — and two mechanisms are two truths. A service declares which groups
 it accepts; a human is put into one of them.
+
+**An audience a resource declares about itself is topology, and it is declared.** `accessUsers` names the
+accounts a service belongs to. The contract turns each username into its own group (`lib/endpoints.nix`
+`audienceGroup`) and feeds it into `accessGroups`, so the ingress, the directory filter and the portal read one
+value; the compiler creates that group *with* the membership, so no deploy leaves an audience empty and nobody
+has to click before a new personal service works. It is still one mechanism — both halves are memberships — and
+the test that separates them is §11.2's: "this gateway belongs to kai" is a sentence a reviewer comments on,
+"katja is in the film group" is not. The role groups stay untouched and interface-owned, because nothing
+declares their members.
 
 **And it is enforced at the ingress, not only described.** Every endpoint that authenticates through authentik
 declares `accessGroups` at the endpoint; the compiler projects them into a `PolicyBinding` per group on the

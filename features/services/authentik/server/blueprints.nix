@@ -173,7 +173,17 @@ let
         id = "audience_${safeAudienceId groupName}";
         model = blueprintLib.models.group;
         identifiers.name = groupName;
-        attrs.attributes.description = "Own audience of ${name}; membership is an interface decision, as for every other group.";
+        attrs = {
+          attributes.description = "Own audience declared by ${name}. Its member is the account its name derives from.";
+          # The membership is declared here, which is what makes a deploy leave no empty group behind:
+          # an audience group that nobody is in binds its application shut for everyone, including the
+          # person it was created for.
+          users = [
+            (blueprintLib.refs.byField blueprintLib.models.user "username" (
+              lib.removePrefix endpointLib.audienceGroupPrefix groupName
+            ))
+          ];
+        };
       }
     ) (lib.filter endpointLib.isAudienceGroup ep.accessGroups);
 
@@ -211,9 +221,32 @@ let
   # misspelt role (the binding points at nothing, the service becomes unreachable for everyone, and the
   # deploy reports success), an own-audience name that belongs to no endpoint, and an admin group
   # outside the access group it administers - which the schema describes as a rule but never enforced.
+  # The usernames a derived audience may name, read from the same document that seeds the accounts: a
+  # group named after a person who does not exist binds an application shut for everyone.
+  rbacUsernames =
+    let
+      document = builtins.readFile ./blueprints/01-rbac/users-and-groups.yaml;
+      nameOfBlock =
+        block:
+        let
+          after = builtins.elemAt (lib.splitString "identifiers:" block) 1;
+          captures = builtins.filter (found: found != null) (
+            map (line: builtins.match "[[:space:]]+username: \"(.*)\"" line) (lib.splitString "\n" after)
+          );
+        in
+        if captures == [ ] then null else builtins.head (builtins.head captures);
+      names = builtins.filter (found: found != null) (
+        map nameOfBlock (lib.drop 1 (lib.splitString "- model: authentik_core.user" document))
+      );
+    in
+    if names == [ ] then
+      throw "Authentik compiler error: 01-rbac/users-and-groups.yaml yielded no usernames - the document's shape changed, and a derived audience would bind an application shut"
+    else
+      names;
+
   audiencePolicyCheck =
     let
-      endpointNames = map (item: item.name) allClusterEndpointsList;
+      audienceUsernames = rbacUsernames;
       audiences = lib.concatMap (
         item:
         map (groupName: {
@@ -234,7 +267,7 @@ let
           lib.filter (
             x:
             endpointLib.isAudienceGroup x.groupName
-            && !(builtins.elem (lib.removePrefix endpointLib.audienceGroupPrefix x.groupName) endpointNames)
+            && !(builtins.elem (lib.removePrefix endpointLib.audienceGroupPrefix x.groupName) audienceUsernames)
           ) audiences
         )
       );
@@ -249,7 +282,7 @@ let
     if undeclaredRole != [ ] then
       throw "Authentik compiler error: ${lib.concatStringsSep ", " undeclaredRole} names an audience group that neither the RBAC document declares nor this compiler derives from an endpoint"
     else if ownerlessAudience != [ ] then
-      throw "Authentik compiler error: ${lib.concatStringsSep ", " ownerlessAudience} derives an own audience from an endpoint name that does not exist"
+      throw "Authentik compiler error: ${lib.concatStringsSep ", " ownerlessAudience} derives an own audience from a username the RBAC document does not seed"
     else if adminOutsideAccess != [ ] then
       throw "Authentik compiler error: ${lib.concatStringsSep ", " adminOutsideAccess} names an admin group that is not in its own accessGroups"
     else
@@ -303,6 +336,10 @@ let
   providerFlowDependencies = [
     (metaApply "default/flow-default-provider-authorization-implicit-consent.yaml")
     (metaApply "default/flow-default-provider-invalidation.yaml")
+    # The accounts the derived audience groups name are seeded by that document. Declaring the
+    # dependency makes the resolution order explicit instead of hoping for discovery order - and it
+    # covers the role-group lookups in these blueprints, which relied on it all along.
+    (metaApply "01-rbac/users-and-groups.yaml")
   ];
 
   # The 2026-09-20 authorization-flow experiment left two user-scoped policy bindings on the shared
