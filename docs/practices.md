@@ -427,4 +427,24 @@ the shape grows. What stays written by hand are the directional facts no entry c
 consumer has to hold, a token that must not expire. The rule is: **a comparison the database can answer is
 derived from the declaration; a statement only a person can make is declared for what it is.**
 
+### 6.14 A declaration and an initialization are different things, and mixing them makes the drift report lie
+
+`state: present` overwrites the fields in `attrs` at every apply. `state: created` writes them once, when the
+object is created, and never again. The first is a fact the repository owns and enforces; the second is a
+default for a new object, and the interface owns the field from the moment the object exists. Both are
+legitimate. The mistake is to use one while describing the other.
+
+The person entries said "seeded" in a comment and carried no `state`, so they defaulted to `present`: an
+e-mail address changed in the interface was reverted at the next apply, and the drift report named it only as
+a journal line nobody paged on. The state was then added - and the same drift report would have reported
+`RESET` forever, because it compared `attrs` for every state except `absent`. A permanent false positive is
+worse than none: it is always wrong, so it can never disagree with anything, and the real finding hides
+inside it.
+
+The lesson is that ownership has to be readable from the representation, not from a comment. `created` now
+means *initialized*, every other state means *declared*; the drift report compares fields only for
+`state: present`; and `features/services/authentik/lib/blueprints-check.py` fails the build when a person is
+declared or a topology object is seeded. A rule a comment states and the code does not read is not a rule -
+and each of these two failures was exactly that.
+
 

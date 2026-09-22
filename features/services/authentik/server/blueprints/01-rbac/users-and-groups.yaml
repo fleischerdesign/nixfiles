@@ -34,12 +34,18 @@ entries:
 
   # Users: Philipp (Admin), Katja, Lilly, Kai, Rieke.
   #
-  # The object is seeded; the membership is not. `groups` is deliberately absent: who is in which
-  # group is the access decision and belongs to the interface (docs/identity.md §11.1). Declaring it
-  # here would overwrite a human's change at the next apply, and access runs only through membership
-  # (no per-user application bindings either).
+  # `state: created` makes these seeds, not declarations: the object is created when it is missing and
+  # its fields are never written again. That is the boundary of docs/identity.md §11 - the repository
+  # seeds existence, and the person owns the name, the address and the credential from the moment the
+  # account exists. Without the state the entry defaults to `present`, and every apply resets a name or
+  # an address changed in the interface (practices.md §6.14).
+  #
+  # Membership is not declared at all: `groups` is deliberately absent, because who is in which group is
+  # the access decision and belongs to the interface (docs/identity.md §11.1). Access runs only through
+  # membership (no per-user application bindings either).
   - model: authentik_core.user
     id: user_philipp
+    state: created
     identifiers:
       username: "philipp"
     attrs:
@@ -48,6 +54,7 @@ entries:
 
   - model: authentik_core.user
     id: user_katja
+    state: created
     identifiers:
       username: "katja"
     attrs:
@@ -56,6 +63,7 @@ entries:
 
   - model: authentik_core.user
     id: user_lilly
+    state: created
     identifiers:
       username: "lilly"
     attrs:
@@ -64,6 +72,7 @@ entries:
 
   - model: authentik_core.user
     id: user_kai
+    state: created
     identifiers:
       username: "kai"
     attrs:
@@ -72,6 +81,7 @@ entries:
 
   - model: authentik_core.user
     id: user_rieke
+    state: created
     identifiers:
       username: "rieke"
     attrs:

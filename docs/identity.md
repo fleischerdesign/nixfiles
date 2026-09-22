@@ -20,7 +20,7 @@ everything else.
 
 ```
 features/services/authentik/
-├── server/blueprints/            hand-written, applied in name order
+├── server/blueprints/            hand-written; order across files is declared, never assumed
 │   ├── 00-system/brand.yaml      title, design tokens, favicon
 │   ├── 01-rbac/users-and-groups.yaml
 │   └── 02-flows/                 enrollment, recovery, remember-me, passkey autofill
@@ -63,11 +63,18 @@ and the consuming service reads the same secret. Neither side needs a human.
 
 ### 4.2 People - the shell is declarative, the credential is not
 
-Username, display name and e-mail are **seeded once**: the entry carries `state: created`, so the object
-exists after the first apply and everything about it afterwards belongs to the person and to whoever
-administers identities in the interface. **Group membership is not declared at all** - it is the assignment
-of people to policy and therefore people data, not configuration; see section 11 for the whole boundary. The **passkey cannot be**: FIDO2 is
-bound to a secure element and created through an interactive challenge-response ceremony in the
+Username, display name and e-mail are **initialized, not declared**: the entry carries `state: created`, so
+the value is written when the account is first created and never again. The account therefore exists after
+the first apply, and everything about it afterwards - name, address, credential, avatar - belongs to the
+person and to whoever administers identities in the interface. This is an initialization, not a hand-off
+of a fact: the repository makes a statement about the default for a new object, never about the object's
+current value (§11.4). A `state: created` entry is the only initialization this repository uses;
+`features/services/authentik/lib/blueprints-check.py` fails a build that seeds a topology object or
+declares a person.
+
+**Group membership is not declared at all** - it is the assignment of people to policy and therefore people
+data, not configuration; see section 11 for the whole boundary. The **passkey cannot be declared**: FIDO2
+is bound to a secure element and created through an interactive challenge-response ceremony in the
 browser. A person therefore exists immediately with every right they will have, and registers their
 passkey at first login through the standard WebAuthn flow.
 
@@ -202,9 +209,19 @@ Two authorities write into the same object store. The rule that keeps them apart
 A fact has exactly one owner. It is never shared, and it never changes hands between the two: "first the
 repository, then the interface" is how a declaration turns into a statement that is no longer true.
 
+**Initialization is not a hand-off.** A seed (`state: created`) writes an initial value once, when the
+object is created, and the interface owns the field from that moment - so the repository never makes a
+claim about the object's current value and no declaration goes stale. That is the distinction the rest of
+this section rests on: an entry is either **declared** (`state: present` or `absent`: the repository owns
+the field, the apply enforces it, the drift report names a divergence) or **initialized** (`state:
+created`: a default for a new object, never enforced, never drift). The two never mix on one entry, and
+`features/services/authentik/lib/blueprints-check.py` enforces exactly that.
+
 ### 11.1 The interface may change
 
-- **Users** — existence, name, address, password, avatar. People are not configuration.
+- **Users** — name, address, password, avatar, and everything the person sets afterwards. People are not
+  configuration. Existence is deliberately not in this list: the repository seeds the account, so it exists
+  again after the next apply even if the interface deletes it (§11.5).
 - **Group membership** — who is in which group. Membership is the assignment of people to policy, and it is
   the access decision: a service accepts a group, a human decides who is in it.
 - **Own credentials and devices** — app passwords, TOTP, WebAuthn, sessions. Nobody else can hold these; the
@@ -234,15 +251,16 @@ the old name stays behind and can still grant access.
 second mechanism next to the group filter — and two mechanisms are two truths. A service declares which groups
 it accepts; a human is put into one of them.
 
-### 11.4 Three kinds of fact, and what each one does
+### 11.4 The kinds of fact, and what each one does
 
 | Kind | Owner | Behaviour |
 |---|---|---|
 | declared, with a declared value | repository | a change in the interface is overwritten at the next apply — and the drift report says so **before** that happens |
+| initialized, with a seeded value | repository writes it once | a default for a new object; never enforced, never drift, and the interface owns the field afterwards |
 | not declared | interface | it is never touched; it is reported as foreign, which is normal |
 | declared, but the database value came from elsewhere | **defect** | the declaration is incomplete; a fresh install or a restore produces a different world and nothing notices - §11.6 is the inventory that closes it |
 
-That third row is the only dangerous one, and it is not the interface's fault: it means we depend on a fact we
+That last row is the only dangerous one, and it is not the interface's fault: it means we depend on a fact we
 do not name. `token.managed`, `token.expiring` and `LDAPProvider.mfa_support` were three of them and are
 closed - each is now declared with the value the serializer actually accepts (`practices.md` §6.11, §11.6
 below). What remains in
@@ -279,7 +297,7 @@ no row of this table.
 ### 11.6 Facts we rely on but do not set
 
 The rule from §11.4: a fact we depend on is either declared, or documented with the reason it cannot be.
-This is the inventory that closes the third row. Every row here has been measured, not guessed.
+This is the inventory that closes that last row. Every row here has been measured, not guessed.
 
 | Fact | Where it comes from | Resolution |
 |---|---|---|
@@ -295,6 +313,10 @@ This is the inventory that closes the third row. Every row here has been measure
   plus the event arm of the drift report are the only countermeasures.
 - **Objects created in the interface that nobody declares are not reclaimed.** They are reported as foreign,
   which is the intended behaviour, not a gap.
+- **A seed is not a migration.** An account that already exists is never updated, and a value seeded with a
+  typo can never be corrected by the repository - the same property a SQL column `DEFAULT` has for rows that
+  already exist. Changing an existing person's fields is an interface action, by design; a new seeded value
+  reaches only accounts that are created afterwards.
 - **A new consumer's SOPS secret is added by hand.** The endpoint contract derives the path; if the key is
   missing, `sops-install-secrets` fails the deploy loudly rather than starting with an empty credential.
 - **The derived relation inventory covers the relations that are their own rows** - policy bindings and

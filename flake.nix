@@ -125,6 +125,13 @@
       gatewayHosts = nixpkgs-unstable.lib.filter (
         name: self.nixosConfigurations.${name}.config.services.openclaw-gateway.enable
       ) hostNames;
+
+      # Every host that runs the authentik server ships a compiled blueprint directory. The check below
+      # proves those bytes before a deploy, so a bad model name, a cross-file reference or a person who
+      # is declared instead of seeded fails here instead of on the identity provider.
+      blueprintHosts = nixpkgs-unstable.lib.filter (
+        name: self.nixosConfigurations.${name}.config.my.features.services.authentik.server.enable or false
+      ) hostNames;
     in
     {
       formatter.${system} = pkgs.nixfmt;
@@ -283,6 +290,39 @@
                 exit 1
               ''
           );
+
+        # The identity provider's blueprints only fail on the host: a model name without a dot, a
+        # `!KeyOf` that points nowhere, a dependency on a blueprint that is not there, or a person who
+        # is declared instead of seeded. The apply there proves the same files, but a deploy is too late
+        # for a typo. This reads the exact compiled directory the server ships, so the check and the
+        # apply consume identical bytes. The rules are documented in docs/identity.md §11 and enforced
+        # by features/services/authentik/lib/blueprints-check.py.
+        authentik-blueprints =
+          let
+            blueprintLib = import ./features/services/authentik/lib/blueprint.nix {
+              lib = nixpkgs-unstable.lib;
+            };
+            directories = map (
+              name: self.nixosConfigurations.${name}.config.my.features.services.authentik.server.blueprintsDir
+            ) blueprintHosts;
+            ownerLabel = "${blueprintLib.ownerLabelName}=${blueprintLib.ownerLabelValue}";
+          in
+          pkgs.runCommandLocal "authentik-blueprints-check"
+            {
+              nativeBuildInputs = [
+                (pkgs.python3.withPackages (pythonPackages: [ pythonPackages.pyyaml ]))
+              ];
+            }
+            ''
+              python3 ${./features/services/authentik/lib/blueprints-check.py} \
+                --owner-label ${nixpkgs-unstable.lib.escapeShellArg ownerLabel} \
+                ${
+                  nixpkgs-unstable.lib.concatStringsSep " " (
+                    map (directory: nixpkgs-unstable.lib.escapeShellArg "${directory}") directories
+                  )
+                } \
+                > $out
+            '';
       }
       // nixpkgs-unstable.lib.genAttrs' gatewayHosts (name: {
         name = "openclaw-config-validity-${name}";

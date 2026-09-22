@@ -22,6 +22,11 @@ let
   # finished when the objects exist, not when a file was written.
   blueprintsApplyTimeoutSeconds = 900;
 
+  # Where the drift report publishes its finding count for the node-exporter textfile collector. The
+  # directory is authentik's, so the writer creates it; the monitoring feature points its collector at the
+  # same path, and the coupling is the file rather than an import (docs/identity.md §11.6).
+  metricsTextfileDir = "/var/lib/authentik-metrics";
+
   # Blueprint data: discovery, checks, the four documents and the directory they assemble into. It lives
   # in its own module because it has its own owner - authentik's object model and the fleet contracts.
   blueprints = import ./blueprints.nix {
@@ -189,9 +194,14 @@ let
   # Drift report: report only, never correct. The apply only runs when the deployment changed, so a
   # change made in the interface is invisible until the next deploy - exactly the window in which the
   # ownership rule needs a voice. It compares the declared scalar fields against the objects and lists
-  # the recent interface events, and it writes nothing.
+  # the recent interface events, and it changes nothing in authentik: the only file it writes is the
+  # finding count for the monitoring stack. Only `state: present` entries declare a field the repository
+  # owns; a seed (`state: created`) supplies an initial value the interface owns afterwards, so a
+  # difference there is not drift and reporting it would be a false alarm that never clears
+  # (docs/identity.md §11, practices.md §6.14).
   driftReportScript = pkgs.writeText "authentik-drift-report.py" ''
     import sys
+    import time
     from pathlib import Path
 
     from django.apps import apps
@@ -234,6 +244,11 @@ let
             if state == BlueprintEntryDesiredState.ABSENT:
                 findings.append(f"STALE {model_name} {identifiers}: tombstoned but still present")
                 continue
+            # Only `present` declares a field the repository owns and the apply overwrites. A `created`
+            # entry is a seed: its value was written once, when the object was created, and the interface
+            # owns it from then on. A `must_created` entry cannot reach this line for an existing object.
+            if state != BlueprintEntryDesiredState.PRESENT:
+                continue
             for field, declared in (entry.attrs or {}).items():
                 if not scalar(declared):
                     continue
@@ -246,6 +261,31 @@ let
 
     # The same derived relation inventory the apply enforces, reported instead of corrected.
     findings.extend(relation_diffs(paths))
+
+    def publish_metric(count):
+        """Publish the finding count for the node-exporter textfile collector.
+
+        A report nobody can query is a report nobody reads - which is how a person's e-mail address was
+        reverted for weeks while the finding sat in a journal. This is the only thing the report writes, it
+        corrects nothing, and a failure to write it must never change the report's exit code.
+        """
+        try:
+            body = (
+                "# HELP authentik_blueprint_drift_findings Differences between the declared blueprints and the database\n"
+                "# TYPE authentik_blueprint_drift_findings gauge\n"
+                f"authentik_blueprint_drift_findings {count}\n"
+                "# HELP authentik_blueprint_drift_last_run_timestamp_seconds Unix time of the last drift report\n"
+                "# TYPE authentik_blueprint_drift_last_run_timestamp_seconds gauge\n"
+                f"authentik_blueprint_drift_last_run_timestamp_seconds {int(time.time())}\n"
+            )
+            target = Path("${metricsTextfileDir}") / "authentik-blueprint-drift.prom"
+            temporary = target.with_name(target.name + ".tmp")
+            temporary.write_text(body, encoding="utf-8")
+            temporary.replace(target)
+        except OSError as error:
+            print(f"metric publish failed (ignored): {error}", file=sys.stderr)
+
+    publish_metric(len(findings))
 
     print(f"drift report: {len(findings)} finding(s)")
     for finding in findings:
@@ -508,6 +548,10 @@ in
     # only honoured on user creation, so ensure it declaratively on every activation.
     systemd.tmpfiles.rules = [
       "d /var/lib/authentik 0700 authentik authentik -"
+      # The drift report publishes its finding count here for the node-exporter textfile collector. The
+      # directory is world-readable and world-traversable on purpose: the collector runs as its own user
+      # and has to reach the file, while authentik's own home stays 0700.
+      "d ${metricsTextfileDir} 0755 authentik authentik -"
     ];
 
     # 2. Authentik Server Service

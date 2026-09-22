@@ -415,28 +415,6 @@ let
       inherit permissions;
     };
 
-  # Policy bindings take exactly one of policy, group or user, and the target plus order identify the row.
-  policyBinding =
-    {
-      target,
-      order,
-      policy ? null,
-      group ? null,
-      user ? null,
-      enabled ? null,
-    }:
-    entry {
-      model = models.policyBinding;
-      identifiers = {
-        inherit order target;
-      };
-      attrs =
-        lib.optionalAttrs (enabled != null) { inherit enabled; }
-        // lib.optionalAttrs (policy != null) { inherit policy; }
-        // lib.optionalAttrs (group != null) { inherit group; }
-        // lib.optionalAttrs (user != null) { inherit user; };
-    };
-
   blueprint =
     {
       name,
@@ -474,7 +452,6 @@ in
     oauth2Provider
     ldapProvider
     outpost
-    policyBinding
     blueprint
     ;
 }
