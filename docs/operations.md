@@ -156,6 +156,17 @@ off (measured 2026-09-21: it had). Verify it on the device, not in the config: a
 `127.0.0.1` (`00000.uno`) where a public resolver answers a real address, `cld-edge-01` must show the
 client on port 853, and the VPN network must carry a DNS address instead of an empty list.
 
+One more thing belongs to the device, and the profile can carry it: an Android client is bound to its VPN
+network, and a split tunnel has routes and no default route, so Android gives that network no `INTERNET`
+capability - and an app that requires the capability does not use such a network. Google's push transport
+is one of those apps, which is why notifications stopped being rebuilt while the tunnel was up and were
+delivered in a burst as soon as it was switched off (measured 2026-09-22, and the same exclusion was
+needed on Tailscale in this household). The answer is a declaration on the host entry in the inventory,
+`excludedApplications = [ "com.google.android.gms" "com.google.android.gsf" ]`, which renders as
+`ExcludedApplications = …` in `[Interface]`. The key exists only in the Android implementation of the
+client - verified in `com.wireguard.config.Interface` - so an iOS client must not set it; it is a
+per-device declaration and not a fleet default.
+
 The peers, addresses, DNS and routes in that file are derived, not typed: the same `relayPeersFor`
 function builds the NixOS spokes' peers. Revocation is the inverse, plus the key rotation in
 [security.md §3.2](security.md).

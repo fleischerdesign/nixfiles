@@ -402,7 +402,7 @@ in
                         MTU = 1280
             ${lib.optionalString (
               excludedApplications != [ ]
-            ) "ExcludedApplications = ${lib.concatStringsSep ", " excludedApplications}\n"}
+            ) "            ExcludedApplications = ${lib.concatStringsSep ", " excludedApplications}\n"}
 
                         ${peers}'';
         }
