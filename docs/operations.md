@@ -142,15 +142,19 @@ sudo qrencode -t ansiutf8 -r /run/secrets/rendered/wg-<name>.conf
 Use `-r`, not a shell redirect: the file is root-only, and `< file` would be opened by the operator's
 shell before `qrencode` runs.
 
-The profile deliberately carries **no `DNS =` line**: a mesh door would answer a client at home with
-overlay addresses, so every home service would leave through a hub and come back. A roaming device
-gets its resolver from a setting of its own instead - **Android: Settings → Network → Private DNS →
+The profile carries the resolvers of the mesh as **`DNS =`**, and it needs them: measured 2026-09-22,
+a phone whose VPN network had no DNS server could not resolve the name it was told to use for private
+DNS, so the network was reported `PrivateDnsBroken` and without `INTERNET` while the underlying network
+was fine - the phone's push connections stopped being rebuilt on the network it was actually using, and
+notifications only arrived when the tunnel was switched off. The line is the *bootstrap*; the resolver
+the device actually uses is still a setting of its own - **Android: Settings → Network → Private DNS →
 hostname `dns.vyrx.de`** (iOS needs a configuration profile, `wg-quick` on Linux takes `DNS =` per
-interface). It is a precondition, not an automatism: one setting per device, invisible if it silently
-turns off (measured 2026-09-21: it had), and the only mechanism that gives a roaming client our
-resolver on *any* network. Verify it on the device, not in the config: a blocked name must answer
-`127.0.0.1` (`00000.uno`) where a public resolver answers a real address, and `cld-edge-01` must show
-the client on port 853.
+interface). Both are needed and neither replaces the other: private DNS is global and covers the networks
+the tunnel is not up on, including a foreign WLAN where the setting is the only reason the device still
+asks us. It is a precondition, not an automatism: one setting per device, invisible if it silently turns
+off (measured 2026-09-21: it had). Verify it on the device, not in the config: a blocked name must answer
+`127.0.0.1` (`00000.uno`) where a public resolver answers a real address, `cld-edge-01` must show the
+client on port 853, and the VPN network must carry a DNS address instead of an empty list.
 
 The peers, addresses, DNS and routes in that file are derived, not typed: the same `relayPeersFor`
 function builds the NixOS spokes' peers. Revocation is the inverse, plus the key rotation in

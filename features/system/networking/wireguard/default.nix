@@ -359,6 +359,24 @@ in
           # so the client must route them there.
           ingressAddress = (topology.hosts.${topology.ingressHost} or { }).ipv4 or null;
           clientRoutes = lib.optional (ingressAddress != null) "${ingressAddress}/32" ++ announcedCidrs;
+
+          # The resolvers a rendered client uses *inside* the tunnel, and they are the overlay addresses
+          # of the hosts the inventory declares as resolvers - the same doors the fleet's own hosts are
+          # given, so there is one list of resolvers and not two.
+          #
+          # Measured without this line: the client's VPN network carries no DNS server at all
+          # (`DnsAddresses: [ ]`), so Android cannot even resolve the name it was told to use for private
+          # DNS - the network ends up `PrivateDnsBroken`, without `INTERNET` and without validation, while
+          # the underlying network is fine, and notifications stop being rebuilt on the network the phone
+          # is actually using.
+          #
+          # It does not replace private DNS: that setting is global and covers every network, including
+          # the ones the tunnel is not up on; this line is what lets it work on the VPN network at all.
+          # IPv4 only - the mesh is IPv4-primary, and whether the resolvers' overlay v6 listeners answer
+          # is not something this file can verify.
+          clientDns = map (resolver: topology.hosts.${resolver}.wireguardIpv4) (
+            lib.filter (resolver: topology.hosts.${resolver}.wireguardIpv4 != null) topology.resolverHosts
+          );
           peers = lib.concatMapStrings (peer: ''
             [Peer]
             PublicKey = ${peer.publicKey}
@@ -373,6 +391,7 @@ in
             [Interface]
             PrivateKey = ${config.sops.placeholder."infra/wireguard/${name}_private_key"}
             Address = ${lib.concatStringsSep ", " addresses}
+            DNS = ${lib.concatStringsSep ", " clientDns}
             MTU = 1280
 
             ${peers}'';

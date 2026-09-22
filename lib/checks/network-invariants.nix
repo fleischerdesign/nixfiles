@@ -229,6 +229,10 @@ let
             lib.splitString "\n" (cfgOf name).sops.templates."wg-${client}.conf".content
           )
         );
+      contentOf = client: (cfgOf name).sops.templates."wg-${client}.conf".content;
+      declaredResolvers = map (resolver: topology.hosts.${resolver}.wireguardIpv4) (
+        lib.filter (resolver: topology.hosts.${resolver}.wireguardIpv4 != null) topology.resolverHosts
+      );
     in
     lib.concatMap (
       client:
@@ -239,6 +243,15 @@ let
         cidr:
         "client ${client} (rendered on ${name}) does not route the carried zone ${cidr}, so a device in it is unreachable outside the LAN"
       ) (lib.filter (cidr: !(lib.hasInfix cidr line)) carriedCidrs)
+      ++
+        lib.optional (!(lib.hasInfix "DNS =" (contentOf client)))
+          "client ${client} (rendered on ${name}) carries no resolver, so its VPN network cannot resolve the name it is told to use for private DNS"
+      ++ lib.concatMap (
+        address:
+        lib.optional (
+          !(lib.hasInfix address (contentOf client))
+        ) "client ${client} (rendered on ${name}) does not carry the declared resolver ${address}"
+      ) declaredResolvers
       ++ lib.optional (
         !(lib.hasInfix meshCidr line)
       ) "client ${client} (rendered on ${name}) does not route the mesh"
@@ -303,7 +316,7 @@ in
     "the resolver doors follow the host class, derived from the zone"
     "every declared resolver runs one, and can be reached where it is announced"
     "every resolver handed to clients belongs to a host of this fleet"
-    "a rendered client routes the mesh, the ingress and the carried zones, and no host zone"
+    "a rendered client carries the resolvers, routes the mesh, the ingress and the carried zones, and no host zone"
     "a device name is answered off the LAN exactly when its zone is carried"
     "every device declaration names a carried device and a trust level that exists"
   ];
