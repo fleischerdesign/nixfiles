@@ -90,6 +90,14 @@ in
               IP=${pkgs.iproute2}/bin/ip
               RESOLVECTL=${pkgs.systemd}/bin/resolvectl
 
+              # NetworkManager calls a dispatcher script as `<script> <interface> <action>`; the activation
+              # service calls the same script with ACTION and DEVICE in the environment. Reading only the
+              # environment was a real failure: after a reboot the service ran before the WLAN had an
+              # address, and every later dispatcher call did nothing at all - measured: no state file, no
+              # domain on the link, and every internal name answered from the mesh plane.
+              ACTION="''${2:-''${ACTION:-}}"
+              DEVICE="''${1:-''${DEVICE:-}}"
+
               HOME_DOOR=${homeDoor}
               INTERNAL_DOMAIN=${topology.domain}
               LAN_ZONES="${lanZoneArgs}"

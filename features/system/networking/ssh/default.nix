@@ -33,6 +33,18 @@ in
 {
   options.my.features.system.networking.ssh = {
     enable = lib.mkEnableOption "SSH server, bound to the LAN and the mesh overlay only";
+
+    # The administrative path is `infra` and `corp`, and it deliberately excludes the mesh: a
+    # compromised public relay should not reach into a host. One host needs an exception, and an
+    # exception written down is worth more than a rule widened for everyone: `cld-ops-01` runs the
+    # OpenClaw nodes, and the gateway instances on its sibling reach them through an SSH tunnel. So
+    # that sibling - a member of the `mesh` zone - has to be admitted *there* and nowhere else.
+    admits = lib.mkOption {
+      type = lib.types.listOf (lib.types.enum config.my.topology.trustLevels);
+      default = [ ];
+      description = "Trust levels beyond `infra` and `corp` that this host admits on the SSH endpoint";
+    };
+
     deployKeys = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
@@ -72,7 +84,8 @@ in
           from = [
             "infra"
             "corp"
-          ];
+          ]
+          ++ cfg.admits;
         };
       };
     };

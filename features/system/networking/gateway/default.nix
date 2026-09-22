@@ -241,16 +241,20 @@ in
       }
     ) cfg.routedZones;
 
-    # 2c. Transit for the routed zones. Without this the kernel drops the packets in FORWARD even
-    # though ip_forward and the NAT rule are in place. Zones the trust model marks untrusted
-    # (iot, guest) stay excluded, which is the point of having them.
+    # 2c. Transit for the routed zones, and only toward the uplink: the rule names the external interface,
+    # so it says "this zone may reach the internet" instead of "this zone may go anywhere" - the latter
+    # would walk straight past the device policy that guards the carried zones. The forward chain's own
+    # policy is `drop` (`networking.firewall.filterForward`), so the untrusted zones (iot, guest) need no
+    # exclusion here: they are simply not listed, and that is the whole of the rule.
     networking.firewall.extraForwardRules = lib.concatMapStrings (
       zone:
       let
         subnet = topology.subnets.${zone};
         trusted = subnet.trustLevel != "iot" && subnet.trustLevel != "guest";
       in
-      lib.optionalString (trusted && subnet.gateway != null) "ip saddr ${subnet.cidr} accept\n"
+      lib.optionalString (trusted && subnet.gateway != null) ''
+        oifname "${cfg.interface}" ip saddr ${subnet.cidr} accept
+      ''
     ) cfg.routedZones;
 
     networking.firewall = {

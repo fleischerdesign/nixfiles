@@ -14,7 +14,7 @@ let
   cfg = config.my.features.system.networking.wireguard;
   topology = config.my.topology;
   ownHostname = config.networking.hostName;
-  firewall = import ../../../../lib/firewall.nix { inherit lib pkgs; };
+  nft = import ../../../../lib/nftables.nix { inherit lib; };
   ownHost = topology.hosts.${ownHostname} or null;
 
   isRelay = ownHost != null && (ownHost.wireguardRelay or false);
@@ -65,6 +65,14 @@ let
   # Only IPv4 sources are used. A device has one address and it is an IPv4 one, so a v6 rule could only
   # ever match nothing - and a rule that matches nothing is the failure mode this whole projection
   # exists to make visible.
+  # The rules are nftables matches, not commands. The firewall renders them into its own forward chain,
+  # whose policy is `drop`, so a declaration is the only thing that opens a path and a declaration that
+  # disappears takes its rule with it. The previous shape wrote `iptables` commands into `extraCommands`,
+  # which cost twice: a syntax error stopped the firewall mid-reload (and with it the NAT of a whole
+  # zone), and a rule whose declaration was withdrawn stayed in the chain forever.
+  #
+  # A device has one address and it is an IPv4 one, so the sources are filtered to that family: a v6
+  # address in the set would make the rule match nothing while looking like it does something.
   devicePolicy = lib.concatLists (
     lib.mapAttrsToList (
       deviceName: device:
@@ -72,10 +80,8 @@ let
         lib.mapAttrsToList (
           endpointName: endpoint:
           let
-            sources = lib.unique (
-              lib.filter (address: !(lib.hasInfix ":" address)) (
-                lib.concatMap (level: topology.sourcesByTrust.${level} or [ ]) endpoint.from
-              )
+            sources = lib.filter (address: !(lib.hasInfix ":" address)) (
+              nft.sourcesOfTrust topology endpoint.from
             );
             protocols =
               if endpoint.protocol == "both" then
@@ -86,41 +92,28 @@ let
               else
                 [ endpoint.protocol ];
           in
-          lib.flatten (
-            map (
-              proto:
-              map (
-                source:
-                firewall.guardedInsert {
-                  binary = "iptables";
-                  chain = "FORWARD";
-                  match = "-s ${source} -d ${device.ipv4} -p ${proto} --dport ${toString endpoint.port} -m comment --comment device-policy-${deviceName}-${endpointName} -j ACCEPT";
-                }
-              ) sources
-            ) protocols
-          )
+          map (
+            proto:
+            nft.rule [
+              ''iifname "${cfg.interfaceName}"''
+              "ip saddr ${nft.addressSet sources}"
+              "ip daddr ${device.ipv4}"
+              "${proto} dport ${toString endpoint.port}"
+              "accept"
+              ''comment "device-policy-${deviceName}-${endpointName}"''
+            ]
+          ) protocols
         ) device.endpoints
       )
     ) (lib.filterAttrs (_: device: builtins.elem device.zone topology.announcedZones) topology.devices)
   );
 
-  # And the zones stay closed for everything nobody declared. Without this the policy is an allow-list in
-  # front of a chain whose policy is ACCEPT - measured: with only the allow rules in place, the relays'
-  # 6053 and the printer's web interface stayed reachable from the hub, because nothing ever denied them.
-  # The deny is *appended*, so every declared allow (inserted at the head) wins, and it sits behind the
-  # firewall's own established/related accept, so it only ever affects new connections.
-  #
-  # One rule per carried zone and not per device: the zones are IPv4 today, and a zone is a prefix, so
-  # the deny says "nothing here unless it was accepted" without listing what is there.
-  deviceDefaultDeny = map (
-    zone:
-    firewall.guardedInsert {
-      binary = "iptables";
-      chain = "FORWARD";
-      position = "tail";
-      match = "-d ${topology.subnets.${zone}.cidr} -m comment --comment device-policy-default -j DROP";
-    }
-  ) topology.announcedZones;
+  # There is deliberately no deny rule for the carried zones. Under the nftables implementation the
+  # forward chain's own policy is `drop` (`networking.firewall.filterForward`), so everything nobody
+  # declared above is closed by construction. The previous implementation needed an explicit deny because
+  # the iptables forward chain accepted by default - measured: without it the relays' 6053 and the
+  # printer's web interface stayed reachable from the hub, and with the explicit deny the *withdrawal* of
+  # a rule never happened at all.
 
   meshCidr = topology.subnets.mesh.cidr or "10.10.100.0/24";
 
@@ -312,26 +305,31 @@ in
       peers = peersConfig;
     };
 
-    # 4. MSS Clamping and relay packet forwarding via iptables / ip6tables (docs/architecture.md 5.1)
-    networking.firewall.extraCommands = ''
-      # TCP-MSS-Clamping for WireGuard interface (IPv4 & IPv6)
-      ${pkgs.iptables}/bin/iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -o ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true
-      ${pkgs.iptables}/bin/iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -i ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true
-      ${pkgs.iptables}/bin/ip6tables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -o ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true
-      ${pkgs.iptables}/bin/ip6tables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -i ${cfg.interfaceName} -j TCPMSS --clamp-mss-to-pmtu || true
-    ''
-    + lib.optionalString isRelay ''
-      # Relay interface forwarding for inter-peer mesh transit
-      ${pkgs.iptables}/bin/iptables -A FORWARD -i ${cfg.interfaceName} -o ${cfg.interfaceName} -j ACCEPT || true
-      ${pkgs.iptables}/bin/ip6tables -A FORWARD -i ${cfg.interfaceName} -o ${cfg.interfaceName} -j ACCEPT || true
-    ''
-    + lib.optionalString (isLanRouter && topology.announcedZones != [ ]) ''
-      # The device policy: the carried zones' devices, exactly what they declare and who may ask.
-      ${lib.concatStringsSep "\n" devicePolicy}
+    # 4. MSS clamping, relay transit and the device policy - all of it declarative.
+    #
+    # Clamping modifies packets, so it belongs in a chain at the mangle priority rather than in the filter
+    # chain, and it is scoped to the tunnel because that is where a smaller MTU has to survive an uplink
+    # that never reports one. It lives in its own table instead of `networking.nftables.ruleset`: a
+    # non-empty `ruleset` makes the nftables service flush everything before loading it, which would take
+    # the firewall's own chains with it, while a table is deleted and recreated on every update.
+    networking.nftables.tables.wireguard-mss = {
+      family = "inet";
+      content = ''
+        chain clamp {
+          type filter hook forward priority mangle; policy accept;
+          iifname "${cfg.interfaceName}" tcp flags syn tcp option maxseg size set rt mtu
+          oifname "${cfg.interfaceName}" tcp flags syn tcp option maxseg size set rt mtu
+        }
+      '';
+    };
 
-      # … and closed for everything nobody declared.
-      ${lib.concatStringsSep "\n" deviceDefaultDeny}
-    '';
+    # Transit between mesh peers, and what the carried zones' devices declare. Nothing else passes the
+    # forward path: its policy is `drop` (`networking.firewall.filterForward`), so this list *is* the
+    # forwarding policy instead of an allow-list in front of an accept.
+    networking.firewall.extraForwardRules = lib.concatStringsSep "\n" (
+      lib.optional isRelay ''iifname "${cfg.interfaceName}" oifname "${cfg.interfaceName}" accept''
+      ++ lib.optionals (isLanRouter && topology.announcedZones != [ ]) devicePolicy
+    );
 
     # 5. Secrets: this host's own WireGuard key and the private key of every client it renders, both
     # under the same convention `infra/wireguard/<name>_private_key`.

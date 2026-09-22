@@ -5,17 +5,16 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 
 let
   cfg = config.my.contracts;
 
-  # Two things are shared rather than repeated: the firewall's one insertion pattern (head of the chain,
-  # guarded against duplication), and the lattice's vocabulary - both come from the modules that own
-  # them, so a policy here and the same policy on another chain cannot drift apart.
-  firewall = import ../../lib/firewall.nix { inherit lib pkgs; };
+  # Two things are shared rather than repeated: how a rule is spelled (`lib/nftables.nix`) and the
+  # lattice's vocabulary, both coming from the modules that own them - so a policy here and the same
+  # policy projected elsewhere cannot drift apart.
+  nft = import ../../lib/nftables.nix { inherit lib; };
   levels = config.my.topology.trustLevels;
 
   # Submodule for Endpoint Contract
@@ -450,100 +449,82 @@ let
     lib.mapAttrsToList (_svcName: contract: lib.attrValues contract.endpoints) cfg.provides
   );
 
-  directEndpoints = lib.filter (ep: ep.directAccess.enable) localEndpointsList;
-
-  allTcp = lib.concatMap (
-    ep:
-    lib.optional (
-      ep.directAccess.interface == "all"
-      && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
-    ) ep.port
-  ) directEndpoints;
-
-  allUdp = lib.concatMap (
-    ep:
-    lib.optional (
-      ep.directAccess.interface == "all"
-      && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
-    ) ep.port
-  ) directEndpoints;
-
-  # A named endpoint - one that carries a canonical domain - is proxied by an ingress, and both ingresses
-  # (the public one on the ingress host and the local one on the delivery host) reach the serving host over
-  # the mesh. So the mesh carries exactly the ports a proxy needs; an endpoint without a name is reached
-  # directly or not at all, and has to say so itself.
-  proxiedTcp = lib.concatMap (
-    ep:
-    lib.optional (ep.canonicalDomain != null && (ep.protocol == "tcp" || ep.protocol == "both")) ep.port
-  ) localEndpointsList;
-
-  wireguardTcp = lib.unique (
-    proxiedTcp
-    ++ lib.concatMap (
-      ep:
-      lib.optional (
-        ep.directAccess.interface == "wireguard"
-        && (ep.directAccess.protocol == "tcp" || ep.directAccess.protocol == "both")
-      ) ep.port
-    ) directEndpoints
-  );
-
-  wireguardUdp = lib.concatMap (
-    ep:
-    lib.optional (
-      ep.directAccess.interface == "wireguard"
-      && (ep.directAccess.protocol == "udp" || ep.directAccess.protocol == "both")
-    ) ep.port
-  ) directEndpoints;
-
-  # --- the identity policy ---------------------------------------------------------------------------
-  # Which address belongs to which trust level is an inventory fact, and it lives in the topology
-  # (`sourcesByTrust`): the input policy here, the device policy on the LAN router and whatever policy
-  # this repository grows next read one map instead of each deriving its own. The levels come from the
-  # same place, because a vocabulary that exists twice is a vocabulary that drifts.
-  trustLevels = levels;
-
-  # An endpoint may say which trust levels reach it over the mesh. What is denied there becomes a rule of
-  # our own, at a priority *ahead* of the firewall's filter chain, because a port opened for the local
-  # network (`interface = "all"`) is otherwise open on every interface - and "the local network is one
-  # trusted segment, the mesh is judged by who is asking" is exactly what the trust lattice is for. A
-  # drop is final in nftables, so the rule holds no matter what else opens the port; it can only ever
-  # restrict, never open, which is why it is safe to derive.
-  # An endpoint may say which trust levels reach it over the mesh. What is denied there becomes a rule of
-  # our own, at the **head** of the input chain: measured, the firewall accepts a port before anything
-  # appended later can speak, so the rule is inserted with `-I INPUT 1` - ahead of every accept - and
-  # guarded with `-C`, because `extraCommands` accumulate across activations otherwise (the module's own
-  # comment records that lesson from an earlier MASQUERADE rule).
+  # --- what an endpoint exposes, and to whom ---------------------------------------------------------
+  # Two things are being said, and one port list cannot say both: a port opened for the local network is
+  # reachable from every address on it - that is what "the local network is one trusted segment" means -
+  # while the mesh is judged by who is asking, which is the trust lattice, written in levels and rendered
+  # into addresses here.
   #
-  # The backend in use is the iptables one. The nftables backend rejects the MSS-clamping commands the
-  # wireguard module needs (measured: "extraCommands is incompatible with the nftables based firewall"),
-  # and it is the only backend that renders the declarative `extraInputRules` - which is why that option
-  # had no effect at all when it was tried. A DROP at the head holds whatever else opens the port, so the
-  # rule can only ever restrict, never open, and it is safe to derive.
-  identityRules = lib.concatMap (
+  # Every rule is an allow. Under the nftables implementation these land in the firewall's `input-allow`
+  # chain *behind* the declarative port accepts, so a deny here would never be reached - and it is not
+  # needed, because the chain's own policy is `drop`: what nobody allowed is closed. The previous shape
+  # opened a port for everyone and denied the mesh levels on top, which is why the deny had to be inserted
+  # at the head of the chain with a shell command, and why a withdrawn one stayed there forever.
+  #
+  # A named endpoint is proxied by an ingress, and the ingress is a host of the `mesh` zone: a proxy always
+  # implies that level, whatever the endpoint declares for direct use. That is also why the mesh side is
+  # narrower than it used to be - it is no longer "every mesh member", but the levels the endpoint is for.
+  accessRules = lib.concatMap (
     ep:
     let
-      denied = lib.subtractLists ep.directAccess.from trustLevels;
-      sources = lib.unique (
-        lib.concatMap (level: config.my.topology.sourcesByTrust.${level} or [ ]) denied
-      );
-      proto = if ep.directAccess.protocol == "udp" then "udp" else "tcp";
+      protos =
+        if ep.directAccess.protocol == "both" then
+          [
+            "tcp"
+            "udp"
+          ]
+        else
+          [ ep.directAccess.protocol ];
+      levels = lib.unique (ep.directAccess.from ++ lib.optional (ep.canonicalDomain != null) "mesh");
+      meshSources = nft.sourcesOfTrust config.my.topology levels;
+      v4 = lib.filter (address: !(lib.hasInfix ":" address)) meshSources;
+      v6 = lib.filter (address: lib.hasInfix ":" address) meshSources;
       dport = toString ep.port;
-      # The rule matches the mesh interface on purpose: the source map now also holds the address a host
-      # carries inside its zone, and that address must *not* be judged here - a LAN packet never arrives
-      # on wg0, so the rule simply never matches it. One map, one rule, both paths.
-      forSource =
-        binary: source:
-        firewall.guardedInsert {
-          inherit binary;
-          chain = "INPUT";
-          match = "-i wg0 -s ${source} -p ${proto} --dport ${dport} -m comment --comment identity-policy -j DROP";
-        };
-      v4 = map (forSource "iptables") (lib.filter (address: !(lib.hasInfix ":" address)) sources);
-      v6 = map (forSource "ip6tables") (lib.filter (address: lib.hasInfix ":" address) sources);
+      localRule =
+        proto:
+        nft.rule [
+          ''iifname != "wg0"''
+          "${proto} dport ${dport}"
+          "accept"
+        ];
+      meshRules =
+        proto:
+        lib.optionals (v4 != [ ]) [
+          (nft.rule [
+            ''iifname "wg0"''
+            "ip saddr ${nft.addressSet v4}"
+            "${proto} dport ${dport}"
+            "accept"
+          ])
+        ]
+        ++ lib.optionals (v6 != [ ]) [
+          (nft.rule [
+            ''iifname "wg0"''
+            "ip6 saddr ${nft.addressSet v6}"
+            "${proto} dport ${dport}"
+            "accept"
+          ])
+        ];
+      exposed =
+        proto:
+        lib.optionals (ep.directAccess.enable && ep.directAccess.interface == "all") [ (localRule proto) ]
+        ++ lib.optionals (
+          (ep.directAccess.enable && ep.directAccess.interface == "all")
+          || ep.directAccess.interface == "wireguard"
+          # A named endpoint is reached by an ingress that is a mesh host, even when it never declared
+          # direct access for itself: being proxied is what puts it on the mesh, and the rule says so.
+          || ep.canonicalDomain != null
+        ) (meshRules proto);
     in
-    lib.optionals (ep.directAccess.enable && denied != [ ]) (v4 ++ v6)
+    lib.optionals (ep.directAccess.enable || ep.canonicalDomain != null) (lib.concatMap exposed protos)
   ) localEndpointsList;
+
+  # There is no deny rule, and that is the point: the chain's own policy closes what nobody allowed, so
+  # "the mesh is judged by who is asking" is expressed by *not opening* a port for the other levels rather
+  # than by dropping them afterwards. The previous shape did the opposite - open for everyone, deny on top
+  # - which is why the deny needed a shell command at the head of the chain, and why a withdrawn one
+  # stayed there forever.
+
   # Every endpoint that enables directory authentication becomes a consumer with fully resolved values:
   # the audience it stated, the SOPS path its app password lives at, and the DN it binds as. The provider
   # that creates those accounts derives the same DN from the same directory contract, so both sides agree
@@ -597,21 +578,10 @@ in
   config = {
     my.contracts.consumes = ldapConsumers;
 
-    networking.firewall = {
-      allowedTCPPorts = allTcp;
-      allowedUDPPorts = allUdp;
-      interfaces.wg0 = {
-        allowedTCPPorts = wireguardTcp;
-        allowedUDPPorts = wireguardUdp;
-      };
-    };
-
-    # The trust lattice, applied. The rules go into the firewall's own input chain *ahead* of the port
-    # accepts, which is what `extraInputRules` is for - a separate nftables table would be a second
-    # firewall, and enabling it switches the whole firewall to the nftables implementation, which then
-    # rejects the MSS-clamping commands the wireguard module needs (measured). One firewall, one place.
-    # The trust lattice, applied at the head of the input path. See `identityRules` for why this is a
-    # command rather than a declarative rule: the backend in use ignores the declarative form.
-    networking.firewall.extraCommands = lib.concatStringsSep "\n" identityRules;
+    # One firewall, one place: what is opened is derived from the endpoints - already scoped to the
+    # interface they name and to the trust levels they are for - and the chain's own policy closes the
+    # rest. Nothing here is a command, and nothing has to be withdrawn, because the firewall renders this
+    # from the configuration on every activation: the running rules and the declarations cannot disagree.
+    networking.firewall.extraInputRules = lib.concatStringsSep "\n" accessRules;
   };
 }

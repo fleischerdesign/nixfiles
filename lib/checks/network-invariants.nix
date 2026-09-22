@@ -5,8 +5,9 @@
 # a carried zone without a forward rule (the packets stop at the delivery host), a *blanket* forward
 # rule (every member reached every device on every port), a name that resolves to an address nothing
 # routes, a client that routes a zone it has no business routing, a resolver list naming a host that is
-# not ours. The check returns its violations and the flake turns an empty list into a passing build - a
-# check that cannot fail loudly is not a check.
+# not ours - and a firewall policy written as shell commands, which is the one that took the network down
+# twice. The check returns its violations and the flake turns an empty list into a passing build - a check
+# that cannot fail loudly is not a check.
 {
   lib,
   self,
@@ -14,6 +15,7 @@
 }:
 let
   cfgOf = name: self.nixosConfigurations.${name}.config;
+  nft = import ../nftables.nix { inherit lib; };
 
   # The inventory is the same on every host; read it from one of them.
   reference = cfgOf (builtins.head hostNames);
@@ -58,54 +60,80 @@ let
     ) carriedDevices
   );
 
-  # 1. The host that carries the home zones into the mesh is the one that forwards into them, and it
-  #    forwards exactly what the devices declare - never a blanket. A blanket makes the routing decision
-  #    and the permission decision the same decision; measured, that meant every member reached every
-  #    device on every port.
-  forwardCommands = name: (cfgOf name).networking.firewall.extraCommands;
-  blanket = "ip saddr ${meshCidr} accept";
-  hasDeviceRules = name: lib.hasInfix "device-policy" (forwardCommands name);
-  hasDefaultDeny = name: lib.hasInfix "device-policy-default" (forwardCommands name);
-  carries = carriedZones != [ ];
-  shouldForward = carries && declaredEndpoints != [ ];
-  expectedRule =
-    entry:
-    "-d ${entry.device.ipv4} -p ${
-      if entry.endpoint.protocol == "both" then "tcp" else entry.endpoint.protocol
-    } --dport ${toString entry.endpoint.port}";
-  forwardViolations =
-    lib.optional (lib.hasInfix blanket (forwardCommands lanRouter)) "forward: ${lanRouter} still forwards every mesh source into the carried zones - routing and permission are one decision again"
-    ++ lib.concatMap (
-      name:
-      lib.optional (
-        name != lanRouter && hasDeviceRules name
-      ) "forward: ${name} projects device rules although it does not route the carried zones"
-      ++ lib.optional (
-        name != lanRouter && hasDefaultDeny name
-      ) "forward: ${name} denies the carried zones although it does not route them"
-    ) deployed
-    ++
-      lib.optional (hasDeviceRules lanRouter != shouldForward)
-        "forward: ${lanRouter} has device rules = ${toString (hasDeviceRules lanRouter)}, but the mesh carries ${builtins.toJSON carriedZones} with ${toString (builtins.length declaredEndpoints)} declared endpoint(s)"
-    ++
-      lib.optional (hasDefaultDeny lanRouter != carries)
-        "forward: ${lanRouter} denies the carried zones by default = ${toString (hasDefaultDeny lanRouter)}, but the mesh carries ${builtins.toJSON carriedZones} - an allow-list without a deny leaves the chain's own ACCEPT policy in charge"
-    ++ lib.concatMap (
-      zone:
-      lib.optional (
-        carries
-        && !(lib.hasInfix "-d ${subnets.${zone}.cidr} -m comment --comment device-policy-default -j DROP" (
-          forwardCommands lanRouter
-        ))
-      ) "forward: no default deny for the carried zone ${zone} on ${lanRouter}"
-    ) carriedZones
-    ++ lib.concatMap (
-      entry:
-      lib.optional (!(lib.hasInfix (expectedRule entry) (forwardCommands lanRouter)))
-        "forward: ${entry.deviceName}.${entry.endpointName} declares ${expectedRule entry}, but ${lanRouter} has no such rule"
-    ) declaredEndpoints;
+  # 1. One firewall, rendered. The implementation is nftables, forwarded traffic is filtered (without it
+  #    the forward chain accepts by default and every allow-list is decoration), and every permission is a
+  #    rule in the firewall's own options. A host that writes a shell command into `extraCommands` fails
+  #    this check: that shape is what took the network down twice - it is not validated before it runs, it
+  #    is not rebuilt atomically, and a rule whose declaration is withdrawn never leaves the chain.
+  inputRules = name: (cfgOf name).networking.firewall.extraInputRules;
+  forwardRules = name: (cfgOf name).networking.firewall.extraForwardRules;
+  firewallViolations = lib.concatMap (
+    name:
+    lib.optional (
+      !(cfgOf name).networking.nftables.enable
+    ) "firewall: ${name} does not use the nftables implementation"
+    ++ lib.optional (
+      !(cfgOf name).networking.firewall.filterForward
+    ) "firewall: ${name} does not filter forwarded traffic, so its forward chain accepts by default"
+    ++ lib.optional (
+      (cfgOf name).networking.firewall.extraCommands != ""
+    ) "firewall: ${name} still writes shell commands into extraCommands"
+    ++ lib.optional (lib.hasInfix "iptables" (
+      inputRules name + forwardRules name
+    )) "firewall: ${name} has a generated rule that names a command instead of an nftables match"
+  ) deployed;
 
-  # 2. A host inside the home LAN installs no route for a carried zone - it reaches it through its own
+  # 2. The LAN router forwards what the carried zones' devices declare - and nothing is opened for a
+  #    device that declared nothing, because the chain's policy is drop. The audit proves the same thing
+  #    from the wire; this proves it from the configuration, including the ports nobody declared.
+  deviceForwardViolations = lib.concatMap (
+    entry:
+    let
+      rules = forwardRules lanRouter;
+      sources = nft.sourcesOfTrust topology entry.endpoint.from;
+      hasSource = lib.any (address: lib.hasInfix address rules) sources;
+    in
+    lib.optional (
+      !(lib.hasInfix "ip daddr ${entry.device.ipv4}" rules)
+    ) "forward: ${entry.deviceName} is carried, but ${lanRouter} has no rule for its address"
+    ++
+      lib.optional (!(lib.hasInfix "dport ${toString entry.endpoint.port}" rules))
+        "forward: ${entry.deviceName}.${entry.endpointName} declares port ${toString entry.endpoint.port}, but ${lanRouter} has no rule for it"
+    ++
+      lib.optional (!hasSource)
+        "forward: ${entry.deviceName}.${entry.endpointName} declares a level whose addresses appear in no rule of ${lanRouter}"
+  ) declaredEndpoints;
+
+  # 3. Every endpoint that opens a port appears in the input rules, scoped the way it declared itself: the
+  #    local network reaching it, and the mesh only for the levels it is for.
+  endpointViolations = lib.concatMap (
+    name:
+    let
+      provides = (cfgOf name).my.contracts.provides or { };
+      endpoints = lib.concatLists (
+        map (contract: lib.attrValues (contract.endpoints or { })) (lib.attrValues provides)
+      );
+      rules = inputRules name;
+    in
+    lib.concatMap (
+      ep:
+      let
+        wantsMesh = ep.directAccess.interface == "wireguard" || ep.canonicalDomain != null;
+        wantsLocal = ep.directAccess.interface == "all";
+      in
+      lib.optional (
+        !(lib.hasInfix "dport ${toString ep.port}" rules)
+      ) "input: ${name} declares an endpoint on port ${toString ep.port} but opens no rule for it"
+      ++ lib.optional (
+        wantsLocal && !(lib.hasInfix "iifname != \"wg0\"" rules)
+      ) "input: ${name} never scopes a rule to the local network (iifname != \"wg0\")"
+      ++ lib.optional (
+        wantsMesh && !(lib.hasInfix "iifname \"wg0\"" rules)
+      ) "input: ${name} has an endpoint that the mesh must reach, but no rule names the mesh interface"
+    ) (lib.filter (ep: ep.directAccess.enable && ep.directAccess.interface != "local") endpoints)
+  ) deployed;
+
+  # 4. A host inside the home LAN installs no route for a carried zone - it reaches it through its own
   #    gateway - and a node that is not inside carries all of them, because abroad it has no other path.
   inLan =
     name:
@@ -130,7 +158,7 @@ let
       )
   ) deployed;
 
-  # 3. The doors follow the class: a host fixed at home has the home door alone - a mesh door would be a
+  # 5. The doors follow the class: a host fixed at home has the home door alone - a mesh door would be a
   #    liability, because a single failed probe would move its LAN lookups onto the overlay plane. A node
   #    that is not fixed at home has the home door first, so a node inside the LAN uses the LAN, and then
   #    every declared resolver's overlay address, which is what makes the resolver survive a home outage.
@@ -157,7 +185,7 @@ let
     )
   ) deployed;
 
-  # 3b. A declared resolver has to be one: a door nobody serves is worse than no door, because the
+  # 5b. A declared resolver has to be one: a door nobody serves is worse than no door, because the
   #     clients are told to use it.
   resolverHostViolations = lib.concatMap (
     name:
@@ -173,7 +201,7 @@ let
       [ ]
   ) topology.resolverHosts;
 
-  # 4. Every resolver the inventory hands out belongs to a host of this fleet. One that knows none of
+  # 6. Every resolver the inventory hands out belongs to a host of this fleet. One that knows none of
   #    our names would resolve the internet and fail silently on everything internal.
   fleetAddresses = lib.concatMap (
     name:
@@ -187,9 +215,9 @@ let
     address: "resolvers: ${address} is handed to clients but belongs to no host in the inventory"
   ) (lib.filter (address: !builtins.elem address fleetAddresses) topology.resolvers);
 
-  # 5. A rendered client routes the mesh, the ingress and every zone the mesh carries - that is what
-  #    makes a carried device reachable for a phone that is not at home - and no host zone: a client that
-  #    routed `infra` or `corp` would send its traffic through a hub while sitting in the LAN.
+  # 7. A rendered client routes the mesh, the ingress and every zone the mesh carries - that is what makes
+  #    a carried device reachable for a phone that is not at home - and no host zone: a client that routed
+  #    `infra` or `corp` would send its traffic through a hub while it sits in the LAN.
   clientViolations = lib.concatMap (
     name:
     let
@@ -223,10 +251,10 @@ let
     ) clients
   ) deployed;
 
-  # 6. A device has one address and no overlay identity, so its name may only be answered off the LAN
-  #    when its zone is carried - otherwise the answer would name an address nothing routes. Both
-  #    off-LAN planes follow that rule, because a client that is not in the LAN reaches the resolver
-  #    through the mesh door or the public one, depending on where it is.
+  # 8. A device has one address and no overlay identity, so its name may only be answered off the LAN when
+  #    its zone is carried - otherwise the answer would name an address nothing routes. Both off-LAN planes
+  #    follow that rule, because a client that is not in the LAN reaches the resolver through the mesh door
+  #    or the public one, depending on where it is.
   resolverHost = lib.findFirst (name: (cfgOf name).my.features.services.dns.enable) null deployed;
   strip = name: lib.removeSuffix "." name;
   deviceViolations =
@@ -253,9 +281,9 @@ let
         ++ lib.optional (!(answered fqdn "lan")) "answers: ${fqdn} is not answered in the LAN plane"
       ) (lib.attrNames topology.devices);
 
-  # 7. A device declaration is only meaningful where the mesh carries the device, and a level that has no
-  #    addresses in the inventory cannot be asked from. Both are declarations that look like access and
-  #    are none, which is the one kind of mistake a policy derived from data cannot survive quietly.
+  # 9. A device declaration is only meaningful where the mesh carries the device, and a level that has no
+  #    addresses in the inventory cannot be asked from. Both are declarations that look like access and are
+  #    none, which is the one kind of mistake a policy derived from data cannot survive quietly.
   declarationViolations = lib.concatMap (
     entry:
     lib.optional (!(builtins.elem entry.device.zone carriedZones))
@@ -268,7 +296,9 @@ let
 in
 {
   invariants = [
-    "the LAN router forwards the devices' declared ports, denies the rest, and never a blanket"
+    "one firewall, rendered: nftables, forwarding filtered, no shell command in the rules"
+    "the LAN router opens exactly the ports the carried zones' devices declare"
+    "every endpoint that opens a port appears in the input rules, scoped to interface and levels"
     "a host inside the home LAN installs no route for a carried zone; a node outside carries all of them"
     "the resolver doors follow the host class, derived from the zone"
     "every declared resolver runs one, and can be reached where it is announced"
@@ -278,7 +308,9 @@ in
     "every device declaration names a carried device and a trust level that exists"
   ];
   violations =
-    forwardViolations
+    firewallViolations
+    ++ deviceForwardViolations
+    ++ endpointViolations
     ++ routeViolations
     ++ doorViolations
     ++ resolverHostViolations

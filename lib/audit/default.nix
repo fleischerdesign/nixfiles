@@ -75,8 +75,9 @@ let
   ) topology.lanZones;
 
   # What each host declared it serves, per protocol and interface. This is the expectation the exposure
-  # report compares a live socket against: the firewall's rendered sets are the ports that are *open*,
-  # and the contracts' `local` declarations are the listeners that are deliberately not.
+  # report compares a live socket against - and it is read from the declarations, not from the rendered
+  # firewall, because the declarations are what the firewall is rendered *from*: an endpoint that declares
+  # a port has it, and one that does not, has not.
   declaredOf =
     name:
     let
@@ -85,10 +86,30 @@ let
       endpoints = lib.concatLists (
         map (contract: lib.attrValues (contract.endpoints or { })) (lib.attrValues provides)
       );
+      withProto =
+        proto:
+        lib.unique (
+          map (ep: ep.port) (
+            lib.filter (
+              ep:
+              # The same predicate the firewall is rendered from: a port is a decision when the endpoint
+              # declared direct access, or when a named endpoint makes an ingress reach it over the mesh.
+              (ep.directAccess.enable || ep.canonicalDomain != null)
+              && (ep.directAccess.protocol == proto || ep.directAccess.protocol == "both")
+            ) endpoints
+          )
+        );
     in
     {
-      tcp = lib.unique (fw.allowedTCPPorts ++ (fw.interfaces.wg0.allowedTCPPorts or [ ]));
-      udp = lib.unique (fw.allowedUDPPorts ++ (fw.interfaces.wg0.allowedUDPPorts or [ ]));
+      # Both sources are declarations and both count: the endpoints (which is what this repository's
+      # firewall is rendered from) and whatever a module opened through the firewall's own port options -
+      # the exposure report asks whether a listener is a decision, not which module made it.
+      tcp = lib.unique (
+        fw.allowedTCPPorts ++ (fw.interfaces.wg0.allowedTCPPorts or [ ]) ++ withProto "tcp"
+      );
+      udp = lib.unique (
+        fw.allowedUDPPorts ++ (fw.interfaces.wg0.allowedUDPPorts or [ ]) ++ withProto "udp"
+      );
       local = lib.unique (
         map (ep: ep.port) (
           lib.filter (ep: ep.directAccess.enable && ep.directAccess.interface == "local") endpoints

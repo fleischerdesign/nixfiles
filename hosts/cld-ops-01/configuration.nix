@@ -28,6 +28,14 @@
     ];
   };
 
+  # The SSH endpoint admits `infra` and `corp` everywhere, and the mesh nowhere - with one exception,
+  # and it belongs to this host: the OpenClaw *nodes* run here, while the gateway instances that talk to
+  # them run on `cld-edge-01` and reach them through an SSH tunnel (`openclaw-node-tunnel-*`, whose
+  # forwarding target is `127.0.0.1:<node port>` on this host). Without this line the tunnel is refused by
+  # the identity policy and flaps - measured: 26289 packets dropped on port 22 from `10.10.100.1`, and
+  # every deploy of the sibling reported failure because the flapping units fail its activation.
+  my.features.system.networking.ssh.admits = [ "mesh" ];
+
   my.features.services.openclaw.gateway =
     let
       commonDeepseekProvider = {

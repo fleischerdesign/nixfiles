@@ -168,6 +168,16 @@ Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no
   it made the routing decision and the permission decision one decision, so every member reached every
   device on every port - measured: the printer answered on 80, 443 and 631, the relays on 6053. Measured
   after: the printer's IPP answers, its web interface and the relays' API do not.
+- **One firewall, and it is rendered - not written.** Every permission in this fleet is data: what the
+  mesh carries, what an endpoint exposes and to whom, which zones may reach the uplink. Those
+  declarations are projected into the firewall's own rule options (`extraInputRules`,
+  `extraForwardRules`) under the **nftables implementation**, which renders one ruleset and applies it
+  atomically. Nothing writes a shell command into the firewall any more, and that is a rule rather than a
+  preference: measured twice, a command-shaped policy cost us the network - a syntax error stopped the
+  firewall mid-reload and took the NAT of a whole zone with it, and a rule whose declaration was
+  withdrawn stayed in the chain forever (28535 dropped packets against a rule that no longer existed).
+  Both chain policies are `drop` (`networking.firewall.filterForward`), so what nobody declared is closed
+  by construction and no projection has to write a deny rule.
 - **The mesh is the last resort.** The interface carries route metric 1000 against NetworkManager's
   600: a prefix the host can reach directly always wins, and the tunnel is used only when the LAN is
   elsewhere. Without it, a client at home would send LAN traffic out through the cloud and back.

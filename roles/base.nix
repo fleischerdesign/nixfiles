@@ -18,6 +18,10 @@
       networking = {
         wireguard.enable = lib.mkDefault true;
         ssh.enable = lib.mkDefault true;
+        # One firewall, rendered: the nftables implementation takes every declaration - the mesh's
+        # forwarding rules, the endpoints' exposure, the zones' transit - and applies them as one
+        # ruleset. Nothing in this fleet writes a shell command into the firewall any more.
+        firewall.enable = lib.mkDefault true;
         # Every host in this fleet is a mesh node and resolves through the resolver in the
         # inventory, never through whatever a network hands it. Which doors it uses is derived
         # from its zone, not written here.
