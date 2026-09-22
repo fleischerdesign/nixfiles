@@ -323,6 +323,34 @@
                 } \
                 > $out
             '';
+
+        # The apply and the drift report are Python embedded in the module and executed only on the host;
+        # a syntax error in either would otherwise be found by a deploy, which is a fleet-wide failure.
+        # This compiles both with the same interpreter the host runs, so a pull request finds it instead.
+        authentik-scripts =
+          let
+            units = [
+              "authentik-blueprints-apply"
+              "authentik-drift-report"
+            ];
+            scriptOf =
+              name: unit:
+              builtins.substring 5 1000000
+                self.nixosConfigurations.${name}.config.systemd.services.${unit}.serviceConfig.StandardInput;
+            scripts = nixpkgs-unstable.lib.unique (
+              nixpkgs-unstable.lib.concatMap (name: map (scriptOf name) units) blueprintHosts
+            );
+          in
+          pkgs.runCommandLocal "authentik-scripts-check"
+            {
+              nativeBuildInputs = [ pkgs.python3 ];
+            }
+            ''
+              for script in ${nixpkgs-unstable.lib.concatStringsSep " " scripts}; do
+                python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="out.pyc", doraise=True)' "$script"
+              done
+              echo "ok: ${toString (nixpkgs-unstable.lib.length scripts)} embedded authentik script(s) compile" > $out
+            '';
       }
       // nixpkgs-unstable.lib.genAttrs' gatewayHosts (name: {
         name = "openclaw-config-validity-${name}";

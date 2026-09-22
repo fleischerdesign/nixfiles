@@ -213,7 +213,15 @@ def check_meta_apply(where, attrs, names, directory, problems):
         problems.append(f"{where}: metaapply instance {name!r} names no blueprint in the directory")
 
 
-def check_cycles(owned, names, directory, problems):
+def looks_owned(path, owner_name):
+    """Whether a file claims ownership without a successful parse, so a syntax error is still caught."""
+    try:
+        return owner_name in path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
+def check_cycles(owned, names, problems):
     """Cross-file dependencies are declared, so a cycle between two owned files can never settle."""
     edges = {rel: set() for rel in owned}
     for rel, raw in owned.items():
@@ -257,8 +265,14 @@ def check_directory(directory, owner_name, owner_value):
     for path in sorted(root.rglob("*.yaml")):
         rel = str(path.relative_to(root))
         raw = parse(path)
-        if not isinstance(raw, dict) or "__parse_error__" in raw:
-            # Upstream directories ship more than blueprints; only our files are our problem.
+        if not isinstance(raw, dict):
+            continue
+        if "__parse_error__" in raw:
+            # Without a parse there is no label to read, so ownership is decided from the raw text.
+            # Upstream files do not name the owner; our own do, and a broken one must still fail here
+            # rather than at the blueprint migration on the host.
+            if looks_owned(path, owner_name):
+                problems.append(f"{rel}: not valid YAML: {raw['__parse_error__']}")
             continue
         metadata = raw.get("metadata") or {}
         labels = metadata.get("labels") or {}
@@ -275,7 +289,7 @@ def check_directory(directory, owner_name, owner_value):
 
     for rel, raw in owned.items():
         check_owned(rel, raw, names, root, problems)
-    check_cycles(owned, names, root, problems)
+    check_cycles(owned, names, problems)
     return owned, problems
 
 
