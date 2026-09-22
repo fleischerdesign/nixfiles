@@ -388,6 +388,11 @@ let
           default = "default";
           description = "Dashboard icon identifier";
         };
+        description = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "Short copy shown on the portal tile and in search results";
+        };
       };
 
       # Computed Read-Only Options

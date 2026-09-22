@@ -36,10 +36,18 @@ let
                 {
                   id = if epName == "default" || epName == "web" then svcName else "${svcName}-${epName}";
                   name = if ep.displayName != null then ep.displayName else svcName;
+                  description = ep.dashboard.description;
                   url = "https://${ep.canonicalDomain}";
                   category = if ep.group != null then ep.group else "Services";
                   icon = ep.dashboard.icon;
+                  # Where the service is reachable from, so the tile can say "LAN" or "Mesh" instead of
+                  # handing out a name that only resolves inside the network.
+                  scope = ep.scope;
                   groups = ep.accessGroups;
+                  admin = ep.adminGroups;
+                  monitoring = {
+                    inherit (ep.monitoring.http) enable path group;
+                  };
                 }
               ]
             ) contract.endpoints
@@ -49,11 +57,18 @@ let
     ) (builtins.attrNames flakeConfigurations)
   );
 
+  # Who administers the portal itself. The catalogue carries it so the app can gate its admin view
+  # without knowing a group name: the page stays generic, the audience is configuration.
+  portalAdminGroups = [ "infra-admins" ];
+
   # One entry per id: several hosts may project the same service, and the last declaration wins.
   portal = pkgs.writeText "portal.json" (
-    builtins.toJSON (
-      builtins.attrValues (lib.listToAttrs (map (entry: lib.nameValuePair entry.id entry) portalEntries))
-    )
+    builtins.toJSON {
+      adminGroups = portalAdminGroups;
+      services = builtins.attrValues (
+        lib.listToAttrs (map (entry: lib.nameValuePair entry.id entry) portalEntries)
+      );
+    }
   );
 
   # The static site plus the generated projection, served from one read-only store path.
@@ -117,6 +132,7 @@ in
           "media-users"
           "infra-admins"
         ];
+        adminGroups = portalAdminGroups;
         subdomain = "@";
         inherit customExtraConfig;
         dashboard = {
