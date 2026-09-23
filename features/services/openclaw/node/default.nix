@@ -22,34 +22,10 @@ let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.openclaw.node;
 
-  # Standard baseline toolchain available to OpenClaw execution environments
-  defaultBasePackages = [
-    pkgs.nix
-    pkgs.git
-    pkgs.gh
-    pkgs.ripgrep
-    pkgs.ripgrep-all
-    pkgs.fd
-    pkgs.procps
-    pkgs.curl
-    pkgs.gnutar
-    pkgs.gzip
-    pkgs.zip
-    pkgs.unzip
-    pkgs.jq
-    pkgs.yq-go
-    pkgs.sqlite
-    pkgs.poppler-utils
-    pkgs.imagemagick
-    pkgs.pandoc
-    pkgs.ast-grep
-    pkgs.universal-ctags
-    pkgs.tokei
-    pkgs.lsof
-    pkgs.moreutils
-    pkgs.nvd
-    pkgs.nix-diff
-  ];
+  # The command-family catalogue and the shared execution baseline. Both live in ../lib so the
+  # gateway module consumes the same table and the same package list instead of restating them.
+  surface = import ../lib/command-surface.nix { inherit lib; };
+  defaultBasePackages = import ../lib/base-packages.nix { inherit pkgs; };
 
   # Submodule schema for a single node instance
   instanceSubmodule =
@@ -103,6 +79,9 @@ let
       mergedConfig = lib.recursiveUpdate (
         lib.optionalAttrs (mergedNodeHost != { }) {
           nodeHost = mergedNodeHost;
+        }
+        // lib.optionalAttrs inst.workspace.enable {
+          worktreeRoot = inst.workspace.root;
         }
         //
           lib.optionalAttrs
@@ -256,6 +235,18 @@ let
           '';
         };
 
+        capabilities = lib.mkOption {
+          type = lib.types.listOf (lib.types.enum surface.familyNames);
+          default = surface.profiles.node-linux;
+          description = ''
+            Capability families this instance is expected to serve, from
+            features/services/openclaw/lib/command-surface.nix. The node always advertises every
+            command it has - the gateway decides what it grants - so this is the declaration the
+            fleet consistency check compares the gateway's grant against, and the platform
+            assertion checks it against. Narrow it to state intent, not to restrict execution.
+          '';
+        };
+
         nodeHost = lib.mkOption {
           type = lib.types.attrs;
           default = { };
@@ -280,6 +271,25 @@ let
           type = lib.types.listOf lib.types.package;
           default = defaultBasePackages;
           description = "Packages added to the PATH of commands executed on this node instance.";
+        };
+
+        workspace = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Declare this instance's repository checkout root (OpenClaw's `worktreeRoot`).";
+          };
+
+          root = lib.mkOption {
+            type = lib.types.str;
+            default = "${stateDir}/dev";
+            description = ''
+              Absolute path under which OpenClaw allocates managed worktrees
+              (`<root>/<repo-fingerprint>/<name>`). Created by tmpfiles; `git clone` by hand into
+              the state directory is what this replaces - managed worktrees carry their own
+              snapshot and cleanup lifecycle, unmanaged checkouts do not.
+            '';
+          };
         };
 
         browser = {
@@ -450,6 +460,26 @@ in
           assertion = inst._useTunnel || inst.gateway.host != "127.0.0.1";
           message = "OpenClaw node instance '${name}': transport = \"direct\" needs a real gateway host, otherwise the node only reaches itself.";
         }
+        {
+          assertion = lib.all (
+            capability:
+            surface.supports {
+              inherit capability;
+              platform = "linux";
+            }
+          ) inst.capabilities;
+          message =
+            let
+              unsupported = lib.filter (
+                capability:
+                !surface.supports {
+                  inherit capability;
+                  platform = "linux";
+                }
+              ) inst.capabilities;
+            in
+            "OpenClaw node instance '${name}': capabilities ${lib.concatStringsSep ", " unsupported} are not available on linux (see features/services/openclaw/lib/command-surface.nix).";
+        }
       ]
     ) (lib.attrNames enabledInstances);
 
@@ -558,9 +588,14 @@ in
       "d /etc/openclaw 0755 root root - -"
       "d /etc/openclaw/node-instances 0755 root root - -"
     ]
-    ++ map (name: "d ${enabledInstances.${name}._stateDir} 0700 openclaw openclaw - -") (
-      lib.attrNames enabledInstances
-    )
+    ++ lib.concatMap (
+      name:
+      let
+        inst = enabledInstances.${name};
+      in
+      [ "d ${inst._stateDir} 0700 openclaw openclaw - -" ]
+      ++ lib.optional inst.workspace.enable "d ${inst.workspace.root} 0700 openclaw openclaw - -"
+    ) (lib.attrNames enabledInstances)
     # sops-nix can only render the tunnel key if its parent directory exists.
     ++ lib.unique (
       map

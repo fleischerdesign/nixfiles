@@ -29,15 +29,34 @@ jobs:
       - name: Check flake
         run: nix flake check --print-build-logs
 
+  hosts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+
+      - uses: DeterminateSystems/magic-nix-cache-action@v14
+
+      # The host matrix is the flake's own host list; a literal here is a second inventory that
+      # drifts (it last named yorke, jello, strummer, mackaye and rollins - none of which exist).
+      - id: list
+        name: Derive the host matrix from the flake
+        run: |
+          hosts=$(nix eval --json '.#nixosConfigurations' --apply 'builtins.attrNames')
+          echo "matrix={\"host\":$hosts}" >> "$GITHUB_OUTPUT"
+
   build:
-    needs: flake-check
+    needs: [flake-check, hosts]
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix:
-        host: [yorke, jello, strummer, mackaye, rollins]
+      matrix: ${{ fromJSON(needs.hosts.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
 

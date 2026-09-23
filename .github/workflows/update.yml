@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       has-updates: ${{ steps.detect.outputs.has-updates }}
+      matrix: ${{ steps.hosts.outputs.matrix }}
     steps:
       - uses: actions/checkout@v7
 
@@ -37,6 +38,14 @@ jobs:
             echo "has-updates=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # The host matrix is the flake's own host list; a literal here is a second inventory that
+      # drifts (it last named yorke, jello, strummer, mackaye and rollins - none of which exist).
+      - id: hosts
+        name: Derive the host matrix from the flake
+        run: |
+          hosts=$(nix eval --json '.#nixosConfigurations' --apply 'builtins.attrNames')
+          echo "matrix={\"host\":$hosts}" >> "$GITHUB_OUTPUT"
+
       - name: Upload updated flake.lock and manifests
         if: steps.detect.outputs.has-updates == 'true'
         uses: actions/upload-artifact@v7
@@ -55,8 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix:
-        host: [yorke, jello, strummer, mackaye, rollins]
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
 

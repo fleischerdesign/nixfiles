@@ -29,34 +29,10 @@ let
     peer = osConfig.my.topology.hosts.${osConfig.my.topology.ingressHost} or null;
   };
 
-  # Standard baseline toolchain available to OpenClaw execution environments
-  defaultBasePackages = [
-    pkgs.nix
-    pkgs.git
-    pkgs.gh
-    pkgs.ripgrep
-    pkgs.ripgrep-all
-    pkgs.fd
-    pkgs.procps
-    pkgs.curl
-    pkgs.gnutar
-    pkgs.gzip
-    pkgs.zip
-    pkgs.unzip
-    pkgs.jq
-    pkgs.yq-go
-    pkgs.sqlite
-    pkgs.poppler-utils
-    pkgs.imagemagick
-    pkgs.pandoc
-    pkgs.ast-grep
-    pkgs.universal-ctags
-    pkgs.tokei
-    pkgs.lsof
-    pkgs.moreutils
-    pkgs.nvd
-    pkgs.nix-diff
-  ];
+  # The command-family catalogue and the shared execution baseline, shared with the node module via
+  # ../lib so neither side restates command ids or package lists.
+  surface = import ../lib/command-surface.nix { inherit lib; };
+  defaultBasePackages = import ../lib/base-packages.nix { inherit pkgs; };
 
   # Submodule schema for a single gateway instance
   instanceSubmodule =
@@ -148,6 +124,19 @@ let
           sandboxPort = inst.sandbox.port;
           sandboxOrigin = sandboxOrigin;
         };
+      };
+
+      allowCommands = surface.allowCommands inst.nodePolicy.capabilities;
+
+      fileTransferConfig = surface.fileTransferPolicy {
+        capabilities = inst.nodePolicy.capabilities;
+        inherit (inst.nodePolicy.fileTransfer)
+          ask
+          followSymlinks
+          maxBytes
+          allowReadPaths
+          allowWritePaths
+          ;
       };
 
       toolsConfig =
@@ -243,7 +232,7 @@ let
       configPath = "/etc/openclaw/instances/${name}.json";
       logPath = "${stateDir}/logs/gateway.log";
 
-      renderedConfig = lib.recursiveUpdate (
+      renderedConfig = lib.recursiveUpdate (lib.foldl' lib.recursiveUpdate { } [
         {
           gateway = {
             port = inst.port;
@@ -311,7 +300,7 @@ let
             };
           };
         }
-        // lib.optionalAttrs inst.browser.enable {
+        (lib.optionalAttrs inst.browser.enable {
           browser = {
             enabled = true;
             headless = inst.browser.headless;
@@ -334,12 +323,26 @@ let
                     allowedHostnames = inst.browser.ssrfPolicy.allowedHostnames;
                   };
               };
-        }
-        // toolsConfig
-        // mcpAppsConfig
-        // pluginConfig
-        // a2aConfig
-      ) inst.settings;
+        })
+        toolsConfig
+        mcpAppsConfig
+        pluginConfig
+        a2aConfig
+        (lib.optionalAttrs (allowCommands != [ ]) {
+          gateway.nodes.commands.allow = allowCommands;
+        })
+        (lib.optionalAttrs (fileTransferConfig != { }) {
+          plugins.entries.file-transfer.config = fileTransferConfig;
+        })
+        (lib.optionalAttrs (inst.nodePolicy.exec.host != null) {
+          tools.exec = {
+            inherit (inst.nodePolicy.exec) host mode;
+          }
+          // lib.optionalAttrs (inst.nodePolicy.exec.node != null) {
+            node = inst.nodePolicy.exec.node;
+          };
+        })
+      ]) inst.settings;
     in
     {
       options = {
@@ -784,6 +787,90 @@ let
           type = lib.types.attrs;
           default = { };
           description = "Arbitrary openclaw.json overrides merged into this instance.";
+        };
+
+        nodePolicy = {
+          capabilities = lib.mkOption {
+            type = lib.types.listOf (lib.types.enum surface.familyNames);
+            default = surface.profiles.full;
+            description = ''
+              Capability families this gateway grants to connected nodes. Projected into
+              `gateway.nodes.commands.allow` (the dangerous and plugin-owned commands), the File
+              Transfer plugin's path policy and - together with `exec.host` - `tools.exec`. Nothing
+              here is written twice: the command ids come from
+              features/services/openclaw/lib/command-surface.nix.
+
+              The full profile is the default because the gateway is per-person: every node that
+              pairs here belongs to the person the instance belongs to, so a gateway-wide grant is
+              exactly a per-person grant. Narrow it only where an instance is shared.
+            '';
+          };
+
+          exec = {
+            host = lib.mkOption {
+              type = lib.types.nullOr (
+                lib.types.enum [
+                  "gateway"
+                  "node"
+                ]
+              );
+              default = null;
+              description = "Default exec host for the agent's shell tool. Null leaves OpenClaw's own default in place.";
+            };
+
+            mode = lib.mkOption {
+              type = lib.types.enum [
+                "auto"
+                "ask"
+                "allowlist"
+                "full"
+              ];
+              default = "full";
+              description = "Exec policy mode. `full` trusts the operator; it is only projected when `host` is set.";
+            };
+
+            node = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Pin exec to one node id or name. Null routes to any eligible node.";
+            };
+          };
+
+          fileTransfer = {
+            ask = lib.mkOption {
+              type = lib.types.enum [
+                "off"
+                "on-miss"
+                "always"
+              ];
+              default = "off";
+              description = "When the File Transfer plugin asks for a path not covered by the allow patterns.";
+            };
+
+            followSymlinks = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Whether file transfers may follow symlinks on the node.";
+            };
+
+            maxBytes = lib.mkOption {
+              type = lib.types.int;
+              default = 67108864;
+              description = "Upper bound for a single file transfer (OpenClaw's own limit is 16 MiB per unary call).";
+            };
+
+            allowReadPaths = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ "/**" ];
+              description = "minimatch patterns the File Transfer plugin may read from on a node.";
+            };
+
+            allowWritePaths = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ "/**" ];
+              description = "minimatch patterns the File Transfer plugin may write to on a node.";
+            };
+          };
         };
 
         # Computed internal attributes

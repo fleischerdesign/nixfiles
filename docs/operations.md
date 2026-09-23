@@ -247,6 +247,32 @@ Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints
 > `nod switch <target>` works. The Authentik target had the same defect and was removed. Verify
 > `--dry-run` output before applying anything — both device reconcilers report a real diff now.
 
+### 7.1 OpenClaw node command surfaces (runtime, not Nix)
+
+A node advertises its command surface; the gateway's `gateway.nodes.commands.allow`, projected from
+`nodePolicy.capabilities` (`features/services/openclaw/lib/command-surface.nix`), decides which of
+those commands are invocable. Two facts live in the gateway's SQLite and not in the repository, so a
+deploy cannot set them — run them as the instance's system user:
+
+```bash
+# on the gateway host (cld-ops-01); <instance> is philipp, katja, …
+BASH=/nix/store/2ndah67h0z5m31v2wkdmg2md4380ggr5-bash-interactive-5.3p15/bin/bash
+OC=/nix/store/0f4sxmzb9x004w9drfa6n5l7851dqq0y-openclaw-2026.9.4/bin
+su -s "$BASH" openclaw -c "
+  export OPENCLAW_STATE_DIR=/var/lib/openclaw/instances/<instance>
+  export OPENCLAW_CONFIG_PATH=/run/secrets/rendered/openclaw_<instance>_config
+  export PATH=$OC:/run/current-system/sw/bin:\$PATH
+  openclaw nodes pending
+  openclaw nodes approve <nodeRequestId>   # after a node upgrade widens its surface
+  openclaw nodes rename --node <id|name|ip> --name <hostName>   # the pairing record's name
+"
+```
+
+A node's display name is frozen at pairing: the configuration derives the name from
+`networking.hostName`, but an existing pairing keeps the name it was approved with. The
+workstation's historic `jello` was corrected to `hom-wrk-01` on 2026-09-23 with `nodes rename`; the
+matching `device_pairing_paired.node_surface_json` snapshot is the stale source, not the node.
+
 ---
 
 ## 8. Emergency Recovery — Regaining Access
