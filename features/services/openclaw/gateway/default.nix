@@ -246,7 +246,15 @@ let
             ++ lib.optional (ingressProxyAddress != null) ingressProxyAddress;
             auth = {
               mode = "trusted-proxy";
-              identityScopes = lib.genAttrs inst.adminUsers (_: [ "operator.admin" ]);
+              identityScopes = lib.genAttrs inst.adminUsers (_: [
+                "operator.admin"
+                # Approving a node's widened command surface (docs/operations.md §7.1) and renaming a
+                # pairing are `operator.pairing` operations. The CLI token this repository creates
+                # carries `operator.admin` and `operator.read` only, so the operator needs the scope
+                # on the identity the Control UI authenticates with, or a widened surface can never
+                # be approved.
+                "operator.pairing"
+              ]);
               trustedProxy = {
                 userHeader = "x-authentik-email";
                 requiredHeaders = [ "x-authentik-email" ];

@@ -252,26 +252,33 @@ Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints
 A node advertises its command surface; the gateway's `gateway.nodes.commands.allow`, projected from
 `nodePolicy.capabilities` (`features/services/openclaw/lib/command-surface.nix`), decides which of
 those commands are invocable. Two facts live in the gateway's SQLite and not in the repository, so a
-deploy cannot set them — run them as the instance's system user:
+deploy cannot set them:
+
+* a **widened command surface** — when a node upgrade adds commands (the File Transfer plugin's
+  `dir.list`, `file.fetch`, …), the node declares them on reconnect and the gateway holds them in
+  `device_pairing_paired.pending_node_surface_json` until an operator approves them; and
+* the pairing record's **display name**, which is frozen at pairing: the configuration derives the
+  name from `networking.hostName`, but an existing pairing keeps the name it was approved with.
+
+Both are `operator.pairing` operations. The `cli` device token this repository creates carries
+`operator.admin` and `operator.read` only, so `openclaw nodes approve`/`rename` fail (`Unknown node
+pairing requestId` / `node rename denied`). Approve from the **Control UI → Devices**, whose
+authenticated identity carries `operator.pairing` via `auth.identityScopes`.
+
+Verified 2026-09-23: after the capability catalogue deployed, hom-wrk-01's pending surface
+(`dir.fetch`, `dir.list`, `file.fetch`, `file.write`) was present in
+`device_pairing_paired.pending_node_surface_json` while `openclaw nodes pending` returned an empty
+list — read the request straight from the DB when the CLI cannot show it:
 
 ```bash
 # on the gateway host (cld-ops-01); <instance> is philipp, katja, …
-BASH=/nix/store/2ndah67h0z5m31v2wkdmg2md4380ggr5-bash-interactive-5.3p15/bin/bash
-OC=/nix/store/0f4sxmzb9x004w9drfa6n5l7851dqq0y-openclaw-2026.9.4/bin
-su -s "$BASH" openclaw -c "
-  export OPENCLAW_STATE_DIR=/var/lib/openclaw/instances/<instance>
-  export OPENCLAW_CONFIG_PATH=/run/secrets/rendered/openclaw_<instance>_config
-  export PATH=$OC:/run/current-system/sw/bin:\$PATH
-  openclaw nodes pending
-  openclaw nodes approve <nodeRequestId>   # after a node upgrade widens its surface
-  openclaw nodes rename --node <id|name|ip> --name <hostName>   # the pairing record's name
-"
+DB=/var/lib/openclaw/instances/<instance>/state/openclaw.sqlite
+nix shell nixpkgs#sqlite -c sqlite3 "$DB" \
+  "select display_name, json_extract(pending_node_surface_json,'$.requestId') from device_pairing_paired where pending_node_surface_json is not null;"
 ```
 
-A node's display name is frozen at pairing: the configuration derives the name from
-`networking.hostName`, but an existing pairing keeps the name it was approved with. The
-workstation's historic `jello` was corrected to `hom-wrk-01` on 2026-09-23 with `nodes rename`; the
-matching `device_pairing_paired.node_surface_json` snapshot is the stale source, not the node.
+The workstation's historic `jello` is the same kind of runtime state; correct it in the Control UI
+(Devices → rename) or with a pairing-scoped token.
 
 ---
 
