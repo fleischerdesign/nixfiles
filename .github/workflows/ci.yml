@@ -24,7 +24,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@v22
 
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
+      - uses: DeterminateSystems/magic-nix-cache-action@v15
 
       - name: Check flake
         run: nix flake check --print-build-logs
@@ -39,7 +39,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@v22
 
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
+      - uses: DeterminateSystems/magic-nix-cache-action@v15
 
       # The host matrix is the flake's own host list; a literal here is a second inventory that
       # drifts (it last named yorke, jello, strummer, mackaye and rollins - none of which exist).
