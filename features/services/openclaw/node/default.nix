@@ -660,21 +660,32 @@ in
               wants = [ "network-online.target" ];
               requires = lib.optional inst._useTunnel "${tunnelServiceName}.service";
 
+              # `environment` (not `serviceConfig.Environment`) is the systemd unit option that
+              # quotes values, so an author name with a space survives instead of being dropped
+              # with "Invalid environment assignment". The gateway unit has always done this; the
+              # node unit kept a raw list and lost GIT_AUTHOR_* on every start.
+              environment = {
+                HOME = inst._stateDir;
+                OPENCLAW_STATE_DIR = inst._stateDir;
+              }
+              // lib.optionalAttrs (inst._mergedConfig != { }) {
+                OPENCLAW_CONFIG_PATH = inst._configPath;
+              }
+              // lib.optionalAttrs (inst.gitAuthor.name != null) {
+                GIT_AUTHOR_NAME = inst.gitAuthor.name;
+                GIT_COMMITTER_NAME = inst.gitAuthor.name;
+              }
+              // lib.optionalAttrs (inst.gitAuthor.email != null) {
+                GIT_AUTHOR_EMAIL = inst.gitAuthor.email;
+                GIT_COMMITTER_EMAIL = inst.gitAuthor.email;
+              };
+
               serviceConfig = {
                 User = "openclaw";
                 Group = "openclaw";
                 WorkingDirectory = inst._stateDir;
                 StateDirectory = "openclaw/node-instances/${name}";
                 StateDirectoryMode = "0700";
-                Environment = [
-                  "HOME=${inst._stateDir}"
-                  "OPENCLAW_STATE_DIR=${inst._stateDir}"
-                ]
-                ++ lib.optional (inst._mergedConfig != { }) "OPENCLAW_CONFIG_PATH=${inst._configPath}"
-                ++ lib.optional (inst.gitAuthor.name != null) "GIT_AUTHOR_NAME=${inst.gitAuthor.name}"
-                ++ lib.optional (inst.gitAuthor.name != null) "GIT_COMMITTER_NAME=${inst.gitAuthor.name}"
-                ++ lib.optional (inst.gitAuthor.email != null) "GIT_AUTHOR_EMAIL=${inst.gitAuthor.email}"
-                ++ lib.optional (inst.gitAuthor.email != null) "GIT_COMMITTER_EMAIL=${inst.gitAuthor.email}";
                 EnvironmentFile =
                   lib.optional inst._hasPassword
                     osConfig.sops.templates."openclaw_node_${name}_env".path;
