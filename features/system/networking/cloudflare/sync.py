@@ -164,11 +164,66 @@ def main():
     for r in existing_records:
         existing_by_key[(r["name"], r["type"])] = r
 
-    # 4. Reconcile Desired Records
+    # 4. Prune stale records (opt-in, ownership-scoped) before creating new ones.
+    # If a record changed type (e.g. CNAME -> A), Cloudflare will reject creating the new
+    # record with 'A CNAME record with that host already exists' unless the stale one is deleted first.
+    owned_prefixes = (
+        # Comments this engine writes today (every mkRecord call in default.nix).
+        "Zone apex -> ",
+        "Wildcard ingress -> ",
+        "Node management ",
+        "Service ",
+        # Comments earlier revisions of this engine wrote. Without them the records the
+        # engine itself created under the retired `edge.`/`ops.` labels could never be
+        # removed, which is the whole reason this flag exists. The desired-set check is
+        # the primary filter; this list only decides whether a stale record is ours.
+        "Direct Edge Host -> ",
+        "Direct Ops Host -> ",
+        "Root Ingress -> ",
+        "OpenClaw AI Gateway -> ",
+        "Managed by VYRX GitOps",
+    )
+
+    desired_keys = set()
+    for rec in spec.get("records", []):
+        rec_name = rec["name"]
+        if rec_name == "@":
+            fqdn = domain
+        elif not rec_name.endswith(domain):
+            fqdn = f"{rec_name}.{domain}"
+        else:
+            fqdn = rec_name
+        desired_keys.add((fqdn, rec["type"]))
+
+    stale = [
+        r
+        for (name, type_), r in existing_by_key.items()
+        if (name, type_) not in desired_keys
+        and (name == domain or name.endswith("." + domain))
+        and str(r.get("comment") or "").startswith(owned_prefixes)
+    ]
+    pruned = 0
+    for r in stale:
+        if args.prune:
+            print(f"  [-] Delete {r['type']} {r['name']} (stale; {r.get('comment')!r})")
+            if not args.dry_run:
+                api_request(
+                    token,
+                    f"/zones/{zone_id}/dns_records/{r['id']}",
+                    method="DELETE",
+                )
+                pruned += 1
+                existing_by_key.pop((r["name"], r["type"]), None)
+        else:
+            print(
+                f"  [ ] Stale {r['type']} {r['name']} ({r.get('comment')!r})"
+                " -- re-run with --prune to delete"
+            )
+
+    # 5. Reconcile Desired Records
     created = 0
     updated = 0
     unchanged = 0
-    desired_keys = set()
 
     for rec in spec.get("records", []):
         rec_name = rec["name"]
@@ -180,7 +235,6 @@ def main():
             fqdn = rec_name
 
         key = (fqdn, rec["type"])
-        desired_keys.add(key)
         existing = existing_by_key.get(key)
 
         payload = {
@@ -226,53 +280,6 @@ def main():
                 updated += 1
             else:
                 unchanged += 1
-
-    # 5. Prune stale records (opt-in, ownership-scoped). A record is deleted only if all
-    # three conditions hold: it is absent from the desired set, it lies inside the zone this
-    # run manages, and it carries a comment from this engine's own vocabulary. Everything
-    # else - ACME DNS-01 records, manual entries, other tooling - is left alone.
-    owned_prefixes = (
-        # Comments this engine writes today (every mkRecord call in default.nix).
-        "Zone apex -> ",
-        "Wildcard ingress -> ",
-        "Node management ",
-        "Service ",
-        # Comments earlier revisions of this engine wrote. Without them the records the
-        # engine itself created under the retired `edge.`/`ops.` labels could never be
-        # removed, which is the whole reason this flag exists. The desired-set check is
-        # the primary filter; this list only decides whether a stale record is ours.
-        "Direct Edge Host -> ",
-        "Direct Ops Host -> ",
-        "Root Ingress -> ",
-        "OpenClaw AI Gateway -> ",
-        "Managed by VYRX GitOps",
-    )
-    stale = [
-        r
-        for (name, type_), r in existing_by_key.items()
-        if (name, type_) not in desired_keys
-        and (name == domain or name.endswith("." + domain))
-        and str(r.get("comment") or "").startswith(owned_prefixes)
-    ]
-    pruned = 0
-    for r in stale:
-        if args.prune:
-            print(f"  [-] Delete {r['type']} {r['name']} (stale; {r.get('comment')!r})")
-            if not args.dry_run:
-                api_request(
-                    token,
-                    f"/zones/{zone_id}/dns_records/{r['id']}",
-                    method="DELETE",
-                )
-                # Only a real deletion counts as pruned; a dry run must not report one.
-                # Reporting a deletion that did not happen is the exact failure mode this
-                # flag was written to remove.
-                pruned += 1
-        else:
-            print(
-                f"  [ ] Stale {r['type']} {r['name']} ({r.get('comment')!r})"
-                " -- re-run with --prune to delete"
-            )
 
     print(
         f"==> DNS Sync Complete: {created} created, {updated} updated,"
