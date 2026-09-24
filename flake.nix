@@ -398,6 +398,14 @@
                 exit 1
               ''
           );
+
+        # The portal is built, not fetched, and its catalogue is a build input: the artifact the portal
+        # host runs has to carry what its pages were rendered from. lib/checks/vyrx-portal.nix states the
+        # claim and measures it on the artifact, where the consumer sees it.
+        vyrx-portal = import ./lib/checks/vyrx-portal.nix {
+          inherit pkgs self hostNames;
+          lib = nixpkgs-unstable.lib;
+        };
       }
       // nixpkgs-unstable.lib.genAttrs' openclawConfigHosts (name: {
         name = "openclaw-config-validity-${name}";

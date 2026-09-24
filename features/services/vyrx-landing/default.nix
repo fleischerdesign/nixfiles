@@ -8,7 +8,6 @@
 
 let
   cfg = config.my.features.services.vyrx-landing;
-  vyrxLandingPkg = inputs.vyrx-landing.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
   # The portal's data is a projection of the service contracts, never a second list: the same
   # `accessGroups` the ingress enforces decides which tile a user sees, and the same `displayName` /
@@ -113,15 +112,18 @@ let
     }
   );
 
-  # The built landing: `client/` holds the prerendered pages and their assets, `server/` the Node entry
-  # that answers the API routes. One build, so a page and the endpoint it calls cannot be from different
+  # The built portal. `client/` holds the prerendered pages and their assets, `server/` the Node entry
+  # that answers the API routes - one build, so a page and the endpoint it calls cannot be from different
   # versions.
-  site = pkgs.runCommandLocal "vyrx-landing-portal" { } ''
-    mkdir -p "$out"
-    cp -r ${vyrxLandingPkg}/. "$out/"
-    chmod -R u+w "$out"
-    cp ${portal} "$out/client/portal.json"
-  '';
+  #
+  # The catalogue goes in as a *build input*, because one page per service is a prerendered file: a build
+  # handed no catalogue renders the honest "no catalogue" state and produces no service page at all. It is
+  # handed in through `PORTAL_CATALOGUE`, the interface the portal declares for it, and the artifact carries
+  # the same file at `/portal.json` - so the pages and the data the browser reads come from one file, and
+  # nothing is written into a finished artifact here.
+  site = (inputs.vyrx-landing.packages.${pkgs.stdenv.hostPlatform.system}.default).overrideAttrs (_: {
+    PORTAL_CATALOGUE = portal;
+  });
 
   # The API port. The process serves everything - pages, assets and API - so this is the port the
   # endpoint declares, not a private one behind a hand-written proxy.
@@ -131,9 +133,27 @@ in
 {
   options.my.features.services.vyrx-landing = {
     enable = lib.mkEnableOption "VYRX Enterprise Portal & Landing Page";
+
+    package = lib.mkOption {
+      type = lib.types.package;
+      readOnly = true;
+      description = "The built portal: the upstream package with this host's catalogue as its build input.";
+    };
+
+    catalogue = lib.mkOption {
+      type = lib.types.path;
+      readOnly = true;
+      description = ''
+        The catalogue this host's contracts project - the file the portal build is given, and the file the
+        artifact serves at `/portal.json`. The fleet check reads it next to `package`, because "the artifact
+        carries what it was built from" is only measurable against the input it was built with.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    my.features.services.vyrx-landing.package = site;
+    my.features.services.vyrx-landing.catalogue = portal;
     # The portal's API and pages are one process. It reaches the collector over the mesh and, later, the
     # services themselves; what may reach it is decided by the firewall and the ingress, like every other
     # service in this fleet.
