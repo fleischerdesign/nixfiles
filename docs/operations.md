@@ -301,6 +301,11 @@ Only the owner's workstation instance carries all four; the family instances car
 instance `fleet.deploy` gives it root over the whole fleet - that is the point, and the reason it is
 scoped to one identity.
 
+A powered instance also gets the `nod` binary on its PATH and a `safe.directory` entry in its own
+`.gitconfig`. Nix's libgit2 does not read the `GIT_CONFIG_*` environment and refuses a repository the
+instance does not own (`repository path '/etc/nixos' is not owned by current user`), so the git-CLI
+grant alone is not enough for `nod` (measured 2026-09-24).
+
 The node loopback tunnels authenticate as the unprivileged `openclaw-tunnel` account, never as
 `root`. Its authorized key carries `command=false,no-pty,no-agent-forwarding,no-X11-forwarding,no-user-rc`
 and one `permitopen` per gateway port, so a stolen node key can forward one loopback port and nothing

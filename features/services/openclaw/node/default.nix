@@ -22,10 +22,14 @@ let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.openclaw.node;
 
-  # The command-family catalogue and the shared execution baseline. Both live in ../lib so the
-  # gateway module consumes the same table and the same package list instead of restating them.
+  # The command surface and the shared execution baseline. Both live in ../lib so the gateway module
+  # consumes the same table and the same package list instead of restating them.
   surface = import ../lib/command-surface.nix { inherit lib; };
   defaultBasePackages = import ../lib/base-packages.nix { inherit pkgs; };
+
+  # `nod` is a flake input, not a nixpkgs package, so it is referenced through the input. It is only
+  # put on the PATH of instances that were given a deploy/rebuild power.
+  nodPackage = topArgs.inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
   # Submodule schema for a single node instance
   instanceSubmodule =
@@ -601,6 +605,8 @@ in
                   osConfig.sops.placeholder.${osConfig.my.features.services.openclaw.node.pushTokenSecret}
                 }
                 GH_TOKEN=${osConfig.sops.placeholder.${osConfig.my.features.services.openclaw.node.pushTokenSecret}}
+              ''
+              + lib.optionalString (lib.elem "flow.push" inst.powers) ''
                 GIT_CONFIG_COUNT=1
                 GIT_CONFIG_KEY_0=credential.https://github.com.helper
                 GIT_CONFIG_VALUE_0=!${pkgs.gh}/bin/gh auth git-credential
@@ -659,15 +665,35 @@ in
 
     # `repo.write`: an access ACL for existing files and a default ACL so new files (git checkouts,
     # editor writes) inherit it. The ACL is the grant; the path comes from `repoPath`.
+    # File-level projections of the powers. `repo.write` grants the ACL; every deploy/rebuild power
+    # also needs a `safe.directory` entry in the *instance's* gitconfig, because Nix's libgit2 - unlike
+    # the git CLI - does not read the GIT_CONFIG_* environment and refuses a repository it does not own
+    # (`repository path '/etc/nixos' is not owned by current user`).
     system.activationScripts = lib.mapAttrs' (
       name: inst:
-      lib.nameValuePair "openclaw-node-${name}-repo-write" (
-        lib.mkIf (lib.elem "repo.write" inst.powers) ''
-          if [ -d ${osConfig.my.features.services.openclaw.node.repoPath} ]; then
-            ${pkgs.acl}/bin/setfacl -R -m u:${inst._serviceUser}:rwX ${osConfig.my.features.services.openclaw.node.repoPath}
-            ${pkgs.findutils}/bin/find ${osConfig.my.features.services.openclaw.node.repoPath} -type d -exec ${pkgs.acl}/bin/setfacl -m d:u:${inst._serviceUser}:rwX {} +
-          fi
-        ''
+      let
+        repoPath = osConfig.my.features.services.openclaw.node.repoPath;
+        writesRepoAcl = lib.elem "repo.write" inst.powers;
+        needsGitConfig = lib.any (power: lib.elem power inst.powers) [
+          "repo.write"
+          "fleet.deploy"
+          "system.rebuild"
+        ];
+      in
+      lib.nameValuePair "openclaw-node-${name}-powers" (
+        lib.mkIf (writesRepoAcl || needsGitConfig) (
+          lib.optionalString writesRepoAcl ''
+            if [ -d ${repoPath} ]; then
+              ${pkgs.acl}/bin/setfacl -R -m u:${inst._serviceUser}:rwX ${repoPath}
+              ${pkgs.findutils}/bin/find ${repoPath} -type d -exec ${pkgs.acl}/bin/setfacl -m d:u:${inst._serviceUser}:rwX {} +
+            fi
+          ''
+          + lib.optionalString needsGitConfig ''
+            printf '[safe]\n\tdirectory = %s\n' ${repoPath} > ${inst._stateDir}/.gitconfig
+            chown ${inst._serviceUser}:${inst._serviceGroup} ${inst._stateDir}/.gitconfig
+            chmod 0600 ${inst._stateDir}/.gitconfig
+          ''
+        )
       )
     ) enabledInstances;
 
@@ -823,6 +849,10 @@ in
                 pkgs.coreutils
               ]
               ++ inst.extraPackages
+              ++ lib.optional (lib.any (power: lib.elem power inst.powers) [
+                "fleet.deploy"
+                "system.rebuild"
+              ]) nodPackage
               ++ lib.optional inst.browserProxy.enable inst.browserProxy.package;
             };
           }
