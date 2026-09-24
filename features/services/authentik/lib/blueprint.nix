@@ -47,6 +47,7 @@ let
     ldapProvider = "authentik_providers_ldap.ldapprovider";
     outpost = "authentik_outposts.outpost";
     policyBinding = "authentik_policies.policybinding";
+    certificateKeyPair = "authentik_crypto.certificatekeypair";
     # The base the binding points at. A Flow has two identities - its own `flow_uuid` and the
     # `PolicyBindingModel.pbm_uuid` a PolicyBinding's `target` is keyed on - so a tombstone has to
     # reference the base model, never the flow itself.
@@ -346,6 +347,7 @@ let
         "authorization_code"
         "refresh_token"
       ],
+      signingKey ? null,
     }:
     entry {
       inherit id;
@@ -360,7 +362,8 @@ let
         sub_mode = subMode;
         include_claims_in_id_token = includeClaimsInIdToken;
         grant_types = grantTypes;
-      };
+      }
+      // lib.optionalAttrs (signingKey != null) { signing_key = signingKey; };
     };
 
   # The provider the LDAP outpost serves. Note which flow is which: `authorization_flow` is what the

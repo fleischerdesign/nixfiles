@@ -500,6 +500,11 @@ let
               subMode = ep.oidc.subMode;
               includeClaimsInIdToken = ep.oidc.includeClaimsInIdToken;
               grantTypes = ep.oidc.grantTypes;
+              signingKey =
+                if ep.oidc.signingKey != null then
+                  blueprintLib.refs.byName blueprintLib.models.certificateKeyPair ep.oidc.signingKey
+                else
+                  null;
             })
             (blueprintLib.application {
               slug = name;

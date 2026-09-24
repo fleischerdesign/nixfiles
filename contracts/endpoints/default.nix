@@ -144,6 +144,12 @@ let
           ];
           description = "Allowed OAuth2 grant types for the provider";
         };
+
+        signingKey = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = "authentik Internal JWT Certificate";
+          description = "Name of the certificate/keypair in Authentik used to sign ID and access tokens for JWKS";
+        };
       };
 
       # Who may use this endpoint. One declaration per service, projected three ways: the ingress gate
