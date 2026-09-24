@@ -5,7 +5,13 @@
 # plugin SKILL.md files) are deduplicated into hardlinks (nlink > 1), causing OpenClaw
 # to crash on worker turn initialization with `hardlink: hardlinked path not allowed | INVALID_BUNDLE`.
 #
-# This overlay patches the compiled dist modules in openclaw-gateway to allow hardlinks,
+# It also patches the File Transfer plugin's directory fetch: upstream spawns the literal
+# `/usr/bin/tar`, an FHS path that does not exist on NixOS (only `/usr/bin/env` is present), so
+# `dir.fetch` fails with the misleading `READ_ERROR: tar command failed` even though GNU tar is in
+# the node host's PATH. Every patch that must land is checked afterwards, so an upstream rename
+# fails the build instead of silently disabling the fix.
+#
+# This overlay patches the compiled dist modules in openclaw-gateway,
 # and rebuilds the openclaw battery wrapper so both gateway and companion nodes inherit the fix.
 _final: prev:
 let
@@ -65,6 +71,35 @@ let
                 fs.writeFileSync(full, c);
               }
             }
+          }
+
+          // 4. Patch dir-fetch-*.mjs: upstream spawns the literal "/usr/bin/tar", which does not
+          //    exist on NixOS. Resolve "tar" through PATH instead (the node host PATH carries
+          //    gnutar). Both the patch and the absence of the old string are asserted, so an
+          //    upstream rename cannot turn this into a silent no-op.
+          const dirFetchFiles = fs.existsSync(distDir)
+            ? fs.readdirSync(distDir).filter((f) => f.startsWith("dir-fetch-") && f.endsWith(".mjs"))
+            : [];
+          let dirFetchPatched = 0;
+          for (const f of dirFetchFiles) {
+            const full = path.join(distDir, f);
+            let c = fs.readFileSync(full, "utf8");
+            if (c.includes("/usr/bin/tar")) {
+              c = c.split("/usr/bin/tar").join("tar");
+              fs.writeFileSync(full, c);
+              dirFetchPatched += 1;
+            }
+          }
+          if (dirFetchPatched === 0) {
+            console.error("openclaw overlay: no dir-fetch module with the hard-coded \"/usr/bin/tar\" was found - the PATH patch would be a no-op");
+            process.exit(1);
+          }
+          const leftovers = dirFetchFiles.filter((f) =>
+            fs.readFileSync(path.join(distDir, f), "utf8").includes("/usr/bin/tar")
+          );
+          if (leftovers.length > 0) {
+            console.error("openclaw overlay: /usr/bin/tar still present in " + leftovers.join(", "));
+            process.exit(1);
           }
         '
       '';
