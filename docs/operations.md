@@ -280,6 +280,34 @@ nix shell nixpkgs#sqlite -c sqlite3 "$DB" \
 The workstation's historic `jello` is the same kind of runtime state; correct it in the Control UI
 (Devices → rename) or with a pairing-scoped token.
 
+### 7.2 Instance identities, powers and the tunnel account
+
+Every gateway and node instance runs as its own system user `openclaw-<instance>` with a private
+group. State directories, rendered env files and single-consumer secrets (for example
+`users/philipp/github_pat`) belong to that user; secrets more than one instance needs (the fleet-wide
+provider keys) stay in the `openclaw` **group**. One person's agent therefore cannot read another's
+state, and this is enforced by the file system, not by configuration.
+
+A node instance declares `powers`, empty unless declared:
+
+| Power | Grant |
+|---|---|
+| `repo.write` | an access and default ACL for the instance user on `my.features.services.openclaw.node.repoPath` |
+| `fleet.deploy` | the fleet deploy key rendered `0400` into the instance home |
+| `flow.push` | the GitHub token in the service env, wired as the git credential helper |
+| `system.rebuild` | the Nix trusted user plus passwordless `nod` / `nixos-rebuild` rules |
+
+Only the owner's workstation instance carries all four; the family instances carry none. Giving an
+instance `fleet.deploy` gives it root over the whole fleet - that is the point, and the reason it is
+scoped to one identity.
+
+The node loopback tunnels authenticate as the unprivileged `openclaw-tunnel` account, never as
+`root`. Its authorized key carries `command=false,no-pty,no-agent-forwarding,no-X11-forwarding,no-user-rc`
+and one `permitopen` per gateway port, so a stolen node key can forward one loopback port and nothing
+else. Do **not** add `restrict` to that key: it implies `no-port-forwarding`, and `permitopen` only
+narrows an allowed forward - it does not re-enable one (measured 2026-09-24: the forward failed with
+`administratively prohibited` until `restrict` was removed).
+
 ---
 
 ## 8. Emergency Recovery — Regaining Access
