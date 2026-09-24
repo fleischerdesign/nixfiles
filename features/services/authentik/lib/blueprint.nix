@@ -342,6 +342,10 @@ let
       redirectUris,
       subMode,
       includeClaimsInIdToken ? true,
+      grantTypes ? [
+        "authorization_code"
+        "refresh_token"
+      ],
     }:
     entry {
       inherit id;
@@ -355,6 +359,7 @@ let
         redirect_uris = redirectUris;
         sub_mode = subMode;
         include_claims_in_id_token = includeClaimsInIdToken;
+        grant_types = grantTypes;
       };
     };
 

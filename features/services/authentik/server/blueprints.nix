@@ -499,6 +499,7 @@ let
               }) ep.oidc.redirectUris;
               subMode = ep.oidc.subMode;
               includeClaimsInIdToken = ep.oidc.includeClaimsInIdToken;
+              grantTypes = ep.oidc.grantTypes;
             })
             (blueprintLib.application {
               slug = name;

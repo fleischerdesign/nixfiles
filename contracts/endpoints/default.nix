@@ -125,6 +125,25 @@ let
           default = true;
           description = "Whether to include user claims directly in the ID token";
         };
+
+        grantTypes = lib.mkOption {
+          type = lib.types.listOf (
+            lib.types.enum [
+              "authorization_code"
+              "implicit"
+              "hybrid"
+              "refresh_token"
+              "client_credentials"
+              "password"
+              "device_code"
+            ]
+          );
+          default = [
+            "authorization_code"
+            "refresh_token"
+          ];
+          description = "Allowed OAuth2 grant types for the provider";
+        };
       };
 
       # Who may use this endpoint. One declaration per service, projected three ways: the ingress gate
