@@ -306,7 +306,11 @@ let
 
           root = lib.mkOption {
             type = lib.types.str;
-            default = "${stateDir}/dev";
+            # OpenClaw's own default for `worktreeRoot` is `<state-dir>/worktrees`; using the same
+            # noun keeps the path speaking the upstream vocabulary. This is not the gateway's agent
+            # workspace (`agents.*.workspace`) - that one holds AGENTS.md/MEMORY.md, this one holds
+            # disposable checkouts.
+            default = "${stateDir}/worktrees";
             description = ''
               Absolute path under which OpenClaw allocates managed worktrees
               (`<root>/<repo-fingerprint>/<name>`). Created by tmpfiles; `git clone` by hand into
