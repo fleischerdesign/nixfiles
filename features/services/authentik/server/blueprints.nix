@@ -505,6 +505,11 @@ let
                   blueprintLib.refs.byName blueprintLib.models.certificateKeyPair ep.oidc.signingKey
                 else
                   null;
+              propertyMappings = map (
+                scope:
+                blueprintLib.refs.byField blueprintLib.models.scopeMapping "managed"
+                  "goauthentik.io/providers/oauth2/scope-${scope}"
+              ) ep.oidc.propertyMappings;
             })
             (blueprintLib.application {
               slug = name;

@@ -150,6 +150,16 @@ let
           default = "authentik Internal JWT Certificate";
           description = "Name of the certificate/keypair in Authentik used to sign ID and access tokens for JWKS";
         };
+
+        propertyMappings = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [
+            "openid"
+            "email"
+            "profile"
+          ];
+          description = "Authentik scope mappings attached to the provider to populate scopes and claims (e.g. openid, email, profile)";
+        };
       };
 
       # Who may use this endpoint. One declaration per service, projected three ways: the ingress gate
