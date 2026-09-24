@@ -63,11 +63,6 @@
       url = "github:fleischerdesign/nod/develop";
       inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
     };
-
-    openclaw = {
-      url = "github:openclaw/nix-openclaw";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
   };
 
   outputs =
@@ -88,8 +83,6 @@
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
         inputs.nix-vscode-extensions.overlays.default
-        inputs.openclaw.overlays.default
-        (import ./packages/overlays/fix/openclaw)
         (import ./packages/custom)
       ];
 
@@ -111,45 +104,12 @@
       globalModules = [
         inputs.sops-nix.nixosModules.sops
         inputs.nod.nixosModules.default
-        inputs.openclaw.nixosModules.openclaw-gateway
       ];
       hostNames = nixpkgs-unstable.lib.attrNames (
         nixpkgs-unstable.lib.filterAttrs (
           name: type: type == "directory" && builtins.pathExists (./hosts + "/${name}/configuration.nix")
         ) (builtins.readDir ./hosts)
       );
-
-      # Every rendered OpenClaw document - gateway instances and companion nodes - is validated
-      # against the upstream schema at build time. The service and the node load the same document
-      # from a SOPS template, so an unknown key or model name is caught here instead of in a crash
-      # loop. Keyed off this repository's own feature module: the previous variant asked for
-      # `services.openclaw-gateway.enable`, which nothing here sets, so it silently validated
-      # nothing at all.
-      openclawConfigs = nixpkgs-unstable.lib.mapAttrs (
-        _: cfg:
-        let
-          documentsOf =
-            selector: extractor:
-            nixpkgs-unstable.lib.mapAttrsToList (instanceName: instance: {
-              id = instanceName;
-              config = extractor instance;
-            }) (selector cfg);
-        in
-        nixpkgs-unstable.lib.filter (document: document.config != { }) (
-          map (document: document // { id = "gateway-${document.id}"; }) (
-            documentsOf (cfg': cfg'.my.features.services.openclaw.gateway.instances or { }) (
-              instance: instance._renderedConfig
-            )
-          )
-          ++ map (document: document // { id = "node-${document.id}"; }) (
-            documentsOf (cfg': cfg'.my.features.services.openclaw.node.instances or { }) (
-              instance: instance._mergedConfig
-            )
-          )
-        )
-      ) (nixpkgs-unstable.lib.genAttrs hostNames (name: self.nixosConfigurations.${name}.config));
-
-      openclawConfigHosts = nixpkgs-unstable.lib.filter (name: openclawConfigs.${name} != [ ]) hostNames;
 
       # Every host that runs the authentik server ships a compiled blueprint directory. The check below
       # proves those bytes before a deploy, so a bad model name, a cross-file reference or a person who
@@ -377,28 +337,6 @@
               echo "ok: ${toString (nixpkgs-unstable.lib.length scripts)} embedded authentik script(s) compile" > $out
             '';
 
-        # The gateway grant and the node declarations are two halves of one statement; this proves
-        # they agree for every node whose gateway address and port resolve to an instance in this
-        # flake. Without it, "dir.list is not in the allowlist" is the first place a mismatch shows.
-        openclaw-surface =
-          let
-            result = import ./lib/checks/openclaw-surface.nix {
-              inherit self hostNames;
-              lib = nixpkgs-unstable.lib;
-            };
-          in
-          pkgs.runCommandLocal "openclaw-surface" { } (
-            if result.violations == [ ] then
-              "echo 'ok: ${toString result.inspected} OpenClaw node capability declaration(s) agree with their gateway grant' > $out"
-            else
-              ''
-                cat >&2 <<'VIOLATIONS'
-                ${nixpkgs-unstable.lib.concatStringsSep "\n" result.violations}
-                VIOLATIONS
-                exit 1
-              ''
-          );
-
         # The portal is built, not fetched, and its catalogue is a build input: the artifact the portal
         # host runs has to carry what its pages were rendered from. lib/checks/vyrx-portal.nix states the
         # claim and measures it on the artifact, where the consumer sees it.
@@ -406,30 +344,7 @@
           inherit pkgs self hostNames;
           lib = nixpkgs-unstable.lib;
         };
-      }
-      // nixpkgs-unstable.lib.genAttrs' openclawConfigHosts (name: {
-        name = "openclaw-config-validity-${name}";
-        value =
-          pkgs.runCommandLocal "openclaw-config-validity-${name}"
-            {
-              nativeBuildInputs = [ pkgs.openclaw ];
-            }
-            ''
-              export HOME="$TMPDIR/home"
-              export OPENCLAW_STATE_DIR="$TMPDIR/state"
-              mkdir -p "$HOME" "$OPENCLAW_STATE_DIR"
-              ${nixpkgs-unstable.lib.concatMapStrings (document: ''
-                if ! OPENCLAW_CONFIG_PATH=${pkgs.writeText "openclaw-${name}-${document.id}.json" (builtins.toJSON document.config)} openclaw config validate --json > "$TMPDIR/validated-${document.id}.json" 2>&1; then
-                  echo "openclaw config validate failed for ${document.id}:"
-                  cat "$TMPDIR/validated-${document.id}.json"
-                  exit 1
-                fi
-              '') openclawConfigs.${name}}
-              echo "ok: ${
-                toString (nixpkgs-unstable.lib.length openclawConfigs.${name})
-              } OpenClaw configuration(s) validate against the upstream schema" > $out
-            '';
-      });
+      };
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [

@@ -20,25 +20,6 @@
 
   my.features.media.gaming.sunshine.enable = false;
 
-  my.features.services.openclaw.node = {
-    enable = true;
-    instances = {
-      philipp = {
-        enable = true;
-        displayName = "mob-nb-01";
-        # The notebook rebuilds itself; it does not hold the repo, the deploy key or the token.
-        powers = [ "system.rebuild" ];
-        gateway = {
-          host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
-          port = 18789;
-        };
-        transport = "loopback-tunnel";
-        tunnel.localPort = 18790;
-        sessionHosting.enable = true;
-      };
-    };
-  };
-
   my.features.services.attic.client = {
     enable = true;
     autoPush = true;

@@ -3,7 +3,6 @@
 { pkgs, ... }:
 {
   home.packages = with pkgs; [
-    openclaw
     telegram-desktop
     google-chrome
     nerd-fonts.jetbrains-mono

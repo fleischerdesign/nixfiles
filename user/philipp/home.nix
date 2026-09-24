@@ -8,7 +8,6 @@
   imports = [
     ./packages.nix
     ./pi.nix
-    ./openclaw.nix
     ./fish.nix
     inputs.nixcord.homeModules.nixcord
   ];
@@ -46,15 +45,15 @@
   my.features.desktop.webapps = {
     enable = true;
     apps = {
-      openclaw = {
-        displayName = "OpenClaw";
-        url = "https://philipp.ai.${osConfig.my.topology.domain}";
+      ai = {
+        displayName = "AI Assistant";
+        url = "https://ai.${osConfig.my.topology.domain}";
         icon = ../../media/openclaw.png;
-        comment = "OpenClaw AI Gateway";
+        comment = "AI Assistant (Open-WebUI)";
         categories = [
           "Network"
         ];
-        wmClass = "openclaw";
+        wmClass = "open-webui";
       };
 
       gmail = {

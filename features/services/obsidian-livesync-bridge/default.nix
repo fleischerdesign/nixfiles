@@ -178,6 +178,30 @@ in
       ) (lib.attrNames enabledInstances)
     );
 
+    users.users = lib.listToAttrs (
+      lib.concatMap (
+        inst:
+        lib.optional (inst.user == "obsidian-bridge") {
+          name = "obsidian-bridge";
+          value = {
+            isSystemUser = true;
+            group = inst.group;
+            description = "Obsidian LiveSync Bridge Daemon User";
+          };
+        }
+      ) (lib.attrValues enabledInstances)
+    );
+
+    users.groups = lib.listToAttrs (
+      lib.concatMap (
+        inst:
+        lib.optional (inst.group == "obsidian-bridge") {
+          name = "obsidian-bridge";
+          value = { };
+        }
+      ) (lib.attrValues enabledInstances)
+    );
+
     # Ensure vault and state directories exist with correct user ownership
     systemd.tmpfiles.rules = lib.concatMap (
       name:
