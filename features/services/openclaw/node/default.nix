@@ -170,7 +170,7 @@ let
 
           user = lib.mkOption {
             type = lib.types.str;
-            default = "root";
+            default = "openclaw-tunnel";
             description = "SSH user on the gateway host.";
           };
 
@@ -244,6 +244,26 @@ let
             command it has - the gateway decides what it grants - so this is the declaration the
             fleet consistency check compares the gateway's grant against, and the platform
             assertion checks it against. Narrow it to state intent, not to restrict execution.
+          '';
+        };
+
+        powers = lib.mkOption {
+          type = lib.types.listOf (
+            lib.types.enum [
+              "repo.write"
+              "fleet.deploy"
+              "flow.push"
+              "system.rebuild"
+            ]
+          );
+          default = [ ];
+          description = ''
+            Operator powers of this instance's agent, projected to real grants and nothing more:
+              repo.write     - ACL write access to `my.features.services.openclaw.node.repoPath`
+              fleet.deploy   - the fleet deploy private key in the instance home (`nod deploy`)
+              flow.push      - a GitHub token in the service env, wired as a git credential
+              system.rebuild - Nix trusted user plus passwordless `nod`/`nixos-rebuild`
+            Empty for every instance that is not its owner; the family's instances carry none.
           '';
         };
 
@@ -417,13 +437,41 @@ let
     };
 
   enabledInstances = lib.filterAttrs (_: inst: inst.enable) cfg.instances;
+
+  # Instances that carry the `system.rebuild` power, projected to the users that may act as a Nix
+  # trusted user and invoke the deployer through sudo.
+  trustedUsers = lib.mapAttrsToList (_: inst: inst._serviceUser) (
+    lib.filterAttrs (_: inst: lib.elem "system.rebuild" inst.powers) enabledInstances
+  );
 in
 {
   options.my.features.services.openclaw.node = {
     enable = lib.mkEnableOption "OpenClaw companion node service";
 
-    rebuild = {
-      enable = lib.mkEnableOption "allow openclaw to test and switch system configurations (nix trusted-user, sudoers for nod and nixos-rebuild)";
+    # Where the configuration repository lives on a host whose agent was given `repo.write`.
+    repoPath = lib.mkOption {
+      type = lib.types.str;
+      default = "/etc/nixos";
+      description = "Absolute path of the fleet repository the `repo.write` power grants access to.";
+    };
+
+    # Credentials the powers project. Secrets, not literals, because a grant is a key.
+    deployKeySecret = lib.mkOption {
+      type = lib.types.str;
+      default = "infra/deploy_key";
+      description = "SOPS secret holding the fleet deploy private key (`fleet.deploy`).";
+    };
+
+    deployKeySopsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = ../../../../secrets/deploy-key.yaml;
+      description = "SOPS file for the fleet deploy key, deliberately not encrypted to CI.";
+    };
+
+    pushTokenSecret = lib.mkOption {
+      type = lib.types.str;
+      default = "users/${osConfig.my.user.primary}/github_pat";
+      description = "SOPS secret holding a GitHub token with write access (`flow.push`).";
     };
 
     # Node -> gateway loopback-tunnel credential, declared once instead of per host: every
@@ -516,6 +564,21 @@ in
               sopsFile = osConfig.my.features.services.openclaw.node.tunnelPrivateKeySopsFile;
             };
           })
+          (lib.mkIf (lib.elem "fleet.deploy" inst.powers) {
+            "${osConfig.my.features.services.openclaw.node.deployKeySecret}" = {
+              sopsFile = osConfig.my.features.services.openclaw.node.deployKeySopsFile;
+              path = "${inst._stateDir}/.ssh/nixfiles-deploy-key";
+              owner = inst._serviceUser;
+              group = inst._serviceGroup;
+              mode = "0400";
+            };
+          })
+          (lib.mkIf (lib.elem "flow.push" inst.powers) {
+            "${osConfig.my.features.services.openclaw.node.pushTokenSecret}" = {
+              owner = inst._serviceUser;
+              group = inst._serviceGroup;
+            };
+          })
         ]
       ) (lib.attrNames enabledInstances)
     );
@@ -531,7 +594,17 @@ in
           value = {
             owner = inst._serviceUser;
             restartUnits = [ "openclaw-node-${name}.service" ];
-            content = "OPENCLAW_GATEWAY_PASSWORD=${osConfig.sops.placeholder.${inst.passwordSecret}}\n";
+            content =
+              "OPENCLAW_GATEWAY_PASSWORD=${osConfig.sops.placeholder.${inst.passwordSecret}}\n"
+              + lib.optionalString (lib.elem "flow.push" inst.powers) ''
+                GITHUB_TOKEN=${
+                  osConfig.sops.placeholder.${osConfig.my.features.services.openclaw.node.pushTokenSecret}
+                }
+                GH_TOKEN=${osConfig.sops.placeholder.${osConfig.my.features.services.openclaw.node.pushTokenSecret}}
+                GIT_CONFIG_COUNT=1
+                GIT_CONFIG_KEY_0=credential.https://github.com.helper
+                GIT_CONFIG_VALUE_0=!${pkgs.gh}/bin/gh auth git-credential
+              '';
           };
         }
       ) (lib.attrNames enabledInstances)
@@ -550,41 +623,53 @@ in
       }
     ) enabledInstances;
 
-    nix.settings.trusted-users = lib.mkIf cfg.rebuild.enable (
-      lib.mapAttrsToList (_: inst: inst._serviceUser) enabledInstances
-    );
+    # Only instances carrying the `system.rebuild` power are Nix trusted users or may invoke the
+    # deployer through sudo. The blanket grant to the shared account is gone.
+    nix.settings.trusted-users = trustedUsers;
 
-    security.sudo.extraRules = lib.mkIf cfg.rebuild.enable [
-      {
-        users = lib.mapAttrsToList (_: inst: inst._serviceUser) enabledInstances;
-        commands = [
-          {
-            command = "/run/current-system/sw/bin/nod switch *";
-            options = [ "NOPASSWD" ];
-          }
-          {
-            command = "/run/current-system/sw/bin/nod test *";
-            options = [ "NOPASSWD" ];
-          }
-          {
-            command = "/run/current-system/sw/bin/nod check *";
-            options = [ "NOPASSWD" ];
-          }
-          {
-            command = "/run/current-system/sw/bin/nixos-rebuild switch *";
-            options = [ "NOPASSWD" ];
-          }
-          {
-            command = "/run/current-system/sw/bin/nixos-rebuild test *";
-            options = [ "NOPASSWD" ];
-          }
-          {
-            command = "/run/current-system/sw/bin/nixos-rebuild dry-run *";
-            options = [ "NOPASSWD" ];
-          }
-        ];
-      }
-    ];
+    security.sudo.extraRules = lib.optional (trustedUsers != [ ]) {
+      users = trustedUsers;
+      commands = [
+        {
+          command = "/run/current-system/sw/bin/nod switch *";
+          options = [ "NOPASSWD" ];
+        }
+        {
+          command = "/run/current-system/sw/bin/nod test *";
+          options = [ "NOPASSWD" ];
+        }
+        {
+          command = "/run/current-system/sw/bin/nod check *";
+          options = [ "NOPASSWD" ];
+        }
+        {
+          command = "/run/current-system/sw/bin/nixos-rebuild switch *";
+          options = [ "NOPASSWD" ];
+        }
+        {
+          command = "/run/current-system/sw/bin/nixos-rebuild test *";
+          options = [ "NOPASSWD" ];
+        }
+        {
+          command = "/run/current-system/sw/bin/nixos-rebuild dry-run *";
+          options = [ "NOPASSWD" ];
+        }
+      ];
+    };
+
+    # `repo.write`: an access ACL for existing files and a default ACL so new files (git checkouts,
+    # editor writes) inherit it. The ACL is the grant; the path comes from `repoPath`.
+    system.activationScripts = lib.mapAttrs' (
+      name: inst:
+      lib.nameValuePair "openclaw-node-${name}-repo-write" (
+        lib.mkIf (lib.elem "repo.write" inst.powers) ''
+          if [ -d ${osConfig.my.features.services.openclaw.node.repoPath} ]; then
+            ${pkgs.acl}/bin/setfacl -R -m u:${inst._serviceUser}:rwX ${osConfig.my.features.services.openclaw.node.repoPath}
+            ${pkgs.findutils}/bin/find ${osConfig.my.features.services.openclaw.node.repoPath} -type d -exec ${pkgs.acl}/bin/setfacl -m d:u:${inst._serviceUser}:rwX {} +
+          fi
+        ''
+      )
+    ) enabledInstances;
 
     environment.etc = lib.listToAttrs (
       lib.concatMap (
@@ -624,6 +709,7 @@ in
       ++ lib.optional inst.workspace.enable (
         "d ${inst.workspace.root} 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
       )
+      ++ lib.optional (lib.elem "fleet.deploy" inst.powers) "d ${inst._stateDir}/.ssh 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
     ) (lib.attrNames enabledInstances)
     # sops-nix can only render the tunnel key if its parent directory exists.
     ++ lib.unique (

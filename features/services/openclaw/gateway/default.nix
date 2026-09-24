@@ -958,15 +958,21 @@ in
   options.my.features.services.openclaw.gateway = {
     enable = lib.mkEnableOption "OpenClaw multi-tenant gateway service";
 
-    # A gateway is the SSH *server* end of the node loopback tunnels: it authorizes the node
-    # keys for root. The node side renders the matching private key (see the node feature's
-    # tunnelPrivateKeySecret), so exactly one side owns each half of the credential.
+    # A gateway is the SSH *server* end of the node loopback tunnels. The key may open exactly the
+    # loopback forwards to this host's gateway ports and nothing else - never a root shell. The node
+    # side renders the matching private key (my.features.services.openclaw.node.tunnelPrivateKeySecret).
     trustedNodeKeys = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBIIoWHt6VqxvAOIXkZXZdNiNzoQ32a2PoEvjM3oaDEj openclaw-node-tunnel"
       ];
-      description = "SSH public keys allowed to open node tunnels on this gateway.";
+      description = "SSH public keys allowed to open node tunnel forwards on this gateway (no shell).";
+    };
+
+    tunnelUser = lib.mkOption {
+      type = lib.types.str;
+      default = "openclaw-tunnel";
+      description = "Unprivileged account the node loopback tunnels authenticate as.";
     };
 
     # Accounts that may reach every instance in addition to the person it belongs to (the operator
@@ -1008,6 +1014,7 @@ in
       // {
         # Shared-secret group; no user lives here, instances only read the fleet-wide provider keys.
         openclaw = { };
+        ${cfg.tunnelUser} = { };
       };
 
     users.users =
@@ -1026,9 +1033,27 @@ in
       // {
         # Caddy is added to each instance group for socket reverse_proxy.
         caddy.extraGroups = lib.mapAttrsToList (_: inst: inst._serviceGroup) enabledInstances;
-        # Authorize the node tunnel keys. List options merge, so this adds to the fleet deploy keys
-        # set by the ssh feature without replacing them.
-        root.openssh.authorizedKeys.keys = cfg.trustedNodeKeys;
+        # Node tunnels: a restricted account whose key may only open the loopback forwards to this
+        # host's gateway ports. `restrict` disables everything, the permitopen entries re-enable the
+        # one channel each node needs, and the forced command makes a shell impossible.
+        ${cfg.tunnelUser} = {
+          isSystemUser = true;
+          group = cfg.tunnelUser;
+          home = "/var/lib/openclaw/tunnel";
+          createHome = false;
+          shell = "${pkgs.shadow}/bin/nologin";
+          openssh.authorizedKeys.keys = map (
+            key:
+            # NOT `restrict`: that implies no-port-forwarding, and `permitopen` only narrows an
+            # allowed forward, it does not re-enable one. Restrict every other capability
+            # explicitly and let permitopen hold the forwarding to the gateway ports.
+            "command=\"${pkgs.coreutils}/bin/false\",no-pty,no-agent-forwarding,no-X11-forwarding,no-user-rc"
+            + lib.concatMapStringsSep "" (inst: ",permitopen=\"127.0.0.1:${toString inst.port}\"") (
+              lib.attrValues enabledInstances
+            )
+            + " ${key}"
+          ) cfg.trustedNodeKeys;
+        };
       };
 
     # A secret exactly one instance consumes belongs to that instance's user; a secret more than one
@@ -1104,6 +1129,7 @@ in
       # Traversable containers owned by root; each instance directory below carries its own owner.
       "d /var/lib/openclaw 0711 root root - -"
       "d /var/lib/openclaw/instances 0711 root root - -"
+      "d /var/lib/openclaw/tunnel 0755 root root - -"
     ]
     ++ lib.concatMap (
       name:

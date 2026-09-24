@@ -24,11 +24,17 @@
 
   my.features.services.openclaw.node = {
     enable = true;
-    rebuild.enable = true;
     instances = {
       philipp = {
         enable = true;
         displayName = "hom-wrk-01";
+        # This is the owner's agent: it may edit the repository, deploy the fleet, push, and rebuild.
+        powers = [
+          "repo.write"
+          "fleet.deploy"
+          "flow.push"
+          "system.rebuild"
+        ];
         gateway = {
           host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18789;

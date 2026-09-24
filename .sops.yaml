@@ -22,6 +22,18 @@ creation_rules:
           - *cld-ops-01
           - *hom-wrk-01
           - *mob-nb-01
+  # Fleet deploy key: the one secret that is root on every host. Like the tunnel key it is
+  # deliberately NOT encrypted to `ci`, so a compromised CI identity cannot deploy the fleet.
+  - path_regex: secrets/deploy-key\.yaml$
+    key_groups:
+      - pgp: []
+        age:
+          - *philipp
+          - *hom-srv-01
+          - *cld-edge-01
+          - *cld-ops-01
+          - *hom-wrk-01
+          - *mob-nb-01
   - path_regex: secrets/.*\.yaml$
     key_groups:
       - pgp: []

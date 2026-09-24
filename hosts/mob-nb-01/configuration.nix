@@ -22,11 +22,12 @@
 
   my.features.services.openclaw.node = {
     enable = true;
-    rebuild.enable = true;
     instances = {
       philipp = {
         enable = true;
         displayName = "mob-nb-01";
+        # The notebook rebuilds itself; it does not hold the repo, the deploy key or the token.
+        powers = [ "system.rebuild" ];
         gateway = {
           host = config.my.topology.hosts.cld-ops-01.wireguardIpv4;
           port = 18789;
