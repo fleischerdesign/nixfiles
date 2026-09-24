@@ -352,6 +352,10 @@
     enable = true;
     instances.philipp = {
       enable = true;
+      # The bridge writes into the gateway instance's state directory, so it runs as that instance's
+      # service identity - the shared `openclaw` account no longer exists.
+      user = "openclaw-philipp";
+      group = "openclaw-philipp";
       couchdb.url = "https://livesync.vyrx.de";
       couchdb.database = "obsidian-vault";
     };

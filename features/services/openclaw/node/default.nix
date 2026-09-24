@@ -398,6 +398,21 @@ let
           internal = true;
           default = configFile;
         };
+
+        # Every instance is its own system user. The shared `openclaw` account made the 0700 state
+        # directories meaningless: five instances on one host had the same owner and could read each
+        # other's state, credentials and memory. The name is derived, never declared.
+        _serviceUser = lib.mkOption {
+          type = lib.types.str;
+          internal = true;
+          default = "openclaw-${name}";
+        };
+
+        _serviceGroup = lib.mkOption {
+          type = lib.types.str;
+          internal = true;
+          default = "openclaw-${name}";
+        };
       };
     };
 
@@ -514,7 +529,7 @@ in
         lib.optional inst._hasPassword {
           name = "openclaw_node_${name}_env";
           value = {
-            owner = "openclaw";
+            owner = inst._serviceUser;
             restartUnits = [ "openclaw-node-${name}.service" ];
             content = "OPENCLAW_GATEWAY_PASSWORD=${osConfig.sops.placeholder.${inst.passwordSecret}}\n";
           };
@@ -522,21 +537,26 @@ in
       ) (lib.attrNames enabledInstances)
     );
 
-    users.groups.openclaw = { };
+    users.groups = lib.mapAttrs' (_: inst: lib.nameValuePair inst._serviceGroup { }) enabledInstances;
 
-    users.users.openclaw = {
-      isSystemUser = true;
-      group = "openclaw";
-      home = "/var/lib/openclaw";
-      createHome = true;
-      shell = pkgs.bashInteractive;
-    };
+    users.users = lib.mapAttrs' (
+      _: inst:
+      lib.nameValuePair inst._serviceUser {
+        isSystemUser = true;
+        group = inst._serviceGroup;
+        home = inst._stateDir;
+        createHome = false;
+        shell = pkgs.bashInteractive;
+      }
+    ) enabledInstances;
 
-    nix.settings.trusted-users = lib.mkIf cfg.rebuild.enable [ "openclaw" ];
+    nix.settings.trusted-users = lib.mkIf cfg.rebuild.enable (
+      lib.mapAttrsToList (_: inst: inst._serviceUser) enabledInstances
+    );
 
     security.sudo.extraRules = lib.mkIf cfg.rebuild.enable [
       {
-        users = [ "openclaw" ];
+        users = lib.mapAttrsToList (_: inst: inst._serviceUser) enabledInstances;
         commands = [
           {
             command = "/run/current-system/sw/bin/nod switch *";
@@ -583,8 +603,10 @@ in
     );
 
     systemd.tmpfiles.rules = [
-      "d /var/lib/openclaw 0750 openclaw openclaw - -"
-      "d /var/lib/openclaw/node-instances 0750 openclaw openclaw - -"
+      # Traversable containers, owned by root: an instance user may walk into the tree but not
+      # list it, and each instance directory below carries the instance's own owner and mode.
+      "d /var/lib/openclaw 0711 root root - -"
+      "d /var/lib/openclaw/node-instances 0711 root root - -"
       "d /etc/openclaw 0755 root root - -"
       "d /etc/openclaw/node-instances 0755 root root - -"
     ]
@@ -593,8 +615,15 @@ in
       let
         inst = enabledInstances.${name};
       in
-      [ "d ${inst._stateDir} 0700 openclaw openclaw - -" ]
-      ++ lib.optional inst.workspace.enable "d ${inst.workspace.root} 0700 openclaw openclaw - -"
+      # Z (capital): recursive ownership repair, so state written under the old shared account keeps
+      # working after the instance got its own user. Lowercase z only adjusted the path itself.
+      [
+        "d ${inst._stateDir} 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
+        "Z ${inst._stateDir} - ${inst._serviceUser} ${inst._serviceGroup} - -"
+      ]
+      ++ lib.optional inst.workspace.enable (
+        "d ${inst.workspace.root} 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
+      )
     ) (lib.attrNames enabledInstances)
     # sops-nix can only render the tunnel key if its parent directory exists.
     ++ lib.unique (
@@ -681,8 +710,8 @@ in
               };
 
               serviceConfig = {
-                User = "openclaw";
-                Group = "openclaw";
+                User = inst._serviceUser;
+                Group = inst._serviceGroup;
                 WorkingDirectory = inst._stateDir;
                 StateDirectory = "openclaw/node-instances/${name}";
                 StateDirectoryMode = "0700";

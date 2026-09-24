@@ -935,6 +935,20 @@ let
           internal = true;
           default = endpointName;
         };
+
+        # One system user per instance. The shared `openclaw` account gave five tenants the same uid,
+        # so their state directories were readable across people; the name is derived, not declared.
+        _serviceUser = lib.mkOption {
+          type = lib.types.str;
+          internal = true;
+          default = "openclaw-${name}";
+        };
+
+        _serviceGroup = lib.mkOption {
+          type = lib.types.str;
+          internal = true;
+          default = "openclaw-${name}";
+        };
       };
     };
 
@@ -973,9 +987,6 @@ in
   };
 
   config = lib.mkIf (cfg.enable && enabledInstances != { }) {
-    # Authorize the node tunnel keys. List options merge, so this adds to the fleet deploy
-    # keys set by the ssh feature without replacing them.
-    users.users.root.openssh.authorizedKeys.keys = cfg.trustedNodeKeys;
 
     # Validate plugins on all enabled instances
     assertions = lib.concatMap (
@@ -991,27 +1002,68 @@ in
       ]
     ) (lib.attrNames enabledInstances);
 
-    # Ensure openclaw group and system user exist
-    users.groups.openclaw = { };
-    users.users.openclaw = {
-      isSystemUser = true;
-      group = "openclaw";
-      home = "/var/lib/openclaw";
-      createHome = true;
-      shell = pkgs.bashInteractive;
-    };
+    # One system user and private group per instance.
+    users.groups =
+      (lib.mapAttrs' (_: inst: lib.nameValuePair inst._serviceGroup { }) enabledInstances)
+      // {
+        # Shared-secret group; no user lives here, instances only read the fleet-wide provider keys.
+        openclaw = { };
+      };
 
-    # Allow caddy to traverse into /var/lib/openclaw for socket reverse_proxy
-    users.users.caddy.extraGroups = [ "openclaw" ];
+    users.users =
+      (lib.mapAttrs' (
+        _: inst:
+        lib.nameValuePair inst._serviceUser {
+          isSystemUser = true;
+          group = inst._serviceGroup;
+          # The shared provider keys live in group `openclaw`; instance-private secrets do not.
+          extraGroups = [ "openclaw" ];
+          home = inst._stateDir;
+          createHome = false;
+          shell = pkgs.bashInteractive;
+        }
+      ) enabledInstances)
+      // {
+        # Caddy is added to each instance group for socket reverse_proxy.
+        caddy.extraGroups = lib.mapAttrsToList (_: inst: inst._serviceGroup) enabledInstances;
+        # Authorize the node tunnel keys. List options merge, so this adds to the fleet deploy keys
+        # set by the ssh feature without replacing them.
+        root.openssh.authorizedKeys.keys = cfg.trustedNodeKeys;
+      };
 
-    # Collect all secrets used across all instances and grant openclaw access
+    # A secret exactly one instance consumes belongs to that instance's user; a secret more than one
+    # instance needs (the shared provider keys) lives in the shared group. The per-instance rendered
+    # template files are what the services read.
     sops.secrets =
-      lib.genAttrs
-        (lib.unique (lib.concatMap (inst: inst._secretNames) (lib.attrValues enabledInstances)))
-        (_: {
-          owner = "openclaw";
-          group = "openclaw";
-        });
+      lib.mapAttrs
+        (
+          _: consumers:
+          if builtins.length consumers == 1 then
+            let
+              inst = enabledInstances.${builtins.head consumers};
+            in
+            {
+              owner = inst._serviceUser;
+              group = inst._serviceGroup;
+            }
+          else
+            {
+              owner = "root";
+              group = "openclaw";
+              mode = "0440";
+            }
+        )
+        (
+          lib.foldl' (
+            acc: name:
+            let
+              inst = enabledInstances.${name};
+            in
+            lib.foldl' (
+              acc': secret: acc' // { ${secret} = lib.unique ((acc'.${secret} or [ ]) ++ [ name ]); }
+            ) acc inst._secretNames
+          ) { } (lib.attrNames enabledInstances)
+        );
 
     # Generate one environment file and one config file per instance via sops.templates
     # This ensures placeholders like openclaw_gateway_token in JSON are dynamically expanded without leaking into nix store.
@@ -1026,8 +1078,8 @@ in
           {
             name = "openclaw_${name}_config";
             value = {
-              owner = "openclaw";
-              group = "openclaw";
+              owner = inst._serviceUser;
+              group = inst._serviceGroup;
               mode = "0640";
               restartUnits = [ "openclaw-gateway-${name}.service" ];
               content = rawJson;
@@ -1037,8 +1089,8 @@ in
         ++ lib.optional inst._hasSecrets {
           name = "openclaw_${name}_env";
           value = {
-            owner = "openclaw";
-            group = "openclaw";
+            owner = inst._serviceUser;
+            group = inst._serviceGroup;
             mode = "0640";
             restartUnits = [ "openclaw-gateway-${name}.service" ];
             content = lib.concatLines inst._secretEnvLines;
@@ -1049,8 +1101,9 @@ in
 
     # Directory permissions for instances
     systemd.tmpfiles.rules = [
-      "d /var/lib/openclaw 0750 openclaw openclaw - -"
-      "d /var/lib/openclaw/instances 0750 openclaw openclaw - -"
+      # Traversable containers owned by root; each instance directory below carries its own owner.
+      "d /var/lib/openclaw 0711 root root - -"
+      "d /var/lib/openclaw/instances 0711 root root - -"
     ]
     ++ lib.concatMap (
       name:
@@ -1058,19 +1111,23 @@ in
         inst = enabledInstances.${name};
       in
       [
-        "d ${inst._stateDir} 0750 openclaw caddy - -"
-        "d ${builtins.dirOf inst._logPath} 0750 openclaw openclaw - -"
+        "d ${inst._stateDir} 0750 ${inst._serviceUser} ${inst._serviceGroup} - -"
+        # Z (capital): recursive ownership repair so state written under the old shared `openclaw`
+        # account keeps working after the instance got its own user.
+        "Z ${inst._stateDir} - ${inst._serviceUser} ${inst._serviceGroup} - -"
+        "d ${builtins.dirOf inst._logPath} 0750 ${inst._serviceUser} ${inst._serviceGroup} - -"
       ]
       ++ lib.optionals inst.publishing.enable [
-        "d ${inst._stateDir}/run 0750 openclaw caddy - -"
-        "d ${inst._stateDir}/run/sockets 0770 openclaw caddy - -"
+        "d ${inst._stateDir}/run 0755 ${inst._serviceUser} caddy - -"
+        "d ${inst._stateDir}/run/sockets 0770 ${inst._serviceUser} caddy - -"
+        "Z ${inst._stateDir}/run - ${inst._serviceUser} caddy - -"
       ]
       ++ lib.optionals inst.googleWorkspace.enable [
-        "d ${inst._stateDir}/.config 0700 openclaw openclaw - -"
-        "d ${inst._stateDir}/.config/gogcli 0700 openclaw openclaw - -"
-        "d ${inst._stateDir}/.local 0700 openclaw openclaw - -"
-        "d ${inst._stateDir}/.local/share 0700 openclaw openclaw - -"
-        "d ${inst._stateDir}/.local/share/gogcli 0700 openclaw openclaw - -"
+        "d ${inst._stateDir}/.config 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
+        "d ${inst._stateDir}/.config/gogcli 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
+        "d ${inst._stateDir}/.local 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
+        "d ${inst._stateDir}/.local/share 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
+        "d ${inst._stateDir}/.local/share/gogcli 0700 ${inst._serviceUser} ${inst._serviceGroup} - -"
       ]
     ) (lib.attrNames enabledInstances);
 
@@ -1122,8 +1179,8 @@ in
             );
 
             serviceConfig = {
-              User = "openclaw";
-              Group = "openclaw";
+              User = inst._serviceUser;
+              Group = inst._serviceGroup;
               WorkingDirectory = inst._stateDir;
               EnvironmentFile =
                 lib.optional inst._hasSecrets osConfig.sops.templates."openclaw_${name}_env".path
