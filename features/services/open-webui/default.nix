@@ -36,8 +36,17 @@ in
 
     accessGroups = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [ "family" ];
+      default = [
+        "family"
+        "infra-admins"
+      ];
       description = "Authentik groups whose members may access Open-WebUI.";
+    };
+
+    adminGroups = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "infra-admins" ];
+      description = "Authentik groups whose members are granted admin role in Open-WebUI.";
     };
 
     openMeshFirewall = lib.mkOption {
@@ -132,7 +141,13 @@ in
         OAUTH_CLIENT_ID = cfg.sso.clientId;
         OPENID_PROVIDER_URL = "https://${authHost}/application/o/${cfg.sso.clientId}/.well-known/openid-configuration";
         OPENID_REDIRECT_URI = "https://${canonicalHost}/oauth/oidc/callback";
-        OAUTH_SCOPES = "openid email profile";
+        OAUTH_SCOPES = "openid email profile groups";
+
+        # Role Management via Authentik Groups
+        ENABLE_OAUTH_ROLE_MANAGEMENT = if cfg.sso.enable then "True" else "False";
+        OAUTH_ROLES_CLAIM = "groups";
+        OAUTH_ALLOWED_ROLES = lib.concatStringsSep "," cfg.accessGroups;
+        OAUTH_ADMIN_ROLES = lib.concatStringsSep "," cfg.adminGroups;
 
         # Features & Tools
         ENABLE_COMMUNITY_SHARING = "False";
@@ -148,6 +163,7 @@ in
         scope = "public";
         auth = if cfg.sso.enable then "oidc" else "none";
         accessGroups = cfg.accessGroups;
+        adminGroups = cfg.adminGroups;
         subdomain = cfg.subdomain;
         directAccess = {
           enable = cfg.openMeshFirewall;
