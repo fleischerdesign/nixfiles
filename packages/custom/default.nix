@@ -6,11 +6,8 @@ _: prev: {
       customDir = ./.;
       entries = builtins.readDir customDir;
       pkgDirs = prev.lib.filterAttrs (
-        name: type:
-        type == "directory" && builtins.pathExists (customDir + "/${name}/default.nix")
+        name: type: type == "directory" && builtins.pathExists (customDir + "/${name}/default.nix")
       ) entries;
     in
-    prev.lib.mapAttrs (
-      name: _: prev.callPackage (customDir + "/${name}") { }
-    ) pkgDirs;
+    prev.lib.mapAttrs (name: _: prev.callPackage (customDir + "/${name}") { }) pkgDirs;
 }

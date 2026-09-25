@@ -15,24 +15,24 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     outputs:
       has-updates: ${{ steps.detect.outputs.has-updates }}
       matrix: ${{ steps.hosts.outputs.matrix }}
     steps:
       - uses: actions/checkout@v7
 
-      - uses: DeterminateSystems/nix-installer-action@v22
-
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
+      - uses: ./.github/actions/setup-nix
 
       - id: detect
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           nix flake update
-          nix run .#update-custom-packages || true
-          if git diff --quiet -- flake.lock packages/custom features/dev/pi; then
+          nix run .#update-custom-packages
+          # Include newly vendored lockfiles in the Git flake source.
+          git add flake.lock packages/custom features/dev/pi
+          if git diff --cached --quiet; then
             echo "has-updates=false" >> "$GITHUB_OUTPUT"
           else
             echo "has-updates=true" >> "$GITHUB_OUTPUT"
@@ -54,9 +54,13 @@ jobs:
           path: |
             flake.lock
             packages/custom/**/manifest.json
+            packages/custom/**/package-lock.json
             features/dev/pi/**/manifest.json
             features/dev/pi/**/package-lock.json
           retention-days: 1
+
+      - name: Check updated flake
+        run: nix flake check --print-build-logs
 
   build:
     needs: prepare
@@ -75,6 +79,9 @@ jobs:
         with:
           name: updated-flake-lock
 
+      - name: Include updated files in the flake source
+        run: git add flake.lock packages/custom features/dev/pi
+
       - uses: ./.github/actions/build-nixos-host
         with:
           host: ${{ matrix.host }}
@@ -89,7 +96,11 @@ jobs:
     steps:
       - name: Check build status
         run: |
-          if [ "${{ needs.prepare.outputs.has-updates }}" != "true" ]; then
+          if [ "${{ needs.prepare.result }}" != "success" ]; then
+            echo "Update preparation failed" >&2
+            exit 1
+          fi
+          if [ "${{ needs.prepare.outputs.has-updates }}" = "false" ]; then
             echo "ℹ️ No updates detected, nothing to build."
             exit 0
           fi
@@ -100,7 +111,8 @@ jobs:
           echo "✅ All systems built successfully"
 
   commit:
-    needs: build-status
+    needs: [prepare, build-status]
+    if: needs.prepare.outputs.has-updates == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -113,8 +125,9 @@ jobs:
 
       - name: Commit and push
         run: |
+          git switch -C flake-update "${{ github.sha }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add flake.lock packages/custom features/dev/pi
           git commit -m "chore(deps): update flake inputs and custom packages"
-          git push origin main
+          git push origin HEAD:main

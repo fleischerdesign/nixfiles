@@ -22,6 +22,7 @@
 # automatically via refresh_npm_lockfile.
 
 set -euo pipefail
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
 # Temp-dir registry with trap cleanup (robust against aborts/interrupts).
@@ -37,6 +38,8 @@ mk_tmp_dir() {
   TMP_DIRS+=("$_mk_ref")
 }
 
+# Invoked by the EXIT trap.
+# shellcheck disable=SC2329
 cleanup_tmp_dirs() {
   local _dir
   for _dir in ${TMP_DIRS[@]+"${TMP_DIRS[@]}"}; do
@@ -69,16 +72,16 @@ gh_api() {
   # Make an authenticated or unauthenticated GitHub API call.
   local url="$1"
   if [ -n "${GITHUB_TOKEN:-}" ]; then
-    curl -sf -H "Authorization: token $GITHUB_TOKEN" "$url"
+    curl -fsS -H "Authorization: token $GITHUB_TOKEN" "$url"
   else
-    curl -sf "$url"
+    curl -fsS "$url"
   fi
 }
 
 pypi_api() {
   # Fetch PyPI package JSON metadata.
   local pkg="$1"
-  curl -sf "https://pypi.org/pypi/${pkg}/json"
+  curl -fsS "https://pypi.org/pypi/${pkg}/json"
 }
 
 strip_v() {
@@ -108,18 +111,19 @@ refresh_npm_lockfile() {
   mk_tmp_dir _work_dir
 
   echo "  📦 Regenerating lockfile from $_tarball_url..."
-  if ! curl -sfL "$_tarball_url" | tar -xz -C "$_work_dir" --strip-components=1 2>/dev/null; then
+  if ! curl -fsSL "$_tarball_url" | tar -xz -C "$_work_dir" --strip-components=1; then
     echo "  ⚠️ Could not download/extract tarball for lockfile regeneration. Keeping previous lockfile."
     return 1
   fi
 
-  local _extra_flags=""
-  _extra_flags="$(jq -r '(.upstream.npmFlags // []) | join(" ")' "$_manifest_path" 2>/dev/null || true)"
+  local -a _extra_flags=()
+  jq -er '(.upstream.npmFlags // []) | all(.[]; type == "string")' "$_manifest_path" > /dev/null
+  mapfile -t _extra_flags < <(jq -r '(.upstream.npmFlags // [])[]' "$_manifest_path")
 
   local _resolution_ok=0
-  if (cd "$_work_dir" && npm install --package-lock-only --ignore-scripts $_extra_flags 2>/dev/null); then
+  if (cd "$_work_dir" && npm install --package-lock-only --ignore-scripts "${_extra_flags[@]}"); then
     _resolution_ok=1
-  elif (cd "$_work_dir" && npm install --package-lock-only --ignore-scripts --legacy-peer-deps $_extra_flags 2>/dev/null); then
+  elif (cd "$_work_dir" && npm install --package-lock-only --ignore-scripts --legacy-peer-deps "${_extra_flags[@]}"); then
     echo "  ⚠️ Strict peer resolution failed, fell back to --legacy-peer-deps (tree may be incomplete)."
     _resolution_ok=1
   fi
@@ -129,21 +133,11 @@ refresh_npm_lockfile() {
     return 1
   fi
 
-  # Same integrity fix the Nix build applies (features/dev/pi/lib/plugins.nix
-  # mkSrc fixIntegrity): upstream trees omit `integrity` for nested
-  # @earendil-works/pi-* entries, which makes prefetch-npm-deps reject the
-  # lockfile. The fix script lives next to the package when vendored.
-  local _fix_script="$_pkg_dir/fix-integrity.mjs"
-  if [ ! -f "$_fix_script" ]; then
-    _fix_script="$REPO_ROOT/features/dev/pi/lib/fix-pi-integrity.mjs"
-  fi
-  if [ -f "$_fix_script" ]; then
-    (cd "$_work_dir" && node "$_fix_script" package-lock.json 2>/dev/null) || true
-  fi
+  node "$SCRIPT_DIR/fix-npm-integrity.mjs" "$_work_dir/package-lock.json"
 
   echo "  📦 Calculating npmDepsHash via prefetch-npm-deps..."
   local _new_npm_hash
-  _new_npm_hash="$( (cd "$_work_dir" && nix run nixpkgs#prefetch-npm-deps -- package-lock.json 2>/dev/null) | tail -n 1 || true)"
+  _new_npm_hash="$( (cd "$_work_dir" && nix run --inputs-from "$REPO_ROOT" nixpkgs-unstable#prefetch-npm-deps -- package-lock.json) | tail -n 1 || true)"
   if [[ "$_new_npm_hash" != sha256-* ]]; then
     echo "  ⚠️ Could not auto-calculate npmDepsHash (missing integrity in lockfile). Keeping previous hash."
     return 1
@@ -158,6 +152,68 @@ refresh_npm_lockfile() {
   return 0
 }
 
+# Build the package's own fixed-output derivation with a fake hash, then
+# verify the measured hash by building it again. Never mistake an unrelated
+# dependency/network failure for the expected hash mismatch.
+refresh_fixed_hash() {
+  local manifest="$1" package="$2" key="$3" attribute="$4" work="$5"
+  local drv hash
+  drv="$(nix eval --raw ".#${package}.${attribute}.drvPath")"
+  if nix build --no-link --print-build-logs ".#${package}.${attribute}" > "$work/build.log" 2>&1; then
+    cat "$work/build.log"
+    echo "Expected a hash mismatch for $drv, but the fake-hash build succeeded" >&2
+    return 1
+  fi
+  cat "$work/build.log" >&2
+  hash="$(awk -v marker="hash mismatch in fixed-output derivation '$drv':" '
+    index($0, marker) { remaining = 3; next }
+    remaining > 0 { if ($1 == "got:") print $2; remaining-- }
+  ' "$work/build.log")"
+  if [[ ! "$hash" =~ ^sha256-[A-Za-z0-9+/]{43}=$ ]]; then
+    echo "No unique measured SHA256 hash for $drv; refusing to update $manifest" >&2
+    return 1
+  fi
+  jq --arg key "$key" --arg hash "$hash" '.[$key] = $hash' "$manifest" > "$work/manifest.json"
+  cp "$work/manifest.json" "$manifest"
+  nix build --no-link --print-build-logs ".#${package}.${attribute}"
+}
+
+# Publish a version only when all declared source/dependency hashes work.
+# Restore the original manifest on any error, including interruption.
+refresh_source_package() (
+  set -euo pipefail
+  manifest="$1" package="$2" version="$3"
+  work="$(mktemp -d)"
+  cp "$manifest" "$work/original.json"
+  complete=false
+  trap 'if [ "$complete" != true ]; then cp "$work/original.json" "$manifest"; fi; rm -rf "$work"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  jq --arg version "$version" '
+    .version = $version | .srcHash = ""
+    | (if has("cargoHash") then .cargoHash = "" else . end)
+    | (if has("npmDepsHash") then .npmDepsHash = "" else . end)
+  ' "$manifest" > "$work/manifest.json"
+  cp "$work/manifest.json" "$manifest"
+  refresh_fixed_hash "$manifest" "$package" srcHash src "$work"
+  if jq -e 'has("cargoHash")' "$manifest" > /dev/null; then
+    refresh_fixed_hash "$manifest" "$package" cargoHash cargoDeps.vendorStaging "$work"
+    nix build --no-link --print-build-logs ".#${package}.cargoDeps"
+  fi
+  if jq -e 'has("npmDepsHash")' "$manifest" > /dev/null; then
+    refresh_fixed_hash "$manifest" "$package" npmDepsHash npmDeps "$work"
+  fi
+  if jq -e '.upstream.cefManifest' "$manifest" > /dev/null; then
+    source_path="$(nix build --no-link --print-out-paths ".#${package}.src")"
+    python3 "$SCRIPT_DIR/cef-metadata.py" "$source_path" "$(jq -r '.upstream.cefManifest' "$manifest")" > "$work/cef.json"
+    jq --slurpfile cef "$work/cef.json" '.cef = $cef[0]' "$manifest" > "$work/manifest.json"
+    cp "$work/manifest.json" "$manifest"
+    nix build --no-link --print-build-logs ".#${package}.cefBinary"
+  fi
+  complete=true
+)
+
+failures=0
 echo "🔍 Checking custom packages for upstream updates..."
 
 MANIFEST_PATHS=()
@@ -198,6 +254,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || {
       echo "  ⚠️ Could not fetch latest release for $owner/$repo"
+      failures=$((failures + 1))
       continue
     }
 
@@ -205,6 +262,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$latest_tag" ]; then
       echo "  ⚠️ Could not parse latest release tag"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -222,6 +280,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$asset_name" ]; then
       echo "  ⚠️ Could not find matching AppImage asset in release v$latest_tag"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -232,6 +291,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$new_hash" ] || [ "$new_hash" = "null" ]; then
       echo "  ❌ Failed to calculate SRI hash for $download_url"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -295,6 +355,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$latest_tag" ]; then
       echo "  ⚠️ Could not parse latest release or version tag"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -305,33 +366,8 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     echo "  🎉 New version available: v$latest_tag (current: v$current_version)"
 
-    # Fetch source tarball and compute SRI hash.
-    tarball_url="$(echo "$RELEASE_JSON" | jq -r '.tarball_url // empty')"
-    if [ -z "$tarball_url" ]; then
-      echo "  ⚠️ No tarball_url in release, falling back to archive URL"
-      tarball_url="https://github.com/$owner/$repo/archive/refs/tags/$tag_prefix$latest_tag.tar.gz"
-    fi
-
-    echo "  Downloading and hashing source tarball..."
-    new_src_hash="$(nix store prefetch-file --unpack "$tarball_url" --json | jq -r '.hash')"
-
-    if [ -z "$new_src_hash" ] || [ "$new_src_hash" = "null" ]; then
-      echo "  ❌ Failed to calculate source hash"
-      continue
-    fi
-
-    # Build-time hashes are reset to empty so the next nix-build reveals the
-    # correct value via hash mismatch. Only reset keys the manifest declares.
-    tmp_manifest="$(mktemp)"
-    jq --arg ver "$latest_tag" \
-       --arg src_hash "$new_src_hash" \
-       '.version = $ver | .srcHash = $src_hash
-        | (if has("cargoHash") then .cargoHash = "" else . end)
-        | (if has("npmDepsHash") then .npmDepsHash = "" else . end)' \
-       "$manifest_path" > "$tmp_manifest"
-
-    mv "$tmp_manifest" "$manifest_path"
-    echo "  ✨ Updated $pkg_name to v$latest_tag (srcHash, cargoHash needs manual update)"
+    refresh_source_package "$manifest_path" "$pkg_name" "$latest_tag"
+    echo "  ✨ Updated $pkg_name to v$latest_tag with verified source and dependency hashes"
 
   # =========================================================================
   # github-rev — pinned to a commit, tracks default branch HEAD
@@ -352,11 +388,13 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
     # Fetch latest commit on default branch.
     latest_commit="$(gh_api "https://api.github.com/repos/$owner/$repo/commits/$default_branch" | jq -r '.sha // empty')" || {
       echo "  ⚠️ Could not fetch latest commit for $owner/$repo"
+      failures=$((failures + 1))
       continue
     }
 
     if [ -z "$latest_commit" ]; then
       echo "  ⚠️ Could not parse latest commit SHA"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -375,6 +413,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$new_src_hash" ] || [ "$new_src_hash" = "null" ]; then
       echo "  ❌ Failed to calculate source hash"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -386,9 +425,10 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
     mv "$tmp_manifest" "$manifest_path"
 
     # Auto-inspect source tarball for version updates & npmDepsHash
-    local tmp_rev_src
+    tmp_rev_src=""
     mk_tmp_dir tmp_rev_src
-    if curl -sfL "$tarball_url" | tar -xz -C "$tmp_rev_src" --strip-components=1 2>/dev/null; then
+    curl -fsSL "$tarball_url" | tar -xz -C "$tmp_rev_src" --strip-components=1
+    {
       # 1. Check for version in pyproject.toml or package.json
       extracted_version=""
       if [ -f "$tmp_rev_src/pyproject.toml" ]; then
@@ -410,26 +450,18 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
       # 2. Auto-calculate npmDepsHash if field exists
       if jq -e 'has("npmDepsHash")' "$manifest_path" >/dev/null 2>&1; then
         if [ -f "$tmp_rev_src/package-lock.json" ]; then
-          echo "  📦 Calculating npmDepsHash via prefetch-npm-deps..."
-          new_npm_hash="$( (cd "$tmp_rev_src" && nix run nixpkgs#prefetch-npm-deps -- package-lock.json 2>/dev/null) | tail -n 1 || true)"
-          if [[ "$new_npm_hash" == sha256-* ]]; then
-            echo "  ✨ Auto-calculated npmDepsHash: $new_npm_hash"
-            tmp_man="$(mktemp)"
-            jq --arg hash "$new_npm_hash" '.npmDepsHash = $hash' "$manifest_path" > "$tmp_man"
-            mv "$tmp_man" "$manifest_path"
-          else
-            # Leave the previous npmDepsHash intact. Blanking it guarantees a broken
-            # build; keeping it either still works (unchanged deps) or fails loudly
-            # with a hash mismatch (recoverable). Note: some lockfiles also need the
-            # integrity fix (fix-pi-integrity.mjs) before prefetch-npm-deps succeeds.
-            echo "  ⚠️ Could not auto-calculate npmDepsHash (missing integrity or lockfile). Keeping previous hash."
-          fi
+          node "$SCRIPT_DIR/fix-npm-integrity.mjs" "$tmp_rev_src/package-lock.json"
+          new_npm_hash="$(cd "$tmp_rev_src" && nix run --inputs-from "$REPO_ROOT" nixpkgs-unstable#prefetch-npm-deps -- package-lock.json)"
+          [[ "$new_npm_hash" == sha256-* ]]
+          cp "$tmp_rev_src/package-lock.json" "$pkg_dir/package-lock.json"
+          tmp_man="$(mktemp)"
+          jq --arg hash "$new_npm_hash" '.npmDepsHash = $hash' "$manifest_path" > "$tmp_man"
+          mv "$tmp_man" "$manifest_path"
         else
-          # Tarball ships no lockfile: regenerate one from the new tarball.
-          refresh_npm_lockfile "$pkg_dir" "$tarball_url" || true
+          refresh_npm_lockfile "$pkg_dir" "$tarball_url"
         fi
       fi
-    fi
+    }
 
     echo "  ✨ Updated $pkg_name to commit ${latest_commit:0:12}"
 
@@ -463,12 +495,14 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
         PYPI_JSON="$(pypi_api "$pypi_name")" || {
           echo "    ⚠️ Could not fetch PyPI metadata for $pypi_name"
+          failures=$((failures + 1))
           continue
         }
 
         latest_version="$(echo "$PYPI_JSON" | jq -r '.info.version // empty')"
         if [ -z "$latest_version" ]; then
           echo "    ⚠️ Could not parse latest version"
+          failures=$((failures + 1))
           continue
         fi
 
@@ -487,6 +521,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
         new_hash="$(nix store prefetch-file --unpack "$source_url" --json | jq -r '.hash')"
         if [ -z "$new_hash" ] || [ "$new_hash" = "null" ]; then
           echo "    ❌ Failed to calculate hash"
+          failures=$((failures + 1))
           continue
         fi
 
@@ -514,12 +549,14 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
       PYPI_JSON="$(pypi_api "$pypi_pkg")" || {
         echo "  ⚠️ Could not fetch PyPI metadata for $pypi_pkg"
+        failures=$((failures + 1))
         continue
       }
 
       latest_version="$(echo "$PYPI_JSON" | jq -r '.info.version // empty')"
       if [ -z "$latest_version" ]; then
         echo "  ⚠️ Could not parse latest version"
+        failures=$((failures + 1))
         continue
       fi
 
@@ -538,6 +575,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
       new_hash="$(nix store prefetch-file --unpack "$source_url" --json | jq -r '.hash')"
       if [ -z "$new_hash" ] || [ "$new_hash" = "null" ]; then
         echo "  ❌ Failed to calculate hash"
+        failures=$((failures + 1))
         continue
       fi
 
@@ -565,6 +603,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || {
       echo "  ⚠️ Could not fetch latest release for $owner/$repo"
+      failures=$((failures + 1))
       continue
     }
 
@@ -572,6 +611,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$latest_tag" ]; then
       echo "  ⚠️ Could not parse latest release tag"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -598,6 +638,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$main_hash" ] || [ -z "$manifest_hash" ]; then
       echo "  ❌ Failed to calculate hashes for plugin assets"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -623,8 +664,9 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
     echo "  Current version: $current_version"
     echo "  Checking npm upstream: $package..."
 
-    PKG_JSON="$(curl -sf "https://registry.npmjs.org/$package")" || {
+    PKG_JSON="$(curl -fsS "https://registry.npmjs.org/$package")" || {
       echo "  ⚠️ Could not fetch npm metadata for $package"
+      failures=$((failures + 1))
       continue
     }
 
@@ -632,6 +674,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$latest_version" ]; then
       echo "  ⚠️ Could not parse latest version"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -645,6 +688,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
     tarball_url="$(echo "$PKG_JSON" | jq -r --arg v "$latest_version" '.versions[$v].dist.tarball // empty')"
     if [ -z "$tarball_url" ]; then
       echo "  ⚠️ Could not resolve tarball for $latest_version"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -653,6 +697,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     if [ -z "$new_hash" ] || [ "$new_hash" = "null" ]; then
       echo "  ❌ Failed to calculate hash for $tarball_url"
+      failures=$((failures + 1))
       continue
     fi
 
@@ -666,7 +711,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     # Regenerate vendored lockfile + npmDepsHash when the manifest tracks them.
     if jq -e 'has("npmDepsHash")' "$manifest_path" >/dev/null 2>&1; then
-      refresh_npm_lockfile "$pkg_dir" "$tarball_url" || true
+      refresh_npm_lockfile "$pkg_dir" "$tarball_url"
     fi
 
   # =========================================================================
@@ -679,4 +724,9 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 done
 
 echo "--------------------------------------------------"
+if [ "$failures" -ne 0 ]; then
+  echo "$failures custom package update(s) failed" >&2
+  exit 1
+fi
 echo "✅ Custom package check complete."
+exit 0

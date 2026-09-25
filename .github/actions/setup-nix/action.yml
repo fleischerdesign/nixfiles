@@ -1,0 +1,37 @@
+name: Set up Nix
+description: Install Nix and configure the binary cache from the service contract
+runs:
+  using: composite
+  steps:
+    - uses: DeterminateSystems/nix-installer-action@v22
+      with:
+        extra-conf: |
+          fallback = true
+          eval-cache = true
+
+    - name: Configure the declared Attic cache
+      shell: bash
+      run: |
+        cache=$(nix eval --json .#nixosConfigurations --apply '
+          hosts: let
+            providers = builtins.filter
+              (host: host.config.my.features.services.attic.server.enable or false)
+              (builtins.attrValues hosts);
+            config = (builtins.head providers).config;
+          in assert builtins.length providers == 1; {
+            endpoint = "https://${config.my.contracts.provides.attic.endpoints.web.canonicalDomain}";
+            keys = config.nix.settings.trusted-public-keys;
+          }')
+        endpoint=$(jq -er '.endpoint' <<< "$cache")
+        keys=$(jq -er '.keys | join(" ")' <<< "$cache")
+        # A valid cache must answer before any expensive build starts.
+        info=$(curl --fail --silent --show-error --retry 2 --max-time 30 "$endpoint/nixfiles/nix-cache-info")
+        grep -qx 'StoreDir: /nix/store' <<< "$info"
+        {
+          echo "ATTIC_ENDPOINT=$endpoint"
+          echo 'NIX_CONFIG<<NIX_CONFIG_EOF'
+          echo "${NIX_CONFIG:-}"
+          echo "extra-substituters = $endpoint/nixfiles"
+          echo "extra-trusted-public-keys = $keys"
+          echo 'NIX_CONFIG_EOF'
+        } >> "$GITHUB_ENV"

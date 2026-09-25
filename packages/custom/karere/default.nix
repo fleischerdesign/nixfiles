@@ -73,8 +73,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   cefBinary = fetchurl {
     name = "cef.zip";
-    url = "https://github.com/tobagin/karere/releases/download/cef-150.0.10-proprietary-codecs/cef_binary_150.0.10%2Bg8042e43%2Bchromium-150.0.7871.101_linux64_minimal.zip";
-    hash = "sha256-O74pg2jE2HwZrZt+1OhEnqkbMv+jzvyGcnkaG5bJw7k=";
+    inherit (manifest.cef) url hash;
   };
 
   dontUseCmakeConfigure = true;
@@ -137,13 +136,7 @@ stdenv.mkDerivation (finalAttrs: {
     mkdir -p cef-dir
     unzip ${finalAttrs.cefBinary} -d cef-dir
     CEF_PATH="$(echo $PWD/cef-dir/*)"
-    cat <<EOF > "$CEF_PATH/archive.json"
-    {
-      "type": "minimal",
-      "name": "cef_binary_150.0.10",
-      "sha1": "3bbe298368c4d87c19ad9b7ed4e8449ea91b32ffa3cefc8672791a1b96c9c3b9"
-    }
-    EOF
+    cp ${builtins.toFile "cef-archive.json" (builtins.toJSON manifest.cef.archive)} "$CEF_PATH/archive.json"
     ln -sfn "$CEF_PATH/Resources/locales" "$CEF_PATH/locales"
     ln -sfn "$CEF_PATH"/Release/*.so* "$CEF_PATH/"
     ln -sfn "$CEF_PATH"/Resources/* "$CEF_PATH/"
@@ -151,16 +144,6 @@ stdenv.mkDerivation (finalAttrs: {
 
   preConfigure = ''
     export CEF_PATH="$(echo $PWD/../cef-dir/*)"
-    cat <<EOF > "$CEF_PATH/archive.json"
-    {
-      "type": "minimal",
-      "name": "cef_binary_150.0.10",
-      "sha1": "3bbe298368c4d87c19ad9b7ed4e8449ea91b32ffa3cefc8672791a1b96c9c3b9"
-    }
-    EOF
-    ln -sfn "$CEF_PATH/Resources/locales" "$CEF_PATH/locales"
-    ln -sfn "$CEF_PATH"/Release/*.so* "$CEF_PATH/"
-    ln -sfn "$CEF_PATH"/Resources/* "$CEF_PATH/"
   '';
 
   preBuild = ''

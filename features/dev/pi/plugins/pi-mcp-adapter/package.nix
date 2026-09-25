@@ -15,6 +15,7 @@ buildNpmPackage {
   src = mkSrc {
     inherit manifest;
     fixIntegrity = true;
+    lockfile = if builtins.pathExists ./package-lock.json then ./package-lock.json else null;
   };
 
   # No build step — pi loads the TypeScript entry directly via its source-loader.

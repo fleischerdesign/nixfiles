@@ -119,7 +119,7 @@
       ) hostNames;
     in
     {
-      formatter.${system} = pkgs.nixfmt;
+      formatter.${system} = pkgs.nixfmt-tree;
 
       packages.${system} = pkgs.custom;
 
@@ -137,9 +137,14 @@
                 nodejs
                 coreutils
                 gnused
+                gawk
+                gnugrep
+                gnutar
+                gzip
+                (python3.withPackages (ps: [ ps.pyyaml ]))
                 findutils
               ];
-              text = "exec ${./lib/updaters/update-custom-packages.sh} \"$@\"";
+              text = "exec ${./lib/updaters}/update-custom-packages.sh \"$@\"";
             }
           }/bin/update-custom-packages-app";
           meta = {
@@ -184,6 +189,21 @@
       };
 
       checks.${system} = {
+        custom-package-updater =
+          pkgs.runCommandLocal "custom-package-updater-check"
+            {
+              nativeBuildInputs = with pkgs; [
+                bash
+                python3
+                jq
+                gawk
+              ];
+            }
+            ''
+              python3 ${./lib/updaters/tests/test_github_source.py} ${./lib/updaters/update-custom-packages.sh}
+              touch $out
+            '';
+
         eval-hosts = pkgs.runCommandLocal "eval-all-hosts" { } (
           nixpkgs-unstable.lib.concatMapStringsSep "\n" (
             name:

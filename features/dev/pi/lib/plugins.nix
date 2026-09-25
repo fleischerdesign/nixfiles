@@ -60,8 +60,8 @@ let
           inherit src;
           nativeBuildInputs = [ pkgs.nodejs ];
           buildPhase = lib.concatStringsSep "\n" (
-            lib.optional fixIntegrity "node ${./fix-pi-integrity.mjs} package-lock.json"
-            ++ lib.optional (lockfile != null) "cp ${lockfile} package-lock.json"
+            lib.optional (lockfile != null) "cp ${lockfile} package-lock.json"
+            ++ lib.optional fixIntegrity "node ${./fix-pi-integrity.mjs} package-lock.json"
           );
           installPhase = "cp -r . \"$out\"";
         }

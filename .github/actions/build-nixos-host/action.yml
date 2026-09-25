@@ -22,13 +22,7 @@ runs:
         sudo rm -rf /opt/hostedtoolcache /usr/local/.ghcup /usr/share/dotnet \
           /usr/local/lib/android /usr/local/share/powershell 2>/dev/null || true
 
-    - uses: DeterminateSystems/nix-installer-action@v22
-      with:
-        extra-conf: |
-          fallback = true
-          eval-cache = true
-          substituters = https://cache.rls.ancoris.ovh/nixfiles https://cache.nixos.org
-          trusted-public-keys = nixfiles:awB26eXQsIRK6dU9tMhnDs5Ql9z+tSCy1BQL1PWX8JE= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+    - uses: ./.github/actions/setup-nix
 
     - name: Build ${{ inputs.host }}
       shell: bash
@@ -41,20 +35,25 @@ runs:
           | tee build-${{ inputs.host }}.json
 
     - name: Push to Attic cache
+      if: github.event_name != 'pull_request' || inputs.attic-push-token != ''
       shell: bash
+      env:
+        ATTIC_PUSH_TOKEN: ${{ inputs.attic-push-token }}
       run: |
+        test -n "$ATTIC_PUSH_TOKEN"
+        umask 077
         mkdir -p ~/.config/attic
-        cat > ~/.config/attic/config.toml << 'ATTCEOF'
+        cat > ~/.config/attic/config.toml << ATTCEOF
         default-server = "nixfiles-server"
 
         [servers.nixfiles-server]
-        endpoint = "https://cache.rls.ancoris.ovh"
-        token = "${{ inputs.attic-push-token }}"
+        endpoint = "$ATTIC_ENDPOINT"
+        token = "$ATTIC_PUSH_TOKEN"
         ATTCEOF
         chmod 600 ~/.config/attic/config.toml
 
         for i in 1 2 3; do
-          nix shell nixpkgs#attic-client -c attic push -j 2 nixfiles ./result && exit 0
+          nix shell --inputs-from . nixpkgs-unstable#attic-client -c attic push -j 2 nixfiles ./result && exit 0
           echo "Push attempt $i failed, retrying in 10s..."
           sleep 10
         done

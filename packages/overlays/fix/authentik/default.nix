@@ -34,23 +34,22 @@ let
   # Override __functor on python-prev.buildPythonPackage (which is a functor attrset)
   extensions = prev.pythonPackagesExtensions ++ [
     (_python-final: python-prev: {
-      buildPythonPackage =
-        python-prev.buildPythonPackage // {
-          __functor =
-            _self: attrs:
-            let
-              pkg = python-prev.buildPythonPackage attrs;
-              pname = attrs.pname or "";
-            in
-            if builtins.elem pname knownMetadataMismatches then
-              pkg.overrideAttrs (old: {
-                env = (old.env or { }) // {
-                  dontCheckPythonMetadata = "1";
-                };
-              })
-            else
-              pkg;
-        };
+      buildPythonPackage = python-prev.buildPythonPackage // {
+        __functor =
+          _self: attrs:
+          let
+            pkg = python-prev.buildPythonPackage attrs;
+            pname = attrs.pname or "";
+          in
+          if builtins.elem pname knownMetadataMismatches then
+            pkg.overrideAttrs (old: {
+              env = (old.env or { }) // {
+                dontCheckPythonMetadata = "1";
+              };
+            })
+          else
+            pkg;
+      };
     })
   ];
 

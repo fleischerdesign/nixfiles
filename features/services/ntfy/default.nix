@@ -19,17 +19,18 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Secret für den Token (wird von Grafana mitgenutzt)
+    # systemd reads the root-owned environment file before starting ntfy.
+    # Keep Grafana group access to the shared token; ntfy may use DynamicUser.
     sops.secrets."services/monitoring/grafana_ntfy_token" = {
-      owner = "ntfy-sh";
+      owner = "root";
       group = "grafana";
-      mode = "0440"; # Nur Besitzer und Gruppe dürfen lesen
+      mode = "0440"; # Only root and Grafana can read the token.
     };
     sops.secrets."infra/ntfy_users" = {
-      owner = "ntfy-sh";
+      owner = "root";
     };
 
-    # Template für ntfy env, um Token deklarativ einzubauen
+    # Render credentials without exposing them in the Nix store.
     sops.templates."ntfy.env".content = ''
       NTFY_AUTH_USERS="${config.sops.placeholder."infra/ntfy_users"}"
       NTFY_AUTH_TOKENS="${cfg.adminUser}:${
@@ -40,7 +41,7 @@ in
     services.ntfy-sh = {
       enable = true;
       settings = {
-        base-url = "https://push.vyrx.de";
+        base-url = "https://${config.my.contracts.provides.ntfy.endpoints.web.canonicalDomain}";
         listen-http = "127.0.0.1:8083";
         auth-file = "/var/lib/ntfy-sh/auth.db";
         auth-default-access = "deny-all";

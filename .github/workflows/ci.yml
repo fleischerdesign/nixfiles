@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
-    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**"]
+    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**", "contracts/**", ".github/**", "statix.toml"]
   pull_request:
-    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**"]
+    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**", "contracts/**", ".github/**", "statix.toml"]
   workflow_dispatch:
 
 permissions:
@@ -22,9 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: DeterminateSystems/nix-installer-action@v22
-
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
+      - uses: ./.github/actions/setup-nix
 
       - name: Check flake
         run: nix flake check --print-build-logs
@@ -37,9 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: DeterminateSystems/nix-installer-action@v22
-
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
+      - uses: ./.github/actions/setup-nix
 
       # The host matrix is the flake's own host list; a literal here is a second inventory that
       # drifts (it last named yorke, jello, strummer, mackaye and rollins - none of which exist).

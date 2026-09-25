@@ -1,11 +1,21 @@
 {
   "name": "karere",
-  "version": "4.2.5",
-  "srcHash": "sha256-OK5KQH1BaEbbNEOrWZ69oqW2XqWKK/NDg586xcYgQdk=",
-  "cargoHash": "sha256-E4/cNIXy/7EZUHkYdDOVqnL3G1XYz0z9UG9/NbW11kc=",
+  "version": "4.3.0",
+  "srcHash": "sha256-bInQ7dRqsBPVlDthN0hzipsQPlxi+LPXAaKwRxXgfV8=",
+  "cargoHash": "sha256-QwQ9FXPgV8dA7496wlUEZ6JooKWc6I2X6aMa/diHJ7g=",
   "upstream": {
     "type": "github-source",
     "owner": "tobagin",
-    "repo": "karere"
+    "repo": "karere",
+    "cefManifest": "packaging/io.github.tobagin.karere.yml"
+  },
+  "cef": {
+    "url": "https://github.com/tobagin/karere/releases/download/cef-152.0.6-proprietary-codecs/cef_binary_152.0.6%2Bg708dc14%2Bchromium-152.0.7977.83_linux64_minimal.zip",
+    "hash": "sha256-PWT2+siRGjaP+kFePuU9ACy9eShm8I7WV42uHiUsusg=",
+    "archive": {
+      "type": "minimal",
+      "name": "cef_binary_152.0.6+g708dc14+chromium-152.0.7977.83_linux64_minimal.tar.bz2",
+      "sha1": "0000000000000000000000000000000000000000"
+    }
   }
 }
