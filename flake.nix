@@ -190,6 +190,8 @@
       };
 
       checks.${system} = {
+        pi-auth = (import ./features/dev/pi/lib/auth.nix { inherit pkgs; }).check;
+
         custom-package-updater =
           pkgs.runCommandLocal "custom-package-updater-check"
             {
@@ -365,7 +367,14 @@
           inherit pkgs self hostNames;
           lib = nixpkgs-unstable.lib;
         };
-      };
+      }
+      //
+        nixpkgs-unstable.lib.mapAttrs'
+          (name: drv: nixpkgs-unstable.lib.nameValuePair "pi-plugin-${name}" drv)
+          (import ./features/dev/pi/lib/plugins.nix {
+            inherit pkgs;
+            lib = nixpkgs-unstable.lib;
+          }).derivations;
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [

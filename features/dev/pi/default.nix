@@ -1,7 +1,7 @@
 # features/dev/pi/default.nix — Generic Pi coding-agent Home-Manager & System Feature Module
 #
 # Architecture & Guidelines:
-# - System Level: Defines provider configuration, auth.json template, settings, and MCP servers.
+# - System Level: Defines provider configuration, API-key source, settings, and MCP servers.
 # - User-Scoped Level (home-manager.sharedModules): Exposes my.features.dev.pi.enable for HM users.
 # - Agnostic & Generic: Zero hardcoded usernames, hostnames, or stacks. Reusable across NixOS & Home Manager.
 # - Direct execution by default; delegation remains available when a bounded independent task benefits from it.
@@ -124,7 +124,7 @@ in
         }
       );
       default = { };
-      description = "Provider API keys for system-wide auth.json template generation.";
+      description = "Declarative provider API keys; OAuth credentials are managed locally by Pi.";
     };
 
     plugins = {
@@ -189,8 +189,10 @@ in
       );
     }
 
-    (lib.mkIf (cfg.enable || cfg.providers != { }) {
-      sops.templates."pi-auth.json" = lib.mkIf (cfg.providers != { }) {
+    {
+      # Keep the source available even with no providers, including during activation.
+      # Pi reads individual keys through commands; it never writes this template.
+      sops.templates."pi-auth.json" = {
         owner = config.my.user.primary or "root";
         group = "users";
         mode = "0440";
@@ -201,7 +203,7 @@ in
           }) cfg.providers
         );
       };
-    })
+    }
 
     {
       home-manager.sharedModules = [
@@ -215,6 +217,14 @@ in
           }:
           let
             userCfg = config.my.features.dev.pi;
+            authTools = import ./lib/auth.nix { inherit pkgs; };
+            authSpec = pkgs.writeText "pi-auth-providers.json" (
+              builtins.toJSON {
+                providers = lib.attrNames cfg.providers;
+                source = osConfig.sops.templates."pi-auth.json".path;
+                jq = "${pkgs.jq}/bin/jq";
+              }
+            );
             mcpServers = osConfig.my.features.dev.pi.mcpServers or { };
             activeMcpServers = lib.optionalAttrs cfg.plugins.pi-mcp-adapter.enable mcpServers;
 
@@ -302,6 +312,11 @@ in
             };
 
             config = lib.mkIf userCfg.enable {
+              # Read and replace the old managed symlink before HM cleans obsolete links.
+              home.activation.piAuth = lib.hm.dag.entryBetween [ "linkGeneration" ] [ "writeBoundary" ] ''
+                run ${authTools.package}/bin/pi-auth-reconcile ${authSpec} ${lib.escapeShellArg "${config.home.homeDirectory}/.pi/agent/auth.json"}
+              '';
+
               # The plugin + MCP-server packages are installed into the profile so their
               # store paths (referenced as strings in settings.json/mcp.json) are
               # materialized on the target machine. Keep derivation references in the
@@ -331,10 +346,6 @@ in
                   ".pi/agent/themes" = {
                     source = userCfg.themes;
                     recursive = true;
-                  };
-
-                  ".pi/agent/auth.json" = lib.mkIf (osConfig ? sops && osConfig.sops.templates ? "pi-auth.json") {
-                    source = config.lib.file.mkOutOfStoreSymlink osConfig.sops.templates."pi-auth.json".path;
                   };
                 }
                 (lib.optionalAttrs (modelsJsonContent.providers != { }) {
