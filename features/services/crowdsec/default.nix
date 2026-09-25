@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -171,6 +172,29 @@ in
       "systemd-journal"
       "caddy"
     ];
+    # The upstream NixOS module links declarative parsers using their /nix/store/<hash>-...
+    # path directly into /etc/crowdsec/parsers/s02-enrich/ via systemd-tmpfiles without pruning
+    # old generations. CrowdSec discards duplicate parsers when multiple hashed copies accumulate,
+    # causing whitelist parsers to be silently ignored. We purge broken and stale store links.
+    systemd.services.crowdsec.serviceConfig.ExecStartPre = lib.mkBefore [
+      "${pkgs.writeShellScript "crowdsec-prune-stale-parsers" ''
+        for dir in /etc/crowdsec/parsers/*; do
+          [ -d "$dir" ] || continue
+          for link in "$dir"/*; do
+            [ -L "$link" ] || continue
+            target="$(readlink "$link")" || continue
+            case "$target" in
+              /nix/store/*)
+                if [ ! -e "$link" ]; then
+                  rm -f "$link"
+                fi
+                ;;
+            esac
+          done
+        done
+      ''}"
+    ];
+
     systemd.services.crowdsec-firewall-bouncer.serviceConfig.DynamicUser = lib.mkForce false;
 
     my.contracts.provides.crowdsec = lib.mkIf isMaster {
