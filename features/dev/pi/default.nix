@@ -4,9 +4,9 @@
 # - System Level: Defines provider configuration, auth.json template, settings, and MCP servers.
 # - User-Scoped Level (home-manager.sharedModules): Exposes my.features.dev.pi.enable for HM users.
 # - Agnostic & Generic: Zero hardcoded usernames, hostnames, or stacks. Reusable across NixOS & Home Manager.
-# - Pure ReAct Engine: Direct execution, no subagent overhead, instant feedback loop.
-# - Official DeepSeek Default: Native DeepSeek API with prefix caching and deepseek-v4-flash.
-# - OpenRouter Optimization: Configurable provider ordering (Baidu, Wafer, Fireworks, DeepInfra) and FP8 quantization.
+# - Direct execution by default; delegation remains available when a bounded independent task benefits from it.
+# - Provider-agnostic: provider and model identifiers are supplied by the host configuration.
+# - OpenRouter routing: optional provider ordering and quantization controls when OpenRouter is used.
 # - Plugins: Auto-discovered modules and packages via lib/plugins.nix.
 {
   config,
@@ -23,7 +23,7 @@ in
   imports = (import ./lib/plugins.nix { inherit lib; }).modules;
 
   options.my.features.dev.pi = {
-    enable = lib.mkEnableOption "system-wide Pi API secrets template";
+    enable = lib.mkEnableOption "Pi coding agent for enabled Home Manager users";
 
     provider = lib.mkOption {
       type = lib.types.str;
@@ -162,7 +162,7 @@ in
           nixos = {
             package = pkgs.mcp-nixos;
             binName = "mcp-nixos";
-            directTools = true;
+            directTools = false;
           };
         }
         // lib.optionalAttrs (config.my.role != "server") {
@@ -173,7 +173,7 @@ in
               "--executablePath"
               "${pkgs.google-chrome}/bin/google-chrome-stable"
             ];
-            directTools = true;
+            directTools = false;
           };
         }
       );
@@ -206,18 +206,13 @@ in
           let
             userCfg = config.my.features.dev.pi;
             mcpServers = osConfig.my.features.dev.pi.mcpServers or { };
+            activeMcpServers = lib.optionalAttrs cfg.plugins.pi-mcp-adapter.enable mcpServers;
 
-            activePluginNames = lib.filter (name: cfg.plugins.${name}.enable or true) (
+            activePluginNames = lib.filter (name: cfg.plugins.${name}.enable or false) (
               lib.attrNames pluginsLib.packageDirs
             );
             activePluginDirs = map (name: pluginsLib.packageDirs.${name}) activePluginNames;
-
-            fusionTools = [
-              "fusion_investigate"
-              "fusion_reason"
-              "fusion_research"
-              "fusion_validate"
-            ];
+            activePluginDerivations = map (name: pluginsLib.derivations.${name}) activePluginNames;
 
             baseSettings = {
               defaultProvider = cfg.provider;
@@ -226,7 +221,6 @@ in
               theme = cfg.theme;
               enableSkillCommands = true;
               packages = activePluginDirs ++ cfg.plugins.extraPlugins;
-              excludeTools = lib.optionals (!cfg.plugins.pi-background-tasks.enableFusion) fusionTools;
             }
             // lib.optionalAttrs (cfg.defaultModel != null) {
               defaultModel = cfg.defaultModel;
@@ -236,7 +230,7 @@ in
               osConfig.my.features.dev.pi.settings or { }
             )) userCfg.settings;
 
-            mcpAdapterCfg = cfg.plugins.mcp-adapter;
+            mcpAdapterCfg = cfg.plugins.pi-mcp-adapter;
             mcpAdapterSettings = {
               inherit (mcpAdapterCfg) mcpFooterStatus disableProxyTool;
             }
@@ -248,7 +242,7 @@ in
                 command = "${s.package}/bin/${s.binName}";
                 args = s.args;
                 directTools = s.directTools;
-              }) mcpServers;
+              }) activeMcpServers;
             };
 
             openRouterOverrides =
@@ -300,9 +294,8 @@ in
             config = lib.mkIf userCfg.enable {
               # The plugin + MCP-server packages are installed into the profile so their
               # store paths (referenced as strings in settings.json/mcp.json) are
-              # materialized on the target machine. `builtins.toJSON` strips string
-              # context, so referencing them in the config files alone would not pull
-              # them into the closure.
+              # materialized on the target machine. Keep derivation references in the
+              # generated values so Nix retains their string context in the closure.
               home.sessionVariables = {
                 PI_BG_DISABLE_UPDATE_CHECK = "1";
               };
@@ -311,15 +304,14 @@ in
                 pkgs.pi-coding-agent
                 pkgs.nodejs
               ]
-              ++ lib.attrValues pluginsLib.derivations
-              ++ lib.catAttrs "package" (lib.attrValues mcpServers);
+              ++ activePluginDerivations
+              ++ lib.catAttrs "package" (lib.attrValues activeMcpServers);
 
               home.file = lib.mkMerge [
                 {
                   ".pi/agent/settings.json".text = builtins.toJSON mergedSettings;
                   ".pi/agent/mcp.json".text = builtins.toJSON mcpSettings;
                   ".pi/agent/AGENTS.md".source = piDir + "/AGENTS.md";
-
                   ".pi/agent/skills" = {
                     source = userCfg.skills;
                     recursive = true;

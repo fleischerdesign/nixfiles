@@ -6,11 +6,11 @@
   ...
 }:
 let
-  cfg = config.my.features.dev.pi.plugins.web-access;
+  cfg = config.my.features.dev.pi.plugins.pi-web-access;
   piCfg = config.my.features.dev.pi;
 in
 {
-  options.my.features.dev.pi.plugins.web-access = {
+  options.my.features.dev.pi.plugins.pi-web-access = {
     enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -78,7 +78,7 @@ in
     extraConfig = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
-      description = "Additional raw options merged into ~/.pi/web-search.json.";
+      description = "Additional raw options merged into ~/.pi/agent/web-search.json.";
     };
   };
 
@@ -114,7 +114,7 @@ in
         in
         {
           config = lib.mkIf userPiCfg.enable {
-            home.file.".pi/web-search.json".text = builtins.toJSON webSearchPayload;
+            home.file.".pi/agent/web-search.json".text = builtins.toJSON webSearchPayload;
           };
         }
       )

@@ -2,6 +2,7 @@
 # Durable background shell tasks & async process management plugin for Pi.
 {
   lib,
+  config,
   ...
 }:
 {
@@ -12,16 +13,19 @@
       description = "Enable durable background shell tasks & async process management plugin.";
     };
 
-    enableFusion = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = "Enable multi-model Fusion consensus tools (fusion_investigate, fusion_reason, etc.).";
-    };
-
     extraConfig = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
       description = "Additional raw options for pi-background-tasks.";
     };
+  };
+
+  config = lib.mkIf (config.my.features.dev.pi.plugins.pi-background-tasks.extraConfig != { }) {
+    assertions = [
+      {
+        assertion = false;
+        message = "my.features.dev.pi.plugins.pi-background-tasks.extraConfig has no supported serialization path yet.";
+      }
+    ];
   };
 }

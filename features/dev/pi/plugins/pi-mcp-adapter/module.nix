@@ -5,7 +5,7 @@
   ...
 }:
 {
-  options.my.features.dev.pi.plugins.mcp-adapter = {
+  options.my.features.dev.pi.plugins.pi-mcp-adapter = {
     enable = lib.mkOption {
       type = lib.types.bool;
       default = true;

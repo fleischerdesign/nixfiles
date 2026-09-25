@@ -2,6 +2,7 @@
 # Context trimming & summarization plugin for Pi.
 {
   lib,
+  config,
   ...
 }:
 {
@@ -17,5 +18,14 @@
       default = { };
       description = "Additional raw options for context-mode.";
     };
+  };
+
+  config = lib.mkIf (config.my.features.dev.pi.plugins.context-mode.extraConfig != { }) {
+    assertions = [
+      {
+        assertion = false;
+        message = "my.features.dev.pi.plugins.context-mode.extraConfig has no supported serialization path yet.";
+      }
+    ];
   };
 }

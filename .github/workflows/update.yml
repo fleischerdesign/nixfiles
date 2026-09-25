@@ -32,7 +32,7 @@ jobs:
         run: |
           nix flake update
           nix run .#update-custom-packages || true
-          if git diff --quiet flake.lock packages/custom; then
+          if git diff --quiet -- flake.lock packages/custom features/dev/pi; then
             echo "has-updates=false" >> "$GITHUB_OUTPUT"
           else
             echo "has-updates=true" >> "$GITHUB_OUTPUT"
@@ -54,6 +54,8 @@ jobs:
           path: |
             flake.lock
             packages/custom/**/manifest.json
+            features/dev/pi/**/manifest.json
+            features/dev/pi/**/package-lock.json
           retention-days: 1
 
   build:
@@ -113,6 +115,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add flake.lock packages/custom
+          git add flake.lock packages/custom features/dev/pi
           git commit -m "chore(deps): update flake inputs and custom packages"
           git push origin main

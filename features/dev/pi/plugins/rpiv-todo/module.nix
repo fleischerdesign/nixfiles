@@ -2,6 +2,7 @@
 # Persistent task-tree management plugin for Pi.
 {
   lib,
+  config,
   ...
 }:
 {
@@ -17,5 +18,14 @@
       default = { };
       description = "Additional raw options for rpiv-todo.";
     };
+  };
+
+  config = lib.mkIf (config.my.features.dev.pi.plugins.rpiv-todo.extraConfig != { }) {
+    assertions = [
+      {
+        assertion = false;
+        message = "my.features.dev.pi.plugins.rpiv-todo.extraConfig has no supported serialization path yet.";
+      }
+    ];
   };
 }
