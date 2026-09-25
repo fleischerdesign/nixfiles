@@ -7,7 +7,8 @@
 {
   imports = [
     ./packages.nix
-    ./pi.nix
+    ./opencode.nix
+    ./openchamber.nix
     ./fish.nix
     inputs.nixcord.homeModules.nixcord
   ];

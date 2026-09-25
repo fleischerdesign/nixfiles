@@ -68,7 +68,7 @@ in
         OIDC_SIGNUP_ENABLED = "True";
         OIDC_CONFIGURATION_URL = cfg.ssoConfigurationUrl;
         OIDC_CLIENT_ID = "uwxlwWIofaSVKwAJTyzhzT75kUMDfoCpmlSs4M1E";
-        OIDC_ADMIN_GROUP = "Mealie Admins";
+        OIDC_ADMIN_GROUP = "infra-admins";
         OIDC_AUTO_REDIRECT = "True";
         OIDC_PROVIDER_NAME = "Authentik";
         OIDC_USER_CLAIM = "email";
@@ -113,7 +113,6 @@ in
           secretPath = "services/apps/mealie_oidc_secret";
           redirectPaths = [
             "/login"
-            "/api/auth/callback"
           ];
           subMode = "hashed_user_id";
           includeClaimsInIdToken = true;

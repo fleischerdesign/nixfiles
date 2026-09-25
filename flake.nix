@@ -63,6 +63,8 @@
       url = "github:fleischerdesign/nod/develop";
       inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
     };
+
+    opencode.url = "github:anomalyco/opencode/v2";
   };
 
   outputs =
@@ -82,7 +84,12 @@
         (import ./packages/overlays/fix/authentik)
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
-        (import ./packages/overlays/fix/pi-coding-agent)
+        (_final: _prev: {
+          # Upstream v2's completion hook currently runs from a missing directory.
+          opencode-v2 = inputs.opencode.packages.${system}.opencode.overrideAttrs (_: {
+            postInstall = "";
+          });
+        })
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];
@@ -122,7 +129,9 @@
     {
       formatter.${system} = pkgs.nixfmt-tree;
 
-      packages.${system} = pkgs.custom;
+      packages.${system} = pkgs.custom // {
+        opencode = pkgs.opencode-v2;
+      };
 
       apps.${system} = {
         update-custom-packages = {
@@ -190,8 +199,6 @@
       };
 
       checks.${system} = {
-        pi-auth = (import ./features/dev/pi/lib/auth.nix { inherit pkgs; }).check;
-
         custom-package-updater =
           pkgs.runCommandLocal "custom-package-updater-check"
             {
@@ -367,14 +374,7 @@
           inherit pkgs self hostNames;
           lib = nixpkgs-unstable.lib;
         };
-      }
-      //
-        nixpkgs-unstable.lib.mapAttrs'
-          (name: drv: nixpkgs-unstable.lib.nameValuePair "pi-plugin-${name}" drv)
-          (import ./features/dev/pi/lib/plugins.nix {
-            inherit pkgs;
-            lib = nixpkgs-unstable.lib;
-          }).derivations;
+      };
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [

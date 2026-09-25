@@ -19,6 +19,7 @@ agentic contributors).
 | Who is a user, what is a service account, how does authentication and authorisation work? | [identity.md](identity.md) |
 | What is the security model, layer by layer? | [security.md](security.md) |
 | What are the microcontrollers, the access point, the router - and how are they configured? | [embedded.md](embedded.md) |
+| Which coding-agent interfaces are installed, and how do they receive credentials? | [coding-agents.md](coding-agents.md) |
 | What do the interfaces look like, which tokens and typography? | [design.md](design.md) |
 
 ## How to read these

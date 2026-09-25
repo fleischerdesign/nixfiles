@@ -17,6 +17,28 @@ let
   topologyDomain = config.my.topology.domain;
   authHost = "auth.${topologyDomain}";
   canonicalHost = "${cfg.subdomain}.${topologyDomain}";
+
+  # One OpenAI-compatible backend. Base URL and credential live in the same entry because
+  # Open-WebUI pairs `OPENAI_API_BASE_URLS` and `OPENAI_API_KEYS` positionally: two parallel
+  # strings that must agree are two things that can disagree, one list cannot.
+  openAiEndpointSubmodule = lib.types.submodule {
+    options = {
+      baseUrl = lib.mkOption {
+        type = lib.types.str;
+        description = "OpenAI-compatible API root, e.g. https://api.deepseek.com/v1.";
+      };
+
+      apiKeySecret = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          SOPS path holding the API key this endpoint is called with. Null declares an endpoint
+          that takes no credential; its slot in `OPENAI_API_KEYS` is emitted empty to keep the
+          list aligned.
+        '';
+      };
+    };
+  };
 in
 {
   options.my.features.services.open-webui = {
@@ -70,35 +92,41 @@ in
 
       secretPath = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
-        default = "ai/openrouter_api_key";
-        description = "SOPS secret path holding the client secret.";
+        default = "services/apps/open-webui_oidc_secret";
+        description = ''
+          SOPS path holding the OIDC client secret. This value is published to Authentik as the
+          provider's `client_secret` and read back by Open-WebUI, so it must be a credential of
+          its own - an API key reused here would be exposed to every reader of the OAuth client
+          configuration and would have to be rotated with it.
+        '';
       };
     };
 
-    models = {
-      deepseekApiKeySecret = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = "ai/deepseek_api_key";
-        description = "SOPS secret path for DEEPSEEK_API_KEY.";
-      };
-
-      openaiApiKeySecret = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = "ai/openai_api_key";
-        description = "SOPS secret path for OPENAI_API_KEY.";
-      };
+    openAiEndpoints = lib.mkOption {
+      type = lib.types.listOf openAiEndpointSubmodule;
+      default = [
+        {
+          baseUrl = "https://api.deepseek.com/v1";
+          apiKeySecret = "ai/deepseek_api_key";
+        }
+        {
+          baseUrl = "https://api.openai.com/v1";
+          apiKeySecret = "ai/openai_api_key";
+        }
+      ];
+      description = "OpenAI-compatible backends whose models appear in the picker, in this order.";
     };
   };
 
   config = lib.mkIf cfg.enable {
     # 1. SOPS Secret Declarations
     sops.secrets = lib.mkMerge [
-      (lib.optionalAttrs (cfg.models.deepseekApiKeySecret != null) {
-        ${cfg.models.deepseekApiKeySecret} = { };
-      })
-      (lib.optionalAttrs (cfg.models.openaiApiKeySecret != null) {
-        ${cfg.models.openaiApiKeySecret} = { };
-      })
+      (lib.listToAttrs (
+        map (endpoint: {
+          name = endpoint.apiKeySecret;
+          value = { };
+        }) (builtins.filter (endpoint: endpoint.apiKeySecret != null) cfg.openAiEndpoints)
+      ))
       (lib.optionalAttrs (cfg.sso.enable && cfg.sso.secretPath != null) {
         ${cfg.sso.secretPath} = { };
       })
@@ -107,17 +135,22 @@ in
     # 2. SOPS Environment Template (Never leaks plaintext secrets to Nix store)
     sops.templates."open-webui.env" = {
       content = ''
-        ${lib.optionalString (cfg.models.deepseekApiKeySecret != null) ''
-          DEEPSEEK_API_KEY=${config.sops.placeholder.${cfg.models.deepseekApiKeySecret}}
-        ''}
-        ${lib.optionalString (cfg.models.openaiApiKeySecret != null) ''
-          OPENAI_API_KEY=${config.sops.placeholder.${cfg.models.openaiApiKeySecret}}
-        ''}
         ${lib.optionalString (cfg.sso.enable && cfg.sso.secretPath != null) ''
           OAUTH_CLIENT_SECRET=${config.sops.placeholder.${cfg.sso.secretPath}}
         ''}
-        OPENAI_API_BASE_URLS=https://api.deepseek.com/v1;https://api.openai.com/v1
-        OPENAI_API_KEYS=''${DEEPSEEK_API_KEY};''${OPENAI_API_KEY}
+        ${lib.optionalString (cfg.openAiEndpoints != [ ]) ''
+          OPENAI_API_BASE_URLS=${
+            lib.concatStringsSep ";" (map (endpoint: endpoint.baseUrl) cfg.openAiEndpoints)
+          }
+          OPENAI_API_KEYS=${
+            lib.concatStringsSep ";" (
+              map (
+                endpoint:
+                if endpoint.apiKeySecret == null then "" else config.sops.placeholder.${endpoint.apiKeySecret}
+              ) cfg.openAiEndpoints
+            )
+          }
+        ''}
       '';
     };
 

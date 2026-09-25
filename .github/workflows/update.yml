@@ -31,7 +31,7 @@ jobs:
           nix flake update
           nix run .#update-custom-packages
           # Include newly vendored lockfiles in the Git flake source.
-          git add flake.lock packages/custom features/dev/pi
+          git add flake.lock packages/custom
           if git diff --cached --quiet; then
             echo "has-updates=false" >> "$GITHUB_OUTPUT"
           else
@@ -55,8 +55,6 @@ jobs:
             flake.lock
             packages/custom/**/manifest.json
             packages/custom/**/package-lock.json
-            features/dev/pi/**/manifest.json
-            features/dev/pi/**/package-lock.json
           retention-days: 1
 
       - name: Check updated flake
@@ -80,7 +78,7 @@ jobs:
           name: updated-flake-lock
 
       - name: Include updated files in the flake source
-        run: git add flake.lock packages/custom features/dev/pi
+        run: git add flake.lock packages/custom
 
       - uses: ./.github/actions/build-nixos-host
         with:
@@ -128,6 +126,6 @@ jobs:
           git switch -C flake-update "${{ github.sha }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add flake.lock packages/custom features/dev/pi
+          git add flake.lock packages/custom
           git commit -m "chore(deps): update flake inputs and custom packages"
           git push origin HEAD:main

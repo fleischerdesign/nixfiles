@@ -299,6 +299,22 @@
         "type": "github"
       }
     },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1776683584,
+        "narHash": "sha256-NuTLMrr10Tng72hurYG8jYQ4XKK8wnpJmOGcPiis96g=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "9dd5558b06dbdacbf635a3dd36dce1b1a7ee3a89",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nixpkgs-nixcord": {
       "locked": {
         "lastModified": 1789459628,
@@ -390,6 +406,25 @@
         "type": "github"
       }
     },
+    "opencode": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1790370552,
+        "narHash": "sha256-Fq26TwNpvv47nRqSOz6eouo0tcVyu4o/JFlMsYOPguo=",
+        "owner": "anomalyco",
+        "repo": "opencode",
+        "rev": "00738c5b2d2c3f0bce804b9e15107e3a02dd205d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "anomalyco",
+        "ref": "v2",
+        "repo": "opencode",
+        "type": "github"
+      }
+    },
     "portfolio": {
       "inputs": {
         "flake-utils": "flake-utils_2",
@@ -422,6 +457,7 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixvim": "nixvim",
         "nod": "nod",
+        "opencode": "opencode",
         "portfolio": "portfolio",
         "sops-nix": "sops-nix",
         "spicetify-nix": "spicetify-nix",
