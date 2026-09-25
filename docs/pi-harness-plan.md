@@ -11,8 +11,11 @@ runtime state.
 - Generic command-line helpers used through Pi's `bash` tool are declared separately through
   `my.features.dev.pi.cliPackages`; the default set is `ripgrep`, `fd`, `jq`, `nil`, `statix`, and `deadnix`.
 - Plugin identity, package installation, and generated package paths are derived from the discovered
-  plugin modules. The enabled baseline is `context-mode`, `pi-background-tasks`, `pi-lens`,
+  plugin modules. The enabled baseline is `context-mode`, `pi-background-tasks`, `pi-goal-x`, `pi-lens`,
   `pi-mcp-adapter`, `pi-subagents`, `pi-web-access`, `rpiv-ask-user-question`, and `rpiv-todo`.
+- `pi-goal-x` provides autonomous conversational goal loops (`/goal`, `/goal-direct`), ordered staging
+  and migration flows (`/sisyphus`), session-persistent progress checkpoints, and an independent
+  completion auditor to prevent premature task completion.
 - `pi-lens` provides real-time LSP diagnostics, code-navigation (`symbol_search`, `read_symbol`), and
   linters directly hooked into file modification events, eliminating expensive brute-force token greps.
 - `pi-subagents` provides bounded single-agent delegation and isolated multi-agent workflows. Subagents
