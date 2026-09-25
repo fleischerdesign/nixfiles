@@ -3,6 +3,7 @@
   buildNpmPackage,
   lib,
   mkSrc,
+  nodejs,
   pnameOf,
 }:
 let
@@ -26,7 +27,7 @@ buildNpmPackage {
   ];
 
   postPatch = ''
-    node -e '
+    ${nodejs}/bin/node -e '
       const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
       delete pkg.scripts.prepack;
       delete pkg.scripts.postpack;
