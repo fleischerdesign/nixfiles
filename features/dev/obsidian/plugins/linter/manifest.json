@@ -1,10 +1,10 @@
 {
   "name": "obsidian-linter",
   "pname": "obsidian-linter",
-  "version": "1.32.0",
-  "mainHash": "05ilkvvgi48ml2amdxgq97zzgzfgyxascq2yvmwcy94hjazl8kqv",
-  "manifestHash": "0ff8dvg04f93zihmzrmw435hm4rg5s9y43q22f77b2a274ixmqpb",
-  "stylesHash": "0sa2895r6xsb29jba31l2bgvacw1dwxhmw20k3y981gak7lifhg6",
+  "version": "1.33.0",
+  "mainHash": "0gvaxarj163pfzspj1n8sj69inc3c5bnbrv5g24igqiwcp7qhjk5",
+  "manifestHash": "1jzzs6k9c61g19chxcm70mdjwpchlmx8liwz01wnpw8z4xn5gr1g",
+  "stylesHash": "0d4637qqjd96hpfanpxanfvy066hdfli65hdcm41xpkhh1k3mnmf",
   "upstream": {
     "type": "obsidian-plugin",
     "owner": "platers",

@@ -1,10 +1,10 @@
 {
   "name": "templater-obsidian",
   "pname": "templater-obsidian",
-  "version": "2.24.3",
-  "mainHash": "0is135waz0z8wyb4zlx7sgizzhvy9da0pg2wznvfghc9fbymhv0a",
-  "manifestHash": "1h41x70qhmi28gwm7az3wx48lxh16y9zdm3swklk00jgs5dxyviy",
-  "stylesHash": "1pnq8mmpq9janhxj2z71hbd2gc54ysvzqd9ygqwryrq2wqxhd57b",
+  "version": "2.25.1",
+  "mainHash": "151y6cqw6fhg67p4296wc0z4g2fxdwl21hslj44izkll4qldk1pb",
+  "manifestHash": "1z93gnrdx1czp1rxj9yihprvqmgjxnp2zh8hs0md4b5bqk9814mr",
+  "stylesHash": "0pwbrwaaqgmxl247790wywrn86f49s4cld63hw9cmvbd3lnxv9k7",
   "upstream": {
     "type": "obsidian-plugin",
     "owner": "SilentVoid13",

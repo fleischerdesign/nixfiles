@@ -1,9 +1,9 @@
 {
   "name": "pi-mcp-adapter",
-  "version": "2.26.0",
-  "rev": "1bf36719cec478a163bb52e3390182963aab9f85",
-  "srcHash": "sha256-meIyWlYVDVFZkbUiZA2aP5SUq34/JZxIeGHTV2/9tdg=",
-  "npmDepsHash": "sha256-/c2CO6vZsBxfA0UtB3qaVSsP+5/IjDNAQgZlDK9xY2c=",
+  "version": "2.37.0",
+  "rev": "7bf2332932b652416ea717e154352baed7420b66",
+  "srcHash": "sha256-Q9LXw3JQ0Fv23DKF88Pt5sgUS3q5lX60PK3DtY8TlGI=",
+  "npmDepsHash": "sha256-F4llx+dYqAPj1J8VhrIN0Db6YJlJ4ezki4gX27m7g7U=",
   "upstream": {
     "type": "github-rev",
     "owner": "nicobailon",

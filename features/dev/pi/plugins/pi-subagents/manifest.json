@@ -1,9 +1,9 @@
 {
   "name": "pi-subagents",
   "version": "0.71.0",
-  "rev": "4af5e85a427b9f87334585ae8d0eb365d4dd2a1e",
-  "srcHash": "sha256-KUnrfinRPiEPPdj0pd06MWnYncQmjiQvGySmGqdvwEg=",
-  "npmDepsHash": "sha256-aNxQ41bqLLViCEn5FIv6LWZixrAOuJEBZcFW2D1eH3c=",
+  "rev": "2e9c51bada2da6a9ba73b6973e1545a9afa0d057",
+  "srcHash": "sha256-PDdRd2lSVVcUOmv6Q6dHrwnVjHDnQYR9hjdRzif0D8U=",
+  "npmDepsHash": "sha256-pqwb50xwJUSXzG88zOK2JvnjVhaXaxKK47M8GU9SsII=",
   "upstream": {
     "type": "github-rev",
     "owner": "nicobailon",

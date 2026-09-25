@@ -1,9 +1,9 @@
 {
   "name": "pi-web-access",
-  "version": "0.23.0",
-  "rev": "81e18785fdf6e14f9dee28d8a805c74eca29b991",
-  "srcHash": "sha256-zMuL0DFBfDS53lwh6lU1Ue6gImw4uqDlZZ5fncKJbjk=",
-  "npmDepsHash": "sha256-LmR5rpF9oXFkmVeRUznlOsWZFhS2sxOIRsg1h6qPqw0=",
+  "version": "0.31.0",
+  "rev": "610a52033f1e9705c0023ff9e0fac399319310a3",
+  "srcHash": "sha256-ykR2slh8MkxxbP660h0rvk2Y7SaKv+Cw/lJC21JqGW8=",
+  "npmDepsHash": "sha256-WcFzEvUNEkWJJUEpibbrCN/d2b4Hv5NW8p90ZZU0IeY=",
   "upstream": {
     "type": "github-rev",
     "owner": "nicobailon",

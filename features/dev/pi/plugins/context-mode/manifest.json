@@ -1,9 +1,9 @@
 {
   "name": "context-mode",
   "version": "1.0.169",
-  "rev": "7536cebed3f2a3b52262511121aa19744d388e78",
-  "srcHash": "sha256-CmTldprv3qfQW1EJWtPdJHxs/ZFcwF3sbFenzjxDVwY=",
-  "npmDepsHash": "sha256-oGHHMWcSicoZvC/EadVOz0aE9+WrE0t0JvxmE2VyzU8=",
+  "rev": "e80601eb03ecafe63f0fdc2b31787fc5cdf31894",
+  "srcHash": "sha256-4m7iVQG70CW1mmEG5OPj1369IDNqudrq6aJFaRz59qI=",
+  "npmDepsHash": "sha256-wYHuctFaJ0BKZVjbtULZRmnhDTnJzli+m5wSW2reYDU=",
   "upstream": {
     "type": "github-rev",
     "owner": "mksglu",
