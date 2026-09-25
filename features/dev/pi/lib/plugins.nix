@@ -32,7 +32,6 @@ let
   mkSrc =
     {
       manifest,
-      fixIntegrity ? false,
       lockfile ? null,
       tarballUrl ? null,
     }:
@@ -51,18 +50,14 @@ let
             hash = manifest.srcHash;
           };
     in
-    if !fixIntegrity && lockfile == null then
+    if lockfile == null then
       src
     else
       pkgs.stdenv.mkDerivation (
         {
           name = "${manifest.name}-src";
           inherit src;
-          nativeBuildInputs = [ pkgs.nodejs ];
-          buildPhase = lib.concatStringsSep "\n" (
-            lib.optional (lockfile != null) "cp ${lockfile} package-lock.json"
-            ++ lib.optional fixIntegrity "node ${./fix-pi-integrity.mjs} package-lock.json"
-          );
+          buildPhase = "cp ${lockfile} package-lock.json";
           installPhase = "cp -r . \"$out\"";
         }
         // lib.optionalAttrs (tarballUrl != null) { sourceRoot = "package"; }
