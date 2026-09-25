@@ -102,6 +102,16 @@ in
       description = "Custom provider definitions injected into models.json (e.g. self-hosted Ollama, vLLM).";
     };
 
+    cliPackages = lib.mkOption {
+      type = lib.types.listOf lib.types.package;
+      default = with pkgs; [
+        ripgrep
+        fd
+        jq
+      ];
+      description = "CLI packages available to Pi through the user's PATH.";
+    };
+
     providers = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule {
@@ -304,6 +314,7 @@ in
                 pkgs.pi-coding-agent
                 pkgs.nodejs
               ]
+              ++ cfg.cliPackages
               ++ activePluginDerivations
               ++ lib.catAttrs "package" (lib.attrValues activeMcpServers);
 
