@@ -1,0 +1,12 @@
+{
+  "name": "pi-subagents",
+  "version": "0.71.0",
+  "rev": "4af5e85a427b9f87334585ae8d0eb365d4dd2a1e",
+  "srcHash": "sha256-KUnrfinRPiEPPdj0pd06MWnYncQmjiQvGySmGqdvwEg=",
+  "npmDepsHash": "sha256-aNxQ41bqLLViCEn5FIv6LWZixrAOuJEBZcFW2D1eH3c=",
+  "upstream": {
+    "type": "github-rev",
+    "owner": "nicobailon",
+    "repo": "pi-subagents"
+  }
+}

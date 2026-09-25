@@ -1,0 +1,10 @@
+{
+  "name": "@juicesharp/rpiv-ask-user-question",
+  "version": "2.11.0",
+  "srcHash": "sha256-uMUfPANS9Ne9mffCRjcZpWsSuwGdDz0FhHGVqyK756k=",
+  "npmDepsHash": "sha256-INa2iRrJHeYVn8deRNQrEa1JrXsFk/VJkx2NJoHRvuI=",
+  "upstream": {
+    "type": "npm",
+    "package": "@juicesharp/rpiv-ask-user-question"
+  }
+}

@@ -1,26 +1,26 @@
-# features/dev/pi/plugins/rpiv-todo/module.nix
-# Persistent task-tree management plugin for Pi.
+# features/dev/pi/plugins/rpiv-ask-user-question/module.nix
+# Structured questionnaire extension for Pi.
 {
   config,
   lib,
   ...
 }:
 let
-  cfg = config.my.features.dev.pi.plugins.rpiv-todo;
+  cfg = config.my.features.dev.pi.plugins.rpiv-ask-user-question;
   piCfg = config.my.features.dev.pi;
 in
 {
-  options.my.features.dev.pi.plugins.rpiv-todo = {
+  options.my.features.dev.pi.plugins.rpiv-ask-user-question = {
     enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Enable persistent task-tree management plugin.";
+      description = "Enable structured interactive questionnaire extension for Pi.";
     };
 
     extraConfig = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
-      description = "Additional raw options merged into ~/.pi/agent/todo.json.";
+      description = "Additional raw options merged into ~/.pi/agent/ask-user-question.json.";
     };
   };
 
@@ -37,7 +37,7 @@ in
         in
         {
           config = lib.mkIf userPiCfg.enable {
-            home.file.".pi/agent/todo.json".text = builtins.toJSON cfg.extraConfig;
+            home.file.".pi/agent/ask-user-question.json".text = builtins.toJSON cfg.extraConfig;
           };
         }
       )
