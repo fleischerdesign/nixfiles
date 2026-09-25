@@ -38,6 +38,7 @@
   # Credentials shared across hosts (consumed by pi/agents)
   sops.secrets."ai/deepseek_api_key" = lib.mkDefault { };
   sops.secrets."ai/openrouter_api_key" = lib.mkDefault { };
+  sops.secrets."ai/opencode_api_key" = lib.mkDefault { };
 
   nod = {
     enable = lib.mkDefault true;

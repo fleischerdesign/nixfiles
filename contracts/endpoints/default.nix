@@ -319,6 +319,17 @@ let
         '';
       };
 
+      crowdsec = {
+        exemptScenarios = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = ''
+            List of CrowdSec scenario names that are explicitly exempted from triggering bans
+            when accessing this endpoint (e.g. ['crowdsecurity/http-crawl-non_statics'] for binary caches).
+          '';
+        };
+      };
+
       directAccess = {
         enable = lib.mkOption {
           type = lib.types.bool;

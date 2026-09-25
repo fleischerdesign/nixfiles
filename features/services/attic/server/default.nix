@@ -71,6 +71,13 @@ in
       # Streaming binary cache: do not buffer. Declared as a proxy option (not as raw
       # Caddyfile) so the upstream target stays projected onto the ingress (Naming spec §0.3).
       proxyOptions = "flush_interval -1";
+
+      # High-frequency reads on narinfo and non-static binary cache objects are legitimate behavior
+      # for nix substituters and CI/CD runners; exempt them from web crawl / scan detectors.
+      crowdsec.exemptScenarios = [
+        "crowdsecurity/http-crawl-non_statics"
+        "crowdsecurity/http-probing"
+      ];
     };
   };
 }

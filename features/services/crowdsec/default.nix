@@ -16,6 +16,35 @@ let
     consumer = config.my.topology.hosts.${config.networking.hostName} or null;
     peer = config.my.topology.hosts.${cfg.masterHost};
   };
+
+  # Project scenario exemptions across all endpoints in the fleet.
+  # The master/ingress host terminates or inspects traffic for all services, so we project
+  # all declared exemptions from every host configuration.
+  flakeConfigurations =
+    config._module.specialArgs.flake.nixosConfigurations or {
+      "${config.networking.hostName}" = config;
+    };
+
+  allEndpoints = lib.concatLists (
+    lib.mapAttrsToList (
+      _hostName: hostConfig:
+      lib.concatMap (contract: lib.attrValues (contract.endpoints or { })) (
+        lib.attrValues (hostConfig.config.my.contracts.provides or { })
+      )
+    ) flakeConfigurations
+  );
+
+  exemptDomains = lib.unique (
+    lib.concatMap (
+      ep:
+      let
+        domains = lib.filter (d: d != null && !lib.hasInfix "*" d) (
+          (lib.optional (ep.canonicalDomain != null) ep.canonicalDomain) ++ (ep.extraDomains or [ ])
+        );
+      in
+      lib.optionals ((ep.crowdsec.exemptScenarios or [ ]) != [ ]) domains
+    ) allEndpoints
+  );
 in
 {
   options.my.features.services.crowdsec = {
@@ -38,22 +67,49 @@ in
       default = [ ];
       description = "Regex patterns for log files to exclude from acquisition.";
     };
+    whitelist = {
+      cidrs = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Explicit IPv4/IPv6 CIDR ranges to globally whitelist in CrowdSec parsers.";
+      };
+      ips = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Explicit IPv4/IPv6 single addresses to globally whitelist in CrowdSec parsers.";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
     services.crowdsec = {
       enable = true;
 
-      localConfig.parsers.s02Enrich = [
-        {
-          name = "custom/trusted-internal";
-          description = "Whitelist internal LAN and Tailscale IPs";
-          whitelist = {
-            reason = "trusted internal network";
-            cidr = config.my.topology.trustedSubnets;
-          };
-        }
-      ];
+      localConfig = {
+        parsers.s02Enrich = [
+          {
+            name = "custom/trusted-internal";
+            description = "Whitelist internal LAN and WireGuard mesh IPs";
+            whitelist = {
+              reason = "trusted internal network";
+              cidr = lib.unique (config.my.topology.trustedSubnets ++ cfg.whitelist.cidrs);
+              ip = cfg.whitelist.ips;
+            };
+          }
+        ]
+        ++ lib.optionals (exemptDomains != [ ]) [
+          {
+            name = "custom/endpoint-exemptions";
+            description = "Exempt declared service endpoints from crawl/probe detections";
+            whitelist = {
+              reason = "contract-declared exemption for service endpoint";
+              expression = map (
+                domain: "evt.Meta.service == 'http' && evt.Meta.target_fqdn == '${domain}'"
+              ) exemptDomains;
+            };
+          }
+        ];
+      };
 
       hub.collections = [
         "crowdsecurity/linux"

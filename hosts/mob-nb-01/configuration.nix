@@ -27,16 +27,19 @@
 
   my.features.dev.pi = {
     enable = true;
-    provider = "deepseek";
-    defaultModel = "deepseek-v4-flash-vision-exp";
+    provider = "opencode-go";
+    defaultModel = "deepseek-v4.1-flash";
     providers = {
       deepseek.apiKey = config.sops.placeholder."ai/deepseek_api_key";
       openrouter.apiKey = config.sops.placeholder."ai/openrouter_api_key";
+      opencode.apiKey = config.sops.placeholder."ai/opencode_api_key";
+      opencode-go.apiKey = config.sops.placeholder."ai/opencode_api_key";
     };
   };
 
   sops.secrets."ai/deepseek_api_key" = { };
   sops.secrets."ai/openrouter_api_key" = { };
+  sops.secrets."ai/opencode_api_key" = { };
 
   system.stateVersion = "24.05";
 }
