@@ -311,7 +311,7 @@
         # client that routes a home zone. Every one of them was a real failure before it was a check.
         network-invariants =
           let
-            result = import ./lib/checks/network-invariants.nix {
+            result = import ./checks/network-invariants.nix {
               lib = nixpkgs-unstable.lib;
               inherit self hostNames;
             };
@@ -390,10 +390,10 @@
             '';
 
         # The portal reads its fleet at runtime, so the artifact the portal host runs carries the
-        # projection as a file rather than as a build input. lib/checks/vyrx-portal.nix states the
+        # projection as a file rather than as a build input. checks/vyrx-portal.nix states the
         # claim - entry point, prerendered pages, both projections and no person - and measures it on
         # the artifact, where the consumer sees it.
-        vyrx-portal = import ./lib/checks/vyrx-portal.nix {
+        vyrx-portal = import ./checks/vyrx-portal.nix {
           inherit pkgs self hostNames;
           lib = nixpkgs-unstable.lib;
         };

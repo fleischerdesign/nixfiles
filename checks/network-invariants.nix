@@ -1,4 +1,4 @@
-# lib/checks/network-invariants.nix - the promises the network makes, checked against the evaluated
+# checks/network-invariants.nix - the promises the network makes, checked against the evaluated
 # fleet instead of against a convention.
 #
 # Every invariant here was a real failure at some point, which is why it is a check and not a comment:
@@ -15,7 +15,7 @@
 }:
 let
   cfgOf = name: self.nixosConfigurations.${name}.config;
-  nft = import ../nftables.nix { inherit lib; };
+  nft = import ../lib/nftables.nix { inherit lib; };
 
   # The inventory is the same on every host; read it from one of them.
   reference = cfgOf (builtins.head hostNames);

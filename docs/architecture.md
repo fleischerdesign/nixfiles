@@ -335,6 +335,7 @@ hosts/<name>/    entry point: role + hardware + host-specific features
 roles/           base → server | pc → desktop | notebook
 features/        auto-discovered modules, each behind an `enable` option
 contracts/       provides / consumes / naming / endpoints / storage / dependencies
+checks/          the promises, measured: network invariants, the portal artifact
 lib/core/        mkSystem, recursive module discovery
 user/<name>/     Home Manager: user packages, shell, editors
 docs/            this specification

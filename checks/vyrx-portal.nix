@@ -1,4 +1,4 @@
-# lib/checks/vyrx-portal.nix
+# checks/vyrx-portal.nix
 # The portal reads its fleet at runtime, so the projection is a file next to the artifact and not a
 # build input. The claim is about files again: the entry point, the prerendered public pages and the
 # two projections, measured on the artifact the portal host actually runs.

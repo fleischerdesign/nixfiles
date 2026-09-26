@@ -7,7 +7,7 @@
 #
 #   * a rule whose declaration disappears, disappears - there is no state outside the configuration;
 #   * a syntax error cannot reach a running host, because the ruleset is validated as a whole and the
-#     check in `lib/checks` lints what we generate before it is ever rendered;
+#     check in `checks` lints what we generate before it is ever rendered;
 #   * the chain policies decide the defaults (`input` and `forward` are `drop` when filtering is on), so
 #     no projection has to write a deny rule to close what nobody declared.
 #
