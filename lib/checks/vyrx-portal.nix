@@ -7,6 +7,12 @@
 # the old public catalogue cannot come back unnoticed. A host that was skipped and a host that passed
 # must not read the same, so the exit code is derived from the checks rather than from the last
 # statement.
+#
+# The server must be bundled, because the artifact ships no `node_modules`. That claim is asserted
+# where it can be measured precisely - in the application's own build (`scripts/verify-server.mjs`,
+# part of `npm run build`), which this check depends on: the artifact is built by that pipeline, so a
+# server with foreign imports cannot reach here. It is not restated in shell; a second, weaker
+# implementation would only be a second thing to keep right.
 {
   pkgs,
   lib,
