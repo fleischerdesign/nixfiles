@@ -389,9 +389,10 @@
               echo "ok: ${toString (nixpkgs-unstable.lib.length scripts)} embedded authentik script(s) compile" > $out
             '';
 
-        # The portal is built, not fetched, and its catalogue is a build input: the artifact the portal
-        # host runs has to carry what its pages were rendered from. lib/checks/vyrx-portal.nix states the
-        # claim and measures it on the artifact, where the consumer sees it.
+        # The portal reads its fleet at runtime, so the artifact the portal host runs carries the
+        # projection as a file rather than as a build input. lib/checks/vyrx-portal.nix states the
+        # claim - entry point, prerendered pages, both projections and no person - and measures it on
+        # the artifact, where the consumer sees it.
         vyrx-portal = import ./lib/checks/vyrx-portal.nix {
           inherit pkgs self hostNames;
           lib = nixpkgs-unstable.lib;

@@ -356,6 +356,7 @@ service:
 | Surface | Compiled from the repository | Still configured in a UI |
 |---|---|---|
 | cluster dashboard (Homarr) | tiles, categories, icons and URLs from `endpoints.dashboard` | nothing |
+| portal (vyrx.de) | services, categories, dependencies and actions projected from the endpoint contracts; read at runtime and carrying no addresses and no people | nothing |
 | Grafana | three dashboards as files, plus datasources and alerts from the module | nothing |
 | CrowdSec | the trusted-subnet whitelist, from `my.topology.trustedSubnets` | nothing |
 | ntfy | accounts and tokens from SOPS, `deny-all` by default | nothing |
