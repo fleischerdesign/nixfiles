@@ -319,23 +319,38 @@ in
         # `/services`, `/knowledge`, `/status`, `/account`, `/admin` - is authorised and is not here,
         # and neither are `/api/status` or `/api/health`: the projection is read server-side, so the
         # status API must not leak what it measured to an anonymous caller.
+        # Paths the outpost does not check. A path listed here is proxied without
+        # `forward_auth`, so it carries **no** identity headers - which means a page
+        # that reads identity must never be listed. The application declares its
+        # public addresses (`dist/public-paths.json`, built from its route table),
+        # and `checks/vyrx-portal.nix` holds this list and that file equal: if the
+        # two drift apart, the build fails instead of a page quietly showing the
+        # wrong thing.
         unauthenticatedPaths = [
           "/"
-          "/project/*"
-          "/help/*"
-          "/en"
-          "/en/project/*"
-          "/en/help/*"
-          "/404.html"
-          "/en/404.html"
-          "/robots.txt"
+          "/.well-known/security.txt"
           "/_astro/*"
+          "/apple-touch-icon.png"
+          "/en"
+          "/en/"
+          "/en/help"
+          "/en/help/"
+          "/en/help/*"
+          "/en/project"
+          "/en/project/"
+          "/en/project/*"
           "/favicon.ico"
           "/favicon.svg"
-          "/apple-touch-icon.png"
+          "/help"
+          "/help/"
+          "/help/*"
           "/icon-192.png"
           "/icon-512.png"
           "/icon-maskable-512.png"
+          "/project"
+          "/project/"
+          "/project/*"
+          "/robots.txt"
           "/site.webmanifest"
         ];
         dashboard = {

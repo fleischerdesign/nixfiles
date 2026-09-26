@@ -325,7 +325,11 @@ Consequences worth knowing:
   not ask for them;
 - services never reference a host, so moving one is a one-line change in `hosts/`;
 - the FQDNs, the Caddy configuration, the Authentik blueprints and the backup jobs are all *functions*
-  of these declarations, which is why a rename is a derivation change rather than a migration.
+  of these declarations, which is why a rename is a derivation change rather than a migration;
+- a path exempted from authentication (`unauthenticatedPaths`) is proxied **without** `forward_auth`,
+  so it carries **no** identity headers. A page that reads identity must therefore never be exempted,
+  and the set of exempted paths must equal the set the application declares public -
+  `checks/vyrx-portal.nix` holds the two equal, because the two live in different repositories.
 
 ## 7. Configuration layout
 

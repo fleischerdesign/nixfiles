@@ -24,11 +24,13 @@ let
     name: self.nixosConfigurations.${name}.config.my.features.services.vyrx-landing.enable
   ) hostNames;
 
-  # The public pages a visitor gets without a session. `/` and `/en` are server-rendered - they read
-  # the identity headers - so they are not files; project and help are prerendered for both languages.
+  # The public pages a visitor gets without a session: `/` and `/en` are editorial and carry no
+  # identity, so they are files like project and help.
   prerenderedPages = [
+    "index.html"
     "project/index.html"
     "help/index.html"
+    "en/index.html"
     "en/project/index.html"
     "en/help/index.html"
   ];
@@ -37,12 +39,17 @@ let
     name:
     let
       portal = self.nixosConfigurations.${name}.config.my.features.services.vyrx-landing;
+      # What the host's own contract exempts from authentication.
+      exempt =
+        self.nixosConfigurations.${name}.config.my.contracts.provides.vyrx-landing.endpoints.web.unauthenticatedPaths;
     in
     ''
       # ${name}
       pkg=${portal.package}
       projection=${portal.projection}
       adapters=${portal.adapters}
+      work=$(mktemp -d)
+      trap 'rm -rf "$work"' EXIT
 
       if ! test -f "$pkg/server/entry.mjs"; then
         echo "vyrx portal ${name}: the artifact has no server/entry.mjs" >&2
@@ -100,8 +107,7 @@ let
         fi
       fi
 
-      if ! jq -e . "$adapters" >/dev/null 2>&1; then
-        echo "vyrx portal ${name}: the adapter file does not parse as JSON" >&2
+      if ! jq -e . "$adapters" >/dev/null 2>&1; then        echo "vyrx portal ${name}: the adapter file does not parse as JSON" >&2
         fail=1
       else
         if ! jq -e '.schema == 1' "$adapters" >/dev/null 2>&1; then
@@ -115,6 +121,21 @@ let
           echo "vyrx portal ${name}: the adapter file names a service the projection does not" >&2
           fail=1
         fi
+      fi
+
+      # The two lists must be the same list. What the ingress exempts is what the app declares
+      # public - nothing more (a page without identity) and nothing less (a public page behind the
+      # wall). The app derives its list from its route table; this is where the two meet.
+      if jq -S 'sort' "$pkg/public-paths.json" > "$work/public.json" 2>/dev/null; then
+        echo '${builtins.toJSON exempt}' | jq -S 'sort' > "$work/exempt.json"
+        if ! cmp -s "$work/exempt.json" "$work/public.json"; then
+          echo "vyrx portal ${name}: the ingress exempts a different set of paths than the app declares public:" >&2
+          diff -u "$work/public.json" "$work/exempt.json" | sed -n '3,20p' >&2 || true
+          fail=1
+        fi
+      else
+        echo "vyrx portal ${name}: the artifact carries no public-paths.json" >&2
+        fail=1
       fi
 
       echo "  ${name}: entry point, ${toString (builtins.length prerenderedPages)} prerendered page(s), projection and adapters measured"
