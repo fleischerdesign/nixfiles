@@ -9,7 +9,8 @@ let
   upstream = pkgs.opencode-v2;
   credentialExports = lib.concatStringsSep "\n" (
     lib.mapAttrsToList (name: path: ''
-      export ${name}="$(< ${lib.escapeShellArg path})"
+      ${name}="$(< ${lib.escapeShellArg path})"
+      export ${name}
     '') cfg.credentialFiles
   );
   package = pkgs.writeShellScriptBin "opencode" ''

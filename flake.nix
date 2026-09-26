@@ -84,12 +84,34 @@
         (import ./packages/overlays/fix/authentik)
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
-        (_final: _prev: {
-          # Upstream v2's completion hook currently runs from a missing directory.
-          opencode-v2 = inputs.opencode.packages.${system}.opencode.overrideAttrs (_: {
-            postInstall = "";
-          });
-        })
+        (
+          final: _prev:
+          let
+            # OpenCode's flake can lag behind its own Bun requirement.
+            expectedBunVersion = nixpkgs-unstable.lib.removePrefix "bun@" (
+              (builtins.fromJSON (builtins.readFile "${inputs.opencode}/package.json")).packageManager
+            );
+            upstream = inputs.opencode.packages.${system}.opencode;
+          in
+          {
+            opencode-v2 =
+              if final.bun.version != expectedBunVersion then
+                throw "OpenCode requires Bun ${expectedBunVersion}, but nixpkgs provides ${final.bun.version}"
+              else
+                # Upstream v2's completion hook currently runs from a missing directory.
+                (upstream.override {
+                  bun = final.bun;
+                  node_modules = upstream.node_modules.override {
+                    bun = final.bun;
+                    # Upstream's fixed-output hash describes Bun 1.3.13's dependency layout.
+                    hash = "sha256-q9F04B8xHQWDw+0HF0UeAJ7JX5xBHl3b2VdrUdwDl5I=";
+                  };
+                }).overrideAttrs
+                  (_: {
+                    postInstall = "";
+                  });
+          }
+        )
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];

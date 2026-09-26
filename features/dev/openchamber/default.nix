@@ -35,7 +35,7 @@ in
         message = "OpenChamber must enable at least one interface.";
       }
       {
-        assertion = !cfg.desktop.enable || pkgs.system == "x86_64-linux";
+        assertion = !cfg.desktop.enable || pkgs.stdenv.hostPlatform.system == "x86_64-linux";
         message = "The OpenChamber desktop package is available only on x86_64-linux.";
       }
     ];
