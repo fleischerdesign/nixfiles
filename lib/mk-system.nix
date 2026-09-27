@@ -27,6 +27,15 @@ let
       allContractModules =
         if builtins.pathExists contractsDir then loader.findModules contractsDir else [ ];
 
+      # The site inventory, composed explicitly and never auto-discovered: subnets, hosts and
+      # devices are facts, not modules, so they do not match the nixos.nix marker and are
+      # listed here by path instead.
+      inventoryModules = map (name: ../inventory + "/${name}.nix") [
+        "subnets"
+        "hosts"
+        "devices"
+      ];
+
       finalPkgs =
         if pkgs != null then
           pkgs
@@ -90,6 +99,7 @@ let
       ++ extraModules
       ++ allContractModules
       ++ allFeatureModules
+      ++ inventoryModules
       ++ [
         ../hosts/${hostname}/configuration.nix
         home-manager-unstable.nixosModules.home-manager

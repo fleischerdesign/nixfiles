@@ -45,7 +45,8 @@ It is a node like the others; its WireGuard configuration is rendered as a wg-qu
 ### 3.1 One Layer-2 segment, three zones
 
 The house is **one flat Layer-2 segment**. Zones are *addressing and policy*, not separate broadcast
-domains: a zone is a `/24` plus a trust level plus a set of firewall rules. There are no VLANs - the
+domains: a zone is a named subnet with a trust level, plus the firewall rules that treat it.
+There are no VLANs - the
 hardware for a second segment does not exist yet, and the zone model is honest about that
 ([naming.md](naming.md) states this explicitly, because a naming document that implies isolation
 nobody implemented is worse than no document).
@@ -353,8 +354,9 @@ hosts/<name>/    entry point: role + hardware + host-specific features
 roles/           base → server | pc → desktop | notebook
 features/        NixOS modules, discovered by the `nixos.nix` marker, each behind an `enable` option
 contracts/       provides (endpoints, publications, identity, portal, telemetry) / consumes / naming / storage / dependencies
+inventory/       site facts (subnets, hosts, devices), composed explicitly by mk-system, never auto-discovered
 checks/          the promises, measured: network invariants, contract fixtures, the portal artifact
-lib/             mkSystem, module discovery, shared pure helpers (endpoints, addresses)
+lib/             mkSystem, module discovery, shared pure helpers (endpoints, addresses, cidr, users, fleet)
 user/<name>/     Home Manager: user packages, shell, editors
 docs/            this specification
 ```

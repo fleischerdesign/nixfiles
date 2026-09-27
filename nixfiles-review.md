@@ -1685,7 +1685,7 @@ supersedes one by date, not by silently editing this table.
 | 4 | F01 deployment surface (+ `operations.md`) | done |
 | 5 | D1 discovery contract and fixtures, then the marker migration | done |
 | 6 | D3/D5/D6 extractions, D4 `home.nix` split, D7 renderer/projection split | done |
-| 7 | D2 inventory extraction, D8 zone-vs-trust, D15 public API migration, F07 inert options, F15 endpoint segregation | done (D15 public paths migrated, dead options removed, per-domain fixtures green; D2/D8/F11-F14/F16-F18 stay open below) |
+| 7 | D2 inventory extraction, D8 zone-vs-trust, D15 public API migration, F07 inert options, F15 endpoint segregation, F11/F12 topology split and validation | done (inventory/ composes subnets/hosts/devices explicitly; zones are validated subnet references; per-domain fixtures green; F13/F14/F16/F17/F18/D11 done in following commits; live drills in increment 8 stay open) |
 | 8 | F08/F09 and WP2 restore drills, then F19/F20/F21 verification and documentation | open |
 
 ### 10.4 What is deliberately not done yet, and why
@@ -1703,12 +1703,17 @@ and shipping them without it would repeat the failure mode `docs/practices.md` d
   operator in the loop. *(Increment 8.)*
 - **F05/WP2 restore evidence.** The declared artifact and its exclusions are correct and proven, but
   "a dump can be restored" is a claim only a restore drill can make. *(Increment 8.)*
-- **D2 inventory extraction and D8 zone-vs-trust.** Both are schema moves that change where a fact
-  lives; they are safe but large, and the structural work already done (D1-D7) should be reviewed
-  before another 500 lines move. *(Increment 7.)*
-- **F11/F12/D2/D8 (still open).** Topology schema/site-inventory split, zone-vs-trust references
-  and inventory validation touch the fleet's ground truth; they are one coordinated move.
-  *(Increment 7, follow-ups.)*
+- **D2/F11 (done).** Site facts live in `inventory/` (subnets, hosts, devices), composed
+  explicitly by path in `lib/mk-system.nix` and never auto-discovered. The topology module keeps
+  schema, derived policy and validation; inventory files carry plain definitions with a documented
+  extension policy. A synthetic second inventory evaluates through the untouched schema.
+- **D8/F12 (done).** A zone is a validated subnet reference, not a trust-level enum: unknown zones
+  fail with a named message, two zones may share a trust level (proven by fixture), and no
+  mechanism reads level order (the lattice-order claims are retracted to convention). Inventory
+  validation covers IPv4 syntax, subnet-CIDR syntax, address uniqueness, device/overlay/gateway
+  subnet membership and DHCP-served `/24` shape; IPv6 containment is documented out of scope and
+  matched exactly instead. Cloud public addresses and provider gateways are deliberately exempt
+  from zone membership, with the reason stated where the exemption lives.
 - **F13 (done).** Providers are derived as the unique host with the role (authentik core, monitoring
   hub, crowdsec master) via `fleetConfigs.uniqueHost`; zero or several fail loudly. The core URL
   uses the core's declared listen port, outpost/ldap/hub/master bindings that were literals are

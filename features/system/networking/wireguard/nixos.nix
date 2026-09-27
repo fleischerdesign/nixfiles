@@ -292,21 +292,32 @@ in
     };
 
     # 3. Kernel WireGuard interface configuration (Dual-Stack IPv4 / RFC 4193 ULA IPv6)
-    networking.wireguard.interfaces.${cfg.interfaceName} = {
-      # The mesh is the last resort for a prefix that is also directly reachable. A roaming client
-      # that happens to be at home has a connected route to its own zone (NetworkManager gives wifi
-      # 600), and a tunnel route at the default metric 0 would win over it and send LAN traffic out
-      # through the hubs and back. The overlay itself has no competing route, so this only orders the
-      # LAN prefixes the mesh carries.
-      metric = 1000;
-      ips = [
-        "${ownHost.wireguardIpv4}/24"
-      ]
-      ++ lib.optional (ownHost.wireguardIpv6 != null) "${ownHost.wireguardIpv6}/64";
-      listenPort = cfg.port;
-      privateKeyFile = config.sops.secrets.${cfg.privateKeySecretName}.path;
-      peers = peersConfig;
-    };
+    # The prefix lengths come from the inventory's own CIDRs, not literals: a renumbered mesh
+    # keeps its interface addresses, and a mesh whose CIDR cannot be parsed fails here loudly
+    # instead of binding a /24 onto another prefix.
+    networking.wireguard.interfaces.${cfg.interfaceName} =
+      let
+        cidrLib = import ../../../../lib/cidr.nix { inherit lib; };
+        meshPrefix = cidrLib.prefixLength (topology.subnets.mesh.cidr or "10.10.100.0/24");
+        meshV6Prefix = cidrLib.prefixLength (topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64");
+      in
+      assert meshPrefix != null;
+      assert meshV6Prefix != null || ownHost.wireguardIpv6 == null;
+      {
+        # The mesh is the last resort for a prefix that is also directly reachable. A roaming client
+        # that happens to be at home has a connected route to its own zone (NetworkManager gives wifi
+        # 600), and a tunnel route at the default metric 0 would win over it and send LAN traffic out
+        # through the hubs and back. The overlay itself has no competing route, so this only orders the
+        # LAN prefixes the mesh carries.
+        metric = 1000;
+        ips = [
+          "${ownHost.wireguardIpv4}/${toString meshPrefix}"
+        ]
+        ++ lib.optional (ownHost.wireguardIpv6 != null) "${ownHost.wireguardIpv6}/${toString meshV6Prefix}";
+        listenPort = cfg.port;
+        privateKeyFile = config.sops.secrets.${cfg.privateKeySecretName}.path;
+        peers = peersConfig;
+      };
 
     # 4. MSS clamping, relay transit and the device policy - all of it declarative.
     #

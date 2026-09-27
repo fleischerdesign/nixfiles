@@ -247,6 +247,8 @@
 
           fleet-configs = import ./checks/fleet-configs.nix checkArgs;
 
+          topology-inventory = import ./checks/topology-inventory.nix checkArgs;
+
           telemetry-contract = import ./checks/telemetry-contract.nix checkArgs;
 
           custom-package-updater =

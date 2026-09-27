@@ -1,5 +1,7 @@
 # features/system/networking/topology/nixos.nix
-# Declarative network topology, subnet zoning, and host address registry (RFC 1918 / nixfiles 2.0).
+# Topology schema, derived policy and inventory validation. The site facts themselves live in
+# inventory/ (subnets, hosts, devices) and are composed explicitly by lib/mk-system.nix; this
+# module owns the shape of those facts, what is derived from them, and what rejects a bad one.
 {
   config,
   lib,
@@ -8,6 +10,7 @@
 
 let
   cfg = config.my.topology;
+  cidr = import ../../../../lib/cidr.nix { inherit lib; };
 
   # The trust levels of the lattice, in one place: they are the vocabulary every policy in this
   # repository is written in - an endpoint's `from`, a device's reachability, the source map below -
@@ -41,7 +44,7 @@ let
       };
       trustLevel = lib.mkOption {
         type = trustLevel;
-        description = "Trust level within the Bell-LaPadula security lattice";
+        description = "Trust category of this subnet: a policy label, not a rank. Nothing enforces lattice order between levels and nothing reads their position in the list.";
       };
       description = lib.mkOption {
         type = lib.types.str;
@@ -54,9 +57,12 @@ let
   # Submodule for host registry entry
   hostSubmodule = lib.types.submodule {
     options = {
+      # A zone is a subnet name, not a trust level: the reference is validated against the
+      # declared subnets below, so an unknown zone fails the build instead of silently becoming
+      # its own trust level somewhere downstream.
       zone = lib.mkOption {
-        type = trustLevel;
-        description = "Subnet zone membership of the host";
+        type = lib.types.str;
+        description = "Subnet of the inventory this host lives in (a my.topology.subnets key)";
       };
       ipv4 = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
@@ -135,10 +141,11 @@ let
   # Submodule for IoT/microcontroller device definition
   deviceSubmodule = lib.types.submodule {
     options = {
+      # Like a host's zone: a subnet name, validated against the inventory.
       zone = lib.mkOption {
-        type = trustLevel;
+        type = lib.types.str;
         default = "iot";
-        description = "Subnet zone membership of the device";
+        description = "Subnet of the inventory this device lives in (a my.topology.subnets key)";
       };
       ipv4 = lib.mkOption {
         type = lib.types.str;
@@ -272,6 +279,7 @@ in
 
     # The lattice's vocabulary as data, so a policy can be written in levels without repeating the
     # list: the enums in this file, an endpoint's `from`, a device's reachability all read it.
+    # Listed most-trusted-first for humans; no mechanism reads the order, only membership.
     trustLevels = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       readOnly = true;
@@ -352,265 +360,189 @@ in
   # The legacy compatibility shim is gone: it renamed fields (ipv4 -> localIp,
   # wireguardIpv4 -> wireguardIpv4) and its hosts lacked ipv4 entirely, so a consumer filtering on
   # that field silently matched nothing.
-  config = {
-    # Default subnet taxonomy as specified in docs/architecture.md (RFC 1918 10.10.0.0/16 Supernet).
-    #
-    # There are no VLANs: the zones are subnets on one flat L2 behind a single NIC, separated by
-    # routing policy rather than by an 802.1Q tag. The per-subnet `vlan` field that used to sit here
-    # was read by nobody while looking like evidence of segmentation - if VLANs are ever built, the
-    # field comes back together with the code that reads it.
-    my.topology.subnets = lib.mkDefault {
-      infra = {
-        cidr = "10.10.10.0/24";
-        gateway = "10.10.10.1";
-        trustLevel = "infra";
-        description = "Core servers, managed networking, gateways, and storage";
-      };
-      corp = {
-        cidr = "10.10.20.0/24";
-        gateway = "10.10.20.1";
-        trustLevel = "corp";
-        description = "Trusted employee workstations, laptops, and administrative personal devices";
-      };
-      iot = {
-        cidr = "10.10.30.0/24";
-        gateway = "10.10.30.1";
-        trustLevel = "iot";
-        description = "Isolated microcontrollers, 3D printers, ESPHome, smart home devices";
-      };
-      mesh = {
-        cidr = "10.10.100.0/24";
-        gateway = "10.10.100.1";
-        trustLevel = "mesh";
-        description = "Kernel-WireGuard ChaCha20 overlay mesh connecting cloud VPS and home nodes (IPv4)";
-      };
-      mesh-ipv6 = {
-        cidr = "fd10:1000:100::/64";
-        trustLevel = "mesh";
-        description = "Kernel-WireGuard RFC 4193 ULA overlay mesh connecting cloud VPS and home nodes (IPv6)";
-      };
-      guest = {
-        cidr = "10.10.99.0/24";
-        gateway = "10.10.99.1";
-        trustLevel = "guest";
-        description = "Isolated guest network with direct internet transit only";
-      };
+  config =
+    let
+      subnetNames = builtins.attrNames cfg.subnets;
+      hostsWithBadZone = lib.attrNames (
+        lib.filterAttrs (_: host: !(builtins.elem host.zone subnetNames)) cfg.hosts
+      );
+      devicesWithBadZone = lib.attrNames (
+        lib.filterAttrs (_: device: !(builtins.elem device.zone subnetNames)) cfg.devices
+      );
+
+      # Every IPv4 fact in the inventory, tagged for the message. A cloud host's public address
+      # and a provider gateway are addresses too: syntax and uniqueness apply to all of them,
+      # while subnet membership is only asserted where the zone is an addressing container
+      # (devices, overlay addresses, subnet gateways) - a cloud host's public address lives
+      # outside its mesh zone by design, and a provider gateway lives outside every zone.
+      v4Facts =
+        lib.concatLists (
+          lib.mapAttrsToList (
+            name: host:
+            lib.optional (host.ipv4 != null) {
+              inherit name;
+              value = host.ipv4;
+              kind = "host ipv4";
+            }
+            ++ lib.optional (host.gateway != null) {
+              inherit name;
+              value = host.gateway;
+              kind = "host gateway";
+            }
+            ++ lib.optional (host.wireguardIpv4 != null) {
+              inherit name;
+              value = host.wireguardIpv4;
+              kind = "host overlay address";
+            }
+          ) cfg.hosts
+        )
+        ++ lib.concatLists (
+          lib.mapAttrsToList (name: device: [
+            {
+              inherit name;
+              value = device.ipv4;
+              kind = "device ipv4";
+            }
+          ]) cfg.devices
+        )
+        ++ lib.concatLists (
+          lib.mapAttrsToList (
+            name: subnet:
+            lib.optional (subnet.gateway != null) {
+              inherit name;
+              value = subnet.gateway;
+              kind = "subnet gateway";
+            }
+          ) cfg.subnets
+        );
+      malformedV4 = lib.filter (fact: !cidr.validV4 fact.value) v4Facts;
+
+      # Uniqueness covers addresses assigned to inventory nodes: host and device addresses
+      # and overlay addresses. Subnet gateways name router interfaces by design (hom-rt-01's
+      # own address IS the infra gateway) and host gateways are provider routers outside every
+      # zone, so neither class participates here - but a node address colliding with either
+      # would still collide with the node holding it, which is what this checks.
+      assignedV4 =
+        lib.concatLists (
+          lib.mapAttrsToList (
+            _: host:
+            lib.optional (host.ipv4 != null) host.ipv4
+            ++ lib.optional (host.wireguardIpv4 != null) host.wireguardIpv4
+          ) cfg.hosts
+        )
+        ++ lib.mapAttrsToList (_: device: device.ipv4) cfg.devices;
+      duplicateV4 = lib.unique (
+        lib.filter (
+          address: builtins.length (lib.filter (other: other == address) assignedV4) > 1
+        ) assignedV4
+      );
+
+      malformedCidrs = lib.filter (cidrText: cidr.prefixLength cidrText == null) (
+        lib.mapAttrsToList (_: subnet: subnet.cidr) cfg.subnets
+      );
+
+      # Membership is checked only against IPv4 subnets; the IPv6 overlay has no containment
+      # arithmetic in scope (documented in lib/cidr.nix), so its addresses are matched exactly
+      # (uniqueness) rather than by subnet. The overlay is asserted against the mesh subnet,
+      # which is the overlay by design (the wireguard module treats it as such throughout).
+      v4Subnets = lib.filterAttrs (_: subnet: !(lib.hasInfix ":" subnet.cidr)) cfg.subnets;
+      outsideSubnet = lib.filter (fact: !(cidr.containsV4 v4Subnets.${fact.zone}.cidr fact.value)) (
+        lib.concatLists (
+          lib.mapAttrsToList (name: device: [
+            {
+              inherit name;
+              value = device.ipv4;
+              zone = device.zone;
+            }
+          ]) (lib.filterAttrs (_: device: v4Subnets ? ${device.zone}) cfg.devices)
+        )
+        ++ lib.optionals (v4Subnets ? mesh) (
+          lib.concatLists (
+            lib.mapAttrsToList (name: host: [
+              {
+                inherit name;
+                value = host.wireguardIpv4;
+                zone = "mesh";
+              }
+            ]) (lib.filterAttrs (_: host: host.wireguardIpv4 != null) cfg.hosts)
+          )
+        )
+        ++ lib.concatLists (
+          lib.mapAttrsToList (name: subnet: [
+            {
+              inherit name;
+              value = subnet.gateway;
+              zone = name;
+            }
+          ]) (lib.filterAttrs (name: subnet: subnet.gateway != null && v4Subnets ? ${name}) cfg.subnets)
+        )
+      );
+    in
+    {
+      assertions = [
+        {
+          assertion = hostsWithBadZone == [ ];
+          message = "topology: hosts with an unknown zone (not a my.topology.subnets key): ${lib.concatStringsSep ", " hostsWithBadZone}";
+        }
+        {
+          assertion = devicesWithBadZone == [ ];
+          message = "topology: devices with an unknown zone (not a my.topology.subnets key): ${lib.concatStringsSep ", " devicesWithBadZone}";
+        }
+        {
+          assertion = malformedV4 == [ ];
+          message = "topology: malformed IPv4 addresses: ${
+            lib.concatStringsSep ", " (map (fact: "${fact.name} (${fact.kind}): ${fact.value}") malformedV4)
+          }";
+        }
+        {
+          assertion = malformedCidrs == [ ];
+          message = "topology: malformed subnet CIDRs: ${lib.concatStringsSep ", " malformedCidrs}";
+        }
+        {
+          assertion = duplicateV4 == [ ];
+          message = "topology: IPv4 addresses claimed more than once: ${lib.concatStringsSep ", " duplicateV4}";
+        }
+        {
+          assertion = outsideSubnet == [ ];
+          message = "topology: addresses outside their zone's subnet: ${
+            lib.concatStringsSep ", " (
+              map (fact: "${fact.name}: ${fact.value} not in ${fact.zone}") outsideSubnet
+            )
+          }";
+        }
+      ];
+
+      # Synthesize trustedSubnets automatically from subnets where trustLevel != "guest" and trustLevel != "iot"
+
+      # Synthesize trustedSubnets automatically from subnets where trustLevel != "guest" and trustLevel != "iot"
+      my.topology.trustedSubnets = lib.mkDefault (
+        lib.mapAttrsToList (_: subnet: subnet.cidr) (
+          lib.filterAttrs (_: s: s.trustLevel != "guest" && s.trustLevel != "iot") cfg.subnets
+        )
+      );
+
+      my.topology.announcedZones = lib.filter (
+        zone:
+        zone != "guest"
+        && lib.any (device: device.zone == zone && device.ipv4 != null) (lib.attrValues cfg.devices)
+      ) (lib.attrNames cfg.subnets);
+
+      my.topology.trustLevels = trustLevelNames;
+
+      my.topology.lanZones = lib.attrNames (
+        lib.filterAttrs (_: subnet: subnet.trustLevel != "mesh" && subnet.trustLevel != "guest") cfg.subnets
+      );
+
+      my.topology.sourcesByTrust = builtins.foldl' (
+        acc: host:
+        let
+          level = (cfg.subnets.${host.zone} or { }).trustLevel or host.zone;
+          sources =
+            lib.optional (host.ipv4 != null) "${host.ipv4}/32"
+            ++ lib.optional (host.wireguardIpv4 != null) "${host.wireguardIpv4}/32"
+            ++ lib.optional (host.wireguardIpv6 != null) "${host.wireguardIpv6}/128";
+        in
+        acc // { ${level} = (acc.${level} or [ ]) ++ sources; }
+      ) { } (lib.attrValues cfg.hosts);
     };
-
-    # Default host registry conforming to RFC 1178 Enterprise Taxonomy
-    my.topology.hosts = lib.mkDefault {
-      cld-edge-01 = {
-        zone = "mesh";
-        ipv4 = "173.249.22.211";
-        gateway = "173.249.22.1";
-        interface = "eth0";
-        wireguardIpv4 = "10.10.100.1";
-        wireguardIpv6 = "fd10:1000:100::1";
-        wireguardPublicKey = "xaW5sos7b7wPXsjl4U6UqsaHl9l+Y1F013DDJ4kioEg=";
-        wireguardRelay = true;
-        hostType = "server";
-      };
-
-      cld-ops-01 = {
-        zone = "mesh";
-        ipv4 = "37.114.55.91";
-        gateway = "37.114.55.1";
-        interface = "eth0";
-        wireguardIpv4 = "10.10.100.2";
-        wireguardIpv6 = "fd10:1000:100::2";
-        wireguardPublicKey = "DBU0HRrBeIXZFokauPXfsYA3i7feCov154VbkAdwlTM=";
-        wireguardRelay = true;
-        hostType = "server";
-      };
-
-      hom-srv-01 = {
-        zone = "infra";
-        ipv4 = "10.10.10.10";
-        # No per-host gateway: `subnets.infra.gateway` is the single declaration for this zone. The
-        # field survives only as the override for hosts whose uplink is not a zone gateway at all -
-        # the VPS hosts, which sit behind their provider's router.
-        gateway = null;
-        interface = "enp2s0";
-        wireguardIpv4 = "10.10.100.10";
-        wireguardIpv6 = "fd10:1000:100::10";
-        wireguardPublicKey = "j80spw+2+Ojz51aKAytPdCZwFOc64yNOR05rAcXOESE=";
-        hostType = "server";
-      };
-
-      hom-wrk-01 = {
-        zone = "corp";
-        ipv4 = "10.10.20.10";
-        # No per-host gateway: the zone's gateway (10.10.20.1) is the one that lives inside the
-        # subnet and is therefore the only one that can be installed as a default route.
-        gateway = null;
-        interface = "enp0s31f6";
-        wireguardIpv4 = "10.10.100.20";
-        wireguardIpv6 = "fd10:1000:100::20";
-        wireguardPublicKey = "y9CMim/6IWIKdIztKJQh5BR7R2ygjYwCjjEvgJQSLT0=";
-        hostType = "workstation";
-      };
-
-      mob-nb-01 = {
-        zone = "corp";
-        ipv4 = null; # Roaming DHCP
-        gateway = null;
-        wireguardIpv4 = "10.10.100.30";
-        wireguardIpv6 = "fd10:1000:100::30";
-        wireguardPublicKey = "J+PERS3HY0OcfXKk4qFnJWtgLy4afh3cXX8fkuKelx0=";
-        hostType = "client";
-      };
-
-      # A phone joins the mesh as a client node, not a managed host: it has an overlay identity and no
-      # NixOS configuration. `mob-nb-01` is the same class of node; this one's WireGuard configuration
-      # is rendered from the topology and its SOPS key instead of `networking.wireguard.interfaces`.
-      # The name follows `<class>-<role>-<nn>` (docs/architecture.md §2), not a person.
-      mob-ph-01 = {
-        zone = "corp";
-        ipv4 = null; # Roaming: no LAN address, so it carries every delivered zone over the mesh.
-        gateway = null;
-        wireguardIpv4 = "10.10.100.40";
-        wireguardIpv6 = "fd10:1000:100::40";
-        wireguardPublicKey = "33yImKTdRMyeM8yYgabBLbZ1xLIMife6CGsSMCicmjo=";
-        hostType = "client";
-        # The push transport, kept off the tunnel: measured 2026-09-22, the phone's VPN network carries
-        # no `INTERNET` capability (it is a split tunnel, so it has routes, not a default route), and an
-        # app that requires that capability does not use such a network - which is how notifications stop
-        # being rebuilt while the tunnel is up and arrive in a burst once it is switched off. The same
-        # exclusion was needed on Tailscale for the same reason.
-        excludedApplications = [
-          "com.google.android.gms"
-          "com.google.android.gsf"
-        ];
-      };
-
-      # Embedded targets as specified in docs/embedded.md
-      hom-rt-01 = {
-        zone = "infra";
-        ipv4 = "10.10.10.1";
-        hostType = "embedded";
-      };
-
-      hom-ap-01 = {
-        zone = "infra";
-        ipv4 = "10.10.10.20";
-        mac = "7c:f1:7e:6a:b0:82"; # wired MAC: leases the declared address from Kea
-        hostType = "embedded";
-      };
-    };
-
-    # Default IoT devices conforming to RFC 1178 Enterprise Taxonomy
-    my.topology.devices = lib.mkDefault {
-      # Peripheral hardware that is not a microcontroller.
-      hom-prn-01 = {
-        zone = "iot";
-        mac = "80:ce:62:8a:7c:06"; # HP MFP, hostname hp8a7c05; leases its iot address from Kea
-        ipv4 = "10.10.30.19";
-        description = "HP Multifunktionsdrucker/Scanner (hp8a7c05), iot-Zone";
-        # The one thing a mesh member may use on this device: IPP. Its web interface (80/443) is
-        # deliberately *not* declared - it stays reachable inside the LAN, where the segment is flat and
-        # no rule of ours applies anyway, and it is closed from the mesh, which is where the exposure
-        # would otherwise grow without anyone deciding it. Printing is the household's use case: the
-        # servers and the family's own devices, not the cloud.
-        endpoints.ipp = {
-          port = 631;
-          protocol = "tcp";
-          from = [
-            "infra"
-            "corp"
-          ];
-          description = "Drucken aus dem Mesh (Server und Haushalt) - nicht aus der Cloud-Zone";
-        };
-      };
-      # Enterprise Relais-Aktoren (Sonoff Basic ESP8266 Inline-Relais)
-      #
-      # They declare no endpoint, and that is a decision rather than an omission: the ESPHome dashboard
-      # that talks to them runs on `hom-srv-01`, which shares their segment, so its traffic is never
-      # routed; and a relay's API reachable over the mesh would be reachable by every member. Nothing
-      # needs it, so nothing may use it.
-      hom-rly-01 = {
-        zone = "iot";
-        ipv4 = "10.10.30.11";
-        mac = "8c:ce:4e:0c:d7:98";
-        platform = "esp8266";
-        board = "esp01_1m";
-        description = "Arbeitszimmer Relais";
-      };
-
-      hom-rly-02 = {
-        zone = "iot";
-        ipv4 = "10.10.30.12";
-        mac = "70:03:9f:64:8e:b0";
-        platform = "esp8266";
-        board = "esp01_1m";
-        description = "Bad Relais";
-      };
-
-      hom-rly-03 = {
-        zone = "iot";
-        ipv4 = "10.10.30.13";
-        mac = "e8:68:e7:44:b3:a1";
-        platform = "esp8266";
-        board = "esp01_1m";
-        description = "Ender 3D-Drucker Relais";
-      };
-
-      hom-rly-06 = {
-        zone = "iot";
-        ipv4 = "10.10.30.16";
-        mac = "8c:ce:4e:0c:e1:70";
-        platform = "esp8266";
-        board = "esp01_1m";
-        description = "Küche Relais";
-      };
-
-      hom-rly-07 = {
-        zone = "iot";
-        ipv4 = "10.10.30.17";
-        mac = "8c:ce:4e:0c:da:e5";
-        platform = "esp8266";
-        board = "esp01_1m";
-        description = "Schlafzimmer Relais";
-      };
-
-      hom-rly-08 = {
-        zone = "iot";
-        ipv4 = "10.10.30.18";
-        mac = "8c:ce:4e:0c:de:cb";
-        platform = "esp8266";
-        board = "esp01_1m";
-        description = "Sofa Relais";
-      };
-    };
-
-    # Synthesize trustedSubnets automatically from subnets where trustLevel != "guest" and trustLevel != "iot"
-    my.topology.trustedSubnets = lib.mkDefault (
-      lib.mapAttrsToList (_: subnet: subnet.cidr) (
-        lib.filterAttrs (_: s: s.trustLevel != "guest" && s.trustLevel != "iot") cfg.subnets
-      )
-    );
-
-    my.topology.announcedZones = lib.filter (
-      zone:
-      zone != "guest"
-      && lib.any (device: device.zone == zone && device.ipv4 != null) (lib.attrValues cfg.devices)
-    ) (lib.attrNames cfg.subnets);
-
-    my.topology.trustLevels = trustLevelNames;
-
-    my.topology.lanZones = lib.attrNames (
-      lib.filterAttrs (_: subnet: subnet.trustLevel != "mesh" && subnet.trustLevel != "guest") cfg.subnets
-    );
-
-    my.topology.sourcesByTrust = builtins.foldl' (
-      acc: host:
-      let
-        level = (cfg.subnets.${host.zone} or { }).trustLevel or host.zone;
-        sources =
-          lib.optional (host.ipv4 != null) "${host.ipv4}/32"
-          ++ lib.optional (host.wireguardIpv4 != null) "${host.wireguardIpv4}/32"
-          ++ lib.optional (host.wireguardIpv6 != null) "${host.wireguardIpv6}/128";
-      in
-      acc // { ${level} = (acc.${level} or [ ]) ++ sources; }
-    ) { } (lib.attrValues cfg.hosts);
-  };
 }

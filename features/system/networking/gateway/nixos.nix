@@ -172,6 +172,21 @@ in
     # dropped silently or make Kea refuse to start (taking the whole LAN's DHCP down with it).
     assertions = [
       {
+        # Membership below is decided on the /24 network part (netOf): a served zone on another
+        # prefix length would compare the wrong bits, so the limitation is stated and enforced
+        # here rather than implied. A non-numeric suffix is the topology's malformed-CIDR case,
+        # not this one's, so it is skipped here.
+        assertion = lib.all (
+          entry:
+          let
+            parts = lib.splitString "/" entry.config.cidr;
+            suffix = if builtins.length parts == 2 then builtins.elemAt parts 1 else null;
+          in
+          suffix == null || builtins.match "[0-9]+" suffix == null || lib.toInt suffix == 24
+        ) (lib.filter (entry: !(lib.hasInfix ":" entry.config.cidr)) dhcpSubnets);
+        message = "Gateway: a DHCP-served zone is not a /24, but reservation membership is computed on the /24 network part - renumber the zone or generalize netOf first.";
+      }
+      {
         assertion =
           builtins.length reservations == builtins.length (lib.mapAttrsToList (_: h: h) allReservations);
         message = ''

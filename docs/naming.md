@@ -297,7 +297,7 @@ Read-only projections for inspection and tests: `my.contracts.projections.fqdns`
 | `scope` enum (`public\|internal\|mesh\|isolated`) | **unchanged** — suffixes are derived by mapping (§3); no contract churn |
 | hardcoded `"<svc>.edge.${domain}"` fallbacks in features | removed |
 | host-encoded service wildcards | removed (§5) |
-| `my.topology.hosts.<h>.zone` (VLAN/trust) | unchanged — orthogonal to DNS planes |
+| `my.topology.hosts.<h>.zone` / `devices.<d>.zone` | a validated subnet reference (any subnet name; two zones may share a trust level), orthogonal to DNS planes |
 
 ---
 
