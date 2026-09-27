@@ -1,11 +1,10 @@
-# lib/core/system-builder.nix
 # Multi-architecture NixOS system builder with auto-wired Home Manager and feature auto-discovery.
 {
   home-manager-unstable,
   ...
 }:
 let
-  moduleLoader = import ./module-loader.nix;
+  discovery = import ./discovery.nix;
 
   mkSystem =
     {
@@ -20,10 +19,10 @@ let
     }:
     let
       inherit (inputs.nixpkgs-unstable) lib;
-      loader = moduleLoader { inherit lib; };
-      featuresDir = ../../features;
+      loader = discovery { inherit lib; };
+      featuresDir = ../features;
       allFeatureModules = loader.findModules featuresDir;
-      contractsDir = ../../contracts;
+      contractsDir = ../contracts;
       allContractModules =
         if builtins.pathExists contractsDir then loader.findModules contractsDir else [ ];
 
@@ -36,7 +35,7 @@ let
             config.allowUnfree = true;
           };
 
-      userDir = ../../user;
+      userDir = ../user;
       discoveredUsers =
         if builtins.pathExists userDir then
           lib.filter (name: builtins.pathExists (userDir + "/${name}/metadata.nix")) (
@@ -57,7 +56,7 @@ let
         lib.concatMap (
           user:
           let
-            homeFile = ../../user + "/${user.name}/home.nix";
+            homeFile = ../user + "/${user.name}/home.nix";
           in
           lib.optionals (builtins.pathExists homeFile) [
             {
@@ -74,7 +73,7 @@ let
       inherit system;
       specialArgs = {
         inherit inputs hostname flake;
-        features = import ../features.nix { inherit lib; };
+        features = import ./feature-dependencies.nix { inherit lib; };
       };
       modules = [
         { nixpkgs.pkgs = finalPkgs; }
@@ -84,7 +83,7 @@ let
       ++ allContractModules
       ++ allFeatureModules
       ++ [
-        ../../hosts/${hostname}/configuration.nix
+        ../hosts/${hostname}/configuration.nix
         home-manager-unstable.nixosModules.home-manager
         {
           home-manager = {

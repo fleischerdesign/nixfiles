@@ -4,13 +4,13 @@
 # file is a module, a helper that shares no name with the marker is not, the former `default.nix`
 # marker is gone, and a malformed marker fails loudly instead of being skipped quietly. The fixture
 # trees in `checks/fixtures/discovery` encode those decisions, and this check reads them the same way
-# the system builder does - through `lib/core/module-loader.nix`, not a second implementation of it.
+# the system builder does - through `lib/discovery.nix`, not a second implementation of it.
 {
   pkgs,
   lib,
 }:
 let
-  loader = import ../lib/core/module-loader.nix { inherit lib; };
+  loader = import ../lib/discovery.nix { inherit lib; };
   fixtures = ./fixtures/discovery;
 
   found = map (path: lib.removePrefix "${toString fixtures}/" path) (

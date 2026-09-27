@@ -1,4 +1,3 @@
-# lib/core/module-loader.nix
 # Recursive NixOS module discovery: a regular file named `nixos.nix` marks a module.
 #
 # The marker is a name of its own on purpose. When the scanner looked for `default.nix`, the same name

@@ -5,7 +5,7 @@
 }:
 
 let
-  systemBuilder = import ./core/system-builder.nix {
+  systemBuilder = import ./mk-system.nix {
     inherit home-manager-unstable;
   };
 in

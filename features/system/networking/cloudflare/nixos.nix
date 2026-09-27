@@ -15,7 +15,7 @@ let
   topology = config.my.topology;
 
   # Fleet-wide configuration graph. `flake` is injected as a module specialArg by
-  # lib/core/system-builder.nix; the fallback keeps this module evaluable standalone.
+  # lib/mk-system.nix; the fallback keeps this module evaluable standalone.
   flakeConfigurations =
     config._module.specialArgs.flake.nixosConfigurations or {
       "${config.networking.hostName}" = config;

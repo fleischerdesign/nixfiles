@@ -4,7 +4,7 @@
 # Three components need these values and none of them may restate them: the provider that
 # serves the directory, the outpost that exposes it, and every consumer that authenticates
 # against it. The values are properties of the directory, not of a host or a service, so they
-# live in a contract module - it is loaded on every host (lib/core/module-loader.nix) and is
+# live in a contract module - it is loaded on every host (lib/discovery.nix) and is
 # deliberately not gated behind an enable flag, the same way the topology contract is.
 #
 # Derived values are read-only projections, not options a host may set:

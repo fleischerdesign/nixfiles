@@ -8,7 +8,7 @@ let
   cfg = config.my.features.services.blocky;
   topology = config.my.topology;
 
-  # Fleet-wide configuration graph (`flake` is injected by lib/core/system-builder.nix).
+  # Fleet-wide configuration graph (`flake` is injected by lib/mk-system.nix).
   flakeConfigurations =
     config._module.specialArgs.flake.nixosConfigurations or {
       "${config.networking.hostName}" = config;

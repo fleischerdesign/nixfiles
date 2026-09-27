@@ -1,4 +1,3 @@
-# lib/features.nix
 # Declarative feature dependency utilities for the my.features module system.
 {
   lib,
