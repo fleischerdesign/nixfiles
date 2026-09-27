@@ -1686,7 +1686,7 @@ supersedes one by date, not by silently editing this table.
 | 5 | D1 discovery contract and fixtures, then the marker migration | done |
 | 6 | D3/D5/D6 extractions, D4 `home.nix` split, D7 renderer/projection split | done |
 | 7 | D2 inventory extraction, D8 zone-vs-trust, D15 public API migration, F07 inert options, F15 endpoint segregation, F11/F12 topology split and validation | done (inventory/ composes subnets/hosts/devices explicitly; zones are validated subnet references; per-domain fixtures green; F13/F14/F16/F17/F18/D11 done in following commits; live drills in increment 8 stay open) |
-| 8 | F08/F09 and WP2 restore drills, then F19/F20/F21 verification and documentation | open |
+| 8 | F08/F09 and WP2 restore drills, F19/F20/F21 verification and documentation, F22/F23 and remaining WP6/WP7 policy work, live re-measurement after deploy | open |
 
 ### 10.4 What is deliberately not done yet, and why
 
@@ -1730,6 +1730,36 @@ and shipping them without it would repeat the failure mode `docs/practices.md` d
   alphabetical builder fallback); users come from one `usersDir` discovery with per-entry
   Home Manager identity. F15 (endpoint segregation) and the F07 inert options (`websocket`,
   PostgreSQL `extensions`, Redis consumer) were resolved by the D15 migration.
+- **F19 (open, live).** The runtime audits (`apps/network-audit`, `apps/exposure-audit`) measure the
+  running fleet, but packet-level allow/deny tests for representative caller classes (WP5.2) do not
+  exist. Evaluation proves the projection; only measurement proves the exposure.
+- **F20 (partly, rest live).** Two overclaims found after the increments were recorded are corrected
+  in the tree: the mesh "take out a hub without reconfiguring a spoke" sentence (only the assigned
+  primary carries the overlay; transit does not fail over by itself) and the operations numbering and
+  migration narrative. What remains needs the deploy: the dated live measurements (2026-09-2x)
+  describe the fleet before these commits ship, so every operational claim they support is
+  re-measured after the rollout, not re-asserted.
+- **F21 (open).** Per-domain fixtures cover enabled/disabled and non-default cases, but there is no
+  systematic matrix over the supported configuration space (WP5.1): which non-default combinations
+  are supported is still decided per module, not stated once.
+- **F22 (open).** `flake.nix` still mixes assembly with implementation (inputs, overlays, app
+  builders, check bodies inline). Extraction is deferred until the checks above are stable, so the
+  composition root is not churned twice.
+- **F23 (open).** No support and dependency policy is recorded: the two upstream-workaround TODOs
+  (`flake.nix` pnpm, mealie) name no retirement condition, and the supported toolchain is implied by
+  the pins rather than stated.
+- **F24 (done, ongoing).** The LibreOffice warning and locale inconsistency went with increment 1;
+  stale wording is fixed where found (operations numbering and migration narrative, mesh failover
+  sentence, agent layout block). New wording follows the present-tense rule instead of a cleanup pass.
+- **F25–F28, F33 (done).** Discovery contract (`nixos.nix` marker), malformed-marker and stray-module
+  negative controls, and explicit composition in `mk-system.nix` implement WP7 steps 1–4.
+- **F29–F32 (done).** Owner-first placement holds: operational programs in `apps/`, evaluation helpers
+  in `lib/` injected via `specialArgs` (never imported relatively), domain-owned code imported from
+  its owner, one Home Manager entrypoint per feature, `lib/core/` dissolved.
+- **F34 (done).** `checks/module-discovery.nix` is the executable structural check: intended modules
+  found, helpers and the former `default.nix` marker absent, malformed marker loud.
+- **F35 (done).** Policy selection (`contracts/topology/lib/access-sources.nix`) and nftables
+  rendering (`features/system/networking/lib/nftables-render.nix`) are separate, owned modules.
 
 The invariants of this session - one finding per commit, a proof at the consumer level, structure never
 mixed with behaviour - hold for every increment above.
