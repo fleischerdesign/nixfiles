@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# lib/updaters/update-custom-packages.sh
 # Universal auto-update engine for custom packages.
 # Scans packages/custom/ and features/ for manifest.json files and updates
 # them when upstream releases change.

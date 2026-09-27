@@ -176,7 +176,7 @@
                 (python3.withPackages (ps: [ ps.pyyaml ]))
                 findutils
               ];
-              text = "exec ${./lib/updaters}/update-custom-packages.sh \"$@\"";
+              text = "exec ${./apps/update-custom-packages}/update-custom-packages.sh \"$@\"";
             }
           }/bin/update-custom-packages-app";
           meta = {
@@ -194,10 +194,10 @@
         network-audit = {
           type = "app";
           program = "${
-            (import ./lib/audit/default.nix {
+            (import ./apps/network-audit {
               inherit pkgs hostNames self;
               lib = nixpkgs-unstable.lib;
-            }).network
+            })
           }/bin/network-audit";
           meta = {
             description = "Measure the fleet against what the inventory promises";
@@ -209,10 +209,10 @@
         exposure-audit = {
           type = "app";
           program = "${
-            (import ./lib/audit/default.nix {
+            (import ./apps/exposure-audit {
               inherit pkgs hostNames self;
               lib = nixpkgs-unstable.lib;
-            }).exposure
+            })
           }/bin/exposure-audit";
           meta = {
             description = "List every listening socket and whether it was declared";
@@ -232,7 +232,7 @@
               ];
             }
             ''
-              python3 ${./lib/updaters/tests/test_github_source.py} ${./lib/updaters/update-custom-packages.sh}
+              python3 ${./apps/update-custom-packages/tests/test_github_source.py} ${./apps/update-custom-packages/update-custom-packages.sh}
               touch $out
             '';
 
