@@ -2,6 +2,7 @@
   config,
   lib,
   pkgs,
+  addresses,
   fleetConfigs,
   ...
 }:
@@ -9,7 +10,7 @@ let
   cfg = config.my.features.services.authentik.outpost.ldap;
 
   # Which host runs the core is placement, resolved through the fleet - never a literal here.
-  coreLib = import ../../lib/core.nix { inherit lib; };
+  coreLib = import ../../lib/core.nix { inherit fleetConfigs addresses; };
 in
 {
   options.my.features.services.authentik.outpost.ldap = {

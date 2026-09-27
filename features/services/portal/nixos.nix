@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  endpointLib,
   fleetConfigs,
   pkgs,
   inputs,
@@ -16,8 +17,6 @@ let
   # re-audienced in Nix appears in the projection without touching the landing repository.
   flake = config._module.specialArgs.flake or { };
   flakeConfigurations = fleetConfigs.systems config;
-
-  endpointLib = import ../../../lib/endpoints.nix { inherit lib; };
 
   # Live status is read from the collector on this host: the endpoint contracts already generate the
   # probes, and the collector is part of the same deployment. Reaching a collector on another host would

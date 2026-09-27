@@ -1,8 +1,12 @@
 # Named observations of a service. Targets reference endpoint ids; addresses and ports are resolved
 # by the collector adapter, never copied into a probe or a scrape declaration.
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  endpointLib,
+  ...
+}:
 let
-  endpointLib = import ../../lib/endpoints.nix { inherit lib; };
   probe = lib.types.submodule (submod: {
     options = {
       endpoint = lib.mkOption {

@@ -1,6 +1,8 @@
 {
   config,
   lib,
+  addresses,
+  endpointLib,
   pkgs,
   fleetConfigs,
   ...
@@ -16,7 +18,6 @@ let
 
   # The core as this host reaches it: the LAN address while both sides are at home, otherwise the overlay
   # address (lib/addresses.nix).
-  addresses = import ../../../../lib/addresses.nix { inherit lib; };
 
   # Blueprint application is asynchronous upstream: the API's apply endpoint and the hourly discovery both
   # only queue a task. The unit below queues the same task and then waits for the effect, so a deploy is
@@ -36,6 +37,7 @@ let
       lib
       pkgs
       blueprintLib
+      endpointLib
       fleetConfigs
       ;
   };
@@ -509,7 +511,7 @@ in
       default =
         let
           systems = fleetConfigs.systems config;
-          coreLib = import ../lib/core.nix { inherit lib; };
+          coreLib = import ../lib/core.nix { inherit fleetConfigs addresses; };
           serverHost = coreLib.hostName systems;
         in
         if serverHost == config.networking.hostName then

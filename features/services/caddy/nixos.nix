@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  addresses,
   fleetConfigs,
   ...
 }:
@@ -28,7 +29,6 @@ let
 
   # The address the ingress uses to reach a service host: on an internal request the two are at home and
   # the LAN address keeps the traffic in the house, otherwise the overlay carries it (lib/addresses.nix).
-  addresses = import ../../../lib/addresses.nix { inherit lib; };
   serviceAddress =
     host:
     addresses.serviceAddress {

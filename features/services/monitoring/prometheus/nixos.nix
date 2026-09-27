@@ -1,6 +1,8 @@
 {
   config,
   lib,
+  addresses,
+  endpointLib,
   fleetConfigs,
   ...
 }:
@@ -12,8 +14,6 @@ let
 
   # The address this host uses to reach a peer: the LAN address while both are at home, otherwise the
   # overlay address (lib/addresses.nix states the rule once, for every consumer).
-  addresses = import ../../../../lib/addresses.nix { inherit lib; };
-  endpointLib = import ../../../../lib/endpoints.nix { inherit lib; };
   serviceAddress =
     peer:
     addresses.serviceAddress {

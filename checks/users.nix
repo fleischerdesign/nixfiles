@@ -6,7 +6,10 @@ let
   evalUsers =
     primary:
     (lib.evalModules {
-      specialArgs = { inherit pkgs; };
+      specialArgs = {
+        inherit pkgs;
+        usersLib = import ../lib/users.nix { inherit lib; };
+      };
       modules = [
         ../features/system/user/nixos.nix
         {

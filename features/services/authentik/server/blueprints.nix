@@ -11,10 +11,10 @@
   lib,
   pkgs,
   blueprintLib,
+  endpointLib,
   fleetConfigs,
 }:
 let
-  endpointLib = import ../../../../lib/endpoints.nix { inherit lib; };
   audience = import ../../../../contracts/identity/lib/audience.nix;
 
   authentikPackage = pkgs.authentik;

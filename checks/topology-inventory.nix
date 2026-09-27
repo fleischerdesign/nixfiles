@@ -3,7 +3,10 @@ let
   fixture =
     values:
     (lib.evalModules {
-      specialArgs = { inherit lib; };
+      specialArgs = {
+        inherit lib;
+        cidrLib = import ../lib/cidr.nix { inherit lib; };
+      };
       modules = [
         {
           options.assertions = lib.mkOption {

@@ -7,6 +7,7 @@
   config,
   lib,
   pkgs,
+  cidrLib,
   ...
 }:
 
@@ -297,7 +298,6 @@ in
     # instead of binding a /24 onto another prefix.
     networking.wireguard.interfaces.${cfg.interfaceName} =
       let
-        cidrLib = import ../../../../lib/cidr.nix { inherit lib; };
         meshPrefix = cidrLib.prefixLength (topology.subnets.mesh.cidr or "10.10.100.0/24");
         meshV6Prefix = cidrLib.prefixLength (topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64");
       in

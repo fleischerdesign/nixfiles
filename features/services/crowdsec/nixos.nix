@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  addresses,
   fleetConfigs,
   pkgs,
   ...
@@ -12,7 +13,6 @@ let
   # The master as this host reaches it: the LAN address while both are at home, otherwise the overlay
   # address (lib/addresses.nix). The master normally sits in the cloud, so this is the overlay - and the
   # rule is stated once instead of here.
-  addresses = import ../../../lib/addresses.nix { inherit lib; };
   masterIP = addresses.serviceAddress {
     topology = config.my.topology;
     consumer = config.my.topology.hosts.${config.networking.hostName} or null;

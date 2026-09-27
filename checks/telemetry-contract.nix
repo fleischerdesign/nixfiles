@@ -3,6 +3,9 @@ let
   fixture =
     values:
     (lib.evalModules {
+      specialArgs = {
+        endpointLib = import ../lib/endpoints.nix { inherit lib; };
+      };
       modules = [
         {
           options.assertions = lib.mkOption {

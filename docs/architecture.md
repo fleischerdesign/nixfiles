@@ -365,6 +365,14 @@ Every feature and contract is *loaded* on every host and *active* only where `en
 what makes `nix flake check` meaningful: a module that does not evaluate is caught for all five hosts at
 once, whether or not any of them enables it.
 
+Shared code follows one rule with two clauses. Ownerless helpers (`lib/addresses`,
+`lib/cidr`, `lib/endpoints`, `lib/users`, `lib/fleet-configs`) arrive exclusively through
+`specialArgs` from `lib/mk-system.nix` - a module declares them in its arguments and never
+imports `lib/` by relative path. Code with an owner (`contracts/*/lib`, `features/*/lib`)
+is imported relatively from its owner, so the import names the coupling instead of hiding it.
+Capabilities are discovered, facts are composed explicitly, shared code is injected: three
+categories, one mechanism each, no exceptions.
+
 The invariants (`contracts/*`) are evaluation-time assertions, not conventions: a service from the
 public plane without authentication, a name that cannot be derived, an endpoint on a host that does not
 serve it, or a subnet a reservation falls outside - each fails the build rather than the deployment.

@@ -5,12 +5,12 @@
 {
   config,
   lib,
+  cidrLib,
   ...
 }:
 
 let
   cfg = config.my.topology;
-  cidr = import ../../../../lib/cidr.nix { inherit lib; };
 
   # The trust levels of the lattice, in one place: they are the vocabulary every policy in this
   # repository is written in - an endpoint's `from`, a device's reachability, the source map below -
@@ -415,7 +415,7 @@ in
             }
           ) cfg.subnets
         );
-      malformedV4 = lib.filter (fact: !cidr.validV4 fact.value) v4Facts;
+      malformedV4 = lib.filter (fact: !cidrLib.validV4 fact.value) v4Facts;
 
       # Uniqueness covers addresses assigned to inventory nodes: host and device addresses
       # and overlay addresses. Subnet gateways name router interfaces by design (hom-rt-01's
@@ -437,7 +437,7 @@ in
         ) assignedV4
       );
 
-      malformedCidrs = lib.filter (cidrText: cidr.prefixLength cidrText == null) (
+      malformedCidrs = lib.filter (cidrText: cidrLib.prefixLength cidrText == null) (
         lib.mapAttrsToList (_: subnet: subnet.cidr) cfg.subnets
       );
 
@@ -446,7 +446,7 @@ in
       # (uniqueness) rather than by subnet. The overlay is asserted against the mesh subnet,
       # which is the overlay by design (the wireguard module treats it as such throughout).
       v4Subnets = lib.filterAttrs (_: subnet: !(lib.hasInfix ":" subnet.cidr)) cfg.subnets;
-      outsideSubnet = lib.filter (fact: !(cidr.containsV4 v4Subnets.${fact.zone}.cidr fact.value)) (
+      outsideSubnet = lib.filter (fact: !(cidrLib.containsV4 v4Subnets.${fact.zone}.cidr fact.value)) (
         lib.concatLists (
           lib.mapAttrsToList (name: device: [
             {

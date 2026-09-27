@@ -3,12 +3,12 @@
 # The core runs on exactly one host; which one is placement, not a literal. Each outpost and
 # the server itself resolve the same hostname through the same predicate, so a moved core
 # follows without source edits - and zero or several cores fail loudly instead of dialling
-# loopback or list order.
-{ lib }:
-let
-  fleetConfigs = import ../../../../lib/fleet-configs.nix { inherit lib; };
-  addresses = import ../../../../lib/addresses.nix { inherit lib; };
-in
+# loopback or list order. The fleet view and the address rule arrive as arguments (injected
+# once in mk-system.nix); only feature-owned code is imported relatively.
+{
+  fleetConfigs,
+  addresses,
+}:
 rec {
   hostName =
     systems:

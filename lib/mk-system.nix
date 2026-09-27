@@ -88,9 +88,14 @@ let
       specialArgs = {
         inherit inputs hostname flake;
         features = import ./feature-dependencies.nix { inherit lib; };
-        # Shared fleet resolution, injected once: consumers declare `fleetConfigs` in their
-        # arguments instead of importing lib/ by relative path.
+        # Shared ownerless helpers, injected once: modules declare them in their arguments
+        # instead of importing lib/ by relative path. Domain-owned code (contracts/*/lib,
+        # features/*/lib) stays imported from its owner - that import names the coupling.
         fleetConfigs = import ./fleet-configs.nix { inherit lib; };
+        addresses = import ./addresses.nix { inherit lib; };
+        cidrLib = import ./cidr.nix { inherit lib; };
+        endpointLib = import ./endpoints.nix { inherit lib; };
+        inherit usersLib;
       };
       modules = [
         { nixpkgs.pkgs = finalPkgs; }

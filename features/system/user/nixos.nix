@@ -3,11 +3,11 @@
 {
   config,
   lib,
+  usersLib,
   pkgs,
   ...
 }:
 let
-  usersLib = import ../../../lib/users.nix { inherit lib; };
 
   # Discovery reads the configured directory, not a path spelled in this file: `usersDir` is
   # the one knob, and changing it changes who exists. There is no alphabetical fallback for the

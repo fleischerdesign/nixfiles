@@ -4,6 +4,7 @@
 {
   config,
   lib,
+  addresses,
   fleetConfigs,
   ...
 }:
@@ -14,7 +15,6 @@ let
 
   # The hub as this host reaches it: the LAN address while both are at home, otherwise the overlay
   # address (lib/addresses.nix states the rule once, for every consumer).
-  addresses = import ../../../../lib/addresses.nix { inherit lib; };
   serviceAddress =
     peer:
     addresses.serviceAddress {
