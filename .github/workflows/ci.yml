@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
-    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**", "contracts/**", ".github/**", "statix.toml"]
+    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**", "contracts/**", "checks/**", "secrets/**", ".sops.yaml", ".githooks/**", ".github/**", "statix.toml"]
   pull_request:
-    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**", "contracts/**", ".github/**", "statix.toml"]
+    paths: [flake.nix, flake.lock, "hosts/**", "roles/**", "features/**", "packages/**", "lib/**", "user/**", "media/**", "contracts/**", "checks/**", "secrets/**", ".sops.yaml", ".githooks/**", ".github/**", "statix.toml"]
   workflow_dispatch:
 
 permissions:

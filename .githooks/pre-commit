@@ -1,18 +1,35 @@
 #!/usr/bin/env bash
-set -e
+# Format and lint the Nix files that are staged for this commit.
+#
+# The repository's own rule is that a check must be able to fail loudly, and a partial staging is the
+# quiet failure here: `nixfmt` rewrites the whole file, so re-staging it would also stage the hunks the
+# author deliberately left out. A file that has unstaged changes is therefore refused instead of being
+# reformatted - the author stages or stashes it, and nothing enters the commit unnoticed. The full
+# tree is checked by `nix flake check` (the `format` check), so a hook that is not installed cannot
+# turn formatting drift into a silent, permanent state.
+set -euo pipefail
 
-changed=$(git diff --cached --name-only --diff-filter=ACM | grep '\.nix$' || true)
+mapfile -d '' -t changed < <(git diff --cached --name-only --diff-filter=ACM -z -- '*.nix')
 
-if [ -n "$changed" ]; then
-  echo "==> nixfmt"
-  echo "$changed" | xargs -r nixfmt
-  echo "$changed" | xargs -r git add
+if [ "${#changed[@]}" -eq 0 ]; then
+  exit 0
 fi
+
+refused=0
+for file in "${changed[@]}"; do
+  if ! git diff --quiet -- "$file"; then
+    echo "pre-commit: $file has unstaged changes; stage or stash them before committing" >&2
+    refused=1
+  fi
+done
+[ "$refused" -eq 0 ] || exit 1
+
+echo "==> nixfmt"
+nixfmt "${changed[@]}"
+git add -- "${changed[@]}"
 
 echo "==> deadnix"
-echo "$changed" | xargs -r deadnix --fail
+deadnix --fail "${changed[@]}"
 
 echo "==> statix"
-if [ -n "$changed" ]; then
-  echo "$changed" | xargs -r -n1 statix check
-fi
+statix check "${changed[@]}"
