@@ -2,6 +2,10 @@
 
 Review date: 2026-09-27. Baseline: `2117838f3e67125d769b31447125094a9fb4160b`.
 
+File references in the findings name the **reviewed revision**: later increments renamed `default.nix`
+to `nixos.nix`, split `lib/audit` into `apps/`, and moved `lib/nftables.nix`, so a path quoted as
+evidence may be a revision behind the tree. The finding is still about the revision it names.
+
 This is the explicitly requested, point-in-time assessment and improvement plan. It is kept outside
 `docs/`, whose stated purpose is the specification of the current system. Implementation work should
 turn the work packages below into issues or commits and update the relevant present-state specifications.
@@ -1668,9 +1672,35 @@ supersedes one by date, not by silently editing this table.
 | 2 | F06 protocol-aware probes and one health-path spelling | done |
 | 3 | F04/F05 backup per D13: a working hook lifecycle, honest tiers, an explicit no-backup decision | done |
 | 4 | F01 deployment surface (+ `operations.md`) | done |
-| 5 | D1/D6 discovery contract and fixtures, then the marker migration | done |
-| 6 | D2/D3/D4/D5/D7/D8 extractions and renames | in progress |
-| 7 | F19/F20/F21 verification, documentation, polish | planned |
+| 5 | D1 discovery contract and fixtures, then the marker migration | done |
+| 6 | D3/D5/D6 extractions, D4 `home.nix` split, D7 renderer/projection split | done |
+| 7 | D2 inventory extraction, D8 zone-vs-trust, F07 inert contracts, F11-F18 shape work | open |
+| 8 | F08/F09 and WP2 restore drills, then F19/F20/F21 verification and documentation | open |
+
+### 10.4 What is deliberately not done yet, and why
+
+The remaining findings are not blocked by effort; each needs a *verification* that a build cannot give,
+and shipping them without it would repeat the failure mode `docs/practices.md` describes.
+
+- **F08 minimum database grants.** Narrowing the `-arr` roles from `superuser` to database ownership
+  changes what a running PostgreSQL may do. It must be proven by starting each application against a
+  restored database and running its migrations - a live drill on `hom-srv-01`, not an evaluation.
+  *(Increment 8.)*
+- **F09 secret decryption scope.** Partitioning `secrets/secrets.yaml` changes which host can decrypt
+  what, and the existing file is already encrypted to every recipient. It needs a disposable
+  recipient-matrix test and a rotation decision before it is safe; that is an operational step with the
+  operator in the loop. *(Increment 8.)*
+- **F05/WP2 restore evidence.** The declared artifact and its exclusions are correct and proven, but
+  "a dump can be restored" is a claim only a restore drill can make. *(Increment 8.)*
+- **D2 inventory extraction and D8 zone-vs-trust.** Both are schema moves that change where a fact
+  lives; they are safe but large, and the structural work already done (D1-D7) should be reviewed
+  before another 500 lines move. *(Increment 7.)*
+- **F11-F18.** Provider binding, fleet traversal, endpoint-contract segregation and identity
+  consolidation each touch many modules; they are independent and reviewable one at a time.
+  *(Increment 7.)*
+
+The invariants of this session - one finding per commit, a proof at the consumer level, structure never
+mixed with behaviour - hold for every increment above.
 
 ### 10.3 A methodological note, recorded because it cost an hour
 
