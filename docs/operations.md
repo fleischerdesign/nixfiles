@@ -1,7 +1,7 @@
-# VYRX 2.0 — Deployment & Network Cutover Runbook
+# VYRX — Deployment & Operations Runbook
 
 > **Status:** Operational runbook (living document)
-> **Audience:** Operators and autonomous agents. Everything needed to finish (or recover) the 2.0 rollout is here.
+> **Audience:** Operators and autonomous agents. Everything needed to deploy, verify and recover the fleet is here.
 > **Companion docs:** `architecture.md` (the system and its vocabulary), `naming.md` (names and planes), `identity.md` (Authentik), `security.md` (the threat model), `embedded.md` (the device fleet), `practices.md` (how we work).
 > **Emergency?** Jump straight to [§9 Emergency Recovery](#9-emergency-recovery--regaining-access).
 
@@ -9,12 +9,12 @@
 
 ## 1. Purpose
 
-The 2.0 migration moves a historically grown setup ("hosts named after musicians", fragmented domains, `192.168.178.0/24`) onto:
+This fleet runs:
 - RFC 1178 host taxonomy and RFC 1918 zoning (`10.10.0.0/16`),
 - declarative NixOS + Home Manager,
 - a WireGuard mesh (`10.10.100.0/24`) as the transport, which also delivers the home LAN zones to
   roaming clients,
-- `hom-srv-01` taking over LAN services (DHCP, DNS, NTP, gateway) from the FRITZ!Box.
+- `hom-srv-01` as the LAN core (DHCP, DNS, NTP, gateway).
 
 This document is the **execution + safety guide**. It is deliberately explicit about **rollback and lockout avoidance**, because the rollout changes network services that can cut off the very access path you are deploying over.
 
@@ -24,16 +24,14 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 
 1. **Never remove your out-of-band path.** Before any network change you must have at least one working path that does *not* depend on the thing you are changing:
    - Public IP SSH (cloud hosts): `root@173.249.22.211`, `root@37.114.55.91`
-   - the WireGuard mesh (`root@10.10.100.x`) — the only overlay; Tailscale was retired 2026-09-20
+   - the WireGuard mesh (`root@10.10.100.x`) — the only overlay
    - Wired LAN access + a client with a **static IP** in the affected subnet
    - Physical console / keyboard for home hardware; LAN web UI for FRITZ!Box and RE330
-2. **The mesh is the transport.** Tailscale was removed on 2026-09-20; the four cutover criteria of
-   §10 were measured first (every host on 2.0, handshakes on both hubs, `10.10.100.x` reachable, deploy
-   targets resolving to reachable WG addresses). The home LAN reaches roaming clients for the zones
+2. **The mesh is the transport.** The home LAN reaches roaming clients for the zones
    that hold devices without an overlay identity (`announcedZones`, derived from the inventory);
    `my.topology.lanRouter` names the host that carries them - not a second router.
 3. **Exactly one DHCP server per L2 segment.** Never run FRITZ!Box DHCP and `hom-srv-01` Kea DHCP at the same time on the same subnet.
-4. **Never point DNS at a host that is not serving DNS yet.** FRITZ!Box DNS may only be set to `10.10.10.10` (Blocky) after Blocky answers queries.
+4. **Never point DNS at a host that is not serving DNS yet.** FRITZ!Box DNS may only be set to `10.10.10.10` (the resolver) after the resolver answers queries.
 5. **The FRITZ!Box is the WAN modem.** The declarative engine only manages its **DNS, DHCP toggle and port forwards** — *never* its LAN IP, subnet or Wi-Fi. Do not change those.
 6. **Backups/rollback first.** Record the current generation and have a rollback path (see §7).
 7. **Preview before activating.** `nod switch <target> --dry-run` / `nod plan <target>` and `git status` clean.
@@ -56,8 +54,6 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | `hom-ap-01` | TP-Link RE330 AP | infra | `10.10.10.20` | – | – | `ap.lan.vyrx.de` |
 | `hom-rly-01..08` | Sonoff relais (ESPHome) | iot | `10.10.30.11..18` | – | – | `rly-0X.iot.vyrx.de` |
 
-> **Target vs. reality:** this table lists the **2.0 target identity**, which every host now runs. The narrative sections 7 and 8 that follow are the *record of the cutover* (state as of 2026-09-19, when only `cld-edge-01` was migrated); they are kept as history, not as instructions.
-
 ### 3.2 Subnets (`my.topology.subnets`)
 
 | Zone | CIDR | VLAN | Trust | Notes |
@@ -69,13 +65,10 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | `mesh-ipv6` | `fd10:1000:100::/64` | – | mesh | WireGuard overlay (RFC 4193 ULA). |
 | `guest` | `10.10.99.0/24` | 99 | guest | Internet-only. |
 
-### 3.3 Overlay — WireGuard only (Tailscale retired 2026-09-20)
+### 3.3 Overlay — WireGuard only
 
-The tailnet was removed once its four cutover criteria (§10) were met and measured. Remaining tailnet
-devices exist only in Tailscale's own admin console and must be deleted there; nothing in this
-repository or in the fleet reads them.
-
-The overlay is `10.10.100.0/24` (`fd10:1000:100::/64`), relay hubs `cld-edge-01` and `cld-ops-01`, and
+The only overlay is the WireGuard mesh below; nothing in this repository or in the fleet reads any
+other. The overlay is `10.10.100.0/24` (`fd10:1000:100::/64`), relay hubs `cld-edge-01` and `cld-ops-01`, and
 every host peers with both. NetworkManager gives wifi a route metric of 600, so the mesh interface
 carries 1000: a prefix the host can reach directly always wins, and the tunnel is used only when the
 LAN is elsewhere.
@@ -161,7 +154,7 @@ function builds the NixOS spokes' peers. Revocation is the inverse, plus the key
 
 ## 5. Pre-flight Checklist (every deploy session)
 
-- [ ] `git status` clean; 2.0 changes committed (`git log --oneline -5`).
+- [ ] `git status` clean; changes committed (`git log --oneline -5`).
 - [ ] `nix flake check` passes (eval all hosts + statix + deadnix).
 - [ ] Required SOPS secrets present and decryptable on the target host:
       `services/authentik/*`, `services/fritzbox/password`, `services/wifi/ap_password`,
@@ -177,14 +170,12 @@ function builds the NixOS spokes' peers. Revocation is the inverse, plus the key
 ## 6. Deployment Order & Dependencies
 
 ```
-Phase 0  Repository + secrets verified, Tailscale up, backups taken
-Phase 1  cld-edge-01        (DONE)  – identity/ingress
-Phase 2  cld-ops-01                 – observability/AI, second relay hub
-Phase 3  hom-srv-01                 – LAN core; ***network cutover, §8***
-Phase 4  hom-wrk-01                 – desktop
-Phase 5  mob-nb-01                  – notebook
-Phase 6  nodTargets (§9): fritzbox (hom-rt-01), tplink-ap (hom-ap-01), esphome relays, cloudflare
-Phase 7  WireGuard cutover (§10): verify all handshakes, then retire Tailscale
+1  cld-edge-01   – identity/ingress
+2  cld-ops-01    – observability/AI, second relay hub
+3  hom-srv-01    – LAN core (DHCP, DNS, gateway); a network change here affects every client
+4  hom-wrk-01    – desktop
+5  mob-nb-01     – notebook
+6  nodTargets (§8): fritzbox (hom-rt-01), tplink-ap (hom-ap-01), esphome relays, cloudflare
 ```
 
 Rationale: servers first (they carry contracts/outposts/relay hubs), the home LAN core before the clients that depend on its DHCP/DNS, clients afterwards, and the embedded network devices last (they change connectivity, so they need the servers healthy for rollback).
@@ -214,8 +205,8 @@ ssh root@$ADDR 'nixos-rebuild --rollback switch'
 ```
 Worst case: reboot and select the previous generation in the bootloader (GRUB).
 
-### 7.1 cld-edge-01 — DONE
-Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `identity.md`).
+### 7.1 cld-edge-01
+Identity/ingress host. Authentik server + LDAP outpost. Apply path for identity changes: redeploy this host (see `identity.md`).
 
 ## 8. nodTargets (agentless reconcilers)
 
@@ -308,8 +299,7 @@ Order of attempts (stop as soon as one works):
 1. **User account, key-based** — always available, no password involved:
    `ssh -i ~/.ssh/id_rsa philipp@173.249.22.211` (edge) · `…@37.114.55.91` (ops) · `…@10.10.10.10` (hom-srv-01).
    On the home server this is root already: `ssh -i ~/.ssh/id_rsa root@10.10.10.10`.
-2. **Tailscale**: `tailscale status` on any reachable node; `ssh <user>@100.x.x.x`.
-3. **WireGuard**: `ssh root@10.10.100.x` (only if peers handshake).
+2. **WireGuard**: `ssh root@10.10.100.x` (only if peers handshake).
 
 ### 9.1 Which key does root trust? (verified 2026-09-20)
 
@@ -379,8 +369,8 @@ the next deploy. The declaration in SOPS is the source of truth; the host is a c
 store now holds the correct hash, so the password is enforced from then on and cannot drift again.
 That single activation also restores `ssh root@…` via the operator key, which unblocks the fleet key
 rotation and the fleet-wide rollout (`practices.md` §4).
-4. **Wired LAN** from a static-IP client: `ssh root@10.10.10.10` (hom-srv-01), FRITZ!Box UI `http://10.10.10.1`, AP UI `http://10.10.10.20`.
-5. **Physical console** for home hardware.
+3. **Wired LAN** from a static-IP client: `ssh root@10.10.10.10` (hom-srv-01), FRITZ!Box UI `http://10.10.10.1`, AP UI `http://10.10.10.20`.
+4. **Physical console** for home hardware.
 
 If a bad NixOS config is suspected:
 ```bash
@@ -464,8 +454,6 @@ nod plan <host>            # preview
 nod rollback <host>        # rollback
 ssh root@<addr> 'nixos-rebuild --rollback switch'   # manual rollback
 ```
-
-**Change history of this runbook:** created during the initial 2.0 rollout (cld-edge-01 first). Keep it updated as hosts are migrated.
 
 ### 12.1 `exit 4` from the Caddy reload - and what it actually was
 
