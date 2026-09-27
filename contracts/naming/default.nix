@@ -66,14 +66,37 @@ let
   );
   duplicateWireguard = duplicatesOf wireguardAddresses;
 
-  # I2 - one name, one owner, fleet-wide.
-  duplicateFqdns = duplicatesOf fqdns;
+  # I1 - a node answers under one name. Hosts and devices are declared in two inventories but project
+  #      into the same `node` plane, so a name that appears in both is two machines claiming one record.
+  duplicateNodeNames = duplicatesOf (
+    lib.attrNames topology.hosts ++ lib.attrNames (topology.devices or { })
+  );
 
+  # I2 - one name, one owner, fleet-wide. A canonical name, an `extraDomain` and an `alias` are the same
+  #      kind of fact - a name this fleet answers - so they compete for one namespace and are judged
+  #      together, per owner. The previous shape compared aliases against canonical names as plain
+  #      strings, which missed three real cases: an alias that met another endpoint's canonical name
+  #      (one occurrence in the alias list), an alias colliding with an alias, and an `extraDomain` that
+  #      duplicated a name. A name an endpoint repeats for itself is not a collision: it has one owner.
+  claimedNames = lib.concatMap (
+    e:
+    map (name: {
+      inherit name;
+      owner = label e;
+    }) ([ e.ep.canonicalDomain ] ++ e.ep.extraDomains ++ e.ep.aliases)
+  ) named;
+
+  ownersOfName =
+    name: lib.unique (map (claim: claim.owner) (lib.filter (claim: claim.name == name) claimedNames));
+
+  nameCollisions = map (name: "${name} (${lib.concatStringsSep ", " (ownersOfName name)})") (
+    lib.unique (
+      lib.filter (name: builtins.length (ownersOfName name) > 1) (map (c: c.name) claimedNames)
+    )
+  );
+
+  # The alias names as a projection; the enforcement above reads `claimedNames`, not this list.
   aliasNames = lib.concatMap (e: e.ep.extraDomains ++ e.ep.aliases) named;
-
-  # Aliases that collide with a canonical name owned by another endpoint.
-  collidingWith = universe: candidates: builtins.filter (c: builtins.elem c universe) candidates;
-  aliasCollisions = duplicatesOf (collidingWith fqdns aliasNames);
 
   # I3 - a `public` endpoint must be reachable from the ingress. That means the provider has
   #      an address the ingress can dial (LAN address or overlay address); it does *not* mean
@@ -181,12 +204,12 @@ in
         message = report "Naming I1: hosts share a WireGuard address" duplicateWireguard;
       }
       {
-        assertion = duplicateFqdns == [ ];
-        message = report "Naming I2: endpoints derive the same FQDN" duplicateFqdns;
+        assertion = duplicateNodeNames == [ ];
+        message = report "Naming I1: a name is declared as both a host and a device" duplicateNodeNames;
       }
       {
-        assertion = aliasCollisions == [ ];
-        message = report "Naming I2: an alias collides with a canonical FQDN" aliasCollisions;
+        assertion = nameCollisions == [ ];
+        message = "Naming I2: two endpoints claim the same name: ${lib.concatStringsSep "; " nameCollisions}";
       }
       {
         assertion = unreachablePublic == [ ];
