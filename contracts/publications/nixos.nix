@@ -125,7 +125,11 @@ let
             ep = if endpointExists then contract.endpoints.${pub.endpoint} else null;
           in
           lib.optional (!endpointExists) "${service}.publications.${name}: unknown endpoint '${pub.endpoint}'"
-          ++ lib.optional (endpointExists && pub.canonicalDomain == null) (
+          # `isolated` is the deliberate exception: a publication that names nothing - a
+          # mesh-reachable listener with no DNS face. Every projection already tolerates a null
+          # name (naming, DNS, Caddy, firewall and the one-endpoint-one-name grouping all filter
+          # it), so only this coherence check stood in the way of the documented meaning.
+          ++ lib.optional (endpointExists && pub.scope != "isolated" && pub.canonicalDomain == null) (
             "${service}.publications.${name}: scope '${pub.scope}' yields no DNS name; "
             + "give it a subdomain, an fqdn, or drop the publication"
           )

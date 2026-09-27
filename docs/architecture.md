@@ -317,7 +317,7 @@ twice, and no service module knows its host, its name or its neighbours.
 | Declaration | Meaning | Projected to |
 |---|---|---|
 | `my.contracts.provides.<svc>.endpoints` | listeners: port, transport and application protocol, direct network access. A listener is not a publication | firewall rules, telemetry targets, ingress upstreams |
-| `…publications.<name>` | a name on a listener: DNS identity, exposure plane, HTTP ingress policy and audience (`endpoint` references the listener) | DNS records, Caddy vHosts, firewall mesh reachability, access policies |
+| `…publications.<name>` | a name on a listener: DNS identity, exposure plane, HTTP ingress policy and audience (`endpoint` references the listener); `scope = "isolated"` deliberately names nothing | DNS records, Caddy vHosts, firewall mesh reachability, access policies |
 | `…identity.oidc.<name>` / `…identity.ldap.<name>` | application integrations referencing a publication | Authentik blueprints, directory consumers |
 | `…presentation.tiles.<name>`, `…presentation.readouts`, `…presentation.actions` | portal entries referencing an endpoint, plus service-level capabilities | portal inventory and adapter data |
 | `…telemetry.probes.<name>`, `…telemetry.scrapes.<name>` | named HTTP/TCP probes and metrics scrapes referencing an endpoint (no repeated port, no inferred HTTP probe) | Prometheus scrape jobs and portal monitoring state |

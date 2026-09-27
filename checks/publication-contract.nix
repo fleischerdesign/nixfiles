@@ -70,11 +70,18 @@ let
       subdomain = "app";
     };
   };
-  nameless = failures {
+  nameless = fixture {
     inherit endpoints;
     publications.web = {
       endpoint = "web";
       scope = "isolated";
+    };
+  };
+  publicNameless = failures {
+    inherit endpoints;
+    publications.web = {
+      endpoint = "web";
+      scope = "public";
     };
   };
   wrongProtocol = failures {
@@ -119,13 +126,14 @@ if
     (fixture valid).my.contracts.provides.example.publications.web.canonicalDomain == "app.example.test"
   && (fixture valid).my.contracts.provides.example.publications.web.port == 8080
   && contains "unknown endpoint 'missing'" unknown
-  && contains "yields no DNS name" nameless
+  && nameless.my.contracts.provides.example.publications.web.canonicalDomain == null
+  && contains "yields no DNS name" publicNameless
   && contains "ingress terminates HTTP" wrongProtocol
   && contains "enforced by the ingress" authWithoutIngress
   && contains "one endpoint, one name" duplicateName
 then
   pkgs.runCommandLocal "publications-contract-check" { } ''
-    echo "publication references, ingress coherence and five independent negative controls passed" > "$out"
+    echo "publication references, ingress coherence, isolated namelessness and five independent negative controls passed" > "$out"
   ''
 else
-  throw "publications contract fixture failed: expected a derived name and five distinct errors"
+  throw "publications contract fixture failed: expected a derived name, a null isolated name and five distinct errors"
