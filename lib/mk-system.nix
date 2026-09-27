@@ -81,7 +81,7 @@ let
         features = import ./feature-dependencies.nix { inherit lib; };
         # Shared fleet resolution, injected once: consumers declare `fleetConfigs` in their
         # arguments instead of importing lib/ by relative path.
-        fleetConfigs = import ./fleet-configs.nix;
+        fleetConfigs = import ./fleet-configs.nix { inherit lib; };
       };
       modules = [
         { nixpkgs.pkgs = finalPkgs; }

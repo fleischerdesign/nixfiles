@@ -1,5 +1,4 @@
 {
-  config,
   ...
 }:
 {
@@ -47,10 +46,7 @@
         bazarr.enable = true;
         jellyseerr.enable = true;
         klipper.enable = true;
-        authentik.outpost.ldap = {
-          enable = true;
-          coreAddress = "http://${config.my.topology.hosts.cld-edge-01.wireguardIpv4}:9055";
-        };
+        authentik.outpost.ldap.enable = true;
         monitoring = {
           pipeline = {
             enable = true;

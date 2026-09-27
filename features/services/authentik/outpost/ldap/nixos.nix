@@ -2,10 +2,14 @@
   config,
   lib,
   pkgs,
+  fleetConfigs,
   ...
 }:
 let
   cfg = config.my.features.services.authentik.outpost.ldap;
+
+  # Which host runs the core is placement, resolved through the fleet - never a literal here.
+  coreLib = import ../../lib/core.nix { inherit lib; };
 in
 {
   options.my.features.services.authentik.outpost.ldap = {
@@ -13,7 +17,12 @@ in
 
     coreAddress = lib.mkOption {
       type = lib.types.str;
-      description = "The full URL (including protocol and port) of the Authentik Core server.";
+      default = coreLib.url {
+        topology = config.my.topology;
+        systems = fleetConfigs.systems config;
+        consumerName = config.networking.hostName;
+      };
+      description = "URL of the Authentik Core server as this host reaches it, with the core's declared listen port.";
     };
 
     tokenSecretName = lib.mkOption {

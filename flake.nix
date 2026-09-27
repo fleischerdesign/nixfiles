@@ -499,55 +499,62 @@
         }
       );
 
-      nodTargets = {
-        cloudflare = {
-          targetHost = "api.cloudflare.com";
-          role = "cloud";
-          targetType = "agentless";
-          tags = [
-            "edge"
-            "dns"
-            "gitops"
-          ];
-          package =
-            self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package;
-        };
+      # Agentless targets are addressed from the inventory, not literals: the check on
+      # nodTargets fails loudly when a target has no address, so a renamed device cannot
+      # silently keep its old one here.
+      nodTargets =
+        let
+          inventoryHosts = self.nixosConfigurations.cld-edge-01.config.my.topology.hosts;
+        in
+        {
+          cloudflare = {
+            targetHost = "api.cloudflare.com";
+            role = "cloud";
+            targetType = "agentless";
+            tags = [
+              "edge"
+              "dns"
+              "gitops"
+            ];
+            package =
+              self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package;
+          };
 
-        hom-rt-01 = {
-          targetHost = "10.10.10.1";
-          role = "router";
-          targetType = "agentless";
-          tags = [
-            "router"
-            "tr064"
-            "gitops"
-          ];
-          package = self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.fritzbox.package;
-        };
+          hom-rt-01 = {
+            targetHost = inventoryHosts.hom-rt-01.ipv4 or null;
+            role = "router";
+            targetType = "agentless";
+            tags = [
+              "router"
+              "tr064"
+              "gitops"
+            ];
+            package = self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.fritzbox.package;
+          };
 
-        hom-ap-01 = {
-          targetHost = "10.10.10.20";
+          hom-ap-01 = {
+            targetHost = inventoryHosts.hom-ap-01.ipv4 or null;
+            role = "embedded";
+            targetType = "agentless";
+            tags = [
+              "ap"
+              "wifi"
+              "gitops"
+            ];
+            package =
+              self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.tplink-ap.package;
+          };
+        }
+        // (builtins.mapAttrs (devName: devPkg: {
+          targetHost = self.nixosConfigurations.hom-srv-01.config.my.topology.devices.${devName}.ipv4;
           role = "embedded";
           targetType = "agentless";
           tags = [
-            "ap"
-            "wifi"
+            "esphome"
+            "iot"
             "gitops"
           ];
-          package =
-            self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.tplink-ap.package;
-        };
-      }
-      // (builtins.mapAttrs (devName: devPkg: {
-        targetHost = self.nixosConfigurations.hom-srv-01.config.my.topology.devices.${devName}.ipv4;
-        role = "embedded";
-        targetType = "agentless";
-        tags = [
-          "esphome"
-          "iot"
-          "gitops"
-        ];
-        package = devPkg;
-      }) self.nixosConfigurations.hom-srv-01.config.my.features.services.esphome.devicePackages);
+          package = devPkg;
+        }) self.nixosConfigurations.hom-srv-01.config.my.features.services.esphome.devicePackages);
     };
 }

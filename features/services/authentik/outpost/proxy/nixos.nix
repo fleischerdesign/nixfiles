@@ -2,14 +2,14 @@
   config,
   lib,
   pkgs,
+  fleetConfigs,
   ...
 }:
 let
   cfg = config.my.features.services.authentik.outpost.proxy;
 
-  # The core as this host reaches it: the LAN address while both sides are at home, otherwise the overlay
-  # address (lib/addresses.nix).
-  addresses = import ../../../../../lib/addresses.nix { inherit lib; };
+  # Which host runs the core is placement, resolved through the fleet - never a literal here.
+  coreLib = import ../../lib/core.nix { inherit lib; };
 in
 {
   options.my.features.services.authentik.outpost.proxy = {
@@ -21,14 +21,12 @@ in
     };
     coreAddress = lib.mkOption {
       type = lib.types.str;
-      default = "http://${
-        addresses.serviceAddress {
-          topology = config.my.topology;
-          consumer = config.my.topology.hosts.${config.networking.hostName} or null;
-          peer = config.my.topology.hosts.cld-edge-01;
-        }
-      }:9055";
-      description = "Internal address of the Authentik Core instance.";
+      default = coreLib.url {
+        topology = config.my.topology;
+        systems = fleetConfigs.systems config;
+        consumerName = config.networking.hostName;
+      };
+      description = "URL of the Authentik Core instance as this host reaches it, with the core's declared listen port.";
     };
     browserUrl = lib.mkOption {
       type = lib.types.str;

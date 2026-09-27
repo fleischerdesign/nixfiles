@@ -475,8 +475,6 @@ let
 
   # Single listener for the API *and* the embedded proxy outpost (authentik serves
   # both on the same HTTP listener). Kept here so every projection stays in sync.
-  listenHttpPort = 9055;
-
   # Only the trusted ingress networks may inject authentication headers.
   trustedProxyCidrs = lib.concatStringsSep "," (
     [
@@ -500,21 +498,22 @@ in
       default = "philipp@vyrx.de";
       description = "Email address applied to the bootstrapped `akadmin` account.";
     };
+    listenPort = lib.mkOption {
+      type = lib.types.port;
+      default = 9055;
+      description = "HTTP listen port of the core and its embedded outpost; read by outposts fleet-wide instead of a literal.";
+    };
     embeddedOutpostAddress = lib.mkOption {
       type = lib.types.str;
       readOnly = true;
       default =
         let
-          serverHosts = lib.filter (
-            hostName:
-            (blueprints.flakeConfigurations.${hostName}.config.my.features.services.authentik.server.enable
-              or false
-            )
-          ) (builtins.attrNames blueprints.flakeConfigurations);
-          serverHost = if serverHosts == [ ] then null else builtins.head serverHosts;
+          systems = fleetConfigs.systems config;
+          coreLib = import ../lib/core.nix { inherit lib; };
+          serverHost = coreLib.hostName systems;
         in
-        if serverHost == null || serverHost == config.networking.hostName then
-          "127.0.0.1:${toString listenHttpPort}"
+        if serverHost == config.networking.hostName then
+          "127.0.0.1:${toString cfg.listenPort}"
         else
           "${
             addresses.serviceAddress {
@@ -522,7 +521,7 @@ in
               consumer = config.my.topology.hosts.${config.networking.hostName} or null;
               peer = config.my.topology.hosts.${serverHost};
             }
-          }:${toString listenHttpPort}";
+          }:${toString cfg.listenPort}";
       description = "Address of the central embedded outpost as reachable from this host.";
     };
     blueprintsDir = lib.mkOption {
@@ -576,7 +575,7 @@ in
           authentikDatabaseEnvironment
           ++ [
             # The embedded proxy outpost and the API share this listener.
-            "AUTHENTIK_LISTEN__HTTP=0.0.0.0:${toString listenHttpPort}"
+            "AUTHENTIK_LISTEN__HTTP=0.0.0.0:${toString cfg.listenPort}"
             "AUTHENTIK_LISTEN__METRICS=0.0.0.0:9300"
             "AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS=${trustedProxyCidrs}"
             "AUTHENTIK_DISABLE_STARTUP_ANALYTICS=true"
@@ -782,7 +781,7 @@ in
 
       };
       endpoints.web = {
-        port = listenHttpPort;
+        port = cfg.listenPort;
         protocol = "tcp";
       };
     };

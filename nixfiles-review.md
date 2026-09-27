@@ -1706,9 +1706,14 @@ and shipping them without it would repeat the failure mode `docs/practices.md` d
 - **D2 inventory extraction and D8 zone-vs-trust.** Both are schema moves that change where a fact
   lives; they are safe but large, and the structural work already done (D1-D7) should be reviewed
   before another 500 lines move. *(Increment 7.)*
-- **F11-F13 (still open).** Topology/inventory split, zone-vs-trust and explicit provider binding
-  touch many modules; they are independent and reviewable one at a time.
+- **F11/F12/D2/D8 (still open).** Topology schema/site-inventory split, zone-vs-trust references
+  and inventory validation touch the fleet's ground truth; they are one coordinated move.
   *(Increment 7, follow-ups.)*
+- **F13 (done).** Providers are derived as the unique host with the role (authentik core, monitoring
+  hub, crowdsec master) via `fleetConfigs.uniqueHost`; zero or several fail loudly. The core URL
+  uses the core's declared listen port, outpost/ldap/hub/master bindings that were literals are
+  derived (both manual coreAddress settings removed), the alloy loopback fallback throws, and
+  agentless nodTarget addresses come from the inventory. All bindings byte-identical to HEAD.
 - **F14 (done).** One fleet view (`lib/fleet-configs.nix`, injected via `mk-system.nix`): all
   consumers read `fleetConfigs.systems`/`providesOf`, standalone evaluation is explicitly
   unsupported with a domain error, and a fixture proves pass-through plus loud null/empty

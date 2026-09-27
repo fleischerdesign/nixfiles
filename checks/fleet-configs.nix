@@ -1,6 +1,6 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 let
-  fleetConfigs = import ../lib/fleet-configs.nix;
+  fleetConfigs = import ../lib/fleet-configs.nix { inherit lib; };
 
   hostA = {
     networking.hostName = "a";
@@ -31,6 +31,40 @@ let
   emptyFlake = builtins.tryEval (
     fleetConfigs.systems (hostA // { _module.specialArgs.flake = { }; })
   );
+
+  roleSystems = {
+    a = {
+      config = {
+        role = "hub";
+      };
+    };
+    b = {
+      config = {
+        role = "spoke";
+      };
+    };
+  };
+  pickHub =
+    systems:
+    fleetConfigs.uniqueHost {
+      inherit systems;
+      matches = hostCfg: hostCfg.role or null == "hub";
+      role = "hub";
+    };
+  oneHub = pickHub roleSystems;
+  noHub = builtins.tryEval (pickHub { });
+  twoHubs = builtins.tryEval (pickHub {
+    a = {
+      config = {
+        role = "hub";
+      };
+    };
+    b = {
+      config = {
+        role = "hub";
+      };
+    };
+  });
 in
 if
   # The fleet mapping passes through untouched, with every host's services visible.
@@ -40,9 +74,13 @@ if
   # message instead of projecting one host - or nothing - by accident.
   && !nullFlake.success
   && !emptyFlake.success
+  # Provider selection is exact: one candidate wins, zero or several fail loudly.
+  && oneHub == "a"
+  && !noHub.success
+  && !twoHubs.success
 then
   pkgs.runCommandLocal "fleet-configs-check" { } ''
-    echo "fleet pass-through, providesOf and loud rejection of null/empty flakes passed" > "$out"
+    echo "fleet pass-through, providesOf, unique provider and loud rejections passed" > "$out"
   ''
 else
-  throw "fleet configs fixture failed: expected pass-through provides and loud null/empty rejection"
+  throw "fleet configs fixture failed: expected pass-through provides, exact provider selection and loud rejections"

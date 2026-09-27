@@ -76,8 +76,12 @@ in
     enable = lib.mkEnableOption "CrowdSec IPS";
     masterHost = lib.mkOption {
       type = lib.types.str;
-      default = "cld-edge-01";
-      description = "The name of the CrowdSec master host (LAPI server) in the topology.";
+      default = fleetConfigs.uniqueHost {
+        systems = fleetConfigs.systems config;
+        matches = hostCfg: (hostCfg.my.features.services.crowdsec.role or "agent") == "master";
+        role = "crowdsec master";
+      };
+      description = "The CrowdSec master host (LAPI server) in the topology. Derived as the single host with the master role; an explicit override must name a master-role host.";
     };
     role = lib.mkOption {
       type = lib.types.enum [
@@ -107,6 +111,17 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion =
+          let
+            masterCfg = (fleetConfigs.systems config).${cfg.masterHost}.config or null;
+          in
+          masterCfg != null && (masterCfg.my.features.services.crowdsec.role or "agent") == "master";
+        message = "crowdsec: masterHost '${cfg.masterHost}' on ${config.networking.hostName} is not a host with the master role";
+      }
+    ];
+
     services.crowdsec = {
       enable = true;
 

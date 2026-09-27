@@ -33,10 +33,7 @@
   my.features.services.postgresql.enable = true;
   my.features.services.redis.enable = true;
   my.features.services.authentik.server.enable = true;
-  my.features.services.authentik.outpost.ldap = {
-    enable = true;
-    coreAddress = "http://127.0.0.1:9055";
-  };
+  my.features.services.authentik.outpost.ldap.enable = true;
 
   my.features.services.vyrx-landing.enable = true;
   my.features.services.portfolio.enable = true;

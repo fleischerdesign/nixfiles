@@ -4,6 +4,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   ...
 }:
 
@@ -40,13 +41,29 @@ in
 
     hub = lib.mkOption {
       type = lib.types.str;
-      default = "cld-edge-01";
-      description = "Hostname of the monitoring hub. Used to configure alloy's loki endpoint on collectors.";
+      default = fleetConfigs.uniqueHost {
+        systems = fleetConfigs.systems config;
+        matches = hostCfg: (hostCfg.my.features.services.monitoring.pipeline.role or "collector") == "full";
+        role = "monitoring hub";
+      };
+      description = "Hostname of the monitoring hub. Derived as the single host with the full role; an explicit override must name a full-role host. Used to configure alloy's loki endpoint on collectors.";
     };
   };
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
+      {
+        assertions = [
+          {
+            assertion =
+              let
+                hubCfg = (fleetConfigs.systems config).${cfg.hub}.config or null;
+              in
+              hubCfg != null && (hubCfg.my.features.services.monitoring.pipeline.role or "collector") == "full";
+            message = "monitoring pipeline: hub '${cfg.hub}' on ${config.networking.hostName} is not a host with the full role";
+          }
+        ];
+      }
       # Base: all roles get agents
       {
         my.features.services.monitoring = {
@@ -65,7 +82,8 @@ in
         };
       })
 
-      # Configure alloy's loki endpoint
+      # Configure alloy's loki endpoint. An unknown hub fails loudly: shipping logs to
+      # loopback by accident would discard every log line on the floor.
       {
         my.features.services.monitoring.alloy.lokiHost = lib.mkDefault (
           if cfg.role == "full" then
@@ -77,7 +95,7 @@ in
             if hubTopology != null && hubTopology.wireguardIpv4 != null then
               serviceAddress hubTopology
             else
-              "127.0.0.1"
+              throw "monitoring pipeline: hub '${cfg.hub}' on ${config.networking.hostName} has no usable address in the inventory"
         );
       }
     ]
