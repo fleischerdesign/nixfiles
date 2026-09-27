@@ -79,24 +79,31 @@ in
         };
 
         my.contracts.provides.radarr = {
-          endpoints.web = {
-            port = 7878;
-            protocol = "tcp";
+          publications."web" = {
             scope = "internal";
+            endpoint = "web";
             auth = "authentik";
             accessGroups = [ "media-users" ];
             subdomain = "radarr";
-            monitoring.http.path = "/ping";
-            dashboard = {
-              description = {
-                de = "Filmbibliothek automatisch verwalten.";
-                en = "Manage the movie library automatically.";
-              };
-              show = true;
-              displayName = "Radarr";
-              category = "Media";
-              icon = "radarr";
+
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Filmbibliothek automatisch verwalten.";
+              en = "Manage the movie library automatically.";
             };
+            show = true;
+            displayName = "Radarr";
+            category = "Media";
+            icon = "radarr";
+          };
+          telemetry.probes."web-http".endpoint = "web";
+          telemetry.probes."web-http".kind = "http";
+          telemetry.probes."web-http".path = "/ping";
+          endpoints.web = {
+            port = 7878;
+            protocol = "tcp";
           };
           storage = {
             stateDirs = [ "/var/lib/radarr" ];

@@ -94,9 +94,9 @@ in
           host = "0.0.0.0";
           host_whitelist = "${
             let
-              ep = config.my.contracts.provides.sabnzbd.endpoints.web;
+              pub = config.my.contracts.provides.sabnzbd.publications.web;
             in
-            if ep.canonicalDomain != null then "${ep.canonicalDomain}, " else ""
+            if pub.canonicalDomain != null then "${pub.canonicalDomain}, " else ""
           }localhost, 127.0.0.1";
           inet_exposure = 4;
           download_dir = "${cfg.downloadDir}/incomplete";
@@ -150,24 +150,31 @@ in
 
     # Caddy & Firewall Integration via Service Contract
     my.contracts.provides.sabnzbd = {
-      endpoints.web = {
-        port = 8080;
-        protocol = "tcp";
+      publications."web" = {
         scope = "internal";
+        endpoint = "web";
         auth = "authentik";
         accessGroups = [ "media-users" ];
         subdomain = "sabnzbd";
-        monitoring.http.path = "/api?mode=version";
-        dashboard = {
-          description = {
-            de = "Usenet-Downloads für den Medien-Stack.";
-            en = "Usenet downloads for the media stack.";
-          };
-          show = true;
-          displayName = "SABnzbd";
-          category = "Media";
-          icon = "sabnzbd";
+
+      };
+      presentation.tiles."web" = {
+        endpoint = "web";
+        description = {
+          de = "Usenet-Downloads für den Medien-Stack.";
+          en = "Usenet downloads for the media stack.";
         };
+        show = true;
+        displayName = "SABnzbd";
+        category = "Media";
+        icon = "sabnzbd";
+      };
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      telemetry.probes."web-http".path = "/api?mode=version";
+      endpoints.web = {
+        port = 8080;
+        protocol = "tcp";
       };
       storage = {
         stateDirs = [ "/var/lib/sabnzbd" ];

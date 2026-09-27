@@ -48,8 +48,8 @@ in
             SECRET_ENCRYPTION_KEY=${config.sops.placeholder."services/apps/homarr_encryption_key"}
 
             # URLs
-            BASE_URL=https://${config.my.contracts.provides.homarr.endpoints.web.canonicalDomain}
-            NEXTAUTH_URL=https://${config.my.contracts.provides.homarr.endpoints.web.canonicalDomain}
+            BASE_URL=https://${config.my.contracts.provides.homarr.publications.web.canonicalDomain}
+            NEXTAUTH_URL=https://${config.my.contracts.provides.homarr.publications.web.canonicalDomain}
 
             # Redis (Using Mackaye's native redis)
             REDIS_IS_EXTERNAL=true
@@ -88,22 +88,26 @@ in
 
         # 5. Reverse Proxy & Ingress via Service Contract
         my.contracts.provides.homarr = {
+          publications."web" = {
+            endpoint = "web";
+            auth = "none";
+            subdomain = "homarr";
+
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Startseite für alle Dienste.";
+              en = "Start page for all services.";
+            };
+            show = true;
+            displayName = "Homarr";
+            category = "Services";
+            icon = "homarr";
+          };
           endpoints.web = {
             port = 7575;
             protocol = "tcp";
-            scope = "public";
-            auth = "none";
-            subdomain = "homarr";
-            dashboard = {
-              description = {
-                de = "Startseite für alle Dienste.";
-                en = "Start page for all services.";
-              };
-              show = true;
-              displayName = "Homarr";
-              category = "Services";
-              icon = "homarr";
-            };
           };
           storage = {
             stateDirs = [ "/var/lib/homarr" ];

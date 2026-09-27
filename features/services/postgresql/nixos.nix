@@ -43,15 +43,12 @@ in
     };
 
     my.contracts.provides.postgresql = {
+      telemetry.probes."db-tcp".endpoint = "db";
+      telemetry.probes."db-tcp".kind = "tcp";
       endpoints.db = {
         port = 5432;
         protocol = "tcp";
-        scope = "internal";
-        monitoring = {
-          http.enable = false;
-          tcp.enable = true;
-          tcp.group = "Infrastructure";
-        };
+        applicationProtocol = "postgresql";
       };
       # The logical dump is the artifact that restores this service; the data directory is running state
       # a restore recreates from it, so it is declared out and derived from the module rather than copied

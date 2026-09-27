@@ -29,32 +29,34 @@ let
       "${config.networking.hostName}" = config;
     };
 
-  # Every declared endpoint of the whole fleet, flattened.
-  endpoints = lib.concatLists (
+  # Every declared publication of the whole fleet, with the endpoint it names resolved for the
+  # reachability invariants. A name is a publication fact; the listener only carries direct access.
+  publications = lib.concatLists (
     lib.mapAttrsToList (
       hostName: hostConfig:
       lib.concatLists (
         lib.mapAttrsToList (
           svcName: contract:
-          lib.mapAttrsToList (epName: ep: {
+          lib.mapAttrsToList (pubName: pub: {
             inherit
               hostName
               svcName
-              epName
-              ep
+              pubName
+              pub
               ;
-          }) contract.endpoints
+            ep = contract.endpoints.${pub.endpoint};
+          }) contract.publications
         ) (hostConfig.config.my.contracts.provides or { })
       )
     ) flakeConfigurations
   );
 
-  # Only endpoints that claim a name participate in the naming invariants.
-  named = builtins.filter (e: e.ep.canonicalDomain != null) endpoints;
+  # Only publications that claim a name participate in the naming invariants.
+  named = builtins.filter (e: e.pub.canonicalDomain != null) publications;
 
-  fqdns = map (e: e.ep.canonicalDomain) named;
+  fqdns = map (e: e.pub.canonicalDomain) named;
 
-  label = e: "${e.hostName}:${e.svcName}.${e.epName}";
+  label = e: "${e.hostName}:${e.svcName}.${e.pubName}";
 
   duplicatesOf =
     values: lib.unique (lib.filter (v: builtins.length (lib.filter (x: x == v) values) > 1) values);
@@ -74,16 +76,13 @@ let
 
   # I2 - one name, one owner, fleet-wide. A canonical name, an `extraDomain` and an `alias` are the same
   #      kind of fact - a name this fleet answers - so they compete for one namespace and are judged
-  #      together, per owner. The previous shape compared aliases against canonical names as plain
-  #      strings, which missed three real cases: an alias that met another endpoint's canonical name
-  #      (one occurrence in the alias list), an alias colliding with an alias, and an `extraDomain` that
-  #      duplicated a name. A name an endpoint repeats for itself is not a collision: it has one owner.
+  #      together, per owner. A name a publication repeats for itself is not a collision: it has one owner.
   claimedNames = lib.concatMap (
     e:
     map (name: {
       inherit name;
       owner = label e;
-    }) ([ e.ep.canonicalDomain ] ++ e.ep.extraDomains ++ e.ep.aliases)
+    }) ([ e.pub.canonicalDomain ] ++ e.pub.extraDomains ++ e.pub.aliases)
   ) named;
 
   ownersOfName =
@@ -96,14 +95,14 @@ let
   );
 
   # The alias names as a projection; the enforcement above reads `claimedNames`, not this list.
-  aliasNames = lib.concatMap (e: e.ep.extraDomains ++ e.ep.aliases) named;
+  aliasNames = lib.concatMap (e: e.pub.extraDomains ++ e.pub.aliases) named;
 
-  # I3 - a `public` endpoint must be reachable from the ingress. That means the provider has
+  # I3 - a `public` publication must be reachable from the ingress. That means the provider has
   #      an address the ingress can dial (LAN address or overlay address); it does *not* mean
   #      the provider has a public address (docs/naming.md §3.1).
   unreachablePublic = builtins.filter (
     e:
-    e.ep.scope == "public"
+    e.pub.scope == "public"
     && (
       let
         host = topology.hosts.${e.hostName} or null;
@@ -116,9 +115,11 @@ let
   #      inside an internal plane would leak it.
   internalPlaneOverrides = builtins.filter (
     e:
-    e.ep.fqdn != null
+    e.pub.fqdn != null
     && (
-      lib.hasInfix ".lan." e.ep.fqdn || lib.hasInfix ".mesh." e.ep.fqdn || lib.hasInfix ".iot." e.ep.fqdn
+      lib.hasInfix ".lan." e.pub.fqdn
+      || lib.hasInfix ".mesh." e.pub.fqdn
+      || lib.hasInfix ".iot." e.pub.fqdn
     )
   ) named;
 
@@ -128,8 +129,8 @@ let
   # `fleischer.design.vyrx.de`). Foreign zones are served by Caddy and resolved elsewhere.
   outOfZoneOverrides = builtins.filter (
     e:
-    e.ep.fqdn != null
-    && !(e.ep.fqdn == topology.domain || lib.hasSuffix ".${topology.domain}" e.ep.fqdn)
+    e.pub.fqdn != null
+    && !(e.pub.fqdn == topology.domain || lib.hasSuffix ".${topology.domain}" e.pub.fqdn)
   ) named;
 
   # I10 - the ingress terminates TLS and proxies to a remote public endpoint *directly over the
@@ -139,7 +140,7 @@ let
   # atticd still bound 127.0.0.1).
   ingressUnreachable = builtins.filter (
     e:
-    e.ep.scope == "public"
+    e.pub.scope == "public"
     && e.hostName != topology.ingressHost
     && !(
       e.ep.directAccess.enable
@@ -149,7 +150,7 @@ let
 
   # I9 - publishing an unauthenticated service is a decision, not a default.
   unauthenticatedPublic = builtins.filter (
-    e: e.ep.scope == "public" && e.ep.auth == "none" && e.ep.publicExempt == null
+    e: e.pub.scope == "public" && e.pub.auth == "none" && e.pub.publicExempt == null
   ) named;
 
   report =
@@ -209,11 +210,11 @@ in
       }
       {
         assertion = nameCollisions == [ ];
-        message = "Naming I2: two endpoints claim the same name: ${lib.concatStringsSep "; " nameCollisions}";
+        message = "Naming I2: two publications claim the same name: ${lib.concatStringsSep "; " nameCollisions}";
       }
       {
         assertion = unreachablePublic == [ ];
-        message = report "Naming I3: public endpoint on a host the ingress cannot reach" unreachablePublic;
+        message = report "Naming I3: public publication on a host the ingress cannot reach" unreachablePublic;
       }
       {
         assertion = internalPlaneOverrides == [ ];
@@ -225,11 +226,11 @@ in
       }
       {
         assertion = ingressUnreachable == [ ];
-        message = report "Naming I10: public endpoint on a remote host that the ingress cannot reach" ingressUnreachable;
+        message = report "Naming I10: public publication on a remote host that the ingress cannot reach" ingressUnreachable;
       }
       {
         assertion = unauthenticatedPublic == [ ];
-        message = report "Naming I9: public endpoint with auth = \"none\" and no publicExempt reason" unauthenticatedPublic;
+        message = report "Naming I9: public publication with auth = \"none\" and no publicExempt reason" unauthenticatedPublic;
       }
     ];
   };

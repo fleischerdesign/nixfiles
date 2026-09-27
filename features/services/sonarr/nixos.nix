@@ -79,24 +79,31 @@ in
         };
 
         my.contracts.provides.sonarr = {
-          endpoints.web = {
-            port = 8989;
-            protocol = "tcp";
+          publications."web" = {
             scope = "internal";
+            endpoint = "web";
             auth = "authentik";
             accessGroups = [ "media-users" ];
             subdomain = "sonarr";
-            monitoring.http.path = "/ping";
-            dashboard = {
-              description = {
-                de = "Serienbibliothek automatisch verwalten.";
-                en = "Manage the show library automatically.";
-              };
-              show = true;
-              displayName = "Sonarr";
-              category = "Media";
-              icon = "sonarr";
+
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Serienbibliothek automatisch verwalten.";
+              en = "Manage the show library automatically.";
             };
+            show = true;
+            displayName = "Sonarr";
+            category = "Media";
+            icon = "sonarr";
+          };
+          telemetry.probes."web-http".endpoint = "web";
+          telemetry.probes."web-http".kind = "http";
+          telemetry.probes."web-http".path = "/ping";
+          endpoints.web = {
+            port = 8989;
+            protocol = "tcp";
           };
           storage = {
             stateDirs = [ "/var/lib/sonarr" ];

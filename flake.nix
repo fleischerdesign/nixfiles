@@ -221,6 +221,26 @@
       };
 
       checks.${system} = {
+        identity-contract = import ./checks/identity-contract.nix {
+          inherit pkgs;
+          lib = nixpkgs-unstable.lib;
+        };
+
+        presentation-contract = import ./checks/presentation-contract.nix {
+          inherit pkgs;
+          lib = nixpkgs-unstable.lib;
+        };
+
+        publication-contract = import ./checks/publication-contract.nix {
+          inherit pkgs;
+          lib = nixpkgs-unstable.lib;
+        };
+
+        telemetry-contract = import ./checks/telemetry-contract.nix {
+          inherit pkgs;
+          lib = nixpkgs-unstable.lib;
+        };
+
         custom-package-updater =
           pkgs.runCommandLocal "custom-package-updater-check"
             {

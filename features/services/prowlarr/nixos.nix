@@ -70,24 +70,31 @@ in
         };
 
         my.contracts.provides.prowlarr = {
-          endpoints.web = {
-            port = 9696;
-            protocol = "tcp";
+          publications."web" = {
             scope = "internal";
+            endpoint = "web";
             auth = "authentik";
             accessGroups = [ "media-users" ];
             subdomain = "prowlarr";
-            monitoring.http.path = "/ping";
-            dashboard = {
-              description = {
-                de = "Indexer-Verwaltung für den Medien-Stack.";
-                en = "Indexer management for the media stack.";
-              };
-              show = true;
-              displayName = "Prowlarr";
-              category = "Media";
-              icon = "prowlarr";
+
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Indexer-Verwaltung für den Medien-Stack.";
+              en = "Indexer management for the media stack.";
             };
+            show = true;
+            displayName = "Prowlarr";
+            category = "Media";
+            icon = "prowlarr";
+          };
+          telemetry.probes."web-http".endpoint = "web";
+          telemetry.probes."web-http".kind = "http";
+          telemetry.probes."web-http".path = "/ping";
+          endpoints.web = {
+            port = 9696;
+            protocol = "tcp";
           };
           storage = {
             stateDirs = [ "/var/lib/prowlarr" ];

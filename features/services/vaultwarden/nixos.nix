@@ -29,7 +29,7 @@ in
           enable = true;
           dbBackend = "postgresql";
           config = {
-            DOMAIN = "https://${config.my.contracts.provides.vaultwarden.endpoints.web.canonicalDomain}";
+            DOMAIN = "https://${config.my.contracts.provides.vaultwarden.publications.web.canonicalDomain}";
             SIGNUPS_ALLOWED = false;
 
             # OIDC / Authentik
@@ -60,35 +60,40 @@ in
 
         # Service Contract for Caddy, Firewall & OIDC
         my.contracts.provides.vaultwarden = {
-          endpoints.web = {
-            port = 8082;
-            protocol = "tcp";
-            scope = "public";
+          publications."web" = {
+            endpoint = "web";
             auth = "oidc";
             accessGroups = [ "family" ];
             subdomain = "vault";
             extraDomains = [
               "vault.${topologyDomain}"
             ];
-            oidc = {
-              enable = true;
-              clientId = "IW0W9V9cLTDaMbdtXy7lGwHi55Vakio8E2tTSvsg";
-              clientSecretEnv = "AUTHENTIK_OIDC_VAULTWARDEN_SECRET";
-              secretPath = "services/apps/vaultwarden_env";
-              redirectPaths = [ "/identity/connect/oidc-signin" ];
-              subMode = "user_username";
-              includeClaimsInIdToken = true;
+
+          };
+          identity.oidc.web = {
+            publication = "web";
+            enable = true;
+            clientId = "IW0W9V9cLTDaMbdtXy7lGwHi55Vakio8E2tTSvsg";
+            clientSecretEnv = "AUTHENTIK_OIDC_VAULTWARDEN_SECRET";
+            secretPath = "services/apps/vaultwarden_env";
+            redirectPaths = [ "/identity/connect/oidc-signin" ];
+            subMode = "user_username";
+            includeClaimsInIdToken = true;
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Passwort-Tresor im eigenen Netz.";
+              en = "Password vault in your own network.";
             };
-            dashboard = {
-              description = {
-                de = "Passwort-Tresor im eigenen Netz.";
-                en = "Password vault in your own network.";
-              };
-              show = true;
-              displayName = "Vaultwarden";
-              category = "Security";
-              icon = "vaultwarden";
-            };
+            show = true;
+            displayName = "Vaultwarden";
+            category = "Security";
+            icon = "vaultwarden";
+          };
+          endpoints.web = {
+            port = 8082;
+            protocol = "tcp";
           };
           storage = {
             stateDirs = [ "/var/lib/vaultwarden" ];

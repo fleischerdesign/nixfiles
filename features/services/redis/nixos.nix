@@ -22,15 +22,12 @@ in
     };
 
     my.contracts.provides.redis = {
+      telemetry.probes."server-tcp".endpoint = "server";
+      telemetry.probes."server-tcp".kind = "tcp";
       endpoints.server = {
         port = 6379;
         protocol = "tcp";
-        scope = "internal";
-        monitoring = {
-          http.enable = false;
-          tcp.enable = true;
-          tcp.group = "Infrastructure";
-        };
+        applicationProtocol = "redis";
       };
       storage = {
         stateDirs = [ "/var/lib/redis-system" ];

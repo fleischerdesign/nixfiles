@@ -178,20 +178,20 @@ let
         lib.mapAttrsToList (
           _svcName: contract:
           lib.concatMap (
-            ep:
+            pub:
             # The resolver's own name is answered by `resolverRules`, which knows which doors
             # terminate DoT; here it would get the serving host's overlay address instead -
             # an address where no DoT listener exists (measured 2026-09-21).
             mkRules
               (lib.filter (n: n != resolverName) (
-                lib.optionals (ep.canonicalDomain != null) [ ep.canonicalDomain ] ++ ep.extraDomains
+                lib.optionals (pub.canonicalDomain != null) [ pub.canonicalDomain ] ++ pub.extraDomains
               ))
               {
                 lan = lanPlaneAddress host;
                 overlay = overlayAddress host;
-                public = if ep.scope == "public" then ingressAddress else null;
+                public = if pub.scope == "public" then ingressAddress else null;
               }
-          ) (lib.attrValues contract.endpoints)
+          ) (lib.attrValues contract.publications)
         ) (hostConfig.config.my.contracts.provides or { })
       )
     ) flakeConfigurations
@@ -554,17 +554,25 @@ in
     };
 
     my.contracts.provides.dns = {
+      publications = lib.optionalAttrs cfg.publicEntry {
+        ${cfg.subdomain} = {
+          scope = "public";
+          endpoint = cfg.subdomain;
+          subdomain = cfg.subdomain;
+          ingress = false;
+          publicExempt = "DNS has no authentication layer; it is an open resolver by design.";
+        };
+      };
       endpoints = {
         dns = {
           port = cfg.port;
           protocol = "both";
-          scope = "internal";
           directAccess = {
             enable = true;
             protocol = "both";
             interface = "all";
           };
-          monitoring.http.enable = false;
+          applicationProtocol = "dns";
         };
       }
       // lib.optionalAttrs cfg.publicEntry {
@@ -572,13 +580,9 @@ in
         # terminates it - the resolver does - while the name is still projected into
         # public DNS and its port into the firewall.
         ${cfg.subdomain} = {
-          inherit (cfg) subdomain;
           port = cfg.dotPort;
           protocol = "tcp";
-          scope = "public";
-          ingress = false;
-          publicExempt = "DNS has no authentication layer; it is an open resolver by design.";
-          monitoring.http.enable = false;
+          applicationProtocol = "other";
         };
       };
     };

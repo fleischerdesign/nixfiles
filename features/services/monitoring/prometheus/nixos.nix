@@ -37,8 +37,8 @@ let
     }
   ];
 
-  # Flatten all endpoint contracts per host across cluster
-  endpointsByHost =
+  # A named observation resolves its endpoint once; all generated targets read the same binding.
+  observationsByHost =
     let
       configs = if flake != null then flake.nixosConfigurations or { } else { ${ownHost} = config; };
     in
@@ -50,10 +50,20 @@ let
       lib.concatLists (
         lib.mapAttrsToList (
           svcName: contract:
-          lib.mapAttrsToList (epName: ep: {
-            name = endpointLib.endpointName svcName epName;
-            inherit ep;
-          }) contract.endpoints
+          (lib.mapAttrsToList (_: probe: {
+            name = endpointLib.endpointName svcName probe.endpoint;
+            ep = contract.endpoints.${probe.endpoint};
+            pub = lib.findFirst (p: p.endpoint == probe.endpoint) null (lib.attrValues contract.publications);
+            observation = probe;
+            kind = probe.kind;
+          }) contract.telemetry.probes)
+          ++ (lib.mapAttrsToList (_: scrape: {
+            name = endpointLib.endpointName svcName scrape.endpoint;
+            ep = contract.endpoints.${scrape.endpoint};
+            pub = lib.findFirst (p: p.endpoint == scrape.endpoint) null (lib.attrValues contract.publications);
+            observation = scrape;
+            kind = "scrape";
+          }) contract.telemetry.scrapes)
         ) provides
       )
     ) configs;
@@ -71,15 +81,19 @@ let
     lib.mapAttrsToList (
       hostName: epList:
       lib.map (item: {
-        svcName = item.name;
+        svcName = item.observation.jobName;
+        # The job name is an external metric identity; otherwise it follows the endpoint name.
+        name = item.name;
         inherit hostName;
-        svc = item.ep;
-      }) (lib.filter (item: item.ep.monitoring.scrape.enable) epList)
-    ) endpointsByHost
+        inherit (item) ep observation;
+      }) (lib.filter (item: item.kind == "scrape") epList)
+    ) observationsByHost
   );
 
   # Group by service name to prevent the job-per-host anti-pattern
-  groupedScrapeServices = lib.groupBy (x: x.svcName) allScrapeServices;
+  groupedScrapeServices = lib.groupBy (
+    x: if x.svcName != null then x.svcName else x.name
+  ) allScrapeServices;
 
   # Collect all local HTTP Blackbox probes and group them under a single job using exporter_address relabeling
   allHttpLocalProbes = lib.concatLists (
@@ -87,18 +101,18 @@ let
       hostName: epList:
       if hostsWithBlackbox ? ${hostName} then
         lib.map (item: {
-          target = item.ep.localUrl + item.ep.monitoring.http.path;
+          target = item.ep.localUrl + item.observation.path;
           labels = {
             service = item.name;
             host = hostName;
             probe_type = "http_local";
-            group = item.ep.monitoring.http.group;
+            group = item.observation.group;
             exporter_address = blackboxAddrForHost hostName;
           };
-        }) (lib.filter (item: item.ep.monitoring.http.enable) epList)
+        }) (lib.filter (item: item.kind == "http") epList)
       else
         [ ]
-    ) endpointsByHost
+    ) observationsByHost
   );
 
   # Collect all local TCP Blackbox probes and group them under a single job using exporter_address relabeling
@@ -112,13 +126,13 @@ let
             service = item.name;
             host = hostName;
             probe_type = "tcp_local";
-            group = item.ep.monitoring.tcp.group;
+            group = item.observation.group;
             exporter_address = blackboxAddrForHost hostName;
           };
-        }) (lib.filter (item: item.ep.monitoring.tcp.enable) epList)
+        }) (lib.filter (item: item.kind == "tcp") epList)
       else
         [ ]
-    ) endpointsByHost
+    ) observationsByHost
   );
 
   # Public HTTP probes
@@ -129,17 +143,18 @@ let
         (item: {
           inherit (item) name;
           inherit hostName;
-          ep = item.ep;
+          inherit (item) pub observation;
         })
         (
           lib.filter (
             item:
-            (item.ep.scope == "public" || item.ep.scope == "internal")
-            && item.ep.monitoring.http.enable
-            && item.ep.publicUrl != null
+            item.pub != null
+            && (item.pub.scope == "public" || item.pub.scope == "internal")
+            && item.kind == "http"
+            && item.pub.publicUrl != null
           ) epList
         )
-    ) endpointsByHost
+    ) observationsByHost
   );
 
   otherServerHosts = lib.filterAttrs (
@@ -163,14 +178,14 @@ in
         # Unified Prometheus scrape targets grouped by job name
         (lib.mapAttrsToList (svcName: targetsList: {
           job_name = svcName;
-          metrics_path = (lib.head targetsList).svc.monitoring.scrape.path;
+          metrics_path = (lib.head targetsList).observation.path;
           static_configs = map (t: {
             targets = [
               (
                 if t.hostName == ownHost then
-                  "127.0.0.1:${toString t.svc.monitoring.scrape.port}"
+                  "127.0.0.1:${toString t.ep.port}"
                 else
-                  "${serviceAddress hosts.${t.hostName}}:${toString t.svc.monitoring.scrape.port}"
+                  "${serviceAddress hosts.${t.hostName}}:${toString t.ep.port}"
               )
             ];
             labels = {
@@ -225,12 +240,12 @@ in
               metrics_path = "/probe";
               params.module = [ "http_2xx" ];
               static_configs = map (item: {
-                targets = [ "${item.ep.publicUrl}${item.ep.monitoring.http.path}" ];
+                targets = [ "${item.pub.publicUrl}${item.observation.path}" ];
                 labels = {
                   service = item.name;
                   host = item.hostName;
                   probe_type = "http_public";
-                  group = item.ep.monitoring.http.group;
+                  group = item.observation.group;
                 };
               }) httpPublicServices;
               relabel_configs = blackboxRelabel "127.0.0.1:9115";
@@ -332,23 +347,20 @@ in
     };
 
     my.contracts.provides.prometheus = {
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      telemetry.probes."web-tcp".endpoint = "web";
+      telemetry.probes."web-tcp".kind = "tcp";
+      telemetry.scrapes."web-metrics".endpoint = "web";
       endpoints.web = {
         port = 9090;
         protocol = "tcp";
-        scope = "internal";
-        auth = "none";
         # Queried by Grafana and by the portal's status route, both on this host over loopback - the API
         # carries no auth, so it is not put on an interface at all.
         directAccess = {
           enable = true;
           interface = "local";
           protocol = "tcp";
-        };
-        monitoring = {
-          tcp.enable = true;
-          tcp.group = "Infrastructure";
-          scrape.enable = true;
-          scrape.port = 9090;
         };
       };
     };

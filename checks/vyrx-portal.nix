@@ -41,7 +41,7 @@ let
       portal = self.nixosConfigurations.${name}.config.my.features.services.vyrx-landing;
       # What the host's own contract exempts from authentication.
       exempt =
-        self.nixosConfigurations.${name}.config.my.contracts.provides.vyrx-landing.endpoints.web.unauthenticatedPaths;
+        self.nixosConfigurations.${name}.config.my.contracts.provides.vyrx-landing.publications.web.unauthenticatedPaths;
     in
     ''
       # ${name}

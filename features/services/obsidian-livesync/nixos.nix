@@ -31,7 +31,7 @@ in
               enable_cors = true;
             };
             cors = {
-              origins = "app://obsidian.md,capacitor://localhost,http://localhost,https://${config.my.contracts.provides.obsidian-livesync.endpoints.web.canonicalDomain}";
+              origins = "app://obsidian.md,capacitor://localhost,http://localhost,https://${config.my.contracts.provides.obsidian-livesync.publications.web.canonicalDomain}";
               credentials = true;
               methods = "GET, PUT, POST, HEAD, DELETE";
               headers = "accept, authorization, content-type, origin, referer";
@@ -40,23 +40,30 @@ in
         };
 
         my.contracts.provides.obsidian-livesync = {
-          endpoints.web = {
-            port = 5984;
-            protocol = "tcp";
+          publications."web" = {
             scope = "public";
+            endpoint = "web";
             auth = "none";
             subdomain = "livesync";
             publicExempt = "delegates authentication to CouchDB; LiveSync clients cannot perform a browser SSO redirect";
-            dashboard = {
-              description = {
-                de = "Synchronisation der Obsidian-Notizen.";
-                en = "Sync for Obsidian notes.";
-              };
-              show = true;
-              displayName = "Obsidian LiveSync";
-              category = "Productivity";
-              icon = "obsidian";
+
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Synchronisation der Obsidian-Notizen.";
+              en = "Sync for Obsidian notes.";
             };
+            show = true;
+            displayName = "Obsidian LiveSync";
+            category = "Productivity";
+            icon = "obsidian";
+          };
+          telemetry.probes."web-http".endpoint = "web";
+          telemetry.probes."web-http".kind = "http";
+          endpoints.web = {
+            port = 5984;
+            protocol = "tcp";
           };
         };
       }

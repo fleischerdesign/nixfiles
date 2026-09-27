@@ -67,8 +67,8 @@ in
               "https://my.mainsail.xyz"
               "http://my.mainsail.xyz"
             ]
-            (lib.mkIf (config.my.contracts.provides.klipper.endpoints.mainsail.canonicalDomain != null) [
-              "https://${config.my.contracts.provides.klipper.endpoints.mainsail.canonicalDomain}"
+            (lib.mkIf (config.my.contracts.provides.klipper.publications.mainsail.canonicalDomain != null) [
+              "https://${config.my.contracts.provides.klipper.publications.mainsail.canonicalDomain}"
             ])
           ];
           trusted_clients = [
@@ -88,11 +88,11 @@ in
         "include ${config.sops.templates."moonraker_power.conf".path}" = { };
 
         "webcam bed" =
-          lib.mkIf (config.my.contracts.provides.klipper.endpoints.cam.canonicalDomain != null)
+          lib.mkIf (config.my.contracts.provides.klipper.publications.cam.canonicalDomain != null)
             {
               location = "printer";
-              stream_url = "https://${config.my.contracts.provides.klipper.endpoints.cam.canonicalDomain}/?action=stream";
-              snapshot_url = "https://${config.my.contracts.provides.klipper.endpoints.cam.canonicalDomain}/?action=snapshot";
+              stream_url = "https://${config.my.contracts.provides.klipper.publications.cam.canonicalDomain}/?action=stream";
+              snapshot_url = "https://${config.my.contracts.provides.klipper.publications.cam.canonicalDomain}/?action=snapshot";
               flip_vertical = true;
             };
       };
@@ -140,78 +140,99 @@ in
 
     # 4. Service Contracts for Caddy, Firewall, and Monitoring
     my.contracts.provides.klipper = {
+      publications."mainsail" = {
+        scope = "internal";
+        endpoint = "mainsail";
+        auth = "authentik";
+        accessGroups = [ "family" ];
+        subdomain = "mainsail";
+        customExtraConfig = ''
+          root * ${pkgs.mainsail}/share/mainsail
+
+          route {
+            @api {
+              path /websocket /printer/* /api/* /access/* /machine/* /server/*
+            }
+            reverse_proxy @api 127.0.0.1:7125
+
+            import authentik
+
+            file_server
+            try_files {path} /index.html
+          }
+        '';
+
+      };
+      publications."moonraker" = {
+        scope = "internal";
+        endpoint = "moonraker";
+        auth = "authentik";
+        accessGroups = [ "family" ];
+        subdomain = "moonraker";
+      };
+      publications.cam = {
+        scope = "internal";
+        endpoint = "cam";
+        auth = "none";
+        subdomain = "cam.moonraker";
+      };
+      presentation.tiles."mainsail" = {
+        endpoint = "mainsail";
+        description = {
+          de = "3D-Drucker-Steuerung und Druckvorschau.";
+          en = "3D printer control and print preview.";
+        };
+        show = true;
+        displayName = "Mainsail";
+        category = "3D Printing";
+        icon = "printer";
+      };
+      presentation.tiles."moonraker" = {
+        endpoint = "moonraker";
+        show = false;
+        displayName = "Moonraker";
+        category = "3D Printing";
+        icon = "printer";
+      };
+      presentation.tiles."cam" = {
+        endpoint = "cam";
+        show = false;
+        displayName = "Klipper Webcam";
+        category = "3D Printing";
+        icon = "camera";
+      };
+      telemetry.probes."cam-http".endpoint = "cam";
+      telemetry.probes."cam-http".kind = "http";
+      telemetry.probes."mainsail-http".endpoint = "mainsail";
+      telemetry.probes."mainsail-http".kind = "http";
+      telemetry.probes."moonraker-http".endpoint = "moonraker";
+      telemetry.probes."moonraker-http".kind = "http";
       endpoints = {
         mainsail = {
           port = 7125;
           protocol = "tcp";
-          scope = "internal";
-          auth = "authentik";
-          accessGroups = [ "family" ];
-          subdomain = "mainsail";
           directAccess = {
             enable = true;
             protocol = "tcp";
             interface = "all";
-          };
-          customExtraConfig = ''
-            root * ${pkgs.mainsail}/share/mainsail
-
-            route {
-              @api {
-                path /websocket /printer/* /api/* /access/* /machine/* /server/*
-              }
-              reverse_proxy @api 127.0.0.1:7125
-
-              import authentik
-
-              file_server
-              try_files {path} /index.html
-            }
-          '';
-          dashboard = {
-            description = {
-              de = "3D-Drucker-Steuerung und Druckvorschau.";
-              en = "3D printer control and print preview.";
-            };
-            show = true;
-            displayName = "Mainsail";
-            category = "3D Printing";
-            icon = "printer";
           };
         };
 
         moonraker = {
           port = 7125;
           protocol = "tcp";
-          scope = "internal";
-          auth = "authentik";
-          accessGroups = [ "family" ];
-          subdomain = "moonraker";
           directAccess = {
             enable = true;
             protocol = "tcp";
             interface = "all";
           };
-          dashboard = {
-            show = false;
-            displayName = "Moonraker";
-            category = "3D Printing";
-            icon = "printer";
-          };
+
         };
 
         cam = {
           port = 8081;
           protocol = "tcp";
-          scope = "internal";
-          auth = "none";
-          subdomain = "cam.moonraker";
-          dashboard = {
-            show = false;
-            displayName = "Klipper Webcam";
-            category = "3D Printing";
-            icon = "camera";
-          };
+
         };
       };
       storage = {

@@ -39,8 +39,8 @@ in
             NEXT_PUBLIC_AUTHENTIK_ENABLED = "true";
             AUTHENTIK_ISSUER = cfg.ssoAuthority;
             # Linkwarden specific: NEXTAUTH_URL must end with /api/v1/auth
-            NEXTAUTH_URL = "https://${config.my.contracts.provides.linkwarden.endpoints.web.canonicalDomain}/api/v1/auth";
-            BASE_URL = "https://${config.my.contracts.provides.linkwarden.endpoints.web.canonicalDomain}";
+            NEXTAUTH_URL = "https://${config.my.contracts.provides.linkwarden.publications.web.canonicalDomain}/api/v1/auth";
+            BASE_URL = "https://${config.my.contracts.provides.linkwarden.publications.web.canonicalDomain}";
 
             NEXT_PUBLIC_DISABLE_REGISTRATION = "true";
             NEXT_PUBLIC_CREDENTIALS_ENABLED = "false";
@@ -58,35 +58,40 @@ in
 
         # Service Contract for Caddy, Firewall & OIDC
         my.contracts.provides.linkwarden = {
-          endpoints.web = {
-            port = 3010;
-            protocol = "tcp";
-            scope = "public";
+          publications."web" = {
+            endpoint = "web";
             auth = "oidc";
             accessGroups = [ "family" ];
             subdomain = "linkwarden";
             extraDomains = [
               "links.lan.${config.my.topology.domain}"
             ];
-            oidc = {
-              enable = true;
-              clientId = "TBKFgLSIeXirGSZiuCFEXFeaUX3XaYt54FGr4VtM";
-              clientSecretEnv = "AUTHENTIK_OIDC_LINKWARDEN_SECRET";
-              secretPath = "services/apps/linkwarden_env";
-              redirectPaths = [ "/api/v1/auth/callback/authentik" ];
-              subMode = "hashed_user_id";
-              includeClaimsInIdToken = true;
+
+          };
+          identity.oidc.web = {
+            publication = "web";
+            enable = true;
+            clientId = "TBKFgLSIeXirGSZiuCFEXFeaUX3XaYt54FGr4VtM";
+            clientSecretEnv = "AUTHENTIK_OIDC_LINKWARDEN_SECRET";
+            secretPath = "services/apps/linkwarden_env";
+            redirectPaths = [ "/api/v1/auth/callback/authentik" ];
+            subMode = "hashed_user_id";
+            includeClaimsInIdToken = true;
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Lesezeichen und Linkarchiv.";
+              en = "Bookmarks and link archive.";
             };
-            dashboard = {
-              description = {
-                de = "Lesezeichen und Linkarchiv.";
-                en = "Bookmarks and link archive.";
-              };
-              show = true;
-              displayName = "Linkwarden";
-              category = "Productivity";
-              icon = "linkwarden";
-            };
+            show = true;
+            displayName = "Linkwarden";
+            category = "Productivity";
+            icon = "linkwarden";
+          };
+          endpoints.web = {
+            port = 3010;
+            protocol = "tcp";
           };
           storage = {
             stateDirs = [ "/var/lib/linkwarden" ];

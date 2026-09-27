@@ -31,7 +31,7 @@ features/services/authentik/
 
 `03-apps/*.yaml` (`proxy-apps-generated.yaml`, `oidc-apps-generated.yaml`,
 `ldap-outposts-generated.yaml`) does not exist in the tree: the compiler in `server/default.nix` emits
-it **from the service contracts** - every service that declares an OIDC or forward-auth endpoint gets a
+it **from the service contracts** - every service that declares an OIDC integration or a forward-auth publication gets a
 provider and an application without writing any blueprint. That is the whole point of the contract
 layer - see [architecture.md](architecture.md) §6.1.
 
@@ -49,7 +49,8 @@ hard way.
 | `redirect_uris` are objects (`{matching_mode, url}`), not strings | a plain string list is silently ignored |
 | The worker deadlocks on `authentik_flows_stage` during a fresh bootstrap when it runs multi-threaded | `AUTHENTIK_WORKER__THREADS=1`, unconditionally |
 | There is no out-of-band setup wizard | `AUTHENTIK_BOOTSTRAP_PASSWORD` triggers `system/bootstrap.yaml`, which creates `akadmin` and sets `setup = true` |
-| Two hosts may not declare the same OIDC endpoint name | the module asserts it at evaluation time and names the collision |
+| Two hosts may not declare the same OIDC publication name | the module asserts it at evaluation time and names the collision |
+| Two OIDC integrations may not share a client ID | the module asserts it at evaluation time and names the collision |
 
 ## 4. Humans and machines are different kinds of thing
 
@@ -139,7 +140,7 @@ what its closure contains. See [operations.md](operations.md).
 | Situation | Before | Now |
 |---|---|---|
 | database lost | every client, token and outpost clicked back by hand | restart: the blueprints are applied idempotently |
-| new service | provider, redirect URI and secret by hand | the service declares an endpoint; the provider is generated |
+| new service | provider, redirect URI and secret by hand | the service declares a publication and an OIDC integration; the provider is generated |
 | new outpost | token generated in the UI, copied into SOPS | the token already exists; the outpost reads it |
 | "who may access what" | visible only in database rows | a Git commit, reviewable |
 
@@ -159,22 +160,27 @@ accounts. Jellyfin is the first consumer; the mechanism is generic.
 group subtrees, and the prefix of consumer service accounts. It is a contract module rather than a feature,
 so it is loaded on every host and is not behind an enable flag. `usersDn` and `groupsDn` are derived from it.
 
-A consumer never composes a DN. `contracts/endpoints` projects the resolved values into
-`my.contracts.consumes.<service>.ldap` - the audience the service stated on its own endpoint, the SOPS path of
-its app password (derived when the endpoint leaves it empty), and the bind DN. The provider creates its
+A consumer never composes a DN. `contracts/identity` projects the resolved values into
+`my.contracts.consumes.<service>.ldap` - the audience the service stated on its own publication, the SOPS path of
+its app password (derived when the integration leaves it empty), and the bind DN. The provider creates its
 accounts from the same contract, so both sides agree without reading each other's configuration. That matters
 because provider and consumer normally run on different hosts: an earlier attempt published the bind DN from
 the provider's feature and evaluated to an empty value on `hom-srv-01`, where Jellyfin runs.
 
 ### 10.2 What a consumer declares, and what it does not
 
-A consumer states its **audience** once, on its endpoint:
+A consumer states its **audience** once, on its publication:
 
 ```nix
-ldap = {
-  enable = true;
+publications.web = {
+  endpoint = "web";
+  subdomain = "jellyfin";
   accessGroups = [ "media-users" "infra-admins" ];
   adminGroups = [ "infra-admins" ];
+};
+identity.ldap.directory = {
+  publication = "web";
+  enable = true;
 };
 ```
 
@@ -254,16 +260,16 @@ second mechanism next to the group filter — and two mechanisms are two truths.
 it accepts; a human is put into one of them.
 
 **An audience a resource declares about itself is topology, and it is declared.** `accessUsers` names the
-accounts a service belongs to. The contract turns each username into its own group (`lib/endpoints.nix`
-`audienceGroup`) and feeds it into `accessGroups`, so the ingress, the directory filter and the portal read one
+accounts a service belongs to. The contract turns each username into its own group
+(`contracts/identity/lib/audience.nix` `audienceGroup`) and feeds it into `accessGroups`, so the ingress, the directory filter and the portal read one
 value; the compiler creates that group *with* the membership, so no deploy leaves an audience empty and nobody
 has to click before a new personal service works. It is still one mechanism — both halves are memberships — and
 the test that separates them is §11.2's: "this gateway belongs to kai" is a sentence a reviewer comments on,
 "katja is in the film group" is not. The role groups stay untouched and interface-owned, because nothing
 declares their members.
 
-**And it is enforced at the ingress, not only described.** Every endpoint that authenticates through authentik
-declares `accessGroups` at the endpoint; the compiler projects them into a `PolicyBinding` per group on the
+**And it is enforced at the ingress, not only described.** Every publication that authenticates through authentik
+declares `accessGroups` on the publication; the compiler projects them into a `PolicyBinding` per group on the
 generated application and refuses to build a gated service that names no audience (`blueprints.nix`,
 `ingressPolicyCheck`). Until 2026-09-22 the generated applications carried no binding at all, so authentik's
 `AppAccessWithoutBindings` opened every service to any authenticated user - measured before: zero bindings on
@@ -332,7 +338,7 @@ This is the inventory that closes that last row. Every row here has been measure
   plus the event arm of the drift report are the only countermeasures.
 - **Objects created in the interface that nobody declares are not reclaimed.** They are reported as foreign,
   which is the intended behaviour, not a gap. Measured 2026-09-22: `esphome` carries an application and no
-  binding while no endpoint in the repository declares it - a stale object that survives because a blueprint
+  binding while no publication in the repository declares it - a stale object that survives because a blueprint
   deletes only what it tombstones.
 - **`akadmin` is break-glass, not a member.** Superusers do not bypass application policy bindings, so the
   bootstrap admin reaches no service unless a group grants it - measured 2026-09-22: `akadmin` failed every
@@ -342,7 +348,7 @@ This is the inventory that closes that last row. Every row here has been measure
   typo can never be corrected by the repository - the same property a SQL column `DEFAULT` has for rows that
   already exist. Changing an existing person's fields is an interface action, by design; a new seeded value
   reaches only accounts that are created afterwards.
-- **A new consumer's SOPS secret is added by hand.** The endpoint contract derives the path; if the key is
+- **A new consumer's SOPS secret is added by hand.** The identity contract derives the path; if the key is
   missing, `sops-install-secrets` fails the deploy loudly rather than starting with an empty credential.
 - **The derived relation inventory covers the relations that are their own rows** - policy bindings and
   stage bindings - because those are not overwritten by an object's `present` update. Relations that are
@@ -354,5 +360,3 @@ This is the inventory that closes that last row. Every row here has been measure
   `authentik_version_history`) before the first migration. authentik's own `server`/`worker` entrypoint (the
   Go binaries) does this on startup; the fresh-database acceptance test drove `ak migrate` plus a shell
   directly and therefore seeded them itself. No repository action follows from this.
-
-

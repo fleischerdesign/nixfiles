@@ -107,32 +107,47 @@ let
   ) declaredEndpoints;
 
   # 3. Every endpoint that opens a port appears in the input rules, scoped the way it declared itself: the
-  #    local network reaching it, and the mesh only for the levels it is for.
+  #    local network reaching it, and the mesh for the levels it is for plus every proxied publication.
   endpointViolations = lib.concatMap (
     name:
     let
       provides = (cfgOf name).my.contracts.provides or { };
       endpoints = lib.concatLists (
-        map (contract: lib.attrValues (contract.endpoints or { })) (lib.attrValues provides)
+        map (
+          contract:
+          lib.mapAttrsToList (epName: ep: {
+            inherit ep;
+            proxied = lib.any (pub: pub.endpoint == epName && pub.canonicalDomain != null) (
+              lib.attrValues contract.publications
+            );
+          }) (contract.endpoints or { })
+        ) (lib.attrValues provides)
       );
       rules = inputRules name;
     in
-    lib.concatMap (
-      ep:
-      let
-        wantsMesh = ep.directAccess.interface == "wireguard" || ep.canonicalDomain != null;
-        wantsLocal = ep.directAccess.interface == "all";
-      in
-      lib.optional (
-        !(lib.hasInfix "dport ${toString ep.port}" rules)
-      ) "input: ${name} declares an endpoint on port ${toString ep.port} but opens no rule for it"
-      ++ lib.optional (
-        wantsLocal && !(lib.hasInfix "iifname != \"wg0\"" rules)
-      ) "input: ${name} never scopes a rule to the local network (iifname != \"wg0\")"
-      ++ lib.optional (
-        wantsMesh && !(lib.hasInfix "iifname \"wg0\"" rules)
-      ) "input: ${name} has an endpoint that the mesh must reach, but no rule names the mesh interface"
-    ) (lib.filter (ep: ep.directAccess.enable && ep.directAccess.interface != "local") endpoints)
+    lib.concatMap
+      (
+        item:
+        let
+          ep = item.ep;
+          wantsMesh = ep.directAccess.interface == "wireguard" || item.proxied;
+          wantsLocal = ep.directAccess.interface == "all";
+        in
+        lib.optional (
+          !(lib.hasInfix "dport ${toString ep.port}" rules)
+        ) "input: ${name} declares an endpoint on port ${toString ep.port} but opens no rule for it"
+        ++ lib.optional (
+          wantsLocal && !(lib.hasInfix "iifname != \"wg0\"" rules)
+        ) "input: ${name} never scopes a rule to the local network (iifname != \"wg0\")"
+        ++ lib.optional (
+          wantsMesh && !(lib.hasInfix "iifname \"wg0\"" rules)
+        ) "input: ${name} has an endpoint that the mesh must reach, but no rule names the mesh interface"
+      )
+      (
+        lib.filter (
+          item: item.ep.directAccess.enable && item.ep.directAccess.interface != "local"
+        ) endpoints
+      )
   ) deployed;
 
   # 4. A host inside the home LAN installs no route for a carried zone - it reaches it through its own

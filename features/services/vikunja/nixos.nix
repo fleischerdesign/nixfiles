@@ -54,9 +54,9 @@ in
           frontendScheme = "https";
           frontendHostname =
             let
-              ep = config.my.contracts.provides.vikunja.endpoints.web;
+              pub = config.my.contracts.provides.vikunja.publications.web;
             in
-            lib.mkIf (ep.canonicalDomain != null) ep.canonicalDomain;
+            lib.mkIf (pub.canonicalDomain != null) pub.canonicalDomain;
 
           database = {
             type = "postgres";
@@ -71,9 +71,9 @@ in
             service = {
               publicurl =
                 let
-                  ep = config.my.contracts.provides.vikunja.endpoints.web;
+                  pub = config.my.contracts.provides.vikunja.publications.web;
                 in
-                lib.mkIf (ep.publicUrl != null) "${ep.publicUrl}/";
+                lib.mkIf (pub.publicUrl != null) "${pub.publicUrl}/";
               timezone = "Europe/Berlin";
               enableregistration = cfg.enableRegistration;
             };
@@ -101,35 +101,40 @@ in
         };
 
         my.contracts.provides.vikunja = {
-          endpoints.web = {
-            port = 3456;
-            protocol = "tcp";
-            scope = "public";
+          publications."web" = {
+            endpoint = "web";
             auth = "oidc";
             accessGroups = [ "family" ];
             subdomain = "vikunja";
             extraDomains = [
               "tasks.lan.${config.my.topology.domain}"
             ];
-            oidc = {
-              enable = true;
-              clientId = cfg.ssoClientId;
-              clientSecretEnv = "AUTHENTIK_OIDC_VIKUNJA_SECRET";
-              secretPath = "services/apps/vikunja_oidc_secret";
-              redirectPaths = [ "/auth/openid/authentik" ];
-              subMode = "hashed_user_id";
-              includeClaimsInIdToken = true;
+
+          };
+          identity.oidc.web = {
+            publication = "web";
+            enable = true;
+            clientId = cfg.ssoClientId;
+            clientSecretEnv = "AUTHENTIK_OIDC_VIKUNJA_SECRET";
+            secretPath = "services/apps/vikunja_oidc_secret";
+            redirectPaths = [ "/auth/openid/authentik" ];
+            subMode = "hashed_user_id";
+            includeClaimsInIdToken = true;
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Aufgaben, Listen und Projektboards.";
+              en = "Tasks, lists and project boards.";
             };
-            dashboard = {
-              description = {
-                de = "Aufgaben, Listen und Projektboards.";
-                en = "Tasks, lists and project boards.";
-              };
-              show = true;
-              displayName = "Vikunja";
-              category = "Productivity";
-              icon = "vikunja";
-            };
+            show = true;
+            displayName = "Vikunja";
+            category = "Productivity";
+            icon = "vikunja";
+          };
+          endpoints.web = {
+            port = 3456;
+            protocol = "tcp";
           };
           storage = {
             stateDirs = [ "/var/lib/vikunja" ];

@@ -300,6 +300,10 @@ implement imaginary features just to justify a schema. Check ordinary NixOS modu
 **Acceptance:** a supported field has an identified consumer and a behavioral example; non-default use
 cannot silently do nothing. There is one authoritative model for each monitoring and backup fact.
 
+**Decision D14:** retain and implement telemetry as the observability contract. Move the existing
+endpoint-monitoring declarations and their consumers to it using validated endpoint references;
+the absence of a reader is an implementation gap, not evidence that this domain should be deleted.
+
 ### F08 — Database consumers bypass the contract and receive superuser privileges
 
 **P1 · Source-confirmed · M**
@@ -446,6 +450,11 @@ Authentik signing-key names behind clearly marked backend-specific extension poi
 
 **Acceptance:** a raw TCP service needs only transport and its chosen checks; portal changes do not alter
 firewall semantics; existing service declarations migrate without silently changing emitted artifacts.
+
+**Decision D14:** endpoints own interface facts; telemetry owns observation policy, identity owns
+OIDC/LDAP integration, and portal owns presentation and actions. These remain cohesive declarations
+under `my.contracts.provides.<service>`, with schemas separated by domain and backend projections
+owned by their implementing features. See §10.5 for the agreed boundaries and verification.
 
 ### F16 — Configurable interface names are only partially respected
 
@@ -1654,6 +1663,8 @@ supersedes one by date, not by silently editing this table.
 | D11 | User assignment is explicit per host. | Alphabetical discovery of the primary user is removed; a missing or duplicated assignment fails clearly. |
 | D12 | The update workflow keeps its direct push, but records the tested revision. | Behaviour is unchanged; the evidence of what a batch was tested against becomes explicit. |
 | D13 | Backup policy. | Media and downloads are explicitly excluded; `cld-ops-01` is intentionally without Restic (its state is regenerable or valueless) and that is declared, not omitted; a PostgreSQL logical dump is authoritative and the data directory is not file-backed-up; RPO 24 h; class-A services get a restore drill. |
+| D14 | Separate contracts by domain under one service declaration; retain and implement telemetry. | Monitoring moves from endpoints to telemetry through validated endpoint references; identity and portal get their own schemas. Feature-owned projections must preserve generated artifacts during structural extraction. See §10.5. |
+| D15 | Target public API is service-centric: independently named endpoints, publications, identity integrations, observations, presentation, storage, backup and requirements. | Domain references are typed and validated; endpoint owns only listener and direct reachability facts. Ingress, identity and presentation no longer rely on nesting their declarations inside endpoints. Preserve public service ids, names and policy as each projection migrates. See §10.6. |
 
 ### 10.1 Consequences for the findings
 
@@ -1674,7 +1685,7 @@ supersedes one by date, not by silently editing this table.
 | 4 | F01 deployment surface (+ `operations.md`) | done |
 | 5 | D1 discovery contract and fixtures, then the marker migration | done |
 | 6 | D3/D5/D6 extractions, D4 `home.nix` split, D7 renderer/projection split | done |
-| 7 | D2 inventory extraction, D8 zone-vs-trust, F07 inert contracts, F11-F18 shape work | open |
+| 7 | D2 inventory extraction, D8 zone-vs-trust, D15 public API migration, F07 inert options, F15 endpoint segregation | done (D15 public paths migrated, dead options removed, per-domain fixtures green; D2/D8/F11-F14/F16-F18 stay open below) |
 | 8 | F08/F09 and WP2 restore drills, then F19/F20/F21 verification and documentation | open |
 
 ### 10.4 What is deliberately not done yet, and why
@@ -1695,9 +1706,11 @@ and shipping them without it would repeat the failure mode `docs/practices.md` d
 - **D2 inventory extraction and D8 zone-vs-trust.** Both are schema moves that change where a fact
   lives; they are safe but large, and the structural work already done (D1-D7) should be reviewed
   before another 500 lines move. *(Increment 7.)*
-- **F11-F18.** Provider binding, fleet traversal, endpoint-contract segregation and identity
-  consolidation each touch many modules; they are independent and reviewable one at a time.
-  *(Increment 7.)*
+- **F11-F14, F16-F18 (still open).** Provider binding, fleet traversal, interface-name
+  projection and the remaining identity consolidation touch many modules; they are independent
+  and reviewable one at a time. F15 (endpoint segregation) and the F07 inert options
+  (`websocket`, PostgreSQL `extensions`, Redis consumer) are resolved by the D15 migration.
+  *(Increment 7, follow-ups.)*
 
 The invariants of this session - one finding per commit, a proof at the consumer level, structure never
 mixed with behaviour - hold for every increment above.
@@ -1720,3 +1733,106 @@ Residual, deliberately deferred: PostgreSQL's dump is still produced by its own 
 the backup job's `preBackup` hook. The artifact and the exclusion are correct now; binding freshness to the
 run changes what a live backup does and needs a restore drill on `hom-srv-01` before it ships, so it is a
 task with its own verification rather than part of this record.
+
+### 10.5 D14 — Domain-owned contracts and implemented telemetry (2026-09-27)
+
+Agreed design, implemented for the supported observability surface. This supersedes the conversational recommendation to delete
+telemetry and the claim that all monitoring belongs permanently in the endpoint contract. An unused
+schema demonstrates missing implementation, not an invalid domain boundary. An endpoint reference
+avoids duplicated listener facts; it is not itself a DRY violation.
+
+`my.contracts.provides.<service>` remains the common declaration site:
+
+| Domain | Owns | Schema location |
+|---|---|---|
+| Endpoints | Listener port, transport and application protocol, direct network reachability | `contracts/endpoints/` |
+| Publications | DNS identity, exposure plane, HTTP ingress policy and audience, referencing an endpoint | `contracts/publications/` (+ `contracts/ingress/`, audience in `contracts/identity/endpoint.nix`) |
+| Telemetry | Named probes and metrics scrapes referencing an endpoint | `contracts/telemetry/` |
+| Identity | OIDC/LDAP integrations referencing a publication; directory consumers | `contracts/identity/` |
+| Portal | Presentation tiles referencing an endpoint, service-level readouts and actions | `contracts/portal/` |
+| Storage | Persistent and regenerable data | `contracts/storage/` |
+| Backup | Backup scope and lifecycle | `contracts/backup/` |
+
+Schemas and backend-neutral validation belong to their contract domain. Prometheus, Caddy, Authentik
+and portal features own their respective backend projections; shared helpers stay with the domain
+that owns their knowledge. Splitting schemas does not require splitting a service declaration across
+multiple files.
+
+Telemetry references named endpoints of the same service and derives addresses and ports from them.
+Probe kind, health path, scrape path, intervals and observation categories belong to telemetry.
+An endpoint may have no monitoring or several observations; logs and many alerts need no endpoint.
+Model the application protocol explicitly alongside transport: TCP alone cannot distinguish HTTP,
+SSH and PostgreSQL. Replace the universal HTTP-probe default with protocol-aware validation and
+intentional observation policy.
+
+Implementation and acceptance:
+
+1. Move the existing working monitoring declarations and all readers to telemetry together. Keep one
+   authoritative model rather than two independently configurable monitoring APIs.
+2. Validate endpoint references and probe/protocol compatibility during evaluation. Negative checks
+   must demonstrate that unknown references and incompatible combinations fail clearly.
+3. Compare generated probe targets and scrape jobs before and after extraction for every host;
+   structural moves preserve these artifacts. Protocol-policy corrections have separately stated
+   expected changes and checks.
+4. Extract identity and portal responsibilities from endpoints with equivalent consumer-level
+   comparisons of their generated configuration.
+5. Every retained telemetry field needs a real consumer and a behavioral example. Implement needed
+   log/alert capabilities or remove unsupported fields; retaining telemetry does not justify inert
+   options or speculative functionality.
+
+The implemented API is `my.contracts.provides.<service>.telemetry.{probes,scrapes}.<name>`, with an
+explicit `endpoint` reference in each declaration; no HTTP probe is synthesized by a listener.
+The endpoint name is the reference; neither address nor port is repeated. Identity integrations use
+`identity.{oidc,ldap}.<name>.publication`; presentation tiles use `presentation.tiles.<name>.endpoint`;
+publications use `publications.<name>.endpoint` and own DNS identity, ingress policy and audience.
+Ingress policy lives in `contracts/ingress/endpoint.nix`, service dependency references in
+`contracts/dependencies/`, LDAP consumer schema and audience naming in `contracts/identity/`,
+and the Caddy/CrowdSec-specific publication extensions with their respective features.
+HTTP/TCP probe and metrics-scrape declarations have actual consumers; the old unconsumed
+telemetry `logs`, `alerts`, metrics scheme and interval options were removed rather than
+promising behavior that does not exist, as were the unread `websocket` ingress flag, the
+unprojected PostgreSQL `extensions` list and the unimplemented Redis consumer (`instance`,
+`dbIndex`) - no declaration in the tree set any of them. Applications declare a distinct
+application protocol where needed; HTTP probes and scrapes require `applicationProtocol = "http"`,
+and TCP probes reject UDP.
+The supported collector's scrape jobs and the portal inventory/adapters were compared to the
+previous revision at their generated output boundary. This evaluation proof is not a live
+monitoring or incident-response test.
+After the publication migration, every host's Caddy vHosts, firewall rules, DNS records,
+Authentik blueprints, Prometheus scrape jobs, LDAP consumer values, service dependency
+references and portal inventory/adapters were compared byte-for-byte against the pre-D14 revision.
+
+### 10.6 D15 — Service-centric contract API (2026-09-27)
+
+D15 supersedes the idea that separating schema *files* suffices. An option physically declared by an
+identity or ingress module still belongs to the endpoint API if its public path is under
+`endpoints.<name>`. The target is one cohesive `provides.<service>` declaration with sibling
+domains and explicit references, not one application file per domain and not a global resolver that
+silently joins everything:
+
+| Domain | Declaration | Required relationship |
+|---|---|---|
+| Endpoints | `endpoints.<id>` | Own listener port/socket, transport, application protocol and direct network reachability. |
+| Publications | `publications.<id>` | Reference an endpoint; own DNS name, exposure and HTTP termination. A public DNS record need not imply an HTTP proxy. |
+| Access | Within a publication or an explicitly reachable resource | Own audience, forward-auth and exemptions; publication visibility never confers authorization by itself. |
+| Identity | `identity.oidc.<id>` / `identity.ldap.<id>` | Reference the application/publication as appropriate; own provider integration and resolved redirect/consumer data. |
+| Telemetry | `telemetry.probes.<id>` / `telemetry.scrapes.<id>` | Reference an endpoint; neither duplicate its port nor infer observations from TCP. |
+| Presentation | `presentation.tiles.<id>` plus service-level readouts/actions | Reference an endpoint; own names, localized copy and capabilities. |
+| Requirements | `dependsOn` and `consumes` | `dependsOn` names fleet-wide service ids (validated); `consumes` references capabilities/services, never select a provider by list order. |
+| Storage/backup | Existing service-level contracts | Own durable data and restorable artifacts independently of endpoints. |
+
+Two publications may eventually share an endpoint while differing in audience and name. A service
+without a public HTTP face can still publish DNS, expose a direct listener or declare telemetry.
+Identifiers visible outside the repository (DNS names, Authentik slugs, client IDs, Prometheus job
+names, secret/state paths) are preserved unless an explicit behavior change is separately specified.
+Unknown references, incompatible protocols and conflicting bindings fail evaluation with a named
+declaration. The success criterion is the consumer's emitted firewall, Caddy, DNS, Authentik,
+Prometheus and portal artifacts, compared before/after by host class, not merely evaluation of a new
+schema. The service's actual listener and its endpoint contract must share one configured port.
+
+**Current boundary (implemented):** Named probes/scrapes, publication-referenced OIDC/LDAP
+integrations, endpoint-referenced presentation tiles and endpoint-referencing publications have
+migrated. Their generated Prometheus, portal, LDAP, Authentik, Caddy, DNS and firewall artifacts
+are byte-equivalent to the pre-migration revision. `endpoints.<id>` owns only listener facts.
+Remaining work is tracked in increment 7; the file-level extraction is complete and the public
+option paths above are the binding API.

@@ -92,9 +92,9 @@ in
             PAPERLESS_DBUSER = "paperless";
             PAPERLESS_URL =
               let
-                ep = config.my.contracts.provides.paperless.endpoints.web;
+                pub = config.my.contracts.provides.paperless.publications.web;
               in
-              lib.mkIf (ep.publicUrl != null) ep.publicUrl;
+              lib.mkIf (pub.publicUrl != null) pub.publicUrl;
             PAPERLESS_TIME_ZONE = "Europe/Berlin";
             PAPERLESS_OCR_LANGUAGE = "deu+eng";
 
@@ -150,35 +150,43 @@ in
 
         # Register with Caddy & Firewall via Service Contract
         my.contracts.provides.paperless = {
-          endpoints.web = {
-            port = 28981;
-            protocol = "tcp";
+          publications."web" = {
             scope = "internal";
+            endpoint = "web";
             auth = "oidc";
             accessGroups = [ "family" ];
             subdomain = "paperless";
             extraDomains = [
               "docs.lan.${topologyDomain}"
             ];
-            oidc = {
-              enable = true;
-              clientId = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
-              clientSecretEnv = "AUTHENTIK_OIDC_PAPERLESS_SECRET";
-              secretPath = "services/apps/paperless_oidc_secret";
-              redirectPaths = [ "/accounts/authentik/login/callback/" ];
-              subMode = "hashed_user_id";
-              includeClaimsInIdToken = true;
+
+          };
+          identity.oidc.web = {
+            publication = "web";
+            enable = true;
+            clientId = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
+            clientSecretEnv = "AUTHENTIK_OIDC_PAPERLESS_SECRET";
+            secretPath = "services/apps/paperless_oidc_secret";
+            redirectPaths = [ "/accounts/authentik/login/callback/" ];
+            subMode = "hashed_user_id";
+            includeClaimsInIdToken = true;
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Belegarchiv mit Texterkennung.";
+              en = "Document archive with OCR.";
             };
-            dashboard = {
-              description = {
-                de = "Belegarchiv mit Texterkennung.";
-                en = "Document archive with OCR.";
-              };
-              show = true;
-              displayName = "Paperless-ngx";
-              category = "Productivity";
-              icon = "paperless";
-            };
+            show = true;
+            displayName = "Paperless-ngx";
+            category = "Productivity";
+            icon = "paperless";
+          };
+          telemetry.probes."web-http".endpoint = "web";
+          telemetry.probes."web-http".kind = "http";
+          endpoints.web = {
+            port = 28981;
+            protocol = "tcp";
           };
           storage = {
             stateDirs = [ "/var/lib/paperless" ];

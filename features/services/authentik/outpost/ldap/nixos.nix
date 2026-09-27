@@ -87,25 +87,23 @@ in
         ldap = {
           port = 389;
           protocol = "tcp";
-          scope = "internal";
           directAccess = {
             enable = true;
             protocol = "tcp";
             interface = "all";
           };
-          monitoring.http.enable = false;
+          applicationProtocol = "ldap";
         };
 
         ldaps = {
           port = 636;
           protocol = "tcp";
-          scope = "internal";
           directAccess = {
             enable = true;
             protocol = "tcp";
             interface = "all";
           };
-          monitoring.http.enable = false;
+          applicationProtocol = "ldap";
         };
       };
     };

@@ -43,15 +43,27 @@ let
   # A named endpoint is proxied by an ingress, and the ingress is a host of the `mesh` zone: a proxy always
   # implies that level, whatever the endpoint declares for direct use. That is also why the mesh side is
   # narrower than it used to be - it is no longer "every mesh member", but the levels the endpoint is for.
+  allTrustLevels = config.my.topology.trustLevels;
+
   localEndpointsList = lib.concatLists (
     lib.mapAttrsToList (
-      _svcName: contract: lib.attrValues contract.endpoints
+      _svcName: contract:
+      lib.mapAttrsToList (epName: ep: {
+        inherit ep;
+        # Being referenced by a named publication is what puts an endpoint behind the ingress, and the
+        # ingress is a mesh host - so a proxied listener is reachable over the mesh whether or not it
+        # declared direct access for itself.
+        proxied = lib.any (pub: pub.endpoint == epName && pub.canonicalDomain != null) (
+          lib.attrValues contract.publications
+        );
+      }) contract.endpoints
     ) config.my.contracts.provides
   );
 
   accessRules = lib.concatMap (
-    ep:
+    item:
     let
+      ep = item.ep;
       protos =
         if ep.directAccess.protocol == "both" then
           [
@@ -60,7 +72,9 @@ let
           ]
         else
           [ ep.directAccess.protocol ];
-      levels = lib.unique (ep.directAccess.from ++ lib.optional (ep.canonicalDomain != null) "mesh");
+      # An empty `from` means every declared trust level; a publication additionally implies `mesh`.
+      declaredLevels = if ep.directAccess.from == [ ] then allTrustLevels else ep.directAccess.from;
+      levels = lib.unique (declaredLevels ++ lib.optional item.proxied "mesh");
       meshSources = accessSources.sourcesOfTrust config.my.topology levels;
       v4 = lib.filter (address: !(lib.hasInfix ":" address)) meshSources;
       v6 = lib.filter (address: lib.hasInfix ":" address) meshSources;
@@ -96,12 +110,10 @@ let
         ++ lib.optionals (
           (ep.directAccess.enable && ep.directAccess.interface == "all")
           || ep.directAccess.interface == "wireguard"
-          # A named endpoint is reached by an ingress that is a mesh host, even when it never declared
-          # direct access for itself: being proxied is what puts it on the mesh, and the rule says so.
-          || ep.canonicalDomain != null
+          || item.proxied
         ) (meshRules proto);
     in
-    lib.optionals (ep.directAccess.enable || ep.canonicalDomain != null) (lib.concatMap exposed protos)
+    lib.optionals (ep.directAccess.enable || item.proxied) (lib.concatMap exposed protos)
   ) localEndpointsList;
 
   # There is no deny rule, and that is the point: the chain's own policy closes what nobody allowed, so

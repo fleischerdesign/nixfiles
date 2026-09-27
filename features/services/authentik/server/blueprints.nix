@@ -14,6 +14,7 @@
 }:
 let
   endpointLib = import ../../../../lib/endpoints.nix { inherit lib; };
+  audience = import ../../../../contracts/identity/lib/audience.nix;
 
   authentikPackage = pkgs.authentik;
   directory = config.my.directory.ldap;
@@ -42,7 +43,8 @@ let
       "${config.networking.hostName}" = config;
     };
 
-  # Flatten all endpoint contracts across all hosts in the cluster
+  # Flatten every publication of the cluster into the merged record the blueprints consume: the
+  # publication owns name, exposure and audience; the endpoint it references owns the port.
   allClusterEndpointsList = lib.concatMap (
     hostName:
     let
@@ -52,10 +54,26 @@ let
     lib.concatLists (
       lib.mapAttrsToList (
         svcName: contract:
-        lib.mapAttrsToList (epName: ep: {
-          inherit hostName ep;
-          name = endpointLib.endpointName svcName epName;
-        }) contract.endpoints
+        lib.mapAttrsToList (
+          pubName: pub:
+          let
+            tile = contract.presentation.tiles.${pubName} or null;
+          in
+          {
+            inherit hostName;
+            ep = pub // {
+              displayName = if tile != null then tile.displayName else null;
+              group = if tile != null then tile.category else "Services";
+              oidc =
+                contract.identity.oidc.${pubName} or {
+                  enable = false;
+                  redirectUris = [ ];
+                };
+              ldap = contract.identity.ldap.${pubName} or { enable = false; };
+            };
+            name = endpointLib.endpointName svcName pubName;
+          }
+        ) contract.publications
       ) provides
     )
   ) (builtins.attrNames flakeConfigurations);
@@ -123,8 +141,23 @@ let
     else
       true;
 
+  # The client ID is the identity Authentik and every relying party agree on: two integrations
+  # sharing one would exchange each other's tokens, so it is unique fleet-wide like the name.
+  # Integrations without one (a publication with `auth = "oidc"` but no OIDC integration) carry
+  # null here; the identity contract rejects those separately with a named offender.
+  duplicateClientIdCheck =
+    let
+      ids = lib.filter (id: id != null) (map (item: item.ep.oidc.clientId or null) rawOidcEndpointsList);
+      duplicates = lib.filter (id: (lib.count (n: n == id) ids) > 1) (lib.unique ids);
+    in
+    if duplicates != [ ] then
+      throw "Authentik OIDC compiler error: Duplicate OIDC client ID(s) across cluster: ${lib.concatStringsSep ", " duplicates}"
+    else
+      true;
+
   oidcEndpoints =
     assert duplicateOidcCheck;
+    assert duplicateClientIdCheck;
     builtins.listToAttrs (
       map (item: {
         inherit (item) name;
@@ -198,12 +231,12 @@ let
           # person it was created for.
           users = [
             (blueprintLib.refs.byField blueprintLib.models.user "username" (
-              lib.removePrefix endpointLib.audienceGroupPrefix groupName
+              lib.removePrefix audience.audienceGroupPrefix groupName
             ))
           ];
         };
       }
-    ) (lib.filter endpointLib.isAudienceGroup ep.accessGroups);
+    ) (lib.filter audience.isAudienceGroup ep.accessGroups);
 
   # The role groups are declared exactly once, in the RBAC document, which is hand-written. Reading the
   # names from it keeps that one declaration instead of restating them here. The guard is the point: a
@@ -276,7 +309,7 @@ let
       undeclaredRole = lib.unique (
         map report (
           lib.filter (
-            x: !endpointLib.isAudienceGroup x.groupName && !(builtins.elem x.groupName rbacRoleGroupNames)
+            x: !audience.isAudienceGroup x.groupName && !(builtins.elem x.groupName rbacRoleGroupNames)
           ) audiences
         )
       );
@@ -284,8 +317,8 @@ let
         map report (
           lib.filter (
             x:
-            endpointLib.isAudienceGroup x.groupName
-            && !(builtins.elem (lib.removePrefix endpointLib.audienceGroupPrefix x.groupName) audienceUsernames)
+            audience.isAudienceGroup x.groupName
+            && !(builtins.elem (lib.removePrefix audience.audienceGroupPrefix x.groupName) audienceUsernames)
           ) audiences
         )
       );
@@ -318,7 +351,7 @@ let
         # The group this compiler declares is referenced by its id in this same blueprint; a role group
         # is authored by the RBAC document and looked up in the database. One author per name, always.
         group =
-          if endpointLib.isAudienceGroup groupName then
+          if audience.isAudienceGroup groupName then
             blueprintLib.refs.sameBlueprint "audience_${safeAudienceId groupName}"
           else
             blueprintLib.refs.byName blueprintLib.models.group groupName;
@@ -443,8 +476,8 @@ let
                 blueprintLib.refs.sameBlueprint "provider_proxy_${builtins.replaceStrings [ "-" ] [ "_" ] name}"
               ) sortedEndpointNames;
               config = {
-                authentik_host = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
-                authentik_host_browser = "https://${config.my.contracts.provides.authentik.endpoints.web.canonicalDomain}";
+                authentik_host = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
+                authentik_host_browser = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
                 authentik_host_insecure = false;
               };
             };

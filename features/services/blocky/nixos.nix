@@ -29,7 +29,7 @@ let
     else
       host.ipv4;
 
-  # Split-horizon projection (docs/architecture.md §5 and §8.1): every named contract endpoint
+  # Split-horizon projection (docs/architecture.md §5 and §8.1): every named publication
   # resolves locally to the host that serves it - the *same* name that resolves publicly to
   # the ingress. The internal planes (.lan/.vpn/.iot) exist only here.
   endpointMappings = lib.listToAttrs (
@@ -44,12 +44,12 @@ let
             lib.mapAttrsToList (
               _svcName: contract:
               lib.concatMap (
-                ep:
+                pub:
                 map (name: {
                   inherit name;
                   value = address;
-                }) (lib.optionals (ep.canonicalDomain != null) [ ep.canonicalDomain ] ++ ep.extraDomains)
-              ) (lib.attrValues contract.endpoints)
+                }) (lib.optionals (pub.canonicalDomain != null) [ pub.canonicalDomain ] ++ pub.extraDomains)
+              ) (lib.attrValues contract.publications)
             ) (hostConfig.config.my.contracts.provides or { })
           )
         )
@@ -178,24 +178,18 @@ in
             dns = {
               port = 53;
               protocol = "both";
-              scope = "internal";
               directAccess = {
                 enable = true;
                 protocol = "both";
                 interface = "all";
               };
-              monitoring.http.enable = false;
+
             };
 
             api = {
               port = 4000;
               protocol = "tcp";
-              scope = "internal";
-              monitoring = {
-                http.enable = false;
-                scrape.enable = true;
-                scrape.port = 4000;
-              };
+
             };
           };
         };

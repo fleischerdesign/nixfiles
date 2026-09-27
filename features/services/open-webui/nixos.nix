@@ -190,20 +190,30 @@ in
 
     # 4. Service Contract Declarations (Single Source of Truth)
     my.contracts.provides.open-webui = {
-      endpoints.web = {
-        port = cfg.port;
-        protocol = "tcp";
+      publications."web" = {
         scope = "public";
+        endpoint = "web";
         auth = if cfg.sso.enable then "oidc" else "none";
         accessGroups = cfg.accessGroups;
         adminGroups = cfg.adminGroups;
         subdomain = cfg.subdomain;
-        directAccess = {
-          enable = cfg.openMeshFirewall;
-          protocol = "tcp";
-          interface = "wireguard";
+      };
+      presentation.tiles."web" = {
+        endpoint = "web";
+        description = {
+          de = "Zentrale KI-Plattform für Chat, Reasoning & Tools.";
+          en = "Central AI platform for chat, reasoning & tools.";
         };
-        oidc = lib.optionalAttrs cfg.sso.enable {
+        show = true;
+        displayName = "AI Assistant (Open-WebUI)";
+        category = "AI & Agents";
+        icon = "bot";
+      };
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      identity.oidc = lib.optionalAttrs cfg.sso.enable {
+        web = {
+          publication = "web";
           enable = true;
           clientId = cfg.sso.clientId;
           secretPath = cfg.sso.secretPath;
@@ -211,15 +221,14 @@ in
           subMode = "hashed_user_id";
           includeClaimsInIdToken = true;
         };
-        dashboard = {
-          description = {
-            de = "Zentrale KI-Plattform für Chat, Reasoning & Tools.";
-            en = "Central AI platform for chat, reasoning & tools.";
-          };
-          show = true;
-          displayName = "AI Assistant (Open-WebUI)";
-          category = "AI & Agents";
-          icon = "bot";
+      };
+      endpoints.web = {
+        port = cfg.port;
+        protocol = "tcp";
+        directAccess = {
+          enable = cfg.openMeshFirewall;
+          protocol = "tcp";
+          interface = "wireguard";
         };
       };
 

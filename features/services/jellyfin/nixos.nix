@@ -78,25 +78,9 @@ in
     ];
 
     my.contracts.provides.jellyfin = {
-      # Jellyfin's client discovery answers broadcasts on the local link. It is a listening socket, so it
-      # is declared - and it is local, because a discovery protocol that leaves the link is a protocol
-      # nobody uses.
-      endpoints.discovery = {
-        port = 7359;
-        protocol = "udp";
-        scope = "isolated";
-        directAccess = {
-          enable = true;
-          interface = "local";
-          protocol = "udp";
-        };
-        # A UDP broadcast protocol is not HTTP; nothing here answers an HTTP probe.
-        monitoring.http.enable = false;
-      };
-      endpoints.web = {
-        port = 8096;
-        protocol = "tcp";
+      publications."web" = {
         scope = "public";
+        endpoint = "web";
         auth = "none";
         subdomain = "jellyfin";
 
@@ -107,26 +91,50 @@ in
           "infra-admins"
         ];
         adminGroups = [ "infra-admins" ];
-        ldap = {
-          enable = true;
-        };
+
         publicExempt = "enforces its own user authentication; Jellyfin clients cannot perform a browser SSO redirect";
         # Ingress reaches this over the WireGuard mesh (invariant I10).
+      };
+      identity.ldap.web = {
+        publication = "web";
+        enable = true;
+      };
+      presentation.tiles."web" = {
+        endpoint = "web";
+        description = {
+          de = "Filme, Serien und Musik ohne Cloud.";
+          en = "Movies, shows and music without a cloud.";
+        };
+        show = true;
+        displayName = "Jellyfin";
+        category = "Media";
+        icon = "jellyfin";
+      };
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      # Jellyfin's client discovery answers broadcasts on the local link. It is a listening socket, so it
+      # is declared - and it is local, because a discovery protocol that leaves the link is a protocol
+      # nobody uses.
+      endpoints.discovery = {
+        port = 7359;
+        protocol = "udp";
+        directAccess = {
+          enable = true;
+          interface = "local";
+          protocol = "udp";
+        };
+        # A UDP broadcast protocol is not HTTP; nothing here answers an HTTP probe.
+
+      };
+      endpoints.web = {
+        port = 8096;
+        protocol = "tcp";
         directAccess = {
           enable = true;
           protocol = "tcp";
           interface = "wireguard";
         };
-        dashboard = {
-          description = {
-            de = "Filme, Serien und Musik ohne Cloud.";
-            en = "Movies, shows and music without a cloud.";
-          };
-          show = true;
-          displayName = "Jellyfin";
-          category = "Media";
-          icon = "jellyfin";
-        };
+
       };
       storage = {
         stateDirs = [ "/var/lib/jellyfin" ];

@@ -44,34 +44,31 @@ in
     };
 
     my.contracts.provides.loki = {
+      telemetry.probes."web-tcp".endpoint = "web";
+      telemetry.probes."web-tcp".kind = "tcp";
+      telemetry.probes."web-tcp".group = "Observability";
       # Loki's gRPC face: the log pipeline on this host talks to it, nobody else.
       endpoints.grpc = {
         port = 9095;
         protocol = "tcp";
-        scope = "isolated";
         directAccess = {
           enable = true;
           interface = "local";
           protocol = "tcp";
         };
         # gRPC, not HTTP; the web endpoint below is the one an HTTP probe can ask.
-        monitoring.http.enable = false;
+        applicationProtocol = "grpc";
       };
       endpoints.web = {
         port = 3100;
         protocol = "tcp";
-        scope = "internal";
         # Logs are shipped here from every other host, so the port belongs on the mesh.
         directAccess = {
           enable = true;
           interface = "wireguard";
           protocol = "tcp";
         };
-        monitoring = {
-          http.enable = false;
-          tcp.enable = true;
-          tcp.group = "Observability";
-        };
+
       };
       storage = {
         stateDirs = [ "/var/lib/loki" ];

@@ -26,10 +26,10 @@ let
       "${config.networking.hostName}" = config;
     };
 
-  allEndpoints = lib.concatLists (
+  allPublications = lib.concatLists (
     lib.mapAttrsToList (
       _hostName: hostConfig:
-      lib.concatMap (contract: lib.attrValues (contract.endpoints or { })) (
+      lib.concatMap (contract: lib.attrValues (contract.publications or { })) (
         lib.attrValues (hostConfig.config.my.contracts.provides or { })
       )
     ) flakeConfigurations
@@ -37,17 +37,43 @@ let
 
   exemptDomains = lib.unique (
     lib.concatMap (
-      ep:
+      pub:
       let
         domains = lib.filter (d: d != null && !lib.hasInfix "*" d) (
-          (lib.optional (ep.canonicalDomain != null) ep.canonicalDomain) ++ (ep.extraDomains or [ ])
+          (lib.optional (pub.canonicalDomain != null) pub.canonicalDomain) ++ (pub.extraDomains or [ ])
         );
       in
-      lib.optionals ((ep.crowdsec.exemptScenarios or [ ]) != [ ]) domains
-    ) allEndpoints
+      lib.optionals ((pub.crowdsec.exemptScenarios or [ ]) != [ ]) domains
+    ) allPublications
   );
 in
 {
+  options.my.contracts.provides = lib.mkOption {
+    type = lib.types.attrsOf (
+      lib.types.submodule {
+        options.publications = lib.mkOption {
+          type = lib.types.attrsOf (
+            lib.types.submodule {
+              options = {
+                crowdsec = {
+                  exemptScenarios = lib.mkOption {
+                    type = lib.types.listOf lib.types.str;
+                    default = [ ];
+                    description = ''
+                      List of CrowdSec scenario names that are explicitly exempted from triggering bans
+                      when accessing this endpoint (e.g. ['crowdsecurity/http-crawl-non_statics'] for binary caches).
+                    '';
+                  };
+                };
+
+              };
+            }
+          );
+        };
+      }
+    );
+  };
+
   options.my.features.services.crowdsec = {
     enable = lib.mkEnableOption "CrowdSec IPS";
     masterHost = lib.mkOption {
@@ -198,6 +224,9 @@ in
     systemd.services.crowdsec-firewall-bouncer.serviceConfig.DynamicUser = lib.mkForce false;
 
     my.contracts.provides.crowdsec = lib.mkIf isMaster {
+      telemetry.probes."lapi-http".endpoint = "lapi";
+      telemetry.probes."lapi-http".kind = "http";
+      telemetry.scrapes."web-metrics".endpoint = "web";
       # The local API, and the single port in this file that belongs on the mesh: every host's
       # firewall bouncer and agent registers against it (`api_url = http://${masterIP}:8085/`), and
       # `${masterIP}` is an overlay address. Leaving it undeclared is what closing the mesh broke -
@@ -205,7 +234,6 @@ in
       endpoints.lapi = {
         port = 8085;
         protocol = "tcp";
-        scope = "mesh";
         directAccess = {
           enable = true;
           interface = "wireguard";
@@ -215,18 +243,13 @@ in
       endpoints.web = {
         port = 6060;
         protocol = "tcp";
-        scope = "internal";
         # The metrics of the local API, scraped by the collector on this host.
         directAccess = {
           enable = true;
           interface = "local";
           protocol = "tcp";
         };
-        monitoring = {
-          http.enable = false;
-          scrape.enable = true;
-          scrape.port = 6060;
-        };
+
       };
     };
 

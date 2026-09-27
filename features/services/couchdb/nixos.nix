@@ -58,32 +58,34 @@ in
 
     # 4. Service Contract for Ingress & Storage
     my.contracts.provides.couchdb = {
+      publications."web" = {
+        scope = "public";
+        endpoint = "web";
+        auth = "none";
+        subdomain = "couchdb";
+        publicExempt = "enforces its own authentication; LiveSync clients cannot perform a browser SSO redirect";
+      };
+      telemetry.probes."epmd-tcp".endpoint = "epmd";
+      telemetry.probes."epmd-tcp".kind = "tcp";
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
       # Erlang's port mapper, which CouchDB starts next to itself. Nothing outside this host talks to it -
       # a single-node CouchDB resolves its own nodes through it. It is declared rather than left undefined
       # so the exposure inventory can tell "a port nobody decided about" from "a port nobody needs".
       endpoints.epmd = {
         port = 4369;
         protocol = "tcp";
-        scope = "isolated";
         directAccess = {
           enable = true;
           interface = "local";
           protocol = "tcp";
         };
         # An Erlang port mapper is not HTTP; a TCP connect is the honest probe.
-        monitoring = {
-          http.enable = false;
-          tcp.enable = true;
-          tcp.group = "Infrastructure";
-        };
+        applicationProtocol = "epmd";
       };
       endpoints.web = {
         port = 5984;
         protocol = "tcp";
-        scope = "public";
-        auth = "none";
-        subdomain = "couchdb";
-        publicExempt = "enforces its own authentication; LiveSync clients cannot perform a browser SSO redirect";
       };
       storage = {
         stateDirs = [ "/var/lib/couchdb" ];

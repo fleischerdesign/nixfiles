@@ -46,20 +46,20 @@ in
     };
 
     my.contracts.provides.blackbox-exporter = {
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      telemetry.probes."web-tcp".endpoint = "web";
+      telemetry.probes."web-tcp".kind = "tcp";
       endpoints.web = {
         port = 9115;
         protocol = "tcp";
-        scope = "internal";
         # Probed from the collector on another host, so the port belongs on the mesh.
         directAccess = {
           enable = true;
           interface = "wireguard";
           protocol = "tcp";
         };
-        monitoring = {
-          tcp.enable = true;
-          tcp.group = "Infrastructure";
-        };
+
       };
     };
   };

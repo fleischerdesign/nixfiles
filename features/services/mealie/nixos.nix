@@ -51,9 +51,9 @@ in
         TZ = "Europe/Berlin";
         BASE_URL =
           let
-            ep = config.my.contracts.provides.mealie.endpoints.web;
+            pub = config.my.contracts.provides.mealie.publications.web;
           in
-          lib.mkIf (ep.publicUrl != null) ep.publicUrl;
+          lib.mkIf (pub.publicUrl != null) pub.publicUrl;
 
         # SMTP Configuration
         SMTP_HOST = "mail.smtp2go.com";
@@ -93,41 +93,49 @@ in
 
     # Register with Caddy & Firewall via Service Contract
     my.contracts.provides.mealie = {
-      endpoints.web = {
-        port = 9025;
-        protocol = "tcp";
+      publications."web" = {
         scope = "public";
+        endpoint = "web";
         auth = "oidc";
         accessGroups = [ "family" ];
         subdomain = "mealie";
         # Ingress reaches this over the WireGuard mesh (invariant I10).
+      };
+      identity.oidc.web = {
+        publication = "web";
+        enable = true;
+        clientId = "uwxlwWIofaSVKwAJTyzhzT75kUMDfoCpmlSs4M1E";
+        clientSecretEnv = "AUTHENTIK_OIDC_MEALIE_SECRET";
+        secretPath = "services/apps/mealie_oidc_secret";
+        redirectPaths = [
+          "/login"
+        ];
+        subMode = "hashed_user_id";
+        includeClaimsInIdToken = true;
+      };
+      presentation.tiles."web" = {
+        endpoint = "web";
+        description = {
+          de = "Rezepte und Essensplanung.";
+          en = "Recipes and meal planning.";
+        };
+        show = true;
+        displayName = "Mealie";
+        category = "Home";
+        icon = "mealie";
+      };
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      telemetry.probes."web-http".path = "/api/app/about";
+      endpoints.web = {
+        port = 9025;
+        protocol = "tcp";
         directAccess = {
           enable = true;
           protocol = "tcp";
           interface = "wireguard";
         };
-        oidc = {
-          enable = true;
-          clientId = "uwxlwWIofaSVKwAJTyzhzT75kUMDfoCpmlSs4M1E";
-          clientSecretEnv = "AUTHENTIK_OIDC_MEALIE_SECRET";
-          secretPath = "services/apps/mealie_oidc_secret";
-          redirectPaths = [
-            "/login"
-          ];
-          subMode = "hashed_user_id";
-          includeClaimsInIdToken = true;
-        };
-        monitoring.http.path = "/api/app/about";
-        dashboard = {
-          description = {
-            de = "Rezepte und Essensplanung.";
-            en = "Recipes and meal planning.";
-          };
-          show = true;
-          displayName = "Mealie";
-          category = "Home";
-          icon = "mealie";
-        };
+
       };
       storage = {
         stateDirs = [ "/var/lib/mealie" ];

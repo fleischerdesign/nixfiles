@@ -56,8 +56,8 @@ in
         server = {
           http_addr = "127.0.0.1";
           http_port = 3000;
-          domain = config.my.contracts.provides.grafana.endpoints.web.canonicalDomain;
-          root_url = "https://${config.my.contracts.provides.grafana.endpoints.web.canonicalDomain}";
+          domain = config.my.contracts.provides.grafana.publications.web.canonicalDomain;
+          root_url = "https://${config.my.contracts.provides.grafana.publications.web.canonicalDomain}";
         };
 
         security = {
@@ -311,10 +311,9 @@ in
     ];
 
     my.contracts.provides.grafana = {
-      endpoints.web = {
-        port = 3000;
-        protocol = "tcp";
+      publications."web" = {
         scope = "public";
+        endpoint = "web";
         auth = "oidc";
         accessGroups = [ "infra-admins" ];
         subdomain = "grafana";
@@ -322,25 +321,34 @@ in
         # The legacy aliases `grafana.ops.…` and `mon.lan.…` were removed: they encoded a
         # host and a plane into a service name (Naming spec §0.2). Any OIDC redirect URI or
         # bookmark that still uses them must be updated in the same change.
-        oidc = {
-          enable = true;
-          clientId = "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k";
-          clientSecretEnv = "AUTHENTIK_OIDC_GRAFANA_SECRET";
-          secretPath = "services/monitoring/grafana_oidc_client_secret";
-          redirectPaths = [ "/login/generic_oauth" ];
-          subMode = "hashed_user_id";
-          includeClaimsInIdToken = true;
+
+      };
+      identity.oidc.web = {
+        publication = "web";
+        enable = true;
+        clientId = "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k";
+        clientSecretEnv = "AUTHENTIK_OIDC_GRAFANA_SECRET";
+        secretPath = "services/monitoring/grafana_oidc_client_secret";
+        redirectPaths = [ "/login/generic_oauth" ];
+        subMode = "hashed_user_id";
+        includeClaimsInIdToken = true;
+      };
+      presentation.tiles."web" = {
+        endpoint = "web";
+        description = {
+          de = "Metriken, Dashboards und Logs.";
+          en = "Metrics, dashboards and logs.";
         };
-        dashboard = {
-          description = {
-            de = "Metriken, Dashboards und Logs.";
-            en = "Metrics, dashboards and logs.";
-          };
-          show = true;
-          displayName = "Grafana";
-          category = "Observability";
-          icon = "grafana";
-        };
+        show = true;
+        displayName = "Grafana";
+        category = "Observability";
+        icon = "grafana";
+      };
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      endpoints.web = {
+        port = 3000;
+        protocol = "tcp";
       };
       storage = {
         stateDirs = [ "/var/lib/grafana" ];

@@ -41,7 +41,7 @@ in
     services.ntfy-sh = {
       enable = true;
       settings = {
-        base-url = "https://${config.my.contracts.provides.ntfy.endpoints.web.canonicalDomain}";
+        base-url = "https://${config.my.contracts.provides.ntfy.publications.web.canonicalDomain}";
         listen-http = "127.0.0.1:8083";
         auth-file = "/var/lib/ntfy-sh/auth.db";
         auth-default-access = "deny-all";
@@ -57,23 +57,30 @@ in
     systemd.services.ntfy-sh.serviceConfig.CacheDirectory = "ntfy-sh";
 
     my.contracts.provides.ntfy = {
-      endpoints.web = {
-        port = 8083;
-        protocol = "tcp";
+      publications."web" = {
         scope = "public";
+        endpoint = "web";
         auth = "none";
         subdomain = "push";
         publicExempt = "enforces its own authentication; push clients cannot perform a browser SSO redirect";
-        dashboard = {
-          description = {
-            de = "Push-Benachrichtigungen aus dem Netz.";
-            en = "Push notifications from the network.";
-          };
-          show = true;
-          displayName = "ntfy";
-          category = "Observability & Tools";
-          icon = "bell";
+
+      };
+      presentation.tiles."web" = {
+        endpoint = "web";
+        description = {
+          de = "Push-Benachrichtigungen aus dem Netz.";
+          en = "Push notifications from the network.";
         };
+        show = true;
+        displayName = "ntfy";
+        category = "Observability & Tools";
+        icon = "bell";
+      };
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      endpoints.web = {
+        port = 8083;
+        protocol = "tcp";
       };
       storage = {
         stateDirs = [ "/var/lib/ntfy-sh" ];

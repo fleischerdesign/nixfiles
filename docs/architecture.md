@@ -313,15 +313,29 @@ twice, and no service module knows its host, its name or its neighbours.
 
 | Declaration | Meaning | Projected to |
 |---|---|---|
-| `my.contracts.provides.<svc>.endpoints` | the interfaces a service exposes: port, protocol, scope (`public` / `internal` / `local`), authentication | DNS records, Caddy vHosts, firewall rules, health probes |
+| `my.contracts.provides.<svc>.endpoints` | listeners: port, transport and application protocol, direct network access. A listener is not a publication | firewall rules, telemetry targets, ingress upstreams |
+| `…publications.<name>` | a name on a listener: DNS identity, exposure plane, HTTP ingress policy and audience (`endpoint` references the listener) | DNS records, Caddy vHosts, firewall mesh reachability, access policies |
+| `…identity.oidc.<name>` / `…identity.ldap.<name>` | application integrations referencing a publication | Authentik blueprints, directory consumers |
+| `…presentation.tiles.<name>`, `…presentation.readouts`, `…presentation.actions` | portal entries referencing an endpoint, plus service-level capabilities | portal inventory and adapter data |
+| `…telemetry.probes.<name>`, `…telemetry.scrapes.<name>` | named HTTP/TCP probes and metrics scrapes referencing an endpoint (no repeated port, no inferred HTTP probe) | Prometheus scrape jobs and portal monitoring state |
 | `…storage` | persistence needs and their tier | storage contracts, backup sets |
 | `…backup` | what must be restorable, with retention | restic jobs |
-| `…telemetry` | what must be observable | Prometheus scrape targets, alerts |
-| `my.contracts.consumes.<db>` | a database, a user, a bucket | provider resources, declared by the provider engine |
+| `…dependsOn` | fleet-wide service references, validated against every host's declared services | portal dependencies |
+| `my.contracts.consumes.<svc>.postgresql.<db>` / `…ldap` | a database and user, or a directory identity with audience | provider resources, declared by the provider engine |
+
+Each domain owns its schema: listener facts live in `contracts/endpoints/`, named
+publications in `contracts/publications/`, ingress policy in `contracts/ingress/`, audience
+naming and directory consumers in `contracts/identity/`, presentation in `contracts/portal/`,
+observations in `contracts/telemetry/`, and service dependency references in
+`contracts/dependencies/`. Backend-specific option extensions such as Caddy proxy directives
+and CrowdSec exemptions live with those features. References between domains are validated at
+evaluation: unknown endpoints, publications or services, nameless publications, an ingress on
+a non-HTTP listener, authentication without an ingress, ambiguous directory identities and
+duplicate Prometheus job names or OIDC client IDs all fail the build with a named offender.
 
 Consequences worth knowing:
 
-- a service that declares `scope = "public"` gets a public name, a certificate and a proxy - it does
+- a publication with `scope = "public"` gets a public name, a certificate and a proxy - it does
   not ask for them;
 - services never reference a host, so moving one is a one-line change in `hosts/`;
 - the FQDNs, the Caddy configuration, the Authentik blueprints and the backup jobs are all *functions*
@@ -338,9 +352,9 @@ flake.nix        inputs, overlays, one mkSystem call per host
 hosts/<name>/    entry point: role + hardware + host-specific features
 roles/           base → server | pc → desktop | notebook
 features/        NixOS modules, discovered by the `nixos.nix` marker, each behind an `enable` option
-contracts/       provides / consumes / naming / endpoints / storage / dependencies
-checks/          the promises, measured: network invariants, the portal artifact
-lib/core/        mkSystem, recursive module discovery
+contracts/       provides (endpoints, publications, identity, portal, telemetry) / consumes / naming / storage / dependencies
+checks/          the promises, measured: network invariants, contract fixtures, the portal artifact
+lib/             mkSystem, module discovery, shared pure helpers (endpoints, addresses)
 user/<name>/     Home Manager: user packages, shell, editors
 docs/            this specification
 ```
@@ -360,7 +374,7 @@ service:
 
 | Surface | Compiled from the repository | Still configured in a UI |
 |---|---|---|
-| cluster dashboard (Homarr) | tiles, categories, icons and URLs from `endpoints.dashboard` | nothing |
+| cluster dashboard (Homarr) | tiles, categories, icons and URLs from `presentation.tiles` | nothing |
 | portal (vyrx.de) | services, categories, dependencies and actions projected from the endpoint contracts; read at runtime and carrying no addresses and no people | nothing |
 | Grafana | three dashboards as files, plus datasources and alerts from the module | nothing |
 | CrowdSec | the trusted-subnet whitelist, from `my.topology.trustedSubnets` | nothing |

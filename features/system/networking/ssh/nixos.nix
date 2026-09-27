@@ -73,11 +73,16 @@ in
     # phone (all trusted). The port itself is opened by the contract projection, not by the module
     # default, so there is one place that decides exposure.
     my.contracts.provides.ssh = {
+      presentation.tiles.ssh = {
+        endpoint = "ssh";
+        displayName = "Secure Shell";
+      };
+      telemetry.probes."ssh-tcp".endpoint = "ssh";
+      telemetry.probes."ssh-tcp".kind = "tcp";
       endpoints.ssh = {
         port = 22;
         protocol = "tcp";
-        scope = "isolated";
-        displayName = "Secure Shell";
+
         directAccess = {
           enable = true;
           interface = "all";
@@ -88,11 +93,7 @@ in
           ++ cfg.admits;
         };
         # SSH is not HTTP; a TCP connect is the probe that actually answers.
-        monitoring = {
-          http.enable = false;
-          tcp.enable = true;
-          tcp.group = "Infrastructure";
-        };
+        applicationProtocol = "ssh";
       };
     };
 

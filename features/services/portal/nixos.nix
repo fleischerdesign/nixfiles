@@ -60,21 +60,21 @@ let
       ]
       ++ config.my.portal.locales
     )) (_: text);
-  serviceName = svcName: ep: if ep.displayName != null then ep.displayName else svcName;
+  serviceName = svcName: tile: if tile.displayName != null then tile.displayName else svcName;
   summaryOf =
-    svcName: ep:
+    svcName: tile:
     let
-      fallback = serviceName svcName ep;
+      fallback = serviceName svcName tile;
     in
     {
-      de = ep.dashboard.description.de or fallback;
-      en = ep.dashboard.description.en or (ep.dashboard.description.de or fallback);
+      de = tile.description.de or fallback;
+      en = tile.description.en or (tile.description.de or fallback);
     };
 
   # A category id is derived from the declared label so it is stable across redeploys; renaming the
   # label is then a deliberate change of id. The contract offers no per-locale category copy, so both
   # languages carry the one string (the app falls back to German for an unknown tag anyway).
-  categoryOf = ep: if ep.group != null then ep.group else "Services";
+  categoryOf = tile: tile.category;
   slug =
     text:
     let
@@ -89,8 +89,10 @@ let
   capabilityOf =
     contract:
     let
-      readout = contract.readouts;
-      actions = lib.mapAttrsToList (actionId: action: { id = actionId; } // action) contract.actions;
+      readout = contract.presentation.readouts;
+      actions = lib.mapAttrsToList (
+        actionId: action: { id = actionId; } // action
+      ) contract.presentation.actions;
       hasReadout =
         readout != null && (readout.read != null || readout.fields != [ ] || readout.lists != [ ]);
     in
@@ -109,9 +111,9 @@ let
         actions = actions;
       };
 
-  # Every endpoint a contract displays becomes one service; `dependsOn` and `actions` come from the
-  # contract, because they describe the service, not a single endpoint. The `icon` is optional in the
-  # interface, so the dashboard's neutral default is left out rather than spelled as a symbol name.
+  # Every tile a contract shows becomes one service; `dependsOn` and `actions` come from the
+  # contract, because they describe the service, not a single tile. The `icon` is optional in the
+  # interface, so the tile's neutral default is left out rather than spelled as a symbol name.
   portalEntries = lib.concatMap (
     hostName:
     let
@@ -122,30 +124,35 @@ let
         svcName: contract:
         lib.concatLists (
           lib.mapAttrsToList (
-            epName: ep:
-            lib.optionals (ep.dashboard.show && ep.canonicalDomain != null) [
+            tileName: tile:
+            let
+              pub = lib.findFirst (p: p.endpoint == tile.endpoint) null (lib.attrValues contract.publications);
+            in
+            lib.optionals (tile.show && pub != null && pub.canonicalDomain != null) [
               {
-                categoryLabel = categoryOf ep;
+                categoryLabel = categoryOf tile;
                 capability = capabilityOf contract;
                 service = {
-                  id = endpointLib.endpointName svcName epName;
-                  name = localized (serviceName svcName ep);
-                  summary = summaryOf svcName ep;
-                  categoryId = slug (categoryOf ep);
-                  scope = ep.scope;
-                  accessGroups = ep.accessGroups;
-                  adminGroups = ep.adminGroups;
+                  id = endpointLib.endpointName svcName tileName;
+                  name = localized (serviceName svcName tile);
+                  summary = summaryOf svcName tile;
+                  categoryId = slug (categoryOf tile);
+                  scope = pub.scope;
+                  accessGroups = pub.accessGroups;
+                  adminGroups = pub.adminGroups;
                   dependsOn = contract.dependsOn;
-                  actions = builtins.attrNames contract.actions;
-                  url = "https://${ep.canonicalDomain}";
+                  actions = builtins.attrNames contract.presentation.actions;
+                  url = "https://${pub.canonicalDomain}";
                   # Whether anything measures it. A service without a probe is not "unknown" - the
                   # projection says so, and the page shows that instead of inventing a state.
-                  monitored = ep.monitoring.http.enable;
+                  monitored = lib.any (probe: probe.kind == "http" && probe.endpoint == tile.endpoint) (
+                    builtins.attrValues contract.telemetry.probes
+                  );
                 }
-                // lib.optionalAttrs (ep.dashboard.icon != "default") { inherit (ep.dashboard) icon; };
+                // lib.optionalAttrs (tile.icon != "default") { inherit (tile) icon; };
               }
             ]
-          ) contract.endpoints
+          ) contract.presentation.tiles
         )
       ) provides
     )
@@ -296,16 +303,9 @@ in
     };
 
     my.contracts.provides.vyrx-landing = {
-      # An ordinary service: one process, one port, one vhost. It serves its own pages, its assets and its
-      # API, so the ingress does exactly what it does for every other service - authenticate, then proxy -
-      # and knows nothing about files, route names or a collector address.
-      endpoints.web = {
-        port = portalApiPort;
-        protocol = "tcp";
+      publications."web" = {
         scope = "public";
-        # This value registers a proxy application for `vyrx.de` in authentik, which is what lets the
-        # embedded outpost answer `/api/me` at all (without a matching application it returns 404 for the
-        # host). Publishing the fleet inventory is a deliberate decision, not an oversight.
+        endpoint = "web";
         auth = "authentik";
         accessGroups = [
           "family"
@@ -353,9 +353,23 @@ in
           "/robots.txt"
           "/site.webmanifest"
         ];
-        dashboard = {
-          show = false;
-        };
+
+      };
+      presentation.tiles."web" = {
+        endpoint = "web";
+        show = false;
+      };
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
+      # An ordinary service: one process, one port, one vhost. It serves its own pages, its assets and its
+      # API, so the ingress does exactly what it does for every other service - authenticate, then proxy -
+      # and knows nothing about files, route names or a collector address.
+      endpoints.web = {
+        port = portalApiPort;
+        protocol = "tcp";
+        # This value registers a proxy application for `vyrx.de` in authentik, which is what lets the
+        # embedded outpost answer `/api/me` at all (without a matching application it returns 404 for the
+        # host). Publishing the fleet inventory is a deliberate decision, not an oversight.
       };
     };
   };

@@ -144,17 +144,17 @@ let
         lib.mapAttrsToList (
           _svcName: contract:
           lib.concatMap (
-            ep:
+            pub:
             let
               mk = mkRecord "Service ${hostName}";
               names =
-                lib.optionals (ep.scope == "public" && ep.canonicalDomain != null) [
-                  ep.canonicalDomain
+                lib.optionals (pub.scope == "public" && pub.canonicalDomain != null) [
+                  pub.canonicalDomain
                 ]
-                ++ lib.optionals (ep.scope == "public") (lib.filter inZone ep.extraDomains);
+                ++ lib.optionals (pub.scope == "public") (lib.filter inZone pub.extraDomains);
             in
             lib.optionals ingressIsPublic (map (n: mk n "A" ingressHost.ipv4) names)
-          ) (lib.attrValues contract.endpoints)
+          ) (lib.attrValues contract.publications)
         ) (hostConfig.config.my.contracts.provides or { })
       )
     ) flakeConfigurations

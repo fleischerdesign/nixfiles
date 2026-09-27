@@ -29,8 +29,8 @@ in
       environmentFile = config.sops.templates.atticd_env.path;
       settings = {
         listen = "0.0.0.0:8080";
-        allowed-hosts = [ config.my.contracts.provides.attic.endpoints.web.canonicalDomain ];
-        api-endpoint = "https://${config.my.contracts.provides.attic.endpoints.web.canonicalDomain}/";
+        allowed-hosts = [ config.my.contracts.provides.attic.publications.web.canonicalDomain ];
+        api-endpoint = "https://${config.my.contracts.provides.attic.publications.web.canonicalDomain}/";
         chunking = {
           nar-size-threshold = 16 * 1024 * 1024;
           min-size = 256 * 1024;
@@ -54,13 +54,23 @@ in
 
     # The `cache` endpoint is the single source of truth: Caddy's contract
     # projection derives the reverse proxy and Cloudflare derives the DNS record.
-    my.contracts.provides.attic.endpoints.web = {
-      port = 8080;
-      protocol = "tcp";
+    my.contracts.provides.attic.telemetry.probes."web-http".endpoint = "web";
+    my.contracts.provides.attic.telemetry.probes."web-http".kind = "http";
+    my.contracts.provides.attic.publications.web = {
       scope = "public";
+      endpoint = "web";
       auth = "none";
       subdomain = "cache";
       publicExempt = "bearer-token authentication of its own; nix substituters cannot perform a browser SSO redirect";
+      proxyOptions = "flush_interval -1";
+      crowdsec.exemptScenarios = [
+        "crowdsecurity/http-crawl-non_statics"
+        "crowdsecurity/http-probing"
+      ];
+    };
+    my.contracts.provides.attic.endpoints.web = {
+      port = 8080;
+      protocol = "tcp";
       # The ingress terminates TLS and proxies over the WireGuard mesh (Naming spec §5, invariant
       # I10), so the listener must be reachable there; the firewall confines it to wg0.
       directAccess = {
@@ -68,16 +78,6 @@ in
         protocol = "tcp";
         interface = "wireguard";
       };
-      # Streaming binary cache: do not buffer. Declared as a proxy option (not as raw
-      # Caddyfile) so the upstream target stays projected onto the ingress (Naming spec §0.3).
-      proxyOptions = "flush_interval -1";
-
-      # High-frequency reads on narinfo and non-static binary cache objects are legitimate behavior
-      # for nix substituters and CI/CD runners; exempt them from web crawl / scan detectors.
-      crowdsec.exemptScenarios = [
-        "crowdsecurity/http-crawl-non_statics"
-        "crowdsecurity/http-probing"
-      ];
     };
   };
 }

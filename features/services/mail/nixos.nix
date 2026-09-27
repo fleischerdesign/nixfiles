@@ -293,18 +293,17 @@ in
         };
 
         my.contracts.provides.mail = {
+          presentation.tiles."web" = {
+            endpoint = "web";
+            show = true;
+            displayName = "Stalwart Mail";
+            category = "Productivity";
+            icon = "mail";
+          };
           endpoints.web = {
             port = 9081;
             protocol = "tcp";
-            scope = "public";
-            auth = "none";
-            inherit (cfg) domain;
-            dashboard = {
-              show = true;
-              displayName = "Stalwart Mail";
-              category = "Productivity";
-              icon = "mail";
-            };
+
           };
           storage = {
             stateDirs = [ "/var/lib/stalwart-mail" ];

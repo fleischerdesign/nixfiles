@@ -727,6 +727,20 @@ in
 
     # 5. Reverse Proxy & Monitoring via Service Contract
     my.contracts.provides.authentik = {
+      publications."web" = {
+        scope = "public";
+        endpoint = "web";
+        auth = "none";
+        subdomain = "auth";
+        publicExempt = "identity provider - it cannot sit behind its own forward-auth";
+
+      };
+      telemetry.probes."http-http".endpoint = "http";
+      telemetry.probes."http-http".kind = "http";
+      telemetry.scrapes."metrics-metrics".endpoint = "metrics";
+      telemetry.scrapes."metrics-metrics".jobName = "authentik";
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
       # The server's own listeners. The ingress proxies to `web` on this host, so they are the local
       # network's business and nobody else's - declared local, which is what the exposure inventory reads
       # as "a decision", not as "forgotten".
@@ -736,7 +750,6 @@ in
       endpoints.http = {
         port = 9000;
         protocol = "tcp";
-        scope = "isolated";
         directAccess = {
           enable = true;
           interface = "local";
@@ -746,7 +759,6 @@ in
       endpoints.https = {
         port = 9443;
         protocol = "tcp";
-        scope = "isolated";
         directAccess = {
           enable = true;
           interface = "local";
@@ -754,31 +766,22 @@ in
         };
         # authentik's own TLS face uses its internal certificate: a plain-HTTP probe could not verify it,
         # and nothing proxies it. The HTTP face below is what is actually asked.
-        monitoring.http.enable = false;
+        applicationProtocol = "https";
       };
       endpoints.metrics = {
         port = 9300;
         protocol = "tcp";
-        scope = "isolated";
         directAccess = {
           enable = true;
           interface = "local";
           protocol = "tcp";
         };
         # Scraped as metrics (see the endpoint below); it is not a health page, so no HTTP probe.
-        monitoring.http.enable = false;
+
       };
       endpoints.web = {
         port = listenHttpPort;
         protocol = "tcp";
-        scope = "public";
-        auth = "none";
-        subdomain = "auth";
-        publicExempt = "identity provider - it cannot sit behind its own forward-auth";
-        monitoring = {
-          scrape.enable = true;
-          scrape.port = 9300;
-        };
       };
     };
 

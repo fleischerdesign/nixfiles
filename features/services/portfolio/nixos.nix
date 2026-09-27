@@ -83,26 +83,33 @@ in
 
         # Caddy Reverse Proxy & Service Contract
         my.contracts.provides.portfolio = {
-          endpoints.web = {
-            port = 3005;
-            protocol = "tcp";
+          publications."web" = {
             scope = "public";
+            endpoint = "web";
             auth = "none";
             subdomain = "portfolio";
             # Served by this host's Caddy, but its DNS lives in the fleischer.design zone and is
             # therefore NOT managed by the vyrx.de Cloudflare engine (in-zone filtering skips it).
             extraDomains = [ "fleischer.design" ];
             publicExempt = "public static site, no user data";
-            dashboard = {
-              description = {
-                de = "Portfolio-Website.";
-                en = "Portfolio website.";
-              };
-              show = true;
-              displayName = "Portfolio";
-              category = "Services";
-              icon = "globe";
+
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Portfolio-Website.";
+              en = "Portfolio website.";
             };
+            show = true;
+            displayName = "Portfolio";
+            category = "Services";
+            icon = "globe";
+          };
+          telemetry.probes."web-http".endpoint = "web";
+          telemetry.probes."web-http".kind = "http";
+          endpoints.web = {
+            port = 3005;
+            protocol = "tcp";
           };
           storage = {
             stateDirs = [ "/var/lib/portfolio" ];

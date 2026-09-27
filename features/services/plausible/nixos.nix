@@ -32,7 +32,7 @@ in
           enable = true;
 
           server = {
-            baseUrl = "https://${config.my.contracts.provides.plausible.endpoints.web.canonicalDomain}";
+            baseUrl = "https://${config.my.contracts.provides.plausible.publications.web.canonicalDomain}";
             secretKeybaseFile = config.sops.secrets."services/apps/plausible_secret_key_base".path;
             port = 8000;
             listenAddress = "127.0.0.1";
@@ -62,22 +62,26 @@ in
 
         # Service Contract for Caddy & Storage
         my.contracts.provides.plausible = {
+          publications."web" = {
+            endpoint = "web";
+            auth = "none";
+            subdomain = "plausible";
+
+          };
+          presentation.tiles."web" = {
+            endpoint = "web";
+            description = {
+              de = "Datenschutzfreundliche Web-Statistik.";
+              en = "Privacy-friendly web analytics.";
+            };
+            show = true;
+            displayName = "Plausible";
+            category = "Observability & Tools";
+            icon = "plausible";
+          };
           endpoints.web = {
             port = 8000;
             protocol = "tcp";
-            scope = "public";
-            auth = "none";
-            subdomain = "plausible";
-            dashboard = {
-              description = {
-                de = "Datenschutzfreundliche Web-Statistik.";
-                en = "Privacy-friendly web analytics.";
-              };
-              show = true;
-              displayName = "Plausible";
-              category = "Observability & Tools";
-              icon = "plausible";
-            };
           };
           storage = {
             stateDirs = [ "/var/lib/plausible" ];

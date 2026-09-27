@@ -113,8 +113,8 @@ in
           bind_address = cfg.bindAddress;
           secret_key = "@SEARXNG_SECRET@";
           base_url = lib.optionalString (
-            config.my.contracts.provides.searxng.endpoints.web.canonicalDomain != null
-          ) "https://${config.my.contracts.provides.searxng.endpoints.web.canonicalDomain}/";
+            config.my.contracts.provides.searxng.publications.web.canonicalDomain != null
+          ) "https://${config.my.contracts.provides.searxng.publications.web.canonicalDomain}/";
           image_proxy = true;
         };
 
@@ -200,31 +200,41 @@ in
     # `subdomain` plus the topology's root domain derive it, and the application reads the derived
     # value back (one rule, one place).
     my.contracts.provides.searxng = {
+      # Whether the service is published is now the existence of a publication: no publication, no
+      # DNS name and no ingress. The endpoint below is only a listener.
+      publications = lib.optionalAttrs cfg.public {
+        web = {
+          scope = "public";
+          endpoint = "web";
+          auth = if cfg.auth then "authentik" else "none";
+          accessGroups = [ "family" ];
+          subdomain = "search";
+        };
+      };
+      presentation.tiles."web" = {
+        endpoint = "web";
+        description = {
+          de = "Metasuche ohne Tracking.";
+          en = "Metasearch without tracking.";
+        };
+        show = true;
+        displayName = "SearXNG Search";
+        category = "Observability & Tools";
+        icon = "searxng";
+      };
+      telemetry.probes."web-http".endpoint = "web";
+      telemetry.probes."web-http".kind = "http";
       endpoints.web = {
         port = cfg.port;
         protocol = "tcp";
-        # Whether the service is published. This used to be implicit in "a domain is set", which
-        # was always true because the domain had a default - so the isolated branch was dead code
-        # and the switch invisible.
-        scope = if cfg.public then "public" else "isolated";
-        auth = if cfg.auth then "authentik" else "none";
-        accessGroups = [ "family" ];
-        subdomain = "search";
+        # Whether the service is published is the existence of the publication above, not a second
+        # switch on the listener.
         directAccess = {
           enable = cfg.openMeshFirewall;
           protocol = "tcp";
           interface = "wireguard";
         };
-        dashboard = {
-          description = {
-            de = "Metasuche ohne Tracking.";
-            en = "Metasearch without tracking.";
-          };
-          show = true;
-          displayName = "SearXNG Search";
-          category = "Observability & Tools";
-          icon = "searxng";
-        };
+
       };
     };
   };

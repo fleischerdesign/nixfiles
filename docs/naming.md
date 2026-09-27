@@ -48,9 +48,9 @@ an undocumented rule is a document describing a violation that no longer exists.
 | node | — *(host plane from `my.topology.hosts`, device plane from `my.topology.devices`)* | `node.vyrx.de` | Cloudflare | **yes** | CNAME → overlay (VPN) address; SSH/admin only (§2) |
 | isolated | `"isolated"` | — | — | no | direct address/port only |
 
-The `scope` enum is the **existing** contract enum (`contracts/endpoints/default.nix`):
+The `scope` enum is the **existing** contract enum (`contracts/publications/nixos.nix`):
 `public | internal | mesh | isolated` (default `internal`). This specification does **not**
-change it — it only maps it to suffixes (§3). `iot` is deliberately *not* an endpoint scope:
+change it — it only maps it to suffixes (§3). `iot` is deliberately *not* a publication scope:
 IoT names come from the device inventory and use the same `node` plane the hosts use
 (`deviceFqdn(device) = "${name}.node.${domain}"`, e.g. `hom-prn-01.node.vyrx.de`).
 

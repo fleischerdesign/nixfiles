@@ -38,10 +38,10 @@ let
       consumer = config.my.topology.hosts.${config.networking.hostName} or null;
       peer = host;
     };
-  terminatedEndpoints =
+  terminatedPublications =
     lib.concatMap (
       contract:
-      lib.filter (ep: ep.ingress && ep.canonicalDomain != null) (lib.attrValues contract.endpoints)
+      lib.filter (pub: pub.ingress && pub.canonicalDomain != null) (lib.attrValues contract.publications)
     ) (lib.attrValues (config.my.contracts.provides or { }))
     ++ lib.optionals isIngress (
       lib.concatLists (
@@ -50,7 +50,7 @@ let
           lib.optionals (hostName != config.networking.hostName) (
             lib.concatMap (
               contract:
-              lib.filter (ep: ep.ingress && ep.canonicalDomain != null) (lib.attrValues contract.endpoints)
+              lib.filter (pub: pub.ingress && pub.canonicalDomain != null) (lib.attrValues contract.publications)
             ) (lib.attrValues (hostConfig.config.my.contracts.provides or { }))
           )
         ) flakeConfigurations
@@ -58,18 +58,53 @@ let
     );
   publicNames = lib.unique (
     lib.filter inZone (
-      map (ep: ep.canonicalDomain) terminatedEndpoints
+      map (pub: pub.canonicalDomain) terminatedPublications
       ++ lib.concatMap (
-        ep:
+        pub:
         # Aliases count as well, and internal-plane aliases such as `docs.lan.<zone>` are ordinary
         # subdomains of the public zone. Wildcards are skipped: their vhosts are minted at runtime
         # and Caddy issues those on demand.
-        lib.filter (d: d != null && !lib.hasInfix "*" d) ep.extraDomains
-      ) terminatedEndpoints
+        lib.filter (d: d != null && !lib.hasInfix "*" d) pub.extraDomains
+      ) terminatedPublications
     )
   );
 in
 {
+  options.my.contracts.provides = lib.mkOption {
+    type = lib.types.attrsOf (
+      lib.types.submodule {
+        options.publications = lib.mkOption {
+          type = lib.types.attrsOf (
+            lib.types.submodule {
+              options = {
+                customExtraConfig = lib.mkOption {
+                  type = lib.types.nullOr lib.types.lines;
+                  default = null;
+                  description = ''
+                    Fully custom Caddyfile directives that replace the generated proxy block. Prefer
+                    `proxyOptions`: this option ignores the projected upstream target and therefore
+                    cannot be used by the ingress engine.
+                  '';
+                };
+
+                proxyOptions = lib.mkOption {
+                  type = lib.types.str;
+                  default = "";
+                  description = ''
+                    Extra directives placed inside the generated `reverse_proxy` block, e.g.
+                    `flush_interval -1` for streaming. Applied on every host that serves the endpoint,
+                    including the ingress, so the upstream target stays projected.
+                  '';
+                };
+
+              };
+            }
+          );
+        };
+      }
+    );
+  };
+
   options.my.features.services.caddy = {
     enable = lib.mkEnableOption "Caddy Web Server";
 
@@ -112,8 +147,9 @@ in
             lib.mapAttrsToList (
               _svcName: contract:
               lib.filter (
-                ep: ep.ingress && (ep.scope == "public" || ep.scope == "internal") && ep.canonicalDomain != null
-              ) (lib.attrValues contract.endpoints)
+                pub:
+                pub.ingress && (pub.scope == "public" || pub.scope == "internal") && pub.canonicalDomain != null
+              ) (lib.attrValues contract.publications)
             ) config.my.contracts.provides
           );
 
@@ -132,9 +168,9 @@ in
                       lib.mapAttrsToList (
                         _svcName: contract:
                         lib.concatMap (
-                          ep:
-                          lib.optional (ep.ingress && ep.scope == "public" && ep.canonicalDomain != null) {
-                            inherit (ep)
+                          pub:
+                          lib.optional (pub.ingress && pub.scope == "public" && pub.canonicalDomain != null) {
+                            inherit (pub)
                               canonicalDomain
                               extraDomains
                               port
@@ -144,9 +180,9 @@ in
                               customExtraConfig
                               proxyOptions
                               ;
-                            target = "${address}:${toString ep.port}";
+                            target = "${address}:${toString pub.port}";
                           }
-                        ) (lib.attrValues contract.endpoints)
+                        ) (lib.attrValues contract.publications)
                       ) (hostConfig.config.my.contracts.provides or { })
                     )
                   )
@@ -301,25 +337,23 @@ in
         http = {
           port = 80;
           protocol = "tcp";
-          scope = "public";
           directAccess = {
             enable = true;
             protocol = "tcp";
             interface = "all";
           };
-          monitoring.http.enable = false;
+
         };
 
         https = {
           port = 443;
           protocol = "both";
-          scope = "public";
           directAccess = {
             enable = true;
             protocol = "both";
             interface = "all";
           };
-          monitoring.http.enable = false;
+          applicationProtocol = "https";
         };
       };
     };
