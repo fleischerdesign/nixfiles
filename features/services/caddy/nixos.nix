@@ -260,7 +260,7 @@ in
         email = config.my.user.email;
         dnsProvider = "cloudflare";
         # lego determines the zone by asking a resolver for the SOA record. The system resolver on
-        # these hosts is Tailscale MagicDNS (and Blocky on the LAN), neither of which is
+        # these hosts is our own split-horizon view, which is not
         # authoritative for the public zone: asked for `vyrx.de` they answer "has no SOA record",
         # lego then walks up to the bare TLD `de.` and reports "zone could not be found" - which
         # looks exactly like a missing API permission and was misread as one. Zone discovery must
@@ -272,7 +272,7 @@ in
         # NXDOMAIN is then cached negatively for the zone's whole SOA minimum (1800 s here) - which
         # makes every retry for the next half hour fail. Measured: with the check off, all four
         # orders on hom-srv-01 failed with exactly that NXDOMAIN. It is pinned to a public resolver
-        # for the same reason the zone lookup is: these hosts resolve through Tailscale MagicDNS.
+        # for the same reason the zone lookup is: these hosts resolve through our own views.
         dnsPropagationCheck = true;
         # systemd credentials rather than an environment file: lego reads the token from the path
         # the variable names, so the secret never appears in a process environment.

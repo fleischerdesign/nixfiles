@@ -71,7 +71,7 @@ in
         # Load the token from the sops template
         EnvironmentFile = config.sops.templates."authentik-outpost.env".path;
 
-        # Configure connection to Authentik Core via Tailscale
+        # Configure connection to Authentik Core over the mesh
         Environment = [
           "AUTHENTIK_HOST=${cfg.coreAddress}"
           "AUTHENTIK_HOST_BROWSER=${cfg.browserUrl}"

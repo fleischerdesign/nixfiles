@@ -4,7 +4,7 @@
 #
 # Security:
 #   - Listens on 127.0.0.1 (Loopback) by default.
-#   - Exposes Port on Tailscale firewall interface for cluster nodes.
+#   - Exposes the port on the WireGuard mesh interface for cluster nodes.
 #   - Optional Caddy reverse-proxy with Authentik forward-auth SSO for human browser use.
 #   - JSON format enabled for machine API search requests.
 {
@@ -28,7 +28,7 @@ in
     bindAddress = lib.mkOption {
       type = lib.types.str;
       default = "0.0.0.0";
-      description = "Address SearXNG binds to (0.0.0.0 enables direct access via Tailscale and loopback; external ports are blocked by firewall).";
+      description = "Address SearXNG binds to (0.0.0.0 enables direct access over the mesh and loopback; external ports are blocked by firewall).";
     };
 
     secretKeySecret = lib.mkOption {
@@ -56,7 +56,7 @@ in
     openMeshFirewall = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Allow direct access to SearXNG port over Tailscale interface.";
+      description = "Allow direct access to the SearXNG port over the WireGuard mesh interface.";
     };
 
     enableJsonApi = lib.mkOption {

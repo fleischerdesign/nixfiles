@@ -269,7 +269,7 @@ in
 
         ++
 
-          # Ping probe for servers over Tailscale mesh
+          # Ping probe for servers over the WireGuard mesh
           lib.optionals (otherServerHosts != { }) [
             {
               job_name = "blackbox-ping-servers";

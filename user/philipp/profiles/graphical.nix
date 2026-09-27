@@ -17,7 +17,7 @@
     jellyfin-desktop
     inkscape
     evince
-    libreoffice-fresh
+    libreoffice
     nautilus
     gnome-disk-utility
     bluetuith

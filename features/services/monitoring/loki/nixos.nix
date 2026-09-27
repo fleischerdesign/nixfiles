@@ -18,7 +18,7 @@ in
       configuration = {
         auth_enabled = false;
         server.http_listen_port = 3100;
-        server.http_listen_address = "0.0.0.0"; # Allow remote log shipping via Tailscale
+        server.http_listen_address = "0.0.0.0"; # Allow remote log shipping over the mesh
 
         common.instance_addr = "127.0.0.1";
         common.path_prefix = "/var/lib/loki";
