@@ -1,8 +1,9 @@
 # features/system/networking/wireguard/nixos.nix
 # Stateless Kernel-WireGuard Mesh Network (RFC 1918 / 10.10.100.0/24 & RFC 4193 / fd10:1000:100::/64).
-# High-Availability Dual-Hub Active Relay Architecture (cld-edge-01 + cld-ops-01).
-# Eliminates single points of failure, establishes encrypted node-to-node transport,
-# and enforces longest-prefix cryptokey routing with automated MSS clamping.
+# Dual-hub relay architecture (cld-edge-01 + cld-ops-01) with an explicitly assigned
+# primary hub per node. Peering is redundant - every node handshakes with both hubs - but
+# overlay transit is not: only the assigned primary carries the mesh CIDR, so losing it
+# means reassigning `primaryHub` and rebuilding, not an automatic failover.
 {
   config,
   lib,

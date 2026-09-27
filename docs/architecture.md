@@ -125,9 +125,11 @@ Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no
   10.10.100.10    10.10.100.20     10.10.100.30
 ```
 
-- **Dual hub.** Every host peers with both cloud hosts. The *primary* hub carries the overlay CIDR for
-  transit; the secondary is reached by its own `/32`. A hub can be taken out without reconfiguring a
-  spoke.
+- **Dual hub, assigned primary.** Every host peers with both cloud hosts. The *assigned*
+  primary hub (`primaryHub`, one per node) carries the overlay CIDR for transit; the secondary is
+  reached by its own `/32` only. Peering is therefore redundant, transit is not: losing the primary
+  hub means reassigning `primaryHub` and rebuilding the affected nodes. Automatic transit failover
+  is not claimed and not implemented.
 - **Longest-prefix cryptokey routing.** A peer's `allowedIPs` is its overlay address plus whatever it
   carries (§ below). Traffic to a host's own `/32` goes direct; traffic to a prefix goes to whoever
   carries it.
