@@ -91,38 +91,24 @@ LAN is elsewhere.
 | Cloud host, any time | **Public IP** (`root@<public-ip>`) — always-on lifeline |
 | Everything else | **WireGuard** (`root@10.10.100.x`) — all five hosts, hubs and spokes alike |
 
-### 4.2 `nod switch` / `deploy` target the WireGuard IPs — and work
+### 4.2 `nod switch` targets the WireGuard IPs — and works
 
-The flake's `deploy.nodes.<host>.hostname` is the host's `wireguardIpv4`, and the legacy `tailscaleIp`
-shim that used to stand behind it is gone. All five hosts answer on those addresses (measured
-2026-09-20: `ping` and `ssh` on `10.10.100.1`, `.2`, `.10`, `.20`, `.30`), so `nod switch <host>` no
-longer times out at the closure copy stage.
+The deployment surface is `nod` and `nixos-rebuild`. `nod` reads `#nixosConfigurations` and the
+`nodTargets` projection, and nothing else: `nodTargets` maps every deploy target - the five hosts, the
+agentless router, access point and cloud reconciler, and each ESPHome device - to the `targetHost` it
+dials, which for a host is its `wireguardIpv4`. All five hosts answer on those addresses (measured
+2026-09-20: `ping` and `ssh` on `10.10.100.1`, `.2`, `.10`, `.20`, `.30`), so `nod switch <host>` does
+not time out at the closure copy stage.
 
-`deploy` has `autoRollback = true`; `nixos-rebuild` does **not**, so keep out-of-band access ready — on
-the cloud hosts that is the public IP, which never depends on DHCP, DNS or the mesh.
+There is deliberately **no `deploy` output**. It referenced an input (`deploy-rs`) the flake does not
+declare, so it could not be evaluated at all - an interface nobody could have been using. Because
+`nix flake check` cannot see a custom output (it warns "unknown flake output" and moves on), an
+`output-surfaces` check now forces the `nodTargets` projection and requires every target to name an
+address, so a broken deploy surface fails the build instead of a rollout.
 
-The flake `deploy.nodes.<host>.hostname` is computed as:
-
-```nix
-hostConfig.config.my.topology.hosts.${name}.wireguardIpv4
-  or hostConfig.config.my.features.system.networking.topology.hosts.${name}.tailscaleIp;
-```
-
-The topology "legacy shim" sets `tailscaleIp = h.wireguardIpv4`, so **both resolve to the WireGuard IP**. `nod` therefore always targets `10.10.100.x`. While the WG peers are not handshaking (see §10), `nod switch <host>` times out at the closure copy stage.
-
-**Workarounds during the transition (pick one):**
-- **A (recommended now):** deploy with `nixos-rebuild` and an explicit reachable address:
-  ```bash
-  nixos-rebuild switch --flake .#<host> --target-host root@<public-ip|tailscale-ip|lan-ip>
-  ```
-- **B:** fix `deploy.nodes.<host>.hostname` to prefer the public IP (cloud) / Tailscale MagicDNS (`<host>.<tailnet>.ts.net`) and keep WG as a later switch.
-- **C (auto-rollback, if wanted):** `deploy-rs` with an explicit `--hostname` override, since the CLI is not installed locally:
-  ```bash
-  nix run github:serokell/deploy-rs -- .#<host> --hostname <public-ip|tailscale-ip>
-  ```
-  `deploy` has `autoRollback = true` in the flake; `nixos-rebuild` does **not**, so keep out-of-band access (VPS console) ready.
-
-`nod switch <host> --dry-run` and `nod plan <host>` are safe and still useful for planning.
+`nod switch <host> --dry-run` and `nod plan <host>` are safe and still useful for planning. Keep
+out-of-band access ready during a rollout - on the cloud hosts that is the public IP, which never
+depends on DHCP, DNS or the mesh.
 
 ### 4.3 Onboarding a roaming client (a phone)
 
@@ -336,8 +322,8 @@ Order of attempts (stop as soon as one works):
 
 The **fleet deploy key** is `~/.ssh/nixfiles-deploy-key`, fingerprint
 `SHA256:EduFlyoHwWJx3avw46lQsLksum5R0scm6z27OeqBeO4`, generated 2026-09-20 and authorised through
-`my.features.system.networking.ssh.deployKeys` on every host. `~/.ssh/config`, `nod`'s
-`identityFile` (`roles/base.nix`) and `deploy-rs`'s `-i` argument (`flake.nix`) all use it.
+`my.features.system.networking.ssh.deployKeys` on every host. `~/.ssh/config` and `nod`'s
+`identityFile` (`roles/base.nix`) both use it.
 
 `~/.ssh/deploy-key` still points at the node tunnel secret
 (`/run/secrets.d/2/infra/node_tunnel_key`) and must **not** be used to address the fleet. That path
@@ -458,7 +444,7 @@ here: they belong in the commit that resolved them.
 ## 11. Appendix — Files, Secrets, Commands
 
 **Key files**
-- `flake.nix` — hosts, `deploy.nodes`, `nodTargets`.
+- `flake.nix` — hosts, `nodTargets`.
 - `features/system/networking/{gateway,fritzbox,tplink-ap,wireguard,static,topology}` — network model.
 - `hosts/<host>/configuration.nix` — per-host feature switches.
 - `features/services/authentik/**` — identity (see `identity.md`).

@@ -246,6 +246,30 @@
           ) hostNames
         );
 
+        # `nix flake check` cannot see a custom output - it warns "unknown flake output" and does not
+        # evaluate it - so a broken one is invisible until a deploy. This forces the surface the fleet
+        # actually deploys through: the `nodTargets` projection must evaluate and every target must name
+        # the address it dials. It replaced a `deploy` output that referenced an undeclared `deploy-rs`
+        # input and therefore could not be evaluated at all; `nod` reads `nixosConfigurations` and
+        # `nodTargets`, not `deploy`.
+        output-surfaces =
+          let
+            targets = self.nodTargets;
+            names = nixpkgs-unstable.lib.attrNames targets;
+            withoutAddress = nixpkgs-unstable.lib.filter (
+              name: (targets.${name}.targetHost or null) == null
+            ) names;
+          in
+          pkgs.runCommandLocal "output-surfaces" { } (
+            if withoutAddress == [ ] then
+              "echo 'ok: ${toString (nixpkgs-unstable.lib.length names)} nodTargets carry an address' > $out"
+            else
+              ''
+                echo "nodTargets without a targetHost: ${nixpkgs-unstable.lib.concatStringsSep ", " withoutAddress}" >&2
+                exit 1
+              ''
+          );
+
         statix =
           pkgs.runCommandLocal "statix-check"
             {
@@ -448,39 +472,6 @@
             ;
         }
       );
-
-      deploy = {
-        autoRollback = true;
-        magicRollback = false;
-
-        nodes = builtins.mapAttrs (
-          name: _:
-          let
-            hostConfig = self.nixosConfigurations.${name};
-            deployKey =
-              let
-                envKey = builtins.getEnv "DEPLOY_KEY";
-              in
-              # Fallback is the fleet deploy key. ~/.ssh/deploy-key is the node tunnel secret and
-              # must not be the credential that addresses the fleet.
-              if envKey != "" then envKey else "~/.ssh/nixfiles-deploy-key";
-          in
-          {
-            hostname =
-              hostConfig.config.my.topology.hosts.${name}.wireguardIpv4
-                or hostConfig.config.my.topology.hosts.${name}.wireguardIpv4;
-            profiles.system = {
-              user = "root";
-              sshUser = "root";
-              sshOpts = [
-                "-i"
-                deployKey
-              ];
-              path = inputs.deploy-rs.lib.${system}.activate.nixos hostConfig;
-            };
-          }
-        ) self.nixosConfigurations;
-      };
 
       nodTargets = {
         cloudflare = {
