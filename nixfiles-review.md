@@ -1660,9 +1660,7 @@ supersedes one by date, not by silently editing this table.
   `backupCleanupCommand`), not the nonexistent `backupPreparePrune`, and dump freshness is bound to the
   backup run rather than to an independent clock.
 
-### 10.2 Implementation increments
-
-Corrections before churn, so nothing is touched twice:
+### 10.2 Implementation incrementsCorrections before churn, so nothing is touched twice:
 
 | Increment | Scope | Status |
 |---|---|---|
@@ -1671,8 +1669,22 @@ Corrections before churn, so nothing is touched twice:
 | 3 | F04/F05 backup per D13: a working hook lifecycle, honest tiers, an explicit no-backup decision | done |
 | 4 | F01 deployment surface (+ `operations.md`) | done |
 | 5 | D1/D6 discovery contract and fixtures, then the marker migration | done |
-| 6 | D2/D3/D4/D5/D7/D8 extractions and renames | planned |
+| 6 | D2/D3/D4/D5/D7/D8 extractions and renames | in progress |
 | 7 | F19/F20/F21 verification, documentation, polish | planned |
+
+### 10.3 A methodological note, recorded because it cost an hour
+
+The malformed-marker control was first written wrong and still looked like evidence. The probe evaluated
+`loader.findModules` on a malformed tree and grepped the output for the throw message - but the throw
+fires inside list construction, the outer expression never forced it, and the grep matched nothing for
+the wrong reason. A negative test that cannot fail is not a test (cf. `docs/practices.md` §4.1: a
+missing tool, a guessed name and a real negative look identical at the point of measurement).
+
+The corrected form lives in `checks/module-discovery.nix`: `builtins.tryEval (builtins.deepSeq …
+true)` observes the throw *inside* the check derivation, and a stray-module control proves the same
+check fails loudly when it should. The rule for the remaining increments: a negative control must name
+the failure it expects *and* demonstrate it by breaking the fixture, not by asserting over unevaluated
+output.
 
 Residual, deliberately deferred: PostgreSQL's dump is still produced by its own timer (02:00) rather than by
 the backup job's `preBackup` hook. The artifact and the exclusion are correct now; binding freshness to the
