@@ -42,7 +42,7 @@ It is a node like the others; its WireGuard configuration is rendered as a wg-qu
 
 ## 3. Network model
 
-### 3.1 One Layer-2 segment, three zones
+### 3.1 One Layer-2 segment, five zones
 
 The house is **one flat Layer-2 segment**. Zones are *addressing and policy*, not separate broadcast
 domains: a zone is a named subnet with a trust level, plus the firewall rules that treat it.
@@ -377,7 +377,7 @@ The invariants (`contracts/*`) are evaluation-time assertions, not conventions: 
 public plane without authentication, a name that cannot be derived, an endpoint on a host that does not
 serve it, or a subnet a reservation falls outside - each fails the build rather than the deployment.
 
-### 6.1 What is compiled, and what is still a setting
+### 7.1 What is compiled, and what is still a setting
 
 A projection earns its complexity only where it replaces a manual step. Measured 2026-09-20, service by
 service:

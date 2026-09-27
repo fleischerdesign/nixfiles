@@ -3,7 +3,7 @@
 > **Status:** Operational runbook (living document)
 > **Audience:** Operators and autonomous agents. Everything needed to finish (or recover) the 2.0 rollout is here.
 > **Companion docs:** `architecture.md` (the system and its vocabulary), `naming.md` (names and planes), `identity.md` (Authentik), `security.md` (the threat model), `embedded.md` (the device fleet), `practices.md` (how we work).
-> **Emergency?** Jump straight to [§11 Emergency Recovery](#11-emergency-recovery--regaining-access).
+> **Emergency?** Jump straight to [§9 Emergency Recovery](#9-emergency-recovery--regaining-access).
 
 ---
 
@@ -217,7 +217,7 @@ Worst case: reboot and select the previous generation in the bootloader (GRUB).
 ### 7.1 cld-edge-01 — DONE
 Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `identity.md`).
 
-## 7. nodTargets (agentless reconcilers)
+## 8. nodTargets (agentless reconcilers)
 
 `flake.nix → nodTargets` (all `targetType = "agentless"`; `nod` builds `#nodTargets.<name>.package` and runs its single binary locally):
 
@@ -233,7 +233,7 @@ Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints
 > `nod switch <target>` works. The Authentik target had the same defect and was removed. Verify
 > `--dry-run` output before applying anything — both device reconcilers report a real diff now.
 
-### 7.1 OpenClaw node command surfaces (runtime, not Nix)
+### 8.1 OpenClaw node command surfaces (runtime, not Nix)
 
 A node advertises its command surface; the gateway's `gateway.nodes.commands.allow`, projected from
 `nodePolicy.capabilities` (`features/services/openclaw/lib/command-surface.nix`), decides which of
@@ -266,7 +266,7 @@ nix shell nixpkgs#sqlite -c sqlite3 "$DB" \
 The workstation's historic `jello` is the same kind of runtime state; correct it in the Control UI
 (Devices → rename) or with a pairing-scoped token.
 
-### 7.2 Instance identities, powers and the tunnel account
+### 8.2 Instance identities, powers and the tunnel account
 
 Every gateway and node instance runs as its own system user `openclaw-<instance>` with a private
 group. State directories, rendered env files and single-consumer secrets (for example
@@ -301,7 +301,7 @@ narrows an allowed forward - it does not re-enable one (measured 2026-09-24: the
 
 ---
 
-## 8. Emergency Recovery — Regaining Access
+## 9. Emergency Recovery — Regaining Access
 
 Order of attempts (stop as soon as one works):
 
@@ -311,7 +311,7 @@ Order of attempts (stop as soon as one works):
 2. **Tailscale**: `tailscale status` on any reachable node; `ssh <user>@100.x.x.x`.
 3. **WireGuard**: `ssh root@10.10.100.x` (only if peers handshake).
 
-### 11.1 Which key does root trust? (verified 2026-09-20)
+### 9.1 Which key does root trust? (verified 2026-09-20)
 
 | Host | root trusts | Note |
 |---|---|---|
@@ -332,7 +332,7 @@ root on every host, and the feature's lifecycle overwrote it. The operator key s
 everywhere as a fallback, and `~/.ssh/config` deliberately sets no `IdentitiesOnly`, so a mistake
 here cannot lock the fleet out.
 
-### 11.2 Recovering a lost account password
+### 9.2 Recovering a lost account password
 
 Needed when the declared hash and the host disagree, or when a password is not the intended one.
 `root` itself is not an option: `PermitRootLogin = prohibit-password` and no root password is
@@ -399,7 +399,7 @@ If a **network service** was misconfigured:
 
 ---
 
-## 9. Verification cheat-sheet
+## 10. Verification cheat-sheet
 
 ```bash
 # per host
@@ -420,7 +420,7 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 
 ---
 
-## 10. Known hazards
+## 11. Known hazards
 
 Standing conditions that will bite an operator who does not know them. Resolved items do not belong
 here: they belong in the commit that resolved them.
@@ -441,7 +441,7 @@ here: they belong in the commit that resolved them.
 | `nod switch` writes the boot entry but **advances no profile generation** | measured 2026-09-22: after many deploys, a reboot brought the hosts back on configurations from days earlier (Blocky instead of the resolver, iptables instead of nftables). The deployer runs `<closure>/bin/switch-to-configuration switch`, which installs the bootloader and writes an entry (`ssh_cli_deployer.rs`), but nothing in that path runs `nix-env -p /nix/var/nix/profiles/system --set <closure>` - the only `nix-env` calls are garbage collection. systemd-boot derives its `default` from the profile generation, so the entry for the new closure existed while the default kept pointing at the old one. `nixos-rebuild switch` does set the generation, which is why the same deploy behaves differently there. Until `nod` sets it, pin one by hand after a deploy: `nix-env -p /nix/var/nix/profiles/system --set <closure> && switch-to-configuration boot` |
 | Nothing may write shell commands into the firewall | the whole policy is data, projected into the firewall's own rule options under the nftables implementation, which renders and applies one ruleset atomically. A command-shaped policy cost us the house's internet once (a syntax error stopped the firewall mid-reload and flushed the NAT of a zone) and left a withdrawn rule in the chain forever. The invariant `one firewall, rendered` and the `nftables-rules` check exist to keep it that way |
 
-## 11. Appendix — Files, Secrets, Commands
+## 12. Appendix — Files, Secrets, Commands
 
 **Key files**
 - `flake.nix` — hosts, `nodTargets`.
@@ -467,7 +467,7 @@ ssh root@<addr> 'nixos-rebuild --rollback switch'   # manual rollback
 
 **Change history of this runbook:** created during the initial 2.0 rollout (cld-edge-01 first). Keep it updated as hosts are migrated.
 
-### 13.1 `exit 4` from the Caddy reload - and what it actually was
+### 12.1 `exit 4` from the Caddy reload - and what it actually was
 
 `nixos-rebuild switch` returned `exit 4` on every activation of `hom-srv-01`, next to "Failed to reload
 caddy.service". It is tempting to file that as a cosmetic quirk - systemd retrying a reload that the
