@@ -9,12 +9,10 @@
 }:
 
 let
-  cfg = config.my.contracts;
-
-  # Two things are shared rather than repeated: how a rule is spelled (`lib/nftables.nix`) and the
-  # lattice's vocabulary, both coming from the modules that own them - so a policy here and the same
-  # policy projected elsewhere cannot drift apart.
-  nft = import ../../lib/nftables.nix { inherit lib; };
+  # The lattice's vocabulary is read from the module that owns it, so a policy here and the same policy
+  # projected elsewhere cannot drift apart. The firewall rules this contract used to render live in
+  # `features/system/networking/firewall`: a contract declares what an endpoint offers, the network
+  # area decides how that becomes a rule.
   endpointLib = import ../../lib/endpoints.nix { inherit lib; };
   levels = config.my.topology.trustLevels;
 
@@ -707,87 +705,6 @@ let
     };
   };
 
-  # Flatten all local endpoints across all declared contracts on this host
-  localEndpointsList = lib.concatLists (
-    lib.mapAttrsToList (_svcName: contract: lib.attrValues contract.endpoints) cfg.provides
-  );
-
-  # --- what an endpoint exposes, and to whom ---------------------------------------------------------
-  # Two things are being said, and one port list cannot say both: a port opened for the local network is
-  # reachable from every address on it - that is what "the local network is one trusted segment" means -
-  # while the mesh is judged by who is asking, which is the trust lattice, written in levels and rendered
-  # into addresses here.
-  #
-  # Every rule is an allow. Under the nftables implementation these land in the firewall's `input-allow`
-  # chain *behind* the declarative port accepts, so a deny here would never be reached - and it is not
-  # needed, because the chain's own policy is `drop`: what nobody allowed is closed. The previous shape
-  # opened a port for everyone and denied the mesh levels on top, which is why the deny had to be inserted
-  # at the head of the chain with a shell command, and why a withdrawn one stayed there forever.
-  #
-  # A named endpoint is proxied by an ingress, and the ingress is a host of the `mesh` zone: a proxy always
-  # implies that level, whatever the endpoint declares for direct use. That is also why the mesh side is
-  # narrower than it used to be - it is no longer "every mesh member", but the levels the endpoint is for.
-  accessRules = lib.concatMap (
-    ep:
-    let
-      protos =
-        if ep.directAccess.protocol == "both" then
-          [
-            "tcp"
-            "udp"
-          ]
-        else
-          [ ep.directAccess.protocol ];
-      levels = lib.unique (ep.directAccess.from ++ lib.optional (ep.canonicalDomain != null) "mesh");
-      meshSources = nft.sourcesOfTrust config.my.topology levels;
-      v4 = lib.filter (address: !(lib.hasInfix ":" address)) meshSources;
-      v6 = lib.filter (address: lib.hasInfix ":" address) meshSources;
-      dport = toString ep.port;
-      localRule =
-        proto:
-        nft.rule [
-          ''iifname != "wg0"''
-          "${proto} dport ${dport}"
-          "accept"
-        ];
-      meshRules =
-        proto:
-        lib.optionals (v4 != [ ]) [
-          (nft.rule [
-            ''iifname "wg0"''
-            "ip saddr ${nft.addressSet v4}"
-            "${proto} dport ${dport}"
-            "accept"
-          ])
-        ]
-        ++ lib.optionals (v6 != [ ]) [
-          (nft.rule [
-            ''iifname "wg0"''
-            "ip6 saddr ${nft.addressSet v6}"
-            "${proto} dport ${dport}"
-            "accept"
-          ])
-        ];
-      exposed =
-        proto:
-        lib.optionals (ep.directAccess.enable && ep.directAccess.interface == "all") [ (localRule proto) ]
-        ++ lib.optionals (
-          (ep.directAccess.enable && ep.directAccess.interface == "all")
-          || ep.directAccess.interface == "wireguard"
-          # A named endpoint is reached by an ingress that is a mesh host, even when it never declared
-          # direct access for itself: being proxied is what puts it on the mesh, and the rule says so.
-          || ep.canonicalDomain != null
-        ) (meshRules proto);
-    in
-    lib.optionals (ep.directAccess.enable || ep.canonicalDomain != null) (lib.concatMap exposed protos)
-  ) localEndpointsList;
-
-  # There is no deny rule, and that is the point: the chain's own policy closes what nobody allowed, so
-  # "the mesh is judged by who is asking" is expressed by *not opening* a port for the other levels rather
-  # than by dropping them afterwards. The previous shape did the opposite - open for everyone, deny on top
-  # - which is why the deny needed a shell command at the head of the chain, and why a withdrawn one
-  # stayed there forever.
-
   # Every endpoint that enables directory authentication becomes a consumer with fully resolved values:
   # the audience it stated, the SOPS path its app password lives at, and the DN it binds as. The provider
   # that creates those accounts derives the same DN from the same directory contract, so both sides agree
@@ -975,11 +892,5 @@ in
     ];
 
     my.contracts.consumes = ldapConsumers;
-
-    # One firewall, one place: what is opened is derived from the endpoints - already scoped to the
-    # interface they name and to the trust levels they are for - and the chain's own policy closes the
-    # rest. Nothing here is a command, and nothing has to be withdrawn, because the firewall renders this
-    # from the configuration on every activation: the running rules and the declarations cannot disagree.
-    networking.firewall.extraInputRules = lib.concatStringsSep "\n" accessRules;
   };
 }

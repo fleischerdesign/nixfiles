@@ -14,7 +14,8 @@ let
   cfg = config.my.features.system.networking.wireguard;
   topology = config.my.topology;
   ownHostname = config.networking.hostName;
-  nft = import ../../../../lib/nftables.nix { inherit lib; };
+  nftRender = import ../lib/nftables-render.nix { inherit lib; };
+  accessSources = import ../../../../contracts/topology/lib/access-sources.nix { inherit lib; };
   ownHost = topology.hosts.${ownHostname} or null;
 
   isRelay = ownHost != null && (ownHost.wireguardRelay or false);
@@ -81,7 +82,7 @@ let
           endpointName: endpoint:
           let
             sources = lib.filter (address: !(lib.hasInfix ":" address)) (
-              nft.sourcesOfTrust topology endpoint.from
+              accessSources.sourcesOfTrust topology endpoint.from
             );
             protocols =
               if endpoint.protocol == "both" then
@@ -94,9 +95,9 @@ let
           in
           map (
             proto:
-            nft.rule [
+            nftRender.rule [
               ''iifname "${cfg.interfaceName}"''
-              "ip saddr ${nft.addressSet sources}"
+              "ip saddr ${nftRender.addressSet sources}"
               "ip daddr ${device.ipv4}"
               "${proto} dport ${toString endpoint.port}"
               "accept"

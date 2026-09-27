@@ -15,7 +15,9 @@
 }:
 let
   cfgOf = name: self.nixosConfigurations.${name}.config;
-  nft = import ../lib/nftables.nix { inherit lib; };
+  # The trust-level-to-address translation comes from the topology contract, not from a renderer: a
+  # policy check must not have to import nftables to ask which addresses a level has.
+  accessSources = import ../contracts/topology/lib/access-sources.nix { inherit lib; };
 
   # The inventory is the same on every host; read it from one of them.
   reference = cfgOf (builtins.head hostNames);
@@ -90,7 +92,7 @@ let
     entry:
     let
       rules = forwardRules lanRouter;
-      sources = nft.sourcesOfTrust topology entry.endpoint.from;
+      sources = accessSources.sourcesOfTrust topology entry.endpoint.from;
       hasSource = lib.any (address: lib.hasInfix address rules) sources;
     in
     lib.optional (
