@@ -12,12 +12,23 @@ let
   cfg = config.my.features.system.networking.gateway;
   topology = config.my.topology;
 
+  # The uplink is the gateway of the zone it lives in. An explicitly set `uplinkGateway`
+  # wins; otherwise the inventory decides: the infra subnet's gateway is the next hop, because
+  # that is where the uplink router is declared. A missing inventory fact fails loudly instead
+  # of falling back to a literal that silently survives a renumbering.
+  effectiveUplink =
+    if cfg.uplinkGateway != null then
+      cfg.uplinkGateway
+    else
+      topology.subnets.infra.gateway
+        or (throw "gateway: no uplinkGateway set and inventory provides no infra subnet gateway; assign uplinkGateway explicitly");
+
   # Zones this host serves DHCP for, derived from the topology: the zone that holds the uplink (its
   # router is the uplink itself) plus the zones this host routes. Trust levels do not belong here -
   # they govern forwarding and NAT, not addressing, and the isolated iot zone still gets its
   # reservations. Adding a zone therefore needs no change in this file.
   uplinkZone = lib.findFirst (
-    zone: (topology.subnets.${zone}.gateway or null) == cfg.uplinkGateway
+    zone: (topology.subnets.${zone}.gateway or null) == effectiveUplink
   ) null (lib.attrNames topology.subnets);
 
   dhcpZones = lib.unique (lib.optional (uplinkZone != null) uplinkZone ++ cfg.routedZones);
@@ -118,9 +129,12 @@ in
     };
 
     uplinkGateway = lib.mkOption {
-      type = lib.types.str;
-      default = "10.10.10.1";
-      description = "Next-hop router/modem IP for WAN uplink (e.g. FRITZ!Box)";
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Next-hop router/modem IP for WAN uplink (e.g. FRITZ!Box). Null derives the infra
+        subnet's gateway from the inventory, which is where the uplink router is declared.
+      '';
     };
 
     routedZones = lib.mkOption {

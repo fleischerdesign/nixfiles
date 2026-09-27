@@ -119,7 +119,9 @@ let
   # printer's web interface stayed reachable from the hub, and with the explicit deny the *withdrawal* of
   # a rule never happened at all.
 
-  meshCidr = topology.subnets.mesh.cidr or "10.10.100.0/24";
+  meshCidr =
+    topology.subnets.mesh.cidr
+      or (throw "wireguard: inventory provides no mesh subnet CIDR; declare subnets.mesh.cidr");
 
   # A host with its own address in a home zone *is* in the home LAN: its zone gateway reaches every
   # other home zone directly, so a tunnel route for one would shadow a shorter path - measured: a
@@ -156,7 +158,8 @@ let
             meshCidr
           ]
           ++ lib.optional (topology.subnets ? mesh-ipv6) (
-            topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64"
+            topology.subnets.mesh-ipv6.cidr
+              or (throw "wireguard: inventory provides no mesh-ipv6 subnet CIDR; declare subnets.mesh-ipv6.cidr")
           )
           ++ lanRoutes
         else
@@ -299,8 +302,14 @@ in
     # instead of binding a /24 onto another prefix.
     networking.wireguard.interfaces.${cfg.interfaceName} =
       let
-        meshPrefix = cidrLib.prefixLength (topology.subnets.mesh.cidr or "10.10.100.0/24");
-        meshV6Prefix = cidrLib.prefixLength (topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64");
+        meshPrefix = cidrLib.prefixLength (
+          topology.subnets.mesh.cidr
+            or (throw "wireguard: inventory provides no mesh subnet CIDR; declare subnets.mesh.cidr")
+        );
+        meshV6Prefix = cidrLib.prefixLength (
+          topology.subnets.mesh-ipv6.cidr
+            or (throw "wireguard: inventory provides no mesh-ipv6 subnet CIDR; declare subnets.mesh-ipv6.cidr")
+        );
       in
       assert meshPrefix != null;
       assert meshV6Prefix != null || ownHost.wireguardIpv6 == null;

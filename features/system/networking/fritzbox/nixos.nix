@@ -87,7 +87,11 @@ in
 
     host = lib.mkOption {
       type = lib.types.str;
-      default = if routerHost != null && routerHost.ipv4 != null then routerHost.ipv4 else "10.10.10.1";
+      default =
+        if routerHost != null && routerHost.ipv4 != null then
+          routerHost.ipv4
+        else
+          (throw "fritzbox: inventory declares no hom-rt-01 ipv4; declare the router host instead of dialling a literal");
       description = ''
         TR-064 reachable address of the FRITZ!Box: its declared `ipv4` in `my.topology`.
       '';
@@ -111,7 +115,11 @@ in
       lan = {
         address = lib.mkOption {
           type = lib.types.str;
-          default = if routerHost != null && routerHost.ipv4 != null then routerHost.ipv4 else "10.10.10.1";
+          default =
+            if routerHost != null && routerHost.ipv4 != null then
+              routerHost.ipv4
+            else
+              (throw "fritzbox: inventory declares no hom-rt-01 ipv4; declare the router host instead of dialling a literal");
           description = "Target LAN address of the FRITZ!Box (RFC 1812 uplink router)";
         };
 
@@ -129,7 +137,10 @@ in
                 net = lib.concatStringsSep "." (
                   lib.take 3 (
                     lib.splitString "." (
-                      if routerHost != null && routerHost.ipv4 != null then routerHost.ipv4 else "10.10.10.1"
+                      if routerHost != null && routerHost.ipv4 != null then
+                        routerHost.ipv4
+                      else
+                        (throw "fritzbox: inventory declares no hom-rt-01 ipv4; declare the router host instead of dialling a literal")
                     )
                   )
                 );
@@ -148,7 +159,10 @@ in
                 net = lib.concatStringsSep "." (
                   lib.take 3 (
                     lib.splitString "." (
-                      if routerHost != null && routerHost.ipv4 != null then routerHost.ipv4 else "10.10.10.1"
+                      if routerHost != null && routerHost.ipv4 != null then
+                        routerHost.ipv4
+                      else
+                        (throw "fritzbox: inventory declares no hom-rt-01 ipv4; declare the router host instead of dialling a literal")
                     )
                   )
                 );
@@ -162,7 +176,11 @@ in
       dns = {
         primary = lib.mkOption {
           type = lib.types.str;
-          default = if serverHost != null && serverHost.ipv4 != null then serverHost.ipv4 else "10.10.10.10";
+          default =
+            if serverHost != null && serverHost.ipv4 != null then
+              serverHost.ipv4
+            else
+              (throw "fritzbox: inventory declares no hom-srv-01 ipv4; declare the server host instead of dialling a literal");
           description = ''
             DNS server the box should announce. NOT settable over TR-064 (this box exposes no
             such action), so it is reported as a diff and must be set in the UI - or ignored,

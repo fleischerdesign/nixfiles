@@ -45,7 +45,11 @@ in
 
     host = lib.mkOption {
       type = lib.types.str;
-      default = if apHost != null && apHost.ipv4 != null then apHost.ipv4 else "10.10.10.20";
+      default =
+        if apHost != null && apHost.ipv4 != null then
+          apHost.ipv4
+        else
+          (throw "tplink-ap: inventory declares no hom-ap-01 ipv4; declare the access point host instead of dialling a literal");
       description = ''
         Management address of the access point: its declared `ipv4` in `my.topology`.
       '';
