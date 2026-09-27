@@ -32,14 +32,15 @@ let
     name != ownHostname && (h.wireguardRelay or false) && h.ipv4 != null && h.wireguardPublicKey != null
   ) topology.hosts;
 
-  # Active primary hub used for subnet-wide transit (falls back to first available relay if configured hub unavailable)
+  # The hub this node routes the mesh through. It is assigned, not discovered: falling back to
+  # "the first available relay" would re-hub the node whenever a relay appears, disappears or is
+  # renamed - a routing decision disguised as traversal order. A hub that is not an available
+  # relay fails the build with the available names instead.
   effectivePrimaryHub =
     if relayHosts ? ${cfg.primaryHub} then
       cfg.primaryHub
-    else if relayHosts != { } then
-      lib.head (lib.attrNames relayHosts)
     else
-      cfg.primaryHub;
+      throw "wireguard: primaryHub '${cfg.primaryHub}' on ${ownHostname} is not an available relay (available: ${lib.concatStringsSep ", " (lib.attrNames relayHosts)}); assign an available relay explicitly";
 
   # --- LAN reachability over the mesh ----------------------------------------------------------
   # The mesh carries the overlay, plus the home zones that hold devices without an overlay identity.
