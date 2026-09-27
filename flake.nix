@@ -446,6 +446,13 @@
           inherit pkgs self hostNames;
           lib = nixpkgs-unstable.lib;
         };
+
+        # The import contract of `features/` and `contracts/`: which files count as NixOS modules, what
+        # stays a helper, and that the former `default.nix` marker is gone everywhere.
+        module-discovery = import ./checks/module-discovery.nix {
+          inherit pkgs;
+          lib = nixpkgs-unstable.lib;
+        };
       };
 
       devShells.${system}.default = pkgs.mkShell {

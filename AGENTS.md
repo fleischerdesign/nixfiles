@@ -53,10 +53,10 @@ than any real defect.
 flake.nix                 15 inputs, overlays, one mkSystem call per host
 hosts/<name>/             entry point: role + hardware + host-specific features
 roles/                    base → server | pc → desktop | notebook
-features/                 auto-discovered modules, each behind `enable`
+features/                 NixOS modules, discovered by the `nixos.nix` marker, each behind `enable`
   system/  services/  dev/  media/  desktop/
 contracts/                provides (interfaces, storage, backup, telemetry), consumes, naming, endpoints, directory
-lib/core/                 mkSystem, module auto-discovery
+lib/core/                 mkSystem, module discovery (`nixos.nix`)
 user/<name>/              Home Manager: home.nix, packages, fish, editors
 secrets/                  SOPS-encrypted, one file
 docs/                     the specification, see docs/README.md
@@ -64,7 +64,7 @@ docs/                     the specification, see docs/README.md
 
 ## Adding a service
 
-1. `features/services/<name>/default.nix` with an `enable` option.
+1. `features/services/<name>/nixos.nix` with an `enable` option.
 2. Declare what it offers and needs: `my.contracts.provides.<name>` (endpoints, storage, backup,
    telemetry) and `my.contracts.consumes.<name>`. Caddy vHosts, Authentik blueprints and provider
    resources (databases, users, buckets) are projected from those declarations - never written by hand.

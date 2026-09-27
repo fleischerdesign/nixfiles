@@ -168,7 +168,7 @@ def main():
     # If a record changed type (e.g. CNAME -> A), Cloudflare will reject creating the new
     # record with 'A CNAME record with that host already exists' unless the stale one is deleted first.
     owned_prefixes = (
-        # Comments this engine writes today (every mkRecord call in default.nix).
+        # Comments this engine writes today (every mkRecord call in nixos.nix).
         "Zone apex -> ",
         "Wildcard ingress -> ",
         "Node management ",

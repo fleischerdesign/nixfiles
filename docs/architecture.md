@@ -337,7 +337,7 @@ Consequences worth knowing:
 flake.nix        inputs, overlays, one mkSystem call per host
 hosts/<name>/    entry point: role + hardware + host-specific features
 roles/           base → server | pc → desktop | notebook
-features/        auto-discovered modules, each behind an `enable` option
+features/        NixOS modules, discovered by the `nixos.nix` marker, each behind an `enable` option
 contracts/       provides / consumes / naming / endpoints / storage / dependencies
 checks/          the promises, measured: network invariants, the portal artifact
 lib/core/        mkSystem, recursive module discovery

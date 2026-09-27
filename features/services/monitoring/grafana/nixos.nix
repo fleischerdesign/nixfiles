@@ -1,0 +1,350 @@
+{
+  config,
+  lib,
+  ...
+}:
+
+let
+  cfg = config.my.features.services.monitoring.grafana;
+  topologyDomain = config.my.topology.domain;
+  authHost = "auth.${topologyDomain}";
+  ntfyHost = "push.${topologyDomain}";
+in
+{
+  options.my.features.services.monitoring.grafana = {
+    enable = lib.mkEnableOption "Grafana Dashboard";
+    ssoAuthority = lib.mkOption {
+      type = lib.types.str;
+      default = "https://${authHost}/application/o";
+      description = "Base SSO authority URL.";
+    };
+    ntfyAlertUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "https://${ntfyHost}/grafana-alerts?template=grafana";
+      description = "Ntfy webhook URL for Grafana alerts.";
+    };
+  };
+
+  config = lib.mkIf cfg.enable {
+    # SOPS Secrets for OIDC and ntfy
+    sops.secrets."services/monitoring/grafana_oidc_client_secret" = {
+      owner = "grafana";
+    };
+    sops.secrets."services/monitoring/grafana_oidc_client_id" = {
+      owner = "grafana";
+    };
+    sops.secrets."services/monitoring/grafana_ntfy_token" = { }; # Definition from ntfy/nixos.nix
+    sops.secrets."services/monitoring/grafana_secret_key" = {
+      owner = "grafana";
+    };
+
+    # Template for Grafana environment variables
+    sops.templates."grafana.env".content = ''
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID=${
+        config.sops.placeholder."services/monitoring/grafana_oidc_client_id"
+      }
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=${
+        config.sops.placeholder."services/monitoring/grafana_oidc_client_secret"
+      }
+      GF_SECURITY_SECRET_KEY=${config.sops.placeholder."services/monitoring/grafana_secret_key"}
+      NTFY_TOKEN=${config.sops.placeholder."services/monitoring/grafana_ntfy_token"}
+    '';
+
+    services.grafana = {
+      enable = true;
+      settings = {
+        server = {
+          http_addr = "127.0.0.1";
+          http_port = 3000;
+          domain = config.my.contracts.provides.grafana.endpoints.web.canonicalDomain;
+          root_url = "https://${config.my.contracts.provides.grafana.endpoints.web.canonicalDomain}";
+        };
+
+        security = {
+          secret_key = "$__ENV{GF_SECURITY_SECRET_KEY}";
+        };
+
+        log = {
+          level = "info";
+        };
+
+        # OIDC Authentication with Authentik
+        "auth.generic_oauth" = {
+          enabled = true;
+          name = "Authentik";
+          allow_sign_up = true;
+          client_id = "$__ENV{GF_AUTH_GENERIC_OAUTH_CLIENT_ID}";
+          client_secret = "$__ENV{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}";
+          scopes = "openid profile email";
+          auth_url = "${cfg.ssoAuthority}/authorize/";
+          token_url = "${cfg.ssoAuthority}/token/";
+          api_url = "${cfg.ssoAuthority}/userinfo/";
+          role_attribute_path = "contains(groups, 'Grafana Admins') && 'Admin' || 'Viewer'";
+        };
+      };
+
+      provision = {
+        alerting = {
+          contactPoints.settings.contactPoints = [
+            {
+              name = "ntfy";
+              receivers = [
+                {
+                  uid = "ntfy-alerts";
+                  type = "webhook";
+                  settings = {
+                    url = cfg.ntfyAlertUrl;
+                    httpMethod = "POST";
+                    authorization_credentials = "$NTFY_TOKEN";
+                  };
+                }
+              ];
+            }
+          ];
+          policies.settings.policies = [
+            {
+              receiver = "ntfy";
+              group_by = [ "alertname" ];
+            }
+          ];
+          rules.settings.groups = [
+            {
+              name = "Infrastructure";
+              folder = "System";
+              interval = "60s";
+              rules = [
+                {
+                  uid = "infra-host-down-v3";
+                  title = "Host Down";
+                  condition = "C";
+                  for = "2m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      model = {
+                        expr = "up{job=~\"node-exporter_.*\"}";
+                      };
+                    }
+                    {
+                      refId = "B";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "A";
+                        type = "reduce";
+                        reducer = "last";
+                      };
+                    }
+                    {
+                      refId = "C";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "$B == 0";
+                        type = "math";
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Instance {{ $labels.instance }} has been down for more than 2 minutes.";
+                  };
+                }
+                {
+                  uid = "infra-disk-space-v3";
+                  title = "Disk Space Low";
+                  condition = "C";
+                  for = "5m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      model = {
+                        # Only monitor real persistent filesystems to avoid NaN errors from ramfs/tmpfs
+                        expr = "(node_filesystem_avail_bytes{fstype=~\"ext4|xfs|zfs|vfat\"} / node_filesystem_size_bytes{fstype=~\"ext4|xfs|zfs|vfat\"} * 100)";
+                      };
+                    }
+                    {
+                      refId = "B";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "A";
+                        type = "reduce";
+                        reducer = "last";
+                      };
+                    }
+                    {
+                      refId = "C";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "$B < 10";
+                        type = "math";
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Instance {{ $labels.instance }} device {{ $labels.device }} mounted on {{ $labels.mountpoint }} has less than 10% free space.";
+                  };
+                }
+                {
+                  uid = "infra-high-ram-v2";
+                  title = "High Memory Usage";
+                  condition = "C";
+                  for = "5m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      model = {
+                        expr = "100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100)";
+                      };
+                    }
+                    {
+                      refId = "B";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "A";
+                        type = "reduce";
+                        reducer = "last";
+                      };
+                    }
+                    {
+                      refId = "C";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "$B > 95";
+                        type = "math";
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Instance {{ $labels.instance }} has more than 95% RAM usage.";
+                  };
+                }
+                {
+                  uid = "infra-systemd-failed-v2";
+                  title = "Systemd Service Failed";
+                  condition = "C";
+                  for = "1m";
+                  data = [
+                    {
+                      refId = "A";
+                      datasourceUid = "PBFA97CFB590B2093";
+                      relativeTimeRange = {
+                        from = 600;
+                        to = 0;
+                      };
+                      model = {
+                        expr = "node_systemd_unit_state{state=\"failed\"}";
+                      };
+                    }
+                    {
+                      refId = "B";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "A";
+                        type = "reduce";
+                        reducer = "last";
+                      };
+                    }
+                    {
+                      refId = "C";
+                      datasourceUid = "-100";
+                      model = {
+                        expression = "$B == 1";
+                        type = "math";
+                      };
+                    }
+                  ];
+                  annotations = {
+                    summary = "Systemd service {{ $labels.name }} on {{ $labels.instance }} is in failed state.";
+                  };
+                }
+              ];
+            }
+          ];
+        };
+
+        dashboards.settings.providers = [
+          {
+            name = "vyrx-system-dashboards";
+            type = "file";
+            options = {
+              path = ./dashboards;
+              foldersFromFilesStructure = true;
+            };
+            disableDeletion = false;
+            updateIntervalSeconds = 60;
+          }
+        ];
+
+        datasources.settings.datasources = [
+          {
+            name = "Prometheus";
+            uid = "PBFA97CFB590B2093";
+            type = "prometheus";
+            url = "http://localhost:9090";
+            isDefault = true;
+          }
+          {
+            name = "Loki";
+            uid = "P8E80F9AEF21F6940";
+            type = "loki";
+            url = "http://localhost:3100";
+          }
+        ];
+      };
+    };
+
+    systemd.services.grafana.serviceConfig.EnvironmentFile = [
+      config.sops.templates."grafana.env".path
+    ];
+
+    my.contracts.provides.grafana = {
+      endpoints.web = {
+        port = 3000;
+        protocol = "tcp";
+        scope = "public";
+        auth = "oidc";
+        accessGroups = [ "infra-admins" ];
+        subdomain = "grafana";
+        extraDomains = [ ];
+        # The legacy aliases `grafana.ops.…` and `mon.lan.…` were removed: they encoded a
+        # host and a plane into a service name (Naming spec §0.2). Any OIDC redirect URI or
+        # bookmark that still uses them must be updated in the same change.
+        oidc = {
+          enable = true;
+          clientId = "KYgWM4pQYJh61GCmnGIwXMCJYR26mzRhDpJqnn7k";
+          clientSecretEnv = "AUTHENTIK_OIDC_GRAFANA_SECRET";
+          secretPath = "services/monitoring/grafana_oidc_client_secret";
+          redirectPaths = [ "/login/generic_oauth" ];
+          subMode = "hashed_user_id";
+          includeClaimsInIdToken = true;
+        };
+        dashboard = {
+          description = {
+            de = "Metriken, Dashboards und Logs.";
+            en = "Metrics, dashboards and logs.";
+          };
+          show = true;
+          displayName = "Grafana";
+          category = "Observability";
+          icon = "grafana";
+        };
+      };
+      storage = {
+        stateDirs = [ "/var/lib/grafana" ];
+      };
+    };
+  };
+}
