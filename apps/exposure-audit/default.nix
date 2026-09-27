@@ -23,8 +23,21 @@ let
       fw = (cfgOf name).networking.firewall;
       provides = (cfgOf name).my.contracts.provides or { };
       endpoints = lib.concatLists (
-        map (contract: lib.attrValues (contract.endpoints or { })) (lib.attrValues provides)
+        map (
+          contract: lib.mapAttrsToList (epName: ep: ep // { inherit epName; }) (contract.endpoints or { })
+        ) (lib.attrValues provides)
       );
+      # A named publication is what puts a listener behind the ingress on the mesh interface; the
+      # firewall is rendered from the same predicate, so the audit reads it from the same place.
+      proxied = lib.concatLists (
+        map (
+          contract:
+          lib.mapAttrsToList (_: pub: pub.endpoint) (
+            lib.filterAttrs (_: pub: pub.canonicalDomain != null) (contract.publications or { })
+          )
+        ) (lib.attrValues provides)
+      );
+      meshInterface = (cfgOf name).my.features.system.networking.wireguard.interfaceName;
       withProto =
         proto:
         lib.unique (
@@ -32,8 +45,8 @@ let
             lib.filter (
               ep:
               # The same predicate the firewall is rendered from: a port is a decision when the endpoint
-              # declared direct access, or when a named endpoint makes an ingress reach it over the mesh.
-              (ep.directAccess.enable || ep.canonicalDomain != null)
+              # declared direct access, or when a named publication makes an ingress reach it over the mesh.
+              (ep.directAccess.enable || builtins.elem ep.epName proxied)
               && (ep.directAccess.protocol == proto || ep.directAccess.protocol == "both")
             ) endpoints
           )
@@ -44,10 +57,10 @@ let
       # firewall is rendered from) and whatever a module opened through the firewall's own port options -
       # the exposure report asks whether a listener is a decision, not which module made it.
       tcp = lib.unique (
-        fw.allowedTCPPorts ++ (fw.interfaces.wg0.allowedTCPPorts or [ ]) ++ withProto "tcp"
+        fw.allowedTCPPorts ++ (fw.interfaces.${meshInterface}.allowedTCPPorts or [ ]) ++ withProto "tcp"
       );
       udp = lib.unique (
-        fw.allowedUDPPorts ++ (fw.interfaces.wg0.allowedUDPPorts or [ ]) ++ withProto "udp"
+        fw.allowedUDPPorts ++ (fw.interfaces.${meshInterface}.allowedUDPPorts or [ ]) ++ withProto "udp"
       );
       local = lib.unique (
         map (ep: ep.port) (

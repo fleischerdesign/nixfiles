@@ -39,6 +39,10 @@ let
   );
   ingress = topology.hosts.${topology.ingressHost}.ipv4;
 
+  # The mesh interface name is read per host from the feature that owns it: the check must name
+  # the same interface the rules were rendered for, not a literal.
+  meshInterface = name: (cfgOf name).my.features.system.networking.wireguard.interfaceName;
+
   # A host may be declared in the inventory without being a deploy target (the router and the access
   # point are), so the checks run over the configurations that actually exist.
   deployed = lib.filter (name: topology.hosts ? ${name}) hostNames;
@@ -137,10 +141,10 @@ let
           !(lib.hasInfix "dport ${toString ep.port}" rules)
         ) "input: ${name} declares an endpoint on port ${toString ep.port} but opens no rule for it"
         ++ lib.optional (
-          wantsLocal && !(lib.hasInfix "iifname != \"wg0\"" rules)
-        ) "input: ${name} never scopes a rule to the local network (iifname != \"wg0\")"
+          wantsLocal && !(lib.hasInfix "iifname != \"${meshInterface name}\"" rules)
+        ) "input: ${name} never scopes a rule to the local network (iifname != \"${meshInterface name}\")"
         ++ lib.optional (
-          wantsMesh && !(lib.hasInfix "iifname \"wg0\"" rules)
+          wantsMesh && !(lib.hasInfix "iifname \"${meshInterface name}\"" rules)
         ) "input: ${name} has an endpoint that the mesh must reach, but no rule names the mesh interface"
       )
       (
@@ -159,7 +163,10 @@ let
     in
     host.ipv4 != null && builtins.elem host.zone lanZones;
   tunnelCidrs =
-    name: lib.concatMap (peer: peer.allowedIPs) (cfgOf name).networking.wireguard.interfaces.wg0.peers;
+    name:
+    lib.concatMap (peer: peer.allowedIPs) (
+      (cfgOf name).networking.wireguard.interfaces.${meshInterface name}.peers
+    );
   routeViolations = lib.concatMap (
     name:
     let

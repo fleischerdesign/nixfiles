@@ -45,6 +45,11 @@ let
   # narrower than it used to be - it is no longer "every mesh member", but the levels the endpoint is for.
   allTrustLevels = config.my.topology.trustLevels;
 
+  # The mesh interface name is owned by the WireGuard feature; the rules below read it rather than
+  # spelling it. A renamed tunnel keeps its rules, and a name nobody configured cannot drift apart
+  # from the interface the kernel actually creates.
+  meshInterface = config.my.features.system.networking.wireguard.interfaceName;
+
   localEndpointsList = lib.concatLists (
     lib.mapAttrsToList (
       _svcName: contract:
@@ -82,7 +87,7 @@ let
       localRule =
         proto:
         nftRender.rule [
-          ''iifname != "wg0"''
+          ''iifname != "${meshInterface}"''
           "${proto} dport ${dport}"
           "accept"
         ];
@@ -90,7 +95,7 @@ let
         proto:
         lib.optionals (v4 != [ ]) [
           (nftRender.rule [
-            ''iifname "wg0"''
+            ''iifname "${meshInterface}"''
             "ip saddr ${nftRender.addressSet v4}"
             "${proto} dport ${dport}"
             "accept"
@@ -98,7 +103,7 @@ let
         ]
         ++ lib.optionals (v6 != [ ]) [
           (nftRender.rule [
-            ''iifname "wg0"''
+            ''iifname "${meshInterface}"''
             "ip6 saddr ${nftRender.addressSet v6}"
             "${proto} dport ${dport}"
             "accept"

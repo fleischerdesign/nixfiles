@@ -46,12 +46,15 @@ let
     }
   ];
 
-  fleetTable = lib.concatMapStringsSep " " (host: "\"${host.name}|${host.address}\"") (
-    map (name: {
-      inherit name;
-      address = addressOf name;
-    }) deployed
-  );
+  fleetTable =
+    lib.concatMapStringsSep " " (host: "\"${host.name}|${host.address}|${host.meshInterface}\"")
+      (
+        map (name: {
+          inherit name;
+          address = addressOf name;
+          meshInterface = (cfgOf name).my.features.system.networking.wireguard.interfaceName;
+        }) deployed
+      );
 
   # The home zones as `mask:network` pairs, so the path question ("does this host hold an address of a
   # home zone?") is answered the same way the dispatcher answers it: from the inventory, not from a list.
@@ -167,10 +170,11 @@ pkgs.writeShellApplication {
     printf 'paths: home = holds an address of a home zone, away = only the mesh\n'
 
     for entry in ${fleetTable}; do
-      IFS='|' read -r name address <<< "$entry"
+      IFS='|' read -r name address meshInterface <<< "$entry"
       printf '\n%s (%s)\n' "$name" "$address"
 
-      measured=$(ssh "''${SSH_OPTS[@]}" "root@$address" 'bash -s' <<'REMOTE' 2>/dev/null || echo UNREACHABLE
+      measured=$(ssh "''${SSH_OPTS[@]}" "root@$address" 'bash -s' -- "$meshInterface" <<'REMOTE' 2>/dev/null || echo UNREACHABLE
+        meshInterface="$1"
         ip2int() { local a b c d; IFS=. read -r a b c d <<< "$1"; echo $(( (a << 24) + (b << 16) + (c << 8) + d )); }
         path=away
         for entry in ${zoneMasks}; do
@@ -183,7 +187,7 @@ pkgs.writeShellApplication {
         printf 'service=%s\n' "$(getent hosts ${probeName} 2>/dev/null | head -1 | cut -d' ' -f1)"
         printf 'device=%s\n' "$(getent hosts ${deviceFqdn} 2>/dev/null | head -1 | cut -d' ' -f1)"
         printf 'blocked=%s\n' "$(getent hosts doubleclick.net >/dev/null 2>&1 && echo no || echo yes)"
-        printf 'peers=%s\n' "$(wg show wg0 latest-handshakes 2>/dev/null | wc -l)"
+        printf 'peers=%s\n' "$(wg show "$meshInterface" latest-handshakes 2>/dev/null | wc -l)"
     REMOTE
       )
 

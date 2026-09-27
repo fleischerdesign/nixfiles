@@ -2,6 +2,7 @@
 # A listener: where a service accepts connections and on which protocol. It owns no DNS name,
 # no ingress, no audience and no presentation - those are declarations that reference it.
 {
+  config,
   lib,
   ...
 }:
@@ -47,8 +48,8 @@ let
             "udp"
             "both"
           ];
-          default = "tcp";
-          description = "Network protocol to open in the firewall (tcp, udp, or both)";
+          default = submod.config.protocol;
+          description = "Network protocol to open in the firewall. It follows the listener's own transport by default; the assertion below rejects anything else.";
         };
 
         interface = lib.mkOption {
@@ -96,4 +97,19 @@ in
       }
     );
   };
+
+  # `directAccess.protocol` is not a second transport: it must name the listener's own protocol.
+  # A dual-stack listener opened TCP-only would serve UDP into a closed firewall - silently, because
+  # both options evaluate. Narrowing a protocol is a separate explicit mechanism, not a mismatch.
+  config.assertions = [
+    {
+      assertion = lib.all (
+        contract:
+        lib.all (ep: !ep.directAccess.enable || ep.directAccess.protocol == ep.protocol) (
+          lib.attrValues contract.endpoints
+        )
+      ) (lib.attrValues config.my.contracts.provides);
+      message = "an endpoint's directAccess.protocol must equal its transport protocol";
+    }
+  ];
 }

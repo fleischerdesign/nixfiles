@@ -236,6 +236,11 @@
           lib = nixpkgs-unstable.lib;
         };
 
+        wireguard-interface = import ./checks/wireguard-interface.nix {
+          inherit pkgs inputs;
+          lib = nixpkgs-unstable.lib;
+        };
+
         telemetry-contract = import ./checks/telemetry-contract.nix {
           inherit pkgs;
           lib = nixpkgs-unstable.lib;
