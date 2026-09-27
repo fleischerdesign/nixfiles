@@ -13,6 +13,10 @@
 
   networking.hostName = "cld-edge-01";
 
+  # D11: the primary user is assigned, not discovered - alphabetical order must never
+  # decide who owns a home directory.
+  my.user.primary = "philipp";
+
   my.features.system.networking.cloudflare.enable = true;
 
   my.features.system.common.geoip.enable = true;

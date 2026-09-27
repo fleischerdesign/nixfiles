@@ -10,6 +10,10 @@
 
   networking.hostName = "cld-ops-01";
 
+  # D11: the primary user is assigned, not discovered - alphabetical order must never
+  # decide who owns a home directory.
+  my.user.primary = "philipp";
+
   my.features.services.monitoring = {
     pipeline = {
       enable = true;

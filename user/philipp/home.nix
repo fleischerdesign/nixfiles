@@ -1,4 +1,5 @@
 {
+  config,
   pkgs,
   osConfig,
   inputs,
@@ -13,15 +14,15 @@
     inputs.nixcord.homeModules.nixcord
   ];
 
-  home.username = osConfig.my.user.name;
-  home.homeDirectory = "/home/${osConfig.my.user.name}";
+  # Username and home come from Home Manager's own per-user wiring (users.users.<name>),
+  # not from the fleet's primary user: a second account must land in its own home.
   home.stateVersion = "24.05";
 
   systemd.user.startServices = "sd-switch";
 
   xdg.desktopEntries."ls3d-handler" = {
     name = "WBS Learnspace 3D Handler";
-    exec = "/home/${osConfig.my.user.name}/ls3d-handler.sh %u";
+    exec = "${config.home.homeDirectory}/ls3d-handler.sh %u";
     type = "Application";
     terminal = false;
     noDisplay = true;

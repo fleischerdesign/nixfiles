@@ -241,6 +241,11 @@
           lib = nixpkgs-unstable.lib;
         };
 
+        users = import ./checks/users.nix {
+          inherit pkgs;
+          lib = nixpkgs-unstable.lib;
+        };
+
         telemetry-contract = import ./checks/telemetry-contract.nix {
           inherit pkgs;
           lib = nixpkgs-unstable.lib;

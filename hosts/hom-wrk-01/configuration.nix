@@ -11,6 +11,10 @@
 
   networking.hostName = "hom-wrk-01";
 
+  # D11: the primary user is assigned, not discovered - alphabetical order must never
+  # decide who owns a home directory.
+  my.user.primary = "philipp";
+
   # The workstation onboards the roaming phone clients: it renders their WireGuard configuration from
   # the topology and its own SOPS access, so the private key never has to be copied by hand. Scan it
   # from the rendered file (see docs/operations.md).

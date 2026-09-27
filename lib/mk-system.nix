@@ -19,6 +19,7 @@ let
     }:
     let
       inherit (inputs.nixpkgs-unstable) lib;
+      usersLib = import ./users.nix { inherit lib; };
       loader = discovery { inherit lib; };
       featuresDir = ../features;
       allFeatureModules = loader.findModules featuresDir;
@@ -36,21 +37,22 @@ let
           };
 
       userDir = ../user;
-      discoveredUsers =
-        if builtins.pathExists userDir then
-          lib.filter (name: builtins.pathExists (userDir + "/${name}/metadata.nix")) (
-            builtins.attrNames (builtins.readDir userDir)
-          )
-        else
-          [ ];
-
-      defaultUserName = if discoveredUsers != [ ] then lib.head discoveredUsers else "root";
+      # The same discovery the system module uses: who exists is decided once, from metadata.
+      # Home Manager is wired for every discovered user carrying a home profile; a missing
+      # home.nix fails loudly below instead of silently dropping the account's environment.
+      discoveredUsers = usersLib.discoverNames userDir;
 
       normalizedUsers =
         if users == [ ] then
           map (name: { inherit name; }) discoveredUsers
         else
-          map (u: u // { name = u.name or defaultUserName; }) users;
+          map (
+            u:
+            u
+            // {
+              name = u.name or (throw "mkSystem: a users entry names no user: ${builtins.toJSON u}");
+            }
+          ) users;
 
       homeManagerUsers = lib.listToAttrs (
         lib.concatMap (
@@ -58,14 +60,17 @@ let
           let
             homeFile = ../user + "/${user.name}/home.nix";
           in
-          lib.optionals (builtins.pathExists homeFile) [
-            {
-              inherit (user) name;
-              value = {
-                imports = [ (import homeFile) ] ++ (user.homeModules or [ ]);
-              };
-            }
-          ]
+          if builtins.pathExists homeFile then
+            [
+              {
+                inherit (user) name;
+                value = {
+                  imports = [ (import homeFile) ] ++ (user.homeModules or [ ]);
+                };
+              }
+            ]
+          else
+            throw "mkSystem: user/${user.name} has metadata but no home.nix"
         ) normalizedUsers
       );
     in

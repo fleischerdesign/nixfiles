@@ -1,5 +1,5 @@
 # features/system/user/nixos.nix
-# Declarative multi-user identity module with dynamic metadata lookup.
+# Declarative multi-user identity module with metadata lookup from a single discovery source.
 {
   config,
   lib,
@@ -7,44 +7,26 @@
   ...
 }:
 let
-  userDir = ../../../user;
-  discoveredUserNames =
-    if builtins.pathExists userDir then
-      lib.filter (name: builtins.pathExists (userDir + "/${name}/metadata.nix")) (
-        builtins.attrNames (builtins.readDir userDir)
-      )
-    else
-      [ ];
+  usersLib = import ../../../lib/users.nix { inherit lib; };
 
-  allUserMeta = builtins.listToAttrs (
-    map (name: {
-      inherit name;
-      value = import (userDir + "/${name}/metadata.nix");
-    }) discoveredUserNames
-  );
-
-  humanUserNames = lib.filter (n: (allUserMeta.${n}.type or "human") == "human") discoveredUserNames;
-
-  defaultPrimary =
-    if humanUserNames != [ ] then
-      lib.head humanUserNames
-    else if discoveredUserNames != [ ] then
-      lib.head discoveredUserNames
-    else
-      "root";
+  # Discovery reads the configured directory, not a path spelled in this file: `usersDir` is
+  # the one knob, and changing it changes who exists. There is no alphabetical fallback for the
+  # primary user - every host assigns its primary explicitly (decision D11), and an unknown name
+  # fails the build instead of quietly becoming somebody else.
+  discoveredUserNames = usersLib.discoverNames config.my.user.usersDir;
+  allUserMeta = usersLib.loadMeta config.my.user.usersDir discoveredUserNames;
 in
 {
   options.my.user = {
     usersDir = lib.mkOption {
       type = lib.types.path;
       default = ../../../user;
-      description = "Path to directory containing user metadata subdirectories.";
+      description = "Directory of user metadata subdirectories; the single discovery source.";
     };
 
     primary = lib.mkOption {
       type = lib.types.str;
-      default = defaultPrimary;
-      description = "Primary user account name.";
+      description = "Primary user account name, assigned explicitly per host.";
     };
 
     name = lib.mkOption {
@@ -102,8 +84,21 @@ in
   config = lib.mkMerge (
     let
       cfg = config.my.user;
+      # Accounts beyond the primary, keyed by discovered name. Discovery feeds VALUES under the
+      # static `users.users` path - never the definition structure itself: the module system
+      # enumerates definition paths while merging, so a discovery-derived list spine at the top
+      # level feeds back into the discovery it reads from (measured: infinite recursion).
+      otherUsers = removeAttrs allUserMeta [ cfg.primary ];
     in
     [
+      {
+        assertions = [
+          {
+            assertion = builtins.elem cfg.primary discoveredUserNames;
+            message = "my.user.primary '${cfg.primary}' on ${config.networking.hostName} names no user in ${toString cfg.usersDir}";
+          }
+        ];
+      }
       (lib.mkIf (config ? sops) {
         sops.secrets."users/${cfg.primary}/password".neededForUsers = lib.mkDefault true;
         my.user.hashedPasswordFile = lib.mkDefault config.sops.secrets."users/${cfg.primary}/password".path;
@@ -119,44 +114,46 @@ in
           "d /home/${name}/.local 0755 ${name} users - -"
         ]) discoveredUserNames;
 
-        users.users.${cfg.primary} = {
-          isNormalUser = true;
-          description = cfg.fullName;
-          inherit (cfg) extraGroups;
-          openssh.authorizedKeys.keys = cfg.sshKeys;
-          hashedPasswordFile = lib.mkIf (cfg.hashedPasswordFile != null) cfg.hashedPasswordFile;
-        };
+        users.users =
+          let
+            others = removeAttrs allUserMeta [ cfg.primary ];
+            mkOther =
+              name: meta:
+              let
+                userType = meta.type or "human";
+              in
+              lib.mkMerge [
+                {
+                  isNormalUser = userType == "human";
+                  isSystemUser = userType != "human";
+                  description = meta.fullName or name;
+                  openssh.authorizedKeys.keys = meta.sshKeys or [ ];
+                  extraGroups = meta.extraGroups or [ ];
+                }
+                (lib.mkIf (userType != "human") {
+                  home = lib.mkDefault "/home/${name}";
+                  createHome = lib.mkDefault true;
+                  shell = lib.mkDefault pkgs.bash;
+                  group = lib.mkDefault name;
+                })
+                (lib.optionalAttrs (meta ? shell) { inherit (meta) shell; })
+              ];
+          in
+          {
+            ${cfg.primary} = {
+              isNormalUser = true;
+              description = cfg.fullName;
+              inherit (cfg) extraGroups;
+              openssh.authorizedKeys.keys = cfg.sshKeys;
+              hashedPasswordFile = lib.mkIf (cfg.hashedPasswordFile != null) cfg.hashedPasswordFile;
+            };
+          }
+          // lib.mapAttrs mkOther others;
+
+        users.groups = lib.mapAttrs (_: _: { }) (
+          lib.filterAttrs (_: m: (m.type or "human") != "human") otherUsers
+        );
       }
     ]
-    ++ (lib.mapAttrsToList (
-      name: meta:
-      let
-        userType = meta.type or "human";
-      in
-      lib.mkIf (name != cfg.primary) {
-        users.users.${name} = lib.mkMerge [
-          {
-            isNormalUser = userType == "human";
-            isSystemUser = userType != "human";
-            description = meta.fullName or name;
-            openssh.authorizedKeys.keys = meta.sshKeys or [ ];
-            extraGroups = meta.extraGroups or [ ];
-          }
-          (lib.mkIf (userType != "human") {
-            home = lib.mkDefault "/home/${name}";
-            createHome = lib.mkDefault true;
-            shell = lib.mkDefault pkgs.bash;
-            group = lib.mkDefault name;
-          })
-          (lib.optionalAttrs (meta ? shell) { inherit (meta) shell; })
-        ];
-      }
-    ) allUserMeta)
-    ++ (lib.mapAttrsToList (
-      name: meta:
-      lib.mkIf ((meta.type or "human") != "human") {
-        users.groups.${name} = { };
-      }
-    ) (lib.filterAttrs (_: m: (m.type or "human") != "human") allUserMeta))
   );
 }

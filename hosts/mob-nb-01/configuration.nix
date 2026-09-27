@@ -11,6 +11,10 @@
 
   networking.hostName = "mob-nb-01";
 
+  # D11: the primary user is assigned, not discovered - alphabetical order must never
+  # decide who owns a home directory.
+  my.user.primary = "philipp";
+
   # Features
   my.features.desktop.niri.enable = true;
 

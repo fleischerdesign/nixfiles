@@ -11,6 +11,10 @@
 
   networking.hostName = "hom-srv-01";
 
+  # D11: the primary user is assigned, not discovered - alphabetical order must never
+  # decide who owns a home directory.
+  my.user.primary = "philipp";
+
   my.user.extraGroups = [
     "networkmanager"
     "wheel"
