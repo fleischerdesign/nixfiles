@@ -226,6 +226,12 @@ in
       storage = {
         stateDirs = [ config.services.open-webui.stateDir ];
       };
+      # Whether the conversations and accounts here matter is a decision, not an accident: they do not
+      # (review decision D13). The state is therefore declared as not backed up, rather than silently
+      # swept into a host's broad path or silently missing.
+      backup = {
+        enable = false;
+      };
     };
   };
 }

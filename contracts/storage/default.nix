@@ -22,16 +22,21 @@ let
         description = "Irreplaceable user data directories (/persist/data) - mandatory Tier-3 backup";
       };
 
+      # Content that is regenerable - a media library, a download queue, a replica that can be pulled
+      # again. It is declared because it exists, is not a cache, and must therefore not be mistaken for
+      # either irreplaceable data or something nobody decided about. The backup contract reads it to
+      # *exclude* it, which is what keeps a broad host path such as `/var/lib` from quietly pulling a
+      # whole media library offsite.
+      regenerableDirs = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Regenerable content directories (media libraries, download queues, synced replicas) - declared, never backed up";
+      };
+
       cacheDirs = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
         description = "Ephemeral cache directories (/var/cache) - safe to delete on reboot";
-      };
-
-      preBackupHook = lib.mkOption {
-        type = lib.types.nullOr lib.types.package;
-        default = null;
-        description = "Idempotent script to dump consistent state before transactional backup";
       };
     };
   };

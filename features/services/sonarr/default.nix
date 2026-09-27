@@ -100,7 +100,7 @@ in
           };
           storage = {
             stateDirs = [ "/var/lib/sonarr" ];
-            dataDirs = [ "/data/storage/tv" ];
+            regenerableDirs = [ "/data/storage/tv" ];
             cacheDirs = [ ];
           };
         };

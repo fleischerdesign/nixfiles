@@ -100,7 +100,7 @@ in
           };
           storage = {
             stateDirs = [ "/var/lib/radarr" ];
-            dataDirs = [ "/data/storage/movies" ];
+            regenerableDirs = [ "/data/storage/movies" ];
             cacheDirs = [ ];
           };
         };

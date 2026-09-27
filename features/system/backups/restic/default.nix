@@ -38,6 +38,16 @@ in
       description = "Name of the SOPS secret containing environment variables for Restic repository credentials.";
       example = "backups/restic/hom-srv-01";
     };
+
+    declined = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Reason this host deliberately runs no backup. It is what turns "restic was not enabled" into a
+        decision the backup contract can read: a host that declares restorable state, runs no backup and
+        gives no reason fails the build instead of looking like a host somebody forgot.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {

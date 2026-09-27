@@ -80,15 +80,14 @@
         };
         backups.restic = {
           enable = true;
-          paths = [
-            "/var/lib"
-            "/data/storage/docs"
-          ];
+          # The host declares its own `/var/lib` state; service data - `/data/storage/docs` among it - is
+          # declared by the service that owns it, and a service-specific exclusion (Jellyfin's metadata)
+          # lives with its service too, so a host that forgets a line cannot silently lose the rule.
+          paths = [ "/var/lib" ];
           exclude = [
             "**/node_modules"
             "**/.cache"
             "/var/lib/docker"
-            "/var/lib/jellyfin/metadata"
           ];
         };
       };

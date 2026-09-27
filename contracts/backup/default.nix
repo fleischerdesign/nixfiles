@@ -1,14 +1,13 @@
 # contracts/backup/default.nix
 # Declarative Backup Contract Specification (Clean Architecture & Reliability Engineering).
 # Allows services to declare backup requirements, snapshot strategies, exclusions,
-# and pre-dump hooks without coupling directly to restic, borg, or zfs implementations.
+# and consistency hooks without coupling directly to restic, borg, or zfs implementations.
 {
   config,
   lib,
   pkgs,
   ...
 }:
-
 let
   backupContractSubmodule = lib.types.submodule {
     options = {
@@ -30,64 +29,80 @@ let
         description = "File patterns or directories to exclude from backup snapshots (e.g. cache, temp dirs)";
       };
 
-      preDumpHook = lib.mkOption {
-        type = lib.types.nullOr lib.types.package;
+      # The consistency hooks are shell code that runs inside the backup job, so their failure fails the
+      # backup - the property that makes a dump trustworthy. They map to the NixOS options of the same
+      # purpose (`backupPrepareCommand` / `backupCleanupCommand`); the previous shape wrote a
+      # `backupPreparePrune` option the module does not have, so no hook could be declared at all.
+      preBackup = lib.mkOption {
+        type = lib.types.nullOr lib.types.lines;
         default = null;
-        description = "Executable package/script to dump consistent state before transactional backup";
+        description = "Shell code run before the backup starts, to produce a consistent dump (e.g. pg_dumpall)";
       };
 
-      postDumpHook = lib.mkOption {
-        type = lib.types.nullOr lib.types.package;
+      postBackup = lib.mkOption {
+        type = lib.types.nullOr lib.types.lines;
         default = null;
-        description = "Executable package/script to clean up dump artifacts after transactional backup";
+        description = "Shell code run after the backup finishes, to clean up the dump artifacts";
       };
     };
   };
 
-  # Extract active backup contracts across all provided services on this host
-  provides = config.my.contracts.provides or { };
+  # Every service contract declared on this host, and the two sub-contracts the backup reads.
+  contracts = lib.attrValues (config.my.contracts.provides or { });
 
-  # Collect all backup paths across all services
-  allBackupPaths = lib.concatLists (
-    lib.mapAttrsToList (
-      _svcName: svcContract:
-      let
-        bCfg = svcContract.backup or { };
-        sCfg = svcContract.storage or { };
-        customPaths = bCfg.paths or [ ];
-        # Fallback to storage dataDirs + stateDirs if paths not explicitly specified
-        storagePaths = (sCfg.dataDirs or [ ]) ++ (sCfg.stateDirs or [ ]);
-      in
-      if (bCfg.enable or false) then (if customPaths != [ ] then customPaths else storagePaths) else [ ]
-    ) provides
+  backupOf = contract: contract.backup or { };
+  storageOf = contract: contract.storage or { };
+  enabled = contract: (backupOf contract).enable or false;
+
+  pathsOf =
+    contract:
+    let
+      explicit = (backupOf contract).paths or [ ];
+      storage = storageOf contract;
+    in
+    if explicit != [ ] then explicit else (storage.dataDirs or [ ]) ++ (storage.stateDirs or [ ]);
+
+  allBackupPaths = lib.unique (lib.concatMap pathsOf (lib.filter enabled contracts));
+
+  allBackupExcludes = lib.unique (
+    lib.concatMap (
+      contract:
+      if enabled contract then
+        ((backupOf contract).exclude or [ ]) ++ ((storageOf contract).cacheDirs or [ ])
+      else
+        [ ]
+    ) contracts
+    # Content is excluded whether or not its service is backed up: the declaration says this is
+    # regenerable, and regenerable content is not what the backup is for - not even when a host declares
+    # a broad path that would otherwise sweep it in.
+    ++ lib.concatMap (contract: (storageOf contract).regenerableDirs or [ ]) contracts
   );
 
-  allBackupExcludes = lib.concatLists (
-    lib.mapAttrsToList (
-      _svcName: svcContract:
-      let
-        bCfg = svcContract.backup or { };
-        sCfg = svcContract.storage or { };
-        customExcludes = bCfg.exclude or [ ];
-        # Automatically exclude cacheDirs declared in storage contract
-        cacheExcludes = sCfg.cacheDirs or [ ];
-      in
-      if (bCfg.enable or false) then (customExcludes ++ cacheExcludes) else [ ]
-    ) provides
-  );
+  hooksOf =
+    field:
+    map (contract: (backupOf contract).${field}) (
+      lib.filter (contract: enabled contract && (backupOf contract).${field} != null) contracts
+    );
 
-  # Collect preDumpHooks into a composite pre-backup script if any exist
-  preDumpHooks = lib.filter (hook: hook != null) (
-    lib.mapAttrsToList (_svcName: svcContract: (svcContract.backup or { }).preDumpHook or null) provides
-  );
-
-  compositePreDump =
-    if preDumpHooks != [ ] then
-      pkgs.writeShellScript "restic-contract-pre-dump" (
-        lib.concatStringsSep "\n" (map (hook: "${hook}") preDumpHooks)
-      )
+  # One script per phase, run by the backup job itself. `set -euo pipefail` makes the composite stop at
+  # the first hook that fails, instead of carrying on to back up half-written state and reporting success.
+  compositeHook =
+    field:
+    let
+      hooks = hooksOf field;
+    in
+    if hooks == [ ] then
+      null
     else
-      null;
+      pkgs.writeShellScript "restic-contract-${field}" ''
+        set -euo pipefail
+        ${lib.concatStringsSep "\n" hooks}
+      '';
+
+  preBackup = compositeHook "preBackup";
+  postBackup = compositeHook "postBackup";
+
+  restic = config.my.features.system.backups.restic;
 in
 {
   options.my.contracts.provides = lib.mkOption {
@@ -102,14 +117,33 @@ in
     );
   };
 
-  # Automatic projection into Restic backup feature if enabled on the host
-  config = lib.mkIf (config.my.features.system.backups.restic.enable or false) {
-    services.restic.backups.daily = {
-      paths = allBackupPaths;
-      exclude = allBackupExcludes;
+  config = lib.mkMerge [
+    {
+      # A host that declares state worth restoring and then runs no backup is a decision only if it is
+      # written down. This refuses the alternative - an omission that looks exactly like a policy.
+      assertions = [
+        {
+          assertion = (restic.enable or false) || allBackupPaths == [ ] || (restic.declined or null) != null;
+          message = ''
+            this host declares state that must be restorable (${lib.concatStringsSep ", " allBackupPaths})
+            but runs no restic backup. Either enable my.features.system.backups.restic, or state why this
+            host is deliberately without one (my.features.system.backups.restic.declined).
+          '';
+        }
+      ];
     }
-    // (lib.optionalAttrs (compositePreDump != null) {
-      backupPreparePrune = "${compositePreDump}";
-    });
-  };
+    # `lib.mkIf` and not `lib.optionalAttrs`: the condition reads the restic feature through `config`, and
+    # `optionalAttrs` forces it while this module's config is being built - a fixpoint reached too early,
+    # which is an infinite recursion. `mkIf` keeps the condition lazy, the way the previous shape did.
+    (lib.mkIf (restic.enable or false) {
+      # Projection into the Restic feature when the host runs it. The hooks run inside the job, so a
+      # failed dump fails the backup rather than leaving a stale dump that looks fresh.
+      services.restic.backups.daily = {
+        paths = allBackupPaths;
+        exclude = allBackupExcludes;
+      }
+      // lib.optionalAttrs (preBackup != null) { backupPrepareCommand = "${preBackup}"; }
+      // lib.optionalAttrs (postBackup != null) { backupCleanupCommand = "${postBackup}"; };
+    })
+  ];
 }

@@ -59,5 +59,13 @@
     enableJsonApi = true;
   };
 
+  # This host runs no Restic, and that is a decision rather than an omission (review decision D13): its
+  # services hold no state that is not regenerable or reproduced elsewhere. The Attic binary cache and
+  # the search index are rebuilt, and the LiveSync vault is a replica of the CouchDB database on
+  # `cld-edge-01`, which is backed up. The backup contract refuses a host that declares restorable
+  # state without saying either "back it up" or "this is why not".
+  my.features.system.backups.restic.declined =
+    "state on this host is regenerable or reproduced from the backed-up CouchDB on cld-edge-01";
+
   system.stateVersion = "24.11";
 }

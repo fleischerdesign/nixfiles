@@ -13,13 +13,18 @@ let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.obsidian-livesync-bridge;
 
+  # The path an instance writes into, whether it named one or took the OpenClaw default. Defined once so
+  # the bridge's target, the tmpfiles rule and the storage declaration cannot drift apart.
+  effectiveVaultPath =
+    name: inst:
+    if inst.vaultPath != null then inst.vaultPath else "/var/lib/openclaw/instances/${name}/obsidian";
+
   instanceSubmodule =
     { name, config, ... }:
     let
       inst = config;
 
-      targetVaultPath =
-        if inst.vaultPath != null then inst.vaultPath else "/var/lib/openclaw/instances/${name}/obsidian";
+      targetVaultPath = effectiveVaultPath name inst;
 
       rawConfig = {
         peers = [
@@ -153,6 +158,13 @@ in
   };
 
   config = lib.mkIf (cfg.enable && enabledInstances != { }) {
+    # The vault is a replica: the bridge writes the notes *into* this directory from its CouchDB peer, so
+    # the directory is regenerable and the origin - CouchDB on the edge - is the thing that is backed up.
+    # Declared as regenerable rather than left for a host's broad backup path to sweep in.
+    my.contracts.provides.obsidian-livesync-bridge = {
+      storage.regenerableDirs = lib.mapAttrsToList effectiveVaultPath enabledInstances;
+    };
+
     # Ensure SOPS secrets used by any instance are registered
     sops.secrets = lib.genAttrs (lib.unique (
       lib.concatMap (inst: inst._secretNames) (lib.attrValues enabledInstances)

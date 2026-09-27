@@ -171,7 +171,7 @@ in
       };
       storage = {
         stateDirs = [ "/var/lib/sabnzbd" ];
-        dataDirs = [ cfg.downloadDir ];
+        regenerableDirs = [ cfg.downloadDir ];
         cacheDirs = [ ];
       };
     };

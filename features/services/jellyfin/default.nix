@@ -132,6 +132,11 @@ in
         stateDirs = [ "/var/lib/jellyfin" ];
         cacheDirs = [ "/var/cache/jellyfin" ];
       };
+      # Jellyfin's metadata - scraped art and images - regenerates and is expensive to carry offsite, so
+      # it is declared out of the backup next to the service that owns it, not in a host's exclude list.
+      backup = {
+        exclude = [ "/var/lib/jellyfin/metadata" ];
+      };
     };
 
     # LDAP authentication.
