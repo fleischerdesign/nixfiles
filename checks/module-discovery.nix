@@ -8,6 +8,7 @@
 {
   pkgs,
   lib,
+  ...
 }:
 let
   loader = import ../lib/discovery.nix { inherit lib; };

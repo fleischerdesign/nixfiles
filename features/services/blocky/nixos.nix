@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   features,
   ...
 }:
@@ -9,10 +10,7 @@ let
   topology = config.my.topology;
 
   # Fleet-wide configuration graph (`flake` is injected by lib/mk-system.nix).
-  flakeConfigurations =
-    config._module.specialArgs.flake.nixosConfigurations or {
-      "${config.networking.hostName}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
 
   # Address a LAN client should use to reach a host: the LAN address when the host lives in
   # the home network, otherwise the WireGuard overlay address.
@@ -50,7 +48,7 @@ let
                   value = address;
                 }) (lib.optionals (pub.canonicalDomain != null) [ pub.canonicalDomain ] ++ pub.extraDomains)
               ) (lib.attrValues contract.publications)
-            ) (hostConfig.config.my.contracts.provides or { })
+            ) (fleetConfigs.providesOf hostConfig)
           )
         )
       ) flakeConfigurations

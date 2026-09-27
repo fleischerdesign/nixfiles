@@ -220,270 +220,259 @@
         };
       };
 
-      checks.${system} = {
-        identity-contract = import ./checks/identity-contract.nix {
-          inherit pkgs;
-          lib = nixpkgs-unstable.lib;
-        };
+      checks.${system} =
+        let
+          # One argument set for every file-based check below: each check declares the slice it
+          # needs and ignores the rest, so adding a check never re-lists pkgs/lib/inputs/self.
+          checkArgs = {
+            inherit
+              pkgs
+              self
+              hostNames
+              inputs
+              ;
+            lib = nixpkgs-unstable.lib;
+          };
+        in
+        {
+          identity-contract = import ./checks/identity-contract.nix checkArgs;
 
-        presentation-contract = import ./checks/presentation-contract.nix {
-          inherit pkgs;
-          lib = nixpkgs-unstable.lib;
-        };
+          presentation-contract = import ./checks/presentation-contract.nix checkArgs;
 
-        publication-contract = import ./checks/publication-contract.nix {
-          inherit pkgs;
-          lib = nixpkgs-unstable.lib;
-        };
+          publication-contract = import ./checks/publication-contract.nix checkArgs;
 
-        wireguard-interface = import ./checks/wireguard-interface.nix {
-          inherit pkgs inputs;
-          lib = nixpkgs-unstable.lib;
-        };
+          wireguard-interface = import ./checks/wireguard-interface.nix checkArgs;
 
-        users = import ./checks/users.nix {
-          inherit pkgs;
-          lib = nixpkgs-unstable.lib;
-        };
+          users = import ./checks/users.nix checkArgs;
 
-        telemetry-contract = import ./checks/telemetry-contract.nix {
-          inherit pkgs;
-          lib = nixpkgs-unstable.lib;
-        };
+          fleet-configs = import ./checks/fleet-configs.nix checkArgs;
 
-        custom-package-updater =
-          pkgs.runCommandLocal "custom-package-updater-check"
-            {
-              nativeBuildInputs = with pkgs; [
-                bash
-                python3
-                jq
-                gawk
-              ];
-            }
-            ''
-              python3 ${./apps/update-custom-packages/tests/test_github_source.py} ${./apps/update-custom-packages/update-custom-packages.sh}
-              touch $out
-            '';
+          telemetry-contract = import ./checks/telemetry-contract.nix checkArgs;
 
-        eval-hosts = pkgs.runCommandLocal "eval-all-hosts" { } (
-          nixpkgs-unstable.lib.concatMapStringsSep "\n" (
-            name:
-            "echo \"${name}: ${
-              builtins.unsafeDiscardStringContext
-                self.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
-            }\" >> $out"
-          ) hostNames
-        );
-
-        # `nix flake check` cannot see a custom output - it warns "unknown flake output" and does not
-        # evaluate it - so a broken one is invisible until a deploy. This forces the surface the fleet
-        # actually deploys through: the `nodTargets` projection must evaluate and every target must name
-        # the address it dials. It replaced a `deploy` output that referenced an undeclared `deploy-rs`
-        # input and therefore could not be evaluated at all; `nod` reads `nixosConfigurations` and
-        # `nodTargets`, not `deploy`.
-        output-surfaces =
-          let
-            targets = self.nodTargets;
-            names = nixpkgs-unstable.lib.attrNames targets;
-            withoutAddress = nixpkgs-unstable.lib.filter (
-              name: (targets.${name}.targetHost or null) == null
-            ) names;
-          in
-          pkgs.runCommandLocal "output-surfaces" { } (
-            if withoutAddress == [ ] then
-              "echo 'ok: ${toString (nixpkgs-unstable.lib.length names)} nodTargets carry an address' > $out"
-            else
+          custom-package-updater =
+            pkgs.runCommandLocal "custom-package-updater-check"
+              {
+                nativeBuildInputs = with pkgs; [
+                  bash
+                  python3
+                  jq
+                  gawk
+                ];
+              }
               ''
-                echo "nodTargets without a targetHost: ${nixpkgs-unstable.lib.concatStringsSep ", " withoutAddress}" >&2
-                exit 1
-              ''
-          );
+                python3 ${./apps/update-custom-packages/tests/test_github_source.py} ${./apps/update-custom-packages/update-custom-packages.sh}
+                touch $out
+              '';
 
-        statix =
-          pkgs.runCommandLocal "statix-check"
-            {
-              nativeBuildInputs = [ pkgs.statix ];
-            }
-            ''
-              statix check --config ${./statix.toml} ${./.}
-              touch $out
-            '';
-
-        deadnix =
-          pkgs.runCommandLocal "deadnix-check"
-            {
-              nativeBuildInputs = [ pkgs.deadnix ];
-            }
-            ''
-              deadnix --fail ${./.}
-              touch $out
-            '';
-
-        # `nix fmt` is optional locally, so the formatter the repository declares (`formatter.${system}`)
-        # also runs here: a file it would change fails the build instead of being caught only by a hook
-        # that may not be installed. treefmt formats in place, so the tree is copied and the copy is
-        # compared to the original - the check measures the declared formatter, not a second spelling of it.
-        format =
-          pkgs.runCommandLocal "nixfmt-check"
-            {
-              nativeBuildInputs = [
-                pkgs.nixfmt-tree
-                pkgs.diffutils
-              ];
-            }
-            ''
-              cp -r --no-preserve=mode ${./.} src
-              (
-                cd src
-                treefmt --no-cache --tree-root . --walk filesystem
-              )
-              if ! diff -r ${./.} src >&2; then
-                echo "nix fmt would reformat the files above" >&2
-                exit 1
-              fi
-              touch $out
-            '';
-
-        # Every rule this repository generates is an nftables match. The full parser cannot run here - it
-        # wants netlink, which a build sandbox does not have - so this is the part that can be proven at
-        # build time, and it is the part that would have caught the incident: a rule that names a command,
-        # or carries a shell flag, is not a rule. What remains is syntax, and that is safe to defer,
-        # because the firewall applies the whole ruleset in one nftables transaction: a malformed rule
-        # fails loudly and leaves the previous ruleset in place instead of half-applying a new one.
-        nftables-rules =
-          let
-            rulesOf = name: self.nixosConfigurations.${name}.config;
-            generated = nixpkgs-unstable.lib.concatMapStringsSep "\n" (
+          eval-hosts = pkgs.runCommandLocal "eval-all-hosts" { } (
+            nixpkgs-unstable.lib.concatMapStringsSep "\n" (
               name:
-              (rulesOf name).networking.firewall.extraInputRules
-              + "\n"
-              + (rulesOf name).networking.firewall.extraForwardRules
-            ) hostNames;
-          in
-          pkgs.runCommandLocal "nftables-rules" { } ''
-            cat > rules.txt <<'GENERATED'
-            ${generated}
-            GENERATED
-            fail=0
-            forbid() { if grep -qE -- "$1" rules.txt; then echo "violation: $2" >&2; fail=1; fi; }
-            forbid '(^|[[:space:]])(iptables|ip6tables|nft)([[:space:]]|$)' "a rule names a command instead of a match"
-            forbid '/bin/' "a rule contains a store path"
-            forbid '(^|[[:space:]])-(A|I|D|F|X|N)([[:space:]]|$)' "a rule contains a shell flag"
-            forbid -- '--comment' "a rule contains an iptables-only flag"
-            forbid '(^|[[:space:]])-s[[:space:]]' "a rule uses -s instead of ip saddr"
-            while read -r line; do
-              [ -n "$line" ] || continue
-              stripped=$(printf '%s' "$line" | sed 's/ comment .*$//')
-              case "$stripped" in
-                *accept|*drop|*reject|*return|*jump*) ;;
-                *) echo "violation: rule without a verdict: $line" >&2; fail=1 ;;
-              esac
-            done < rules.txt
-            [ "$fail" -eq 0 ] || exit 1
-            echo 'ok: every generated rule is an nftables match with a verdict' > $out
-          '';
-
-        # The promises the network makes, checked against the evaluated fleet. The assertions in the
-        # modules catch a bad declaration; this catches a fleet whose parts contradict each other - a
-        # carried zone without a forward rule, a name that answers with an address nothing routes, a
-        # client that routes a home zone. Every one of them was a real failure before it was a check.
-        network-invariants =
-          let
-            result = import ./checks/network-invariants.nix {
-              lib = nixpkgs-unstable.lib;
-              inherit self hostNames;
-            };
-          in
-          pkgs.runCommandLocal "network-invariants" { } (
-            if result.violations == [ ] then
-              "echo 'ok: ${toString (builtins.length result.invariants)} network invariants hold' > $out"
-            else
-              ''
-                cat >&2 <<'VIOLATIONS'
-                ${nixpkgs-unstable.lib.concatStringsSep "\n" result.violations}
-                VIOLATIONS
-                exit 1
-              ''
+              "echo \"${name}: ${
+                builtins.unsafeDiscardStringContext
+                  self.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
+              }\" >> $out"
+            ) hostNames
           );
 
-        # The identity provider's blueprints only fail on the host: a model name without a dot, a
-        # `!KeyOf` that points nowhere, a dependency on a blueprint that is not there, or a person who
-        # is declared instead of seeded. The apply there proves the same files, but a deploy is too late
-        # for a typo. This reads the exact compiled directory the server ships, so the check and the
-        # apply consume identical bytes. The rules are documented in docs/identity.md §11 and enforced
-        # by features/services/authentik/lib/blueprints-check.py.
-        authentik-blueprints =
-          let
-            blueprintLib = import ./features/services/authentik/lib/blueprint.nix {
-              lib = nixpkgs-unstable.lib;
-            };
-            directories = map (
-              name: self.nixosConfigurations.${name}.config.my.features.services.authentik.server.blueprintsDir
-            ) blueprintHosts;
-            ownerLabel = "${blueprintLib.ownerLabelName}=${blueprintLib.ownerLabelValue}";
-          in
-          pkgs.runCommandLocal "authentik-blueprints-check"
-            {
-              nativeBuildInputs = [
-                (pkgs.python3.withPackages (pythonPackages: [ pythonPackages.pyyaml ]))
-              ];
-            }
-            ''
-              python3 ${./features/services/authentik/lib/blueprints-check.py} \
-                --owner-label ${nixpkgs-unstable.lib.escapeShellArg ownerLabel} \
-                ${
-                  nixpkgs-unstable.lib.concatStringsSep " " (
-                    map (directory: nixpkgs-unstable.lib.escapeShellArg "${directory}") directories
-                  )
-                } \
-                > $out
-            '';
-
-        # The apply and the drift report are Python embedded in the module and executed only on the host;
-        # a syntax error in either would otherwise be found by a deploy, which is a fleet-wide failure.
-        # This compiles both with the same interpreter the host runs, so a pull request finds it instead.
-        authentik-scripts =
-          let
-            units = [
-              "authentik-blueprints-apply"
-              "authentik-drift-report"
-            ];
-            scriptOf =
-              name: unit:
-              builtins.substring 5 1000000
-                self.nixosConfigurations.${name}.config.systemd.services.${unit}.serviceConfig.StandardInput;
-            scripts = nixpkgs-unstable.lib.unique (
-              nixpkgs-unstable.lib.concatMap (name: map (scriptOf name) units) blueprintHosts
+          # `nix flake check` cannot see a custom output - it warns "unknown flake output" and does not
+          # evaluate it - so a broken one is invisible until a deploy. This forces the surface the fleet
+          # actually deploys through: the `nodTargets` projection must evaluate and every target must name
+          # the address it dials. It replaced a `deploy` output that referenced an undeclared `deploy-rs`
+          # input and therefore could not be evaluated at all; `nod` reads `nixosConfigurations` and
+          # `nodTargets`, not `deploy`.
+          output-surfaces =
+            let
+              targets = self.nodTargets;
+              names = nixpkgs-unstable.lib.attrNames targets;
+              withoutAddress = nixpkgs-unstable.lib.filter (
+                name: (targets.${name}.targetHost or null) == null
+              ) names;
+            in
+            pkgs.runCommandLocal "output-surfaces" { } (
+              if withoutAddress == [ ] then
+                "echo 'ok: ${toString (nixpkgs-unstable.lib.length names)} nodTargets carry an address' > $out"
+              else
+                ''
+                  echo "nodTargets without a targetHost: ${nixpkgs-unstable.lib.concatStringsSep ", " withoutAddress}" >&2
+                  exit 1
+                ''
             );
-          in
-          pkgs.runCommandLocal "authentik-scripts-check"
-            {
-              nativeBuildInputs = [ pkgs.python3 ];
-            }
-            ''
-              for script in ${nixpkgs-unstable.lib.concatStringsSep " " scripts}; do
-                python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="out.pyc", doraise=True)' "$script"
-              done
-              echo "ok: ${toString (nixpkgs-unstable.lib.length scripts)} embedded authentik script(s) compile" > $out
+
+          statix =
+            pkgs.runCommandLocal "statix-check"
+              {
+                nativeBuildInputs = [ pkgs.statix ];
+              }
+              ''
+                statix check --config ${./statix.toml} ${./.}
+                touch $out
+              '';
+
+          deadnix =
+            pkgs.runCommandLocal "deadnix-check"
+              {
+                nativeBuildInputs = [ pkgs.deadnix ];
+              }
+              ''
+                deadnix --fail ${./.}
+                touch $out
+              '';
+
+          # `nix fmt` is optional locally, so the formatter the repository declares (`formatter.${system}`)
+          # also runs here: a file it would change fails the build instead of being caught only by a hook
+          # that may not be installed. treefmt formats in place, so the tree is copied and the copy is
+          # compared to the original - the check measures the declared formatter, not a second spelling of it.
+          format =
+            pkgs.runCommandLocal "nixfmt-check"
+              {
+                nativeBuildInputs = [
+                  pkgs.nixfmt-tree
+                  pkgs.diffutils
+                ];
+              }
+              ''
+                cp -r --no-preserve=mode ${./.} src
+                (
+                  cd src
+                  treefmt --no-cache --tree-root . --walk filesystem
+                )
+                if ! diff -r ${./.} src >&2; then
+                  echo "nix fmt would reformat the files above" >&2
+                  exit 1
+                fi
+                touch $out
+              '';
+
+          # Every rule this repository generates is an nftables match. The full parser cannot run here - it
+          # wants netlink, which a build sandbox does not have - so this is the part that can be proven at
+          # build time, and it is the part that would have caught the incident: a rule that names a command,
+          # or carries a shell flag, is not a rule. What remains is syntax, and that is safe to defer,
+          # because the firewall applies the whole ruleset in one nftables transaction: a malformed rule
+          # fails loudly and leaves the previous ruleset in place instead of half-applying a new one.
+          nftables-rules =
+            let
+              rulesOf = name: self.nixosConfigurations.${name}.config;
+              generated = nixpkgs-unstable.lib.concatMapStringsSep "\n" (
+                name:
+                (rulesOf name).networking.firewall.extraInputRules
+                + "\n"
+                + (rulesOf name).networking.firewall.extraForwardRules
+              ) hostNames;
+            in
+            pkgs.runCommandLocal "nftables-rules" { } ''
+              cat > rules.txt <<'GENERATED'
+              ${generated}
+              GENERATED
+              fail=0
+              forbid() { if grep -qE -- "$1" rules.txt; then echo "violation: $2" >&2; fail=1; fi; }
+              forbid '(^|[[:space:]])(iptables|ip6tables|nft)([[:space:]]|$)' "a rule names a command instead of a match"
+              forbid '/bin/' "a rule contains a store path"
+              forbid '(^|[[:space:]])-(A|I|D|F|X|N)([[:space:]]|$)' "a rule contains a shell flag"
+              forbid -- '--comment' "a rule contains an iptables-only flag"
+              forbid '(^|[[:space:]])-s[[:space:]]' "a rule uses -s instead of ip saddr"
+              while read -r line; do
+                [ -n "$line" ] || continue
+                stripped=$(printf '%s' "$line" | sed 's/ comment .*$//')
+                case "$stripped" in
+                  *accept|*drop|*reject|*return|*jump*) ;;
+                  *) echo "violation: rule without a verdict: $line" >&2; fail=1 ;;
+                esac
+              done < rules.txt
+              [ "$fail" -eq 0 ] || exit 1
+              echo 'ok: every generated rule is an nftables match with a verdict' > $out
             '';
 
-        # The portal reads its fleet at runtime, so the artifact the portal host runs carries the
-        # projection as a file rather than as a build input. checks/vyrx-portal.nix states the
-        # claim - entry point, prerendered pages, both projections and no person - and measures it on
-        # the artifact, where the consumer sees it.
-        vyrx-portal = import ./checks/vyrx-portal.nix {
-          inherit pkgs self hostNames;
-          lib = nixpkgs-unstable.lib;
-        };
+          # The promises the network makes, checked against the evaluated fleet. The assertions in the
+          # modules catch a bad declaration; this catches a fleet whose parts contradict each other - a
+          # carried zone without a forward rule, a name that answers with an address nothing routes, a
+          # client that routes a home zone. Every one of them was a real failure before it was a check.
+          network-invariants =
+            let
+              result = import ./checks/network-invariants.nix checkArgs;
+            in
+            pkgs.runCommandLocal "network-invariants" { } (
+              if result.violations == [ ] then
+                "echo 'ok: ${toString (builtins.length result.invariants)} network invariants hold' > $out"
+              else
+                ''
+                  cat >&2 <<'VIOLATIONS'
+                  ${nixpkgs-unstable.lib.concatStringsSep "\n" result.violations}
+                  VIOLATIONS
+                  exit 1
+                ''
+            );
 
-        # The import contract of `features/` and `contracts/`: which files count as NixOS modules, what
-        # stays a helper, and that the former `default.nix` marker is gone everywhere.
-        module-discovery = import ./checks/module-discovery.nix {
-          inherit pkgs;
-          lib = nixpkgs-unstable.lib;
+          # The identity provider's blueprints only fail on the host: a model name without a dot, a
+          # `!KeyOf` that points nowhere, a dependency on a blueprint that is not there, or a person who
+          # is declared instead of seeded. The apply there proves the same files, but a deploy is too late
+          # for a typo. This reads the exact compiled directory the server ships, so the check and the
+          # apply consume identical bytes. The rules are documented in docs/identity.md §11 and enforced
+          # by features/services/authentik/lib/blueprints-check.py.
+          authentik-blueprints =
+            let
+              blueprintLib = import ./features/services/authentik/lib/blueprint.nix {
+                lib = nixpkgs-unstable.lib;
+              };
+              directories = map (
+                name: self.nixosConfigurations.${name}.config.my.features.services.authentik.server.blueprintsDir
+              ) blueprintHosts;
+              ownerLabel = "${blueprintLib.ownerLabelName}=${blueprintLib.ownerLabelValue}";
+            in
+            pkgs.runCommandLocal "authentik-blueprints-check"
+              {
+                nativeBuildInputs = [
+                  (pkgs.python3.withPackages (pythonPackages: [ pythonPackages.pyyaml ]))
+                ];
+              }
+              ''
+                python3 ${./features/services/authentik/lib/blueprints-check.py} \
+                  --owner-label ${nixpkgs-unstable.lib.escapeShellArg ownerLabel} \
+                  ${
+                    nixpkgs-unstable.lib.concatStringsSep " " (
+                      map (directory: nixpkgs-unstable.lib.escapeShellArg "${directory}") directories
+                    )
+                  } \
+                  > $out
+              '';
+
+          # The apply and the drift report are Python embedded in the module and executed only on the host;
+          # a syntax error in either would otherwise be found by a deploy, which is a fleet-wide failure.
+          # This compiles both with the same interpreter the host runs, so a pull request finds it instead.
+          authentik-scripts =
+            let
+              units = [
+                "authentik-blueprints-apply"
+                "authentik-drift-report"
+              ];
+              scriptOf =
+                name: unit:
+                builtins.substring 5 1000000
+                  self.nixosConfigurations.${name}.config.systemd.services.${unit}.serviceConfig.StandardInput;
+              scripts = nixpkgs-unstable.lib.unique (
+                nixpkgs-unstable.lib.concatMap (name: map (scriptOf name) units) blueprintHosts
+              );
+            in
+            pkgs.runCommandLocal "authentik-scripts-check"
+              {
+                nativeBuildInputs = [ pkgs.python3 ];
+              }
+              ''
+                for script in ${nixpkgs-unstable.lib.concatStringsSep " " scripts}; do
+                  python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="out.pyc", doraise=True)' "$script"
+                done
+                echo "ok: ${toString (nixpkgs-unstable.lib.length scripts)} embedded authentik script(s) compile" > $out
+              '';
+
+          # The portal reads its fleet at runtime, so the artifact the portal host runs carries the
+          # projection as a file rather than as a build input. checks/vyrx-portal.nix states the
+          # claim - entry point, prerendered pages, both projections and no person - and measures it on
+          # the artifact, where the consumer sees it.
+          vyrx-portal = import ./checks/vyrx-portal.nix checkArgs;
+
+          # The import contract of `features/` and `contracts/`: which files count as NixOS modules, what
+          # stays a helper, and that the former `default.nix` marker is gone everywhere.
+          module-discovery = import ./checks/module-discovery.nix checkArgs;
         };
-      };
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [

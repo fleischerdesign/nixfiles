@@ -1,4 +1,4 @@
-{ pkgs, lib }:
+{ pkgs, lib, ... }:
 let
   # Two users where the alphabetical first (alice) is NOT the primary (zoe): if the module
   # still picked by traversal order, fullName would say Alice. The fixture directory - not the

@@ -2,6 +2,7 @@
   pkgs,
   lib,
   inputs,
+  ...
 }:
 let
   mkSystem = (import ../lib/mk-system.nix { inherit (inputs) home-manager-unstable; }).mkSystem;
@@ -13,11 +14,12 @@ let
 
   # The same builder the flake uses, but with the mesh interface renamed: if any consumer
   # spelled the name instead of reading the option, its output still says wg0 and this fails.
+  # The fixture reads the real fleet (flake = self); only its own interface name differs.
   fixture =
     (mkSystem {
       inherit system globalModules inputs;
       hostname = "hom-wrk-01";
-      flake = null;
+      flake = inputs.self;
       extraModules = [
         { my.features.system.networking.wireguard.interfaceName = "wgtest0"; }
       ];

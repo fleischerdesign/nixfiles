@@ -5,6 +5,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   ...
 }:
 
@@ -64,14 +65,11 @@ let
   );
   # `dependsOn` names fleet-wide service ids - the portal projection resolves them across hosts,
   # so the reference is validated against the whole fleet, not just this host's services.
-  flakeConfigurations =
-    config._module.specialArgs.flake.nixosConfigurations or {
-      "${config.networking.hostName or "local"}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
   fleetServices = lib.unique (
     lib.concatLists (
       lib.mapAttrsToList (
-        _: hostCfg: builtins.attrNames (hostCfg.config.my.contracts.provides or { })
+        _: hostCfg: builtins.attrNames (fleetConfigs.providesOf hostCfg)
       ) flakeConfigurations
     )
   );

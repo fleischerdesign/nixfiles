@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   ...
 }:
 let
@@ -22,10 +23,7 @@ let
   # that name, so `*.${zone}` and `${zone}` cannot be issued by us - while per-name challenges are
   # free and publish correctly (measured: `_acme-challenge.<name>.<zone>` appears in the zone within
   # three seconds of lego presenting it).
-  flakeConfigurations =
-    config._module.specialArgs.flake.nixosConfigurations or {
-      "${config.networking.hostName}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
   isIngress = config.networking.hostName == config.my.topology.ingressHost;
 
   # The address the ingress uses to reach a service host: on an internal request the two are at home and
@@ -51,7 +49,7 @@ let
             lib.concatMap (
               contract:
               lib.filter (pub: pub.ingress && pub.canonicalDomain != null) (lib.attrValues contract.publications)
-            ) (lib.attrValues (hostConfig.config.my.contracts.provides or { }))
+            ) (lib.attrValues (fleetConfigs.providesOf hostConfig))
           )
         ) flakeConfigurations
       )
@@ -183,7 +181,7 @@ in
                             target = "${address}:${toString pub.port}";
                           }
                         ) (lib.attrValues contract.publications)
-                      ) (hostConfig.config.my.contracts.provides or { })
+                      ) (fleetConfigs.providesOf hostConfig)
                     )
                   )
                 ) flakeConfigurations

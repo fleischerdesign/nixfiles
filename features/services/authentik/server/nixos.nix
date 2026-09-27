@@ -2,6 +2,7 @@
   config,
   lib,
   pkgs,
+  fleetConfigs,
   ...
 }:
 
@@ -35,6 +36,7 @@ let
       lib
       pkgs
       blueprintLib
+      fleetConfigs
       ;
   };
 

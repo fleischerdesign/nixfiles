@@ -20,6 +20,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   pkgs,
   ...
 }:
@@ -27,10 +28,7 @@ let
   cfg = config.my.features.services.dns;
   topology = config.my.topology;
 
-  flakeConfigurations =
-    config._module.specialArgs.flake.nixosConfigurations or {
-      "${config.networking.hostName}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
 
   domain = topology.domain;
   resolverName = "${cfg.subdomain}.${domain}";
@@ -192,7 +190,7 @@ let
                 public = if pub.scope == "public" then ingressAddress else null;
               }
           ) (lib.attrValues contract.publications)
-        ) (hostConfig.config.my.contracts.provides or { })
+        ) (fleetConfigs.providesOf hostConfig)
       )
     ) flakeConfigurations
   );

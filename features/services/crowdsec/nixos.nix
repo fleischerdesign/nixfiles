@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   pkgs,
   ...
 }:
@@ -21,16 +22,13 @@ let
   # Project scenario exemptions across all endpoints in the fleet.
   # The master/ingress host terminates or inspects traffic for all services, so we project
   # all declared exemptions from every host configuration.
-  flakeConfigurations =
-    config._module.specialArgs.flake.nixosConfigurations or {
-      "${config.networking.hostName}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
 
   allPublications = lib.concatLists (
     lib.mapAttrsToList (
       _hostName: hostConfig:
       lib.concatMap (contract: lib.attrValues (contract.publications or { })) (
-        lib.attrValues (hostConfig.config.my.contracts.provides or { })
+        lib.attrValues (fleetConfigs.providesOf hostConfig)
       )
     ) flakeConfigurations
   );

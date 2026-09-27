@@ -1706,14 +1706,20 @@ and shipping them without it would repeat the failure mode `docs/practices.md` d
 - **D2 inventory extraction and D8 zone-vs-trust.** Both are schema moves that change where a fact
   lives; they are safe but large, and the structural work already done (D1-D7) should be reviewed
   before another 500 lines move. *(Increment 7.)*
-- **F11-F14 (still open).** Provider binding and fleet traversal touch many modules; they are
-  independent and reviewable one at a time. F15 (endpoint segregation) and the F07 inert options
-  (`websocket`, PostgreSQL `extensions`, Redis consumer) are resolved by the D15 migration.
+- **F11-F13 (still open).** Topology/inventory split, zone-vs-trust and explicit provider binding
+  touch many modules; they are independent and reviewable one at a time.
   *(Increment 7, follow-ups.)*
+- **F14 (done).** One fleet view (`lib/fleet-configs.nix`, injected via `mk-system.nix`): all
+  consumers read `fleetConfigs.systems`/`providesOf`, standalone evaluation is explicitly
+  unsupported with a domain error, and a fixture proves pass-through plus loud null/empty
+  rejection. All nine projections, the Authentik blueprints and the portal artifacts are
+  byte-identical to the pre-change revision on all hosts; full-fleet evaluation is unmeasurably
+  unchanged (eval-hosts build 40.3s before and after).
 - **F16/F17/F18/D11 (done).** The mesh interface name is projected from its option with a rename
   fixture; list-order identity picks are gone (explicit primary, one LDAP integration, no
   alphabetical builder fallback); users come from one `usersDir` discovery with per-entry
-  Home Manager identity.
+  Home Manager identity. F15 (endpoint segregation) and the F07 inert options (`websocket`,
+  PostgreSQL `extensions`, Redis consumer) were resolved by the D15 migration.
 
 The invariants of this session - one finding per commit, a proof at the consumer level, structure never
 mixed with behaviour - hold for every increment above.

@@ -11,6 +11,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   ...
 }:
 
@@ -24,10 +25,7 @@ let
     name: "${name}.node.${topology.domain}"
   );
 
-  flakeConfigurations =
-    config._module.specialArgs.flake.nixosConfigurations or {
-      "${config.networking.hostName}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
 
   # Every declared publication of the whole fleet, with the endpoint it names resolved for the
   # reachability invariants. A name is a publication fact; the listener only carries direct access.
@@ -46,7 +44,7 @@ let
               ;
             ep = contract.endpoints.${pub.endpoint};
           }) contract.publications
-        ) (hostConfig.config.my.contracts.provides or { })
+        ) (fleetConfigs.providesOf hostConfig)
       )
     ) flakeConfigurations
   );

@@ -1,7 +1,7 @@
 {
   config,
   lib,
-  flake ? null,
+  fleetConfigs,
   ...
 }:
 
@@ -38,39 +38,36 @@ let
   ];
 
   # A named observation resolves its endpoint once; all generated targets read the same binding.
-  observationsByHost =
+  fleetConfigurations = fleetConfigs.systems config;
+  observationsByHost = lib.mapAttrs (
+    _hostName: hostCfg:
     let
-      configs = if flake != null then flake.nixosConfigurations or { } else { ${ownHost} = config; };
+      provides = fleetConfigs.providesOf hostCfg;
     in
-    lib.mapAttrs (
-      _hostName: hostCfg:
-      let
-        provides = hostCfg.config.my.contracts.provides or { };
-      in
-      lib.concatLists (
-        lib.mapAttrsToList (
-          svcName: contract:
-          (lib.mapAttrsToList (_: probe: {
-            name = endpointLib.endpointName svcName probe.endpoint;
-            ep = contract.endpoints.${probe.endpoint};
-            pub = lib.findFirst (p: p.endpoint == probe.endpoint) null (lib.attrValues contract.publications);
-            observation = probe;
-            kind = probe.kind;
-          }) contract.telemetry.probes)
-          ++ (lib.mapAttrsToList (_: scrape: {
-            name = endpointLib.endpointName svcName scrape.endpoint;
-            ep = contract.endpoints.${scrape.endpoint};
-            pub = lib.findFirst (p: p.endpoint == scrape.endpoint) null (lib.attrValues contract.publications);
-            observation = scrape;
-            kind = "scrape";
-          }) contract.telemetry.scrapes)
-        ) provides
-      )
-    ) configs;
+    lib.concatLists (
+      lib.mapAttrsToList (
+        svcName: contract:
+        (lib.mapAttrsToList (_: probe: {
+          name = endpointLib.endpointName svcName probe.endpoint;
+          ep = contract.endpoints.${probe.endpoint};
+          pub = lib.findFirst (p: p.endpoint == probe.endpoint) null (lib.attrValues contract.publications);
+          observation = probe;
+          kind = probe.kind;
+        }) contract.telemetry.probes)
+        ++ (lib.mapAttrsToList (_: scrape: {
+          name = endpointLib.endpointName svcName scrape.endpoint;
+          ep = contract.endpoints.${scrape.endpoint};
+          pub = lib.findFirst (p: p.endpoint == scrape.endpoint) null (lib.attrValues contract.publications);
+          observation = scrape;
+          kind = "scrape";
+        }) contract.telemetry.scrapes)
+      ) provides
+    )
+  ) fleetConfigurations;
 
   hostsWithBlackbox = lib.filterAttrs (
     _: hostCfg: hostCfg.config.my.features.services.monitoring.blackbox-exporter.enable or false
-  ) (if flake != null then (flake.nixosConfigurations or { }) else { ${ownHost} = config; });
+  ) fleetConfigurations;
 
   blackboxAddrForHost =
     hostName:

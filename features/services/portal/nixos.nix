@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   pkgs,
   inputs,
   ...
@@ -14,10 +15,7 @@ let
   # `group` / `dashboard.show` the cluster dashboard uses names it. A service added, renamed or
   # re-audienced in Nix appears in the projection without touching the landing repository.
   flake = config._module.specialArgs.flake or { };
-  flakeConfigurations =
-    flake.nixosConfigurations or {
-      "${config.networking.hostName}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
 
   endpointLib = import ../../../lib/endpoints.nix { inherit lib; };
 
@@ -117,7 +115,7 @@ let
   portalEntries = lib.concatMap (
     hostName:
     let
-      provides = flakeConfigurations.${hostName}.config.my.contracts.provides or { };
+      provides = fleetConfigs.providesOf flakeConfigurations.${hostName};
     in
     lib.concatLists (
       lib.mapAttrsToList (

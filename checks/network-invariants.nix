@@ -12,6 +12,7 @@
   lib,
   self,
   hostNames,
+  ...
 }:
 let
   cfgOf = name: self.nixosConfigurations.${name}.config;

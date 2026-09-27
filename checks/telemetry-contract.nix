@@ -1,4 +1,4 @@
-{ pkgs, lib }:
+{ pkgs, lib, ... }:
 let
   fixture =
     values:

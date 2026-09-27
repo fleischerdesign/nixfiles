@@ -18,6 +18,7 @@
   lib,
   self,
   hostNames,
+  ...
 }:
 let
   portalHosts = lib.filter (

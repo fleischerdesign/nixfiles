@@ -6,6 +6,7 @@
 {
   config,
   lib,
+  fleetConfigs,
   pkgs,
   ...
 }:
@@ -16,10 +17,7 @@ let
 
   # Fleet-wide configuration graph. `flake` is injected as a module specialArg by
   # lib/mk-system.nix; the fallback keeps this module evaluable standalone.
-  flakeConfigurations =
-    config._module.specialArgs.flake.nixosConfigurations or {
-      "${config.networking.hostName}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
 
   # Submodule for a declarative DNS record
   recordSubmodule = lib.types.submodule {
@@ -155,7 +153,7 @@ let
             in
             lib.optionals ingressIsPublic (map (n: mk n "A" ingressHost.ipv4) names)
           ) (lib.attrValues contract.publications)
-        ) (hostConfig.config.my.contracts.provides or { })
+        ) (fleetConfigs.providesOf hostConfig)
       )
     ) flakeConfigurations
   );

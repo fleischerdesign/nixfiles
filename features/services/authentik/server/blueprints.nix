@@ -11,6 +11,7 @@
   lib,
   pkgs,
   blueprintLib,
+  fleetConfigs,
 }:
 let
   endpointLib = import ../../../../lib/endpoints.nix { inherit lib; };
@@ -38,18 +39,15 @@ let
       ++ map (name: "ldap-consumer-${name}-password") sortedLdapEndpointNames;
   };
 
-  flakeConfigurations =
-    config._module.specialArgs.flake.nixosConfigurations or {
-      "${config.networking.hostName}" = config;
-    };
+  flakeConfigurations = fleetConfigs.systems config;
 
   # Flatten every publication of the cluster into the merged record the blueprints consume: the
   # publication owns name, exposure and audience; the endpoint it references owns the port.
   allClusterEndpointsList = lib.concatMap (
     hostName:
     let
-      hostConfig = flakeConfigurations.${hostName}.config;
-      provides = hostConfig.my.contracts.provides or { };
+      hostConfig = flakeConfigurations.${hostName};
+      provides = fleetConfigs.providesOf hostConfig;
     in
     lib.concatLists (
       lib.mapAttrsToList (
