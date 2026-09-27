@@ -1,15 +1,11 @@
-# features/media/spotify.nix
+# features/media/spotify/nixos.nix - Spotify with Spicetify: the system side is the switch.
 {
   config,
   lib,
-  pkgs,
-  inputs,
   ...
 }:
-
 let
   cfg = config.my.features.media.spotify;
-  spicePkgs = inputs.spicetify-nix.legacyPackages.${pkgs.stdenv.hostPlatform.system};
 in
 {
   options.my.features.media.spotify = {
@@ -20,17 +16,8 @@ in
     my.features.system.audio.enable = true;
     my.features.system.wayland.enable = true;
 
-    # This feature is purely for Home Manager.
-    # It injects its configuration into all users that get this feature.
-    home-manager.sharedModules = [
-      inputs.spicetify-nix.homeManagerModules.default
-      {
-        programs.spicetify = {
-          enable = true;
-          wayland = true;
-          theme = spicePkgs.themes.dribbblishDynamic;
-        };
-      }
-    ];
+    # This feature is purely for Home Manager: the user half lives in home.nix, so the system side is
+    # the switch and the per-user side is the implementation.
+    home-manager.sharedModules = [ ./home.nix ];
   };
 }

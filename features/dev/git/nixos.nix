@@ -37,8 +37,10 @@ in
   };
 
   config = lib.mkMerge [
-    # System-level SOPS secrets & templates for GitHub CLI PAT
-    (lib.mkIf (config ? sops) {
+    # System-level SOPS secrets & templates for GitHub CLI PAT. Gated on `enable`, so the system flag is
+    # the switch it claims to be: with it off, no secret and no template is declared, instead of a
+    # credential being provisioned by a feature the host did not turn on.
+    (lib.mkIf (cfg.enable && config ? sops) {
       sops.secrets = builtins.listToAttrs (
         map (secretName: {
           name = "users/${secretName}/github_pat";
@@ -59,82 +61,9 @@ in
       );
     })
 
-    # Home Manager integration for all users
+    # Home Manager integration for all users: the per-user half is home.nix.
     {
-      home-manager.sharedModules = [
-        (
-          {
-            config,
-            lib,
-            osConfig ? { },
-            ...
-          }:
-          let
-            userCfg = config.my.features.dev.git;
-            primaryUser = osConfig.my.user or { };
-          in
-          {
-            options.my.features.dev.git = {
-              enable = lib.mkEnableOption "Git and GitHub CLI for this Home Manager user";
-
-              userName = lib.mkOption {
-                type = lib.types.str;
-                default = primaryUser.fullName or "Philipp Fleischer";
-                description = "git config user.name";
-              };
-
-              userEmail = lib.mkOption {
-                type = lib.types.str;
-                default = primaryUser.email or "philipp@fleischer.design";
-                description = "git config user.email";
-              };
-
-              ghUser = lib.mkOption {
-                type = lib.types.str;
-                default = "fleischerdesign";
-                description = "GitHub username for gh hosts.yml";
-              };
-
-              sopsSecret = lib.mkOption {
-                type = lib.types.str;
-                default = "philipp";
-                description = "SOPS secret name for gh PAT template (github_pat_<sopsSecret>)";
-              };
-            };
-
-            config = lib.mkIf userCfg.enable {
-              programs.git = {
-                enable = true;
-                ignores = [ ".pi/" ];
-                settings = {
-                  user.name = userCfg.userName;
-                  user.email = userCfg.userEmail;
-                };
-              };
-
-              programs.gh = {
-                enable = true;
-                gitCredentialHelper.enable = true;
-                settings = {
-                  git_protocol = "https";
-                  editor = "";
-                  prompt = "enabled";
-                };
-              };
-
-              home.file = {
-                ".config/gh/hosts.yml" =
-                  lib.mkIf (osConfig ? sops && osConfig.sops.templates ? "gh-hosts-${userCfg.sopsSecret}")
-                    {
-                      source =
-                        config.lib.file.mkOutOfStoreSymlink
-                          osConfig.sops.templates."gh-hosts-${userCfg.sopsSecret}".path;
-                    };
-              };
-            };
-          }
-        )
-      ];
+      home-manager.sharedModules = [ ./home.nix ];
     }
   ];
 }

@@ -61,28 +61,6 @@ in
       }
     ];
 
-    home-manager.sharedModules = [
-      (
-        { config, lib, ... }:
-        let
-          userCfg = config.my.features.dev.opencode;
-          settings = lib.recursiveUpdate (
-            {
-              "$schema" = "https://opencode.ai/config.json";
-              update = "disable";
-            }
-            // lib.optionalAttrs (cfg.model != null) { model = cfg.model; }
-          ) cfg.settings;
-        in
-        {
-          options.my.features.dev.opencode.enable = lib.mkEnableOption "OpenCode v2 for this user";
-
-          config = lib.mkIf (cfg.enable && userCfg.enable) {
-            home.packages = [ package ];
-            xdg.configFile."opencode/opencode.json".text = builtins.toJSON settings;
-          };
-        }
-      )
-    ];
+    home-manager.sharedModules = [ ./home.nix ];
   };
 }

@@ -1,0 +1,74 @@
+# features/dev/codium/home.nix - the per-user half of the VSCodium feature.
+{ pkgs, ... }:
+{
+  programs.vscode = {
+    enable = true;
+    mutableExtensionsDir = false;
+
+    profiles.default = {
+      extensions = with pkgs.vscode-marketplace; [
+        bradlc.vscode-tailwindcss
+        vue.volar
+        mkhl.direnv
+        ms-vscode.cpptools
+        jnoortheen.nix-ide
+        redhat.java
+        vscjava.vscode-java-debug
+        vscjava.vscode-java-test
+        vscjava.vscode-java-dependency
+        vscjava.vscode-maven
+        vscjava.vscode-gradle
+        dbaeumer.vscode-eslint
+        bbenoist.qml
+        svelte.svelte-vscode
+        rust-lang.rust-analyzer
+        ms-python.python
+        github.copilot-chat
+      ];
+      userSettings = {
+        "workbench.experimental.modernUI" = true;
+        "extensions.autoUpdate" = "off";
+        "git.confirmSync" = false;
+        "git.autofetch" = true;
+        "terminal.integrated.fontWeight" = "normal";
+
+        "terminal.integrated.persistentSessionReviveProcess" = "never";
+
+        "update.mode" = "none";
+
+        "window.titleBarStyle" = "custom";
+        "window.customTitleBarVisibility" = "auto";
+
+        "security.workspace.trust.enabled" = false;
+
+        "editor.fontFamily" = "'JetBrainsMono Nerd Font', 'monospace', monospace";
+        "editor.fontLigatures" = true;
+        "editor.bracketPairColorization.enabled" = true;
+        "editor.guides.bracketPairs" = "active";
+        "editor.minimap.enabled" = false;
+        "editor.smoothScrolling" = true;
+        "terminal.integrated.smoothScrolling" = true;
+        "explorer.confirmDragAndDrop" = false;
+        "explorer.confirmDelete" = false;
+
+        "C_Cpp.default.compilerPath" = "gcc";
+
+        "direnv.restart.automatic" = true;
+
+        "nix.enableLanguageServer" = true;
+        "nix.serverPath" = "nil";
+        "nix.formatterPath" = "nixfmt";
+
+        "chat.agent.enabled" = true;
+        "chat.agentHost.byokModels.enabled" = true;
+
+        "redhat.telemetry.enabled" = false;
+
+        "editor.formatOnSave" = true;
+
+        "editor.inlineSuggest.enabled" = true;
+        "chat.commandCenter.enabled" = true;
+      };
+    };
+  };
+}
