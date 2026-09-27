@@ -87,6 +87,12 @@ in
           ]
           ++ cfg.admits;
         };
+        # SSH is not HTTP; a TCP connect is the probe that actually answers.
+        monitoring = {
+          http.enable = false;
+          tcp.enable = true;
+          tcp.group = "Infrastructure";
+        };
       };
     };
 

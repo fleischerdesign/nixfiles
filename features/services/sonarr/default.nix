@@ -86,7 +86,7 @@ in
             auth = "authentik";
             accessGroups = [ "media-users" ];
             subdomain = "sonarr";
-            healthProbePath = "/ping";
+            monitoring.http.path = "/ping";
             dashboard = {
               description = {
                 de = "Serienbibliothek automatisch verwalten.";

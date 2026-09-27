@@ -77,7 +77,7 @@ in
             auth = "authentik";
             accessGroups = [ "media-users" ];
             subdomain = "prowlarr";
-            healthProbePath = "/ping";
+            monitoring.http.path = "/ping";
             dashboard = {
               description = {
                 de = "Indexer-Verwaltung für den Medien-Stack.";

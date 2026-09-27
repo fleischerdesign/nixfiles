@@ -369,18 +369,18 @@ let
         };
       };
 
-      healthProbePath = lib.mkOption {
-        type = lib.types.str;
-        default = "/";
-        description = "HTTP path for liveness and health checks";
-      };
-
       monitoring = {
         http = {
           enable = lib.mkOption {
             type = lib.types.bool;
             default = true;
-            description = "Enable HTTP monitoring probe";
+            description = ''
+              Whether this endpoint is probed as HTTP. The default holds for the common case - a web
+              endpoint - and a listener that speaks something else declares it false: a UDP transport,
+              a gRPC port, an Erlang port mapper, a local TLS face nobody proxies. A probe that asks a
+              service a protocol it does not speak is worse than no probe, because it reports a healthy
+              service as down.
+            '';
           };
 
           group = lib.mkOption {
@@ -392,7 +392,12 @@ let
           path = lib.mkOption {
             type = lib.types.str;
             default = "/";
-            description = "HTTP probe path";
+            description = ''
+              Path the local probe asks for, as the endpoint's own health path. It is the one spelling:
+              the rendered target is `http://127.0.0.1:<port><path>`, so a change here is the change to
+              the probe. Local probes are plain HTTP by construction - a TLS listener is verified where
+              it terminates, at the ingress.
+            '';
           };
         };
 

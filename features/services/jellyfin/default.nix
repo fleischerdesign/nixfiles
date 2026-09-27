@@ -90,6 +90,8 @@ in
           interface = "local";
           protocol = "udp";
         };
+        # A UDP broadcast protocol is not HTTP; nothing here answers an HTTP probe.
+        monitoring.http.enable = false;
       };
       endpoints.web = {
         port = 8096;

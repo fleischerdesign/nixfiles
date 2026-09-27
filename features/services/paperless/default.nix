@@ -169,7 +169,6 @@ in
               subMode = "hashed_user_id";
               includeClaimsInIdToken = true;
             };
-            healthProbePath = "/";
             dashboard = {
               description = {
                 de = "Belegarchiv mit Texterkennung.";

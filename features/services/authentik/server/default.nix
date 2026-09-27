@@ -752,6 +752,9 @@ in
           interface = "local";
           protocol = "tcp";
         };
+        # authentik's own TLS face uses its internal certificate: a plain-HTTP probe could not verify it,
+        # and nothing proxies it. The HTTP face below is what is actually asked.
+        monitoring.http.enable = false;
       };
       endpoints.metrics = {
         port = 9300;
@@ -762,6 +765,8 @@ in
           interface = "local";
           protocol = "tcp";
         };
+        # Scraped as metrics (see the endpoint below); it is not a health page, so no HTTP probe.
+        monitoring.http.enable = false;
       };
       endpoints.web = {
         port = listenHttpPort;

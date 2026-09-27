@@ -27,7 +27,7 @@ in
         auth = "authentik";
         accessGroups = [ "media-users" ];
         subdomain = "bazarr";
-        healthProbePath = "/ping";
+        monitoring.http.path = "/ping";
         dashboard = {
           description = {
             de = "Untertitel-Verwaltung für Serien und Filme.";

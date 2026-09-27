@@ -157,7 +157,7 @@ in
         auth = "authentik";
         accessGroups = [ "media-users" ];
         subdomain = "sabnzbd";
-        healthProbePath = "/api?mode=version";
+        monitoring.http.path = "/api?mode=version";
         dashboard = {
           description = {
             de = "Usenet-Downloads für den Medien-Stack.";

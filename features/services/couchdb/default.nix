@@ -70,6 +70,12 @@ in
           interface = "local";
           protocol = "tcp";
         };
+        # An Erlang port mapper is not HTTP; a TCP connect is the honest probe.
+        monitoring = {
+          http.enable = false;
+          tcp.enable = true;
+          tcp.group = "Infrastructure";
+        };
       };
       endpoints.web = {
         port = 5984;

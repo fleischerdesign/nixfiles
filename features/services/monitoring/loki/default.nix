@@ -54,6 +54,8 @@ in
           interface = "local";
           protocol = "tcp";
         };
+        # gRPC, not HTTP; the web endpoint below is the one an HTTP probe can ask.
+        monitoring.http.enable = false;
       };
       endpoints.web = {
         port = 3100;

@@ -86,7 +86,7 @@ in
             auth = "authentik";
             accessGroups = [ "media-users" ];
             subdomain = "radarr";
-            healthProbePath = "/ping";
+            monitoring.http.path = "/ping";
             dashboard = {
               description = {
                 de = "Filmbibliothek automatisch verwalten.";

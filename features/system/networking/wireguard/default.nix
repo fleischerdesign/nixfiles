@@ -239,6 +239,8 @@ in
           interface = if isRelay || (ownHost != null && ownHost.ipv4 != null) then "all" else "local";
           protocol = "udp";
         };
+        # A UDP transport is not an HTTP service, so there is nothing for a local HTTP probe to ask.
+        monitoring.http.enable = false;
       };
     };
 

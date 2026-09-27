@@ -117,7 +117,7 @@ in
           subMode = "hashed_user_id";
           includeClaimsInIdToken = true;
         };
-        healthProbePath = "/api/app/about";
+        monitoring.http.path = "/api/app/about";
         dashboard = {
           description = {
             de = "Rezepte und Essensplanung.";
