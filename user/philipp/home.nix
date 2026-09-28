@@ -66,8 +66,19 @@
     { package = pkgs.gnomeExtensions.gsconnect; }
     { package = pkgs.gnomeExtensions.vitals; }
     { package = pkgs.gnomeExtensions.blur-my-shell; }
-    { package = pkgs.gnomeExtensions.dash2dock-lite; }
+    { package = pkgs.gnomeExtensions.dash-to-dock; }
   ];
+
+  # Dash to Dock and its blur integration, as the user had them before the desktop was rebuilt.
+  dconf.settings = {
+    "org/gnome/shell/extensions/dash-to-dock" = {
+      apply-custom-theme = true;
+      intellihide-mode = "ALL_WINDOWS";
+    };
+    "org/gnome/shell/extensions/blur-my-shell/dash-to-dock" = {
+      blur = true;
+    };
+  };
 
   my.features.desktop.webapps = {
     enable = true;

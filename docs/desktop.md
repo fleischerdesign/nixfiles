@@ -55,7 +55,7 @@ is empty, making "classic GNOME" a stated default rather than a side effect; the
 non-empty that setting yields to Home Manager's own.
 
 The primary user enables five, all verified against the pinned GNOME Shell release: Tiling Shell,
-GSConnect, Vitals, Blur my Shell and Dash2Dock Animated. Per-extension settings are dconf keys under
+GSConnect, Vitals, Blur my Shell and Dash to Dock. Per-extension settings are dconf keys under
 that extension's schema (`org.gnome.shell.extensions.<name>`), declared in the same `home.nix`;
 GSConnect keeps its state at runtime because pairing is not configuration.
 
