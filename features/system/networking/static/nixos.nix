@@ -4,7 +4,7 @@
 # Single source of truth: my.topology.hosts.<host> — interface, ipv4 and gateway.
 # Nothing here hardcodes an interface name (the previous version addressed eth0, which
 # silently did nothing on hosts whose NIC is enp2s0) or a public resolver (which would
-# bypass Blocky's split horizon).
+# bypass Knot Resolver's split-horizon views).
 #
 # NetworkManager must not own an interface that this module addresses, so the interface is
 # declared unmanaged: exactly one system may own a NIC.

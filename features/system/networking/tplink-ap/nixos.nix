@@ -11,7 +11,8 @@
 let
   cfg = config.my.features.system.networking.tplink-ap;
   topology = config.my.topology;
-  apHost = topology.hosts.hom-ap-01 or null;
+  apHost =
+    if topology.accessPoint == null then null else topology.hosts.${topology.accessPoint} or null;
 
   # Render desired state configuration as JSON derivation
   desiredStateJson = pkgs.writeText "tplink-ap-desired-state.json" (
@@ -49,7 +50,7 @@ in
         if apHost != null && apHost.ipv4 != null then
           apHost.ipv4
         else
-          (throw "tplink-ap: inventory declares no hom-ap-01 ipv4; declare the access point host instead of dialling a literal");
+          throw "TP-Link adapter: accessPoint has no IPv4 address";
       description = ''
         Management address of the access point: its declared `ipv4` in `my.topology`.
       '';

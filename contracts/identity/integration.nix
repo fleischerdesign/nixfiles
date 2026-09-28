@@ -44,7 +44,7 @@
         redirectUris = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
-          description = "Explicit redirect URIs. If empty, automatically synthesized from canonicalDomain + extraDomains + redirectPaths.";
+          description = "Explicit redirect URIs. If empty, synthesized from the publication's canonical and additional/alias domains plus redirectPaths.";
         };
 
         subMode = lib.mkOption {

@@ -95,6 +95,20 @@ let
       };
     };
   };
+  ambiguousOidc = failures {
+    endpoints.web = endpoint;
+    publications.web = publication;
+    identity.oidc = {
+      browser = {
+        publication = "web";
+        enable = true;
+      };
+      cli = {
+        publication = "web";
+        enable = true;
+      };
+    };
+  };
   contains = text: messages: lib.any (lib.hasInfix text) messages;
 in
 if
@@ -107,6 +121,7 @@ if
   && contains "unknown publication 'missing'" unknown
   && contains "OIDC ingress needs an enabled" missing
   && contains "only one enabled directory integration per service" ambiguous
+  && contains "multiple enabled OIDC integrations target publication 'web'" ambiguousOidc
 then
   pkgs.runCommandLocal "identity-contract-check" { } ''
     echo "identity references, derived redirects and negative controls passed" > "$out"

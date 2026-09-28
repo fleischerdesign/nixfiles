@@ -56,18 +56,15 @@ in
           };
         };
 
-        services.postgresql = {
-          ensureDatabases = [
-            "radarr-main"
-            "radarr-log"
-          ];
-          ensureUsers = [
-            {
-              name = "radarr";
-              ensureDBOwnership = false;
-              ensureClauses.superuser = true;
-            }
-          ];
+        my.contracts.consumes.radarr.postgresql = {
+          main = {
+            database = "radarr-main";
+            user = "radarr";
+          };
+          log = {
+            database = "radarr-log";
+            user = "radarr";
+          };
         };
 
         systemd.services.radarr.serviceConfig = {

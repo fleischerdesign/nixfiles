@@ -3,10 +3,10 @@
 {
   config,
   lib,
-  endpointLib,
   ...
 }:
 let
+  endpointIdentifiers = import ../endpoints/lib/identifiers.nix { };
   probe = lib.types.submodule (submod: {
     options = {
       endpoint = lib.mkOption {
@@ -86,7 +86,10 @@ let
       service: contract:
       lib.mapAttrsToList (
         _: scrape:
-        if scrape.jobName != null then scrape.jobName else endpointLib.endpointName service scrape.endpoint
+        if scrape.jobName != null then
+          scrape.jobName
+        else
+          endpointIdentifiers.endpointName service scrape.endpoint
       ) contract.telemetry.scrapes
     ) config.my.contracts.provides
   );

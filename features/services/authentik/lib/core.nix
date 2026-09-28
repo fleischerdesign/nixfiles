@@ -3,12 +3,13 @@
 # The core runs on exactly one host; which one is placement, not a literal. Each outpost and
 # the server itself resolve the same hostname through the same predicate, so a moved core
 # follows without source edits - and zero or several cores fail loudly instead of dialling
-# loopback or list order. The fleet view and the address rule arrive as arguments (injected
-# once in mk-system.nix); only feature-owned code is imported relatively.
+# loopback or list order. Topology address selection is imported from its owning contract.
 {
   fleetConfigs,
-  addresses,
 }:
+let
+  serviceAddress = import ../../../../contracts/topology/lib/service-address.nix { };
+in
 rec {
   hostName =
     systems:
@@ -35,7 +36,7 @@ rec {
       "http://127.0.0.1:${toString port}"
     else
       "http://${
-        addresses.serviceAddress {
+        serviceAddress.serviceAddress {
           inherit topology;
           consumer = topology.hosts.${consumerName} or null;
           peer = topology.hosts.${core};

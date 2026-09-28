@@ -35,7 +35,7 @@ The form below is derived, not invented. Each row names the existing mechanism i
 | `architecture.md` §1.5: "The inventory decides … Writing an address twice means a derivation is missing." | The SearXNG URL is read from the SearXNG endpoint contract; no address and no second name is spelled out. |
 | `identity.md`: "order across files is declared, never assumed" | Plugin composition carries an explicit `priority`; the merge order is a declaration. |
 | `AGENTS.md` rule 1: prove the replacement before deleting the original | §9 keeps Open WebUI running until parity is measured. |
-| `lib/endpoints.nix`: `endpointName svcName "web"` is `svcName` | The service id becomes `librechat`, so the Authentik application slug, the Prometheus `service` label and the portal tile id change. `ai.vyrx.de` does not: it follows from `subdomain = "ai"`, which stays. |
+| `contracts/endpoints/lib/identifiers.nix`: `endpointName svcName "web"` is `svcName` | The service id becomes `librechat`, so the Authentik application slug, the Prometheus `service` label and the portal tile id change. `ai.vyrx.de` does not: it follows from `subdomain = "ai"`, which stays. |
 
 ## 3. Placement and naming
 

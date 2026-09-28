@@ -56,18 +56,15 @@ in
           };
         };
 
-        services.postgresql = {
-          ensureDatabases = [
-            "sonarr-main"
-            "sonarr-log"
-          ];
-          ensureUsers = [
-            {
-              name = "sonarr";
-              ensureDBOwnership = false;
-              ensureClauses.superuser = true;
-            }
-          ];
+        my.contracts.consumes.sonarr.postgresql = {
+          main = {
+            database = "sonarr-main";
+            user = "sonarr";
+          };
+          log = {
+            database = "sonarr-log";
+            user = "sonarr";
+          };
         };
 
         systemd.services.sonarr.serviceConfig = {

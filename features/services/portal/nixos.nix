@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  endpointLib,
   fleetConfigs,
   pkgs,
   inputs,
@@ -9,6 +8,7 @@
 }:
 
 let
+  endpointIdentifiers = import ../../../contracts/endpoints/lib/identifiers.nix { };
   cfg = config.my.features.services.vyrx-landing;
 
   # The portal's data is a projection of the service contracts, never a second list: the same
@@ -130,7 +130,7 @@ let
                 categoryLabel = categoryOf tile;
                 capability = capabilityOf contract;
                 service = {
-                  id = endpointLib.endpointName svcName tileName;
+                  id = endpointIdentifiers.endpointName svcName tileName;
                   name = localized (serviceName svcName tile);
                   summary = summaryOf svcName tile;
                   categoryId = slug (categoryOf tile);

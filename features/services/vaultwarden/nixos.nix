@@ -47,15 +47,9 @@ in
           environmentFile = config.sops.secrets."services/apps/vaultwarden_env".path;
         };
 
-        # Ensure Postgres DB exists
-        services.postgresql = {
-          ensureDatabases = [ "vaultwarden" ];
-          ensureUsers = [
-            {
-              name = "vaultwarden";
-              ensureDBOwnership = true;
-            }
-          ];
+        my.contracts.consumes.vaultwarden.postgresql.main = {
+          database = "vaultwarden";
+          user = "vaultwarden";
         };
 
         # Service Contract for Caddy, Firewall & OIDC

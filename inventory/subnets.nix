@@ -16,24 +16,28 @@ _: {
     infra = {
       cidr = "10.10.10.0/24";
       gateway = "10.10.10.1";
+      gatewayHost = "hom-rt-01";
       trustLevel = "infra";
       description = "Core servers, managed networking, gateways, and storage";
     };
     corp = {
       cidr = "10.10.20.0/24";
       gateway = "10.10.20.1";
+      gatewayHost = "hom-srv-01";
       trustLevel = "corp";
       description = "Trusted employee workstations, laptops, and administrative personal devices";
     };
     iot = {
       cidr = "10.10.30.0/24";
       gateway = "10.10.30.1";
+      gatewayHost = "hom-srv-01";
       trustLevel = "iot";
       description = "Isolated microcontrollers, 3D printers, ESPHome, smart home devices";
     };
     mesh = {
       cidr = "10.10.100.0/24";
       gateway = "10.10.100.1";
+      gatewayHost = "cld-edge-01";
       trustLevel = "mesh";
       description = "Kernel-WireGuard ChaCha20 overlay mesh connecting cloud VPS and home nodes (IPv4)";
     };

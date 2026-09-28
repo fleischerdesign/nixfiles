@@ -11,8 +11,10 @@
 let
   cfg = config.my.features.system.networking.fritzbox;
   topology = config.my.topology;
-  routerHost = topology.hosts.hom-rt-01 or null;
-  serverHost = topology.hosts.hom-srv-01 or null;
+  routerHost =
+    if topology.upstreamRouter == null then null else topology.hosts.${topology.upstreamRouter} or null;
+  serverHost =
+    if topology.lanRouter == null then null else topology.hosts.${topology.lanRouter} or null;
 
   # Submodule for declarative port forwarding rules
   portForwardSubmodule = lib.types.submodule {
@@ -91,7 +93,7 @@ in
         if routerHost != null && routerHost.ipv4 != null then
           routerHost.ipv4
         else
-          (throw "fritzbox: inventory declares no hom-rt-01 ipv4; declare the router host instead of dialling a literal");
+          throw "FRITZ!Box adapter: upstreamRouter has no IPv4 address";
       description = ''
         TR-064 reachable address of the FRITZ!Box: its declared `ipv4` in `my.topology`.
       '';
@@ -119,7 +121,7 @@ in
             if routerHost != null && routerHost.ipv4 != null then
               routerHost.ipv4
             else
-              (throw "fritzbox: inventory declares no hom-rt-01 ipv4; declare the router host instead of dialling a literal");
+              throw "FRITZ!Box adapter: upstreamRouter has no IPv4 address";
           description = "Target LAN address of the FRITZ!Box (RFC 1812 uplink router)";
         };
 
@@ -140,7 +142,7 @@ in
                       if routerHost != null && routerHost.ipv4 != null then
                         routerHost.ipv4
                       else
-                        (throw "fritzbox: inventory declares no hom-rt-01 ipv4; declare the router host instead of dialling a literal")
+                        throw "FRITZ!Box adapter: upstreamRouter has no IPv4 address"
                     )
                   )
                 );
@@ -162,7 +164,7 @@ in
                       if routerHost != null && routerHost.ipv4 != null then
                         routerHost.ipv4
                       else
-                        (throw "fritzbox: inventory declares no hom-rt-01 ipv4; declare the router host instead of dialling a literal")
+                        throw "FRITZ!Box adapter: upstreamRouter has no IPv4 address"
                     )
                   )
                 );
@@ -180,7 +182,7 @@ in
             if serverHost != null && serverHost.ipv4 != null then
               serverHost.ipv4
             else
-              (throw "fritzbox: inventory declares no hom-srv-01 ipv4; declare the server host instead of dialling a literal");
+              throw "FRITZ!Box adapter: lanRouter has no IPv4 address";
           description = ''
             DNS server the box should announce. NOT settable over TR-064 (this box exposes no
             such action), so it is reported as a diff and must be set in the UI - or ignored,
@@ -199,7 +201,7 @@ in
         enable = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "Whether DHCP is enabled on the router (false offloads DHCP to hom-srv-01 Kea)";
+          description = "Whether DHCP is enabled on the router (false offloads DHCP to the topology's LAN router)";
         };
       };
 

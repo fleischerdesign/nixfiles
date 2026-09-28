@@ -4,20 +4,20 @@
 {
   config,
   lib,
-  addresses,
   fleetConfigs,
   ...
 }:
 
 let
+  serviceAddressLib = import ../../../../contracts/topology/lib/service-address.nix { };
   cfg = config.my.features.services.monitoring.pipeline;
   topology = config.my.topology;
 
   # The hub as this host reaches it: the LAN address while both are at home, otherwise the overlay
-  # address (lib/addresses.nix states the rule once, for every consumer).
+  # address (the topology contract states the rule once, for every consumer).
   serviceAddress =
     peer:
-    addresses.serviceAddress {
+    serviceAddressLib.serviceAddress {
       inherit topology;
       consumer = topology.hosts.${config.networking.hostName} or null;
       inherit peer;

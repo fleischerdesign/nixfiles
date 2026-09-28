@@ -55,18 +55,15 @@ in
         };
 
         # Ensure PostgreSQL database and user exist for Prowlarr
-        services.postgresql = {
-          ensureDatabases = [
-            "prowlarr-main"
-            "prowlarr-log"
-          ];
-          ensureUsers = [
-            {
-              name = "prowlarr";
-              ensureDBOwnership = false;
-              ensureClauses.superuser = true;
-            }
-          ];
+        my.contracts.consumes.prowlarr.postgresql = {
+          main = {
+            database = "prowlarr-main";
+            user = "prowlarr";
+          };
+          log = {
+            database = "prowlarr-log";
+            user = "prowlarr";
+          };
         };
 
         my.contracts.provides.prowlarr = {

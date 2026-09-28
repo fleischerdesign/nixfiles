@@ -1,11 +1,11 @@
 {
   config,
   lib,
-  addresses,
   fleetConfigs,
   ...
 }:
 let
+  serviceAddressLib = import ../../../contracts/topology/lib/service-address.nix { };
   cfg = config.my.features.services.caddy;
   zone = config.my.topology.domain;
   # The criterion for "can we get a certificate for this name" is not the scope but whether the name
@@ -28,10 +28,10 @@ let
   isIngress = config.networking.hostName == config.my.topology.ingressHost;
 
   # The address the ingress uses to reach a service host: on an internal request the two are at home and
-  # the LAN address keeps the traffic in the house, otherwise the overlay carries it (lib/addresses.nix).
+  # the LAN address keeps the traffic in the house, otherwise the overlay carries it (topology contract).
   serviceAddress =
     host:
-    addresses.serviceAddress {
+    serviceAddressLib.serviceAddress {
       topology = config.my.topology;
       consumer = config.my.topology.hosts.${config.networking.hostName} or null;
       peer = host;
@@ -59,9 +59,9 @@ let
       map (pub: pub.canonicalDomain) terminatedPublications
       ++ lib.concatMap (
         pub:
-        # Aliases count as well, and internal-plane aliases such as `docs.lan.<zone>` are ordinary
-        # subdomains of the public zone. Wildcards are skipped: their vhosts are minted at runtime
-        # and Caddy issues those on demand.
+        # Legacy aliases are normalized into extraDomains by the publication contract, so every
+        # consumer projects the same name set. Wildcards are skipped: their vhosts are minted at
+        # runtime and Caddy issues those on demand.
         lib.filter (d: d != null && !lib.hasInfix "*" d) pub.extraDomains
       ) terminatedPublications
     )
@@ -146,7 +146,13 @@ in
               _svcName: contract:
               lib.filter (
                 pub:
-                pub.ingress && (pub.scope == "public" || pub.scope == "internal") && pub.canonicalDomain != null
+                pub.ingress
+                && builtins.elem pub.scope [
+                  "public"
+                  "internal"
+                  "mesh"
+                ]
+                && pub.canonicalDomain != null
               ) (lib.attrValues contract.publications)
             ) config.my.contracts.provides
           );

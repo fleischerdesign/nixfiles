@@ -59,6 +59,24 @@ let
     service: builtins.length (builtins.attrNames (ldapIntegrationsOf service)) > 1
   ) (builtins.attrNames config.my.contracts.provides);
 
+  ambiguousOidc = lib.concatLists (
+    lib.mapAttrsToList (
+      service: contract:
+      let
+        enabled = lib.filterAttrs (_: integration: integration.enable) contract.identity.oidc;
+        publications = map (integration: integration.publication) (builtins.attrValues enabled);
+        duplicates = lib.unique (
+          lib.filter (
+            publication: builtins.length (lib.filter (candidate: candidate == publication) publications) > 1
+          ) publications
+        );
+      in
+      map (
+        publication: "${service}: multiple enabled OIDC integrations target publication '${publication}'"
+      ) duplicates
+    ) config.my.contracts.provides
+  );
+
   ldapConsumerOf =
     svc:
     let
@@ -170,6 +188,10 @@ in
       {
         assertion = missingOidc == [ ];
         message = "missing identity integrations:\n${lib.concatStringsSep "\n" missingOidc}";
+      }
+      {
+        assertion = ambiguousOidc == [ ];
+        message = "ambiguous OIDC integrations:\n${lib.concatStringsSep "\n" ambiguousOidc}";
       }
     ];
   };

@@ -3,11 +3,24 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 
 let
   cfg = config.my.features.system.backups.restic;
+  requirements = config.my.contracts.projections.backup;
+  makeHook =
+    name: hooks:
+    if hooks == [ ] then
+      null
+    else
+      pkgs.writeShellScript "restic-contract-${name}" ''
+        set -euo pipefail
+        ${lib.concatStringsSep "\n" hooks}
+      '';
+  preBackup = makeHook "pre-backup" requirements.preBackup;
+  postBackup = makeHook "post-backup" requirements.postBackup;
 in
 {
   options.my.features.system.backups.restic = {
@@ -50,26 +63,37 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    services.restic.backups.daily = {
-      inherit (cfg) paths exclude;
-
-      environmentFile = config.sops.secrets."${cfg.environmentFile}".path;
-
-      timerConfig = {
-        OnCalendar = "03:00";
-        RandomizedDelaySec = "1h";
+  config = lib.mkMerge [
+    {
+      my.contracts.backupProviders.restic = {
+        enable = cfg.enable;
+        declined = cfg.declined;
       };
+    }
+    (lib.mkIf cfg.enable {
+      services.restic.backups.daily = {
+        paths = lib.unique (cfg.paths ++ requirements.paths);
+        exclude = lib.unique (cfg.exclude ++ requirements.exclude);
 
-      pruneOpts = [
-        "--keep-daily 7"
-        "--keep-weekly 4"
-        "--keep-monthly 6"
-      ];
+        environmentFile = config.sops.secrets."${cfg.environmentFile}".path;
 
-      initialize = true;
-    };
+        timerConfig = {
+          OnCalendar = "03:00";
+          RandomizedDelaySec = "1h";
+        };
 
-    sops.secrets."${cfg.environmentFile}" = { };
-  };
+        pruneOpts = [
+          "--keep-daily 7"
+          "--keep-weekly 4"
+          "--keep-monthly 6"
+        ];
+
+        initialize = true;
+      }
+      // lib.optionalAttrs (preBackup != null) { backupPrepareCommand = "${preBackup}"; }
+      // lib.optionalAttrs (postBackup != null) { backupCleanupCommand = "${postBackup}"; };
+
+      sops.secrets."${cfg.environmentFile}" = { };
+    })
+  ];
 }

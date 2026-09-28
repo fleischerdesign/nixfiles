@@ -5,6 +5,7 @@
 {
   config,
   lib,
+  pkgs,
   fleetConfigs,
   ...
 }:
@@ -28,7 +29,7 @@ let
       ensureDBOwnership = lib.mkOption {
         type = lib.types.bool;
         default = true;
-        description = "Grant ownership of the database to the specified user";
+        description = "Make the declared role own this database, including when database and role names differ";
       };
     };
   });
@@ -49,20 +50,52 @@ let
 
   allLocalPostgresNeeds = lib.concatLists (
     lib.mapAttrsToList (
-      _svcName: consumer:
-      lib.mapAttrsToList (_depName: pg: {
+      service: consumer:
+      lib.mapAttrsToList (dependency: pg: {
+        inherit service dependency;
         inherit (pg) database user ensureDBOwnership;
       }) (consumer.postgresql or { })
     ) allConsumes
   );
 
   uniqueDatabases = lib.unique (map (p: p.database) allLocalPostgresNeeds);
-  uniqueUsers = lib.unique (
-    map (p: {
-      name = p.user;
-      inherit (p) ensureDBOwnership;
-    }) allLocalPostgresNeeds
+  roleNames = lib.unique (map (need: need.user) allLocalPostgresNeeds);
+  uniqueUsers = map (name: {
+    inherit name;
+    ensureDBOwnership = lib.any (
+      need: need.user == name && need.ensureDBOwnership && need.database == name
+    ) allLocalPostgresNeeds;
+  }) roleNames;
+  ownershipNeeds = lib.filter (
+    need: need.ensureDBOwnership && need.database != need.user
+  ) allLocalPostgresNeeds;
+  ownershipHandoffs = lib.unique (
+    map (need: {
+      inherit (need) database user;
+    }) ownershipNeeds
   );
+  ownershipConsumers = lib.unique (map (need: need.service) ownershipNeeds);
+  ownedDatabaseNames = lib.unique (
+    map (need: need.database) (lib.filter (need: need.ensureDBOwnership) allLocalPostgresNeeds)
+  );
+  conflictingDatabaseOwners = lib.concatMap (
+    database:
+    let
+      owners = lib.unique (
+        map (need: need.user) (
+          lib.filter (need: need.database == database && need.ensureDBOwnership) allLocalPostgresNeeds
+        )
+      );
+    in
+    lib.optional (builtins.length owners > 1) "${database}: ${lib.concatStringsSep ", " owners}"
+  ) ownedDatabaseNames;
+  invalidPostgresqlNames = lib.filter (
+    need:
+    builtins.match "[A-Za-z_][A-Za-z0-9_-]*" need.database == null
+    || builtins.match "[A-Za-z_][A-Za-z0-9_-]*" need.user == null
+    || builtins.match "[a-z0-9][a-z0-9-]*" need.service == null
+  ) allLocalPostgresNeeds;
+  missingPostgresql = allLocalPostgresNeeds != [ ] && !(config.services.postgresql.enable or false);
   # `dependsOn` names fleet-wide service ids - the portal projection resolves them across hosts,
   # so the reference is validated against the whole fleet, not just this host's services.
   flakeConfigurations = fleetConfigs.systems config;
@@ -114,6 +147,24 @@ in
     {
       assertions = [
         {
+          assertion = !missingPostgresql;
+          message = "PostgreSQL is consumed on ${config.networking.hostName}, but no local PostgreSQL provider is enabled";
+        }
+        {
+          assertion = invalidPostgresqlNames == [ ];
+          message = "PostgreSQL database and role names must match [A-Za-z_][A-Za-z0-9_-]*: ${
+            lib.concatStringsSep ", " (
+              map (
+                need: "${need.service}.${need.dependency} (${need.database}, ${need.user})"
+              ) invalidPostgresqlNames
+            )
+          }";
+        }
+        {
+          assertion = conflictingDatabaseOwners == [ ];
+          message = "PostgreSQL databases may have one declared owner: ${lib.concatStringsSep ", " conflictingDatabaseOwners}";
+        }
+        {
           assertion = invalidDependencies == [ ];
           message = "invalid service dependencies:\n${lib.concatStringsSep "\n" invalidDependencies}";
         }
@@ -124,6 +175,36 @@ in
         ensureDatabases = uniqueDatabases;
         ensureUsers = uniqueUsers;
       };
+
+      systemd.services = lib.mkMerge (
+        [
+          (lib.mkIf (ownershipHandoffs != [ ]) {
+            postgresql-contract-ownership = {
+              description = "Apply database ownership declared by service contracts";
+              after = [ "postgresql.service" ];
+              requires = [ "postgresql.service" ];
+              wantedBy = [ "multi-user.target" ];
+              before = map (service: "${service}.service") ownershipConsumers;
+              serviceConfig = {
+                Type = "oneshot";
+                User = "postgres";
+                ExecStart = pkgs.writeShellScript "postgresql-contract-ownership" ''
+                  set -euo pipefail
+                  ${lib.concatMapStringsSep "\n" (need: ''
+                    ${config.services.postgresql.package}/bin/psql --dbname=postgres --set=ON_ERROR_STOP=1 --command='ALTER DATABASE "${need.database}" OWNER TO "${need.user}";'
+                  '') ownershipHandoffs}
+                '';
+              };
+            };
+          })
+        ]
+        ++ map (service: {
+          ${service} = {
+            after = [ "postgresql-contract-ownership.service" ];
+            requires = [ "postgresql-contract-ownership.service" ];
+          };
+        }) ownershipConsumers
+      );
     })
   ];
 }

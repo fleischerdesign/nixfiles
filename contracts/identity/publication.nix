@@ -8,8 +8,8 @@ in
     # Who may use this publication. One declaration per service, projected three ways: the ingress gate
     # (an Authentik policy binding on the application for `auth = "authentik"` or `"oidc"`), the
     # directory filter (an LDAP consumer's memberOf), and the portal (vyrx.de shows a user only what
-    # these groups allow). Deliberately no default: a service published through the ingress without
-    # naming its audience has no policy, and the compiler refuses to build it.
+    # these groups allow). The group list defaults to empty; audience membership is never inferred,
+    # and explicit groups and users are projected as declared.
     accessGroups = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
@@ -28,17 +28,17 @@ in
     accessUsers = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
-      description = "Usernames that may use this endpoint, each through its own audience group.";
+      description = "Usernames that may use this publication, each through its own audience group.";
     };
 
-    # A group this endpoint accepted before its audience became a declaration. An apply adds and
+    # A group this publication accepted before its audience became a declaration. An apply adds and
     # updates; it does not remove a binding that is no longer named, so retiring an audience takes a
     # declaration of its own - the tombstone - or the old binding keeps granting what the change was
     # meant to end (docs/identity.md §11.3).
     retiredAccessGroups = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
-      description = "Groups this endpoint no longer accepts; each is tombstoned on apply.";
+      description = "Groups this publication no longer accepts; each is tombstoned on apply.";
     };
 
     adminGroups = lib.mkOption {

@@ -1,22 +1,22 @@
 {
   config,
   lib,
-  addresses,
-  endpointLib,
   fleetConfigs,
   ...
 }:
 
 let
+  serviceAddressLib = import ../../../../contracts/topology/lib/service-address.nix { };
+  endpointIdentifiers = import ../../../../contracts/endpoints/lib/identifiers.nix { };
   cfg = config.my.features.services.monitoring.prometheus;
   hosts = config.my.topology.hosts or { };
   ownHost = config.networking.hostName;
 
   # The address this host uses to reach a peer: the LAN address while both are at home, otherwise the
-  # overlay address (lib/addresses.nix states the rule once, for every consumer).
+  # overlay address (the topology contract states the rule once, for every consumer).
   serviceAddress =
     peer:
-    addresses.serviceAddress {
+    serviceAddressLib.serviceAddress {
       topology = config.my.topology;
       consumer = hosts.${ownHost} or null;
       peer = peer;
@@ -47,15 +47,17 @@ let
     lib.concatLists (
       lib.mapAttrsToList (
         svcName: contract:
-        (lib.mapAttrsToList (_: probe: {
-          name = endpointLib.endpointName svcName probe.endpoint;
+        (lib.mapAttrsToList (observationName: probe: {
+          name = endpointIdentifiers.endpointName svcName probe.endpoint;
+          inherit observationName;
           ep = contract.endpoints.${probe.endpoint};
           pub = lib.findFirst (p: p.endpoint == probe.endpoint) null (lib.attrValues contract.publications);
           observation = probe;
           kind = probe.kind;
         }) contract.telemetry.probes)
-        ++ (lib.mapAttrsToList (_: scrape: {
-          name = endpointLib.endpointName svcName scrape.endpoint;
+        ++ (lib.mapAttrsToList (observationName: scrape: {
+          name = endpointIdentifiers.endpointName svcName scrape.endpoint;
+          inherit observationName;
           ep = contract.endpoints.${scrape.endpoint};
           pub = lib.findFirst (p: p.endpoint == scrape.endpoint) null (lib.attrValues contract.publications);
           observation = scrape;
@@ -82,7 +84,7 @@ let
         # The job name is an external metric identity; otherwise it follows the endpoint name.
         name = item.name;
         inherit hostName;
-        inherit (item) ep observation;
+        inherit (item) ep observation observationName;
       }) (lib.filter (item: item.kind == "scrape") epList)
     ) observationsByHost
   );
@@ -101,6 +103,7 @@ let
           target = item.ep.localUrl + item.observation.path;
           labels = {
             service = item.name;
+            observation = item.observationName;
             host = hostName;
             probe_type = "http_local";
             group = item.observation.group;
@@ -121,6 +124,7 @@ let
           target = "127.0.0.1:${toString item.ep.port}";
           labels = {
             service = item.name;
+            observation = item.observationName;
             host = hostName;
             probe_type = "tcp_local";
             group = item.observation.group;
@@ -140,7 +144,7 @@ let
         (item: {
           inherit (item) name;
           inherit hostName;
-          inherit (item) pub observation;
+          inherit (item) pub observation observationName;
         })
         (
           lib.filter (
@@ -175,7 +179,6 @@ in
         # Unified Prometheus scrape targets grouped by job name
         (lib.mapAttrsToList (svcName: targetsList: {
           job_name = svcName;
-          metrics_path = (lib.head targetsList).observation.path;
           static_configs = map (t: {
             targets = [
               (
@@ -187,9 +190,15 @@ in
             ];
             labels = {
               host = t.hostName;
+              observation = t.observationName;
+              metrics_path = t.observation.path;
             };
           }) targetsList;
           relabel_configs = [
+            {
+              source_labels = [ "metrics_path" ];
+              target_label = "__metrics_path__";
+            }
             {
               source_labels = [ "host" ];
               target_label = "instance";
@@ -240,6 +249,7 @@ in
                 targets = [ "${item.pub.publicUrl}${item.observation.path}" ];
                 labels = {
                   service = item.name;
+                  observation = item.observationName;
                   host = item.hostName;
                   probe_type = "http_public";
                   group = item.observation.group;

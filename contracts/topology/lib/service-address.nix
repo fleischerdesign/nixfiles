@@ -1,4 +1,4 @@
-# lib/addresses.nix - the one place that decides which address a fleet-internal consumer uses.
+# contracts/topology/lib/service-address.nix - choose a reachable address from topology facts.
 #
 # A host has up to two addresses: the one in its zone and the one on the mesh. Which of them a service
 # should *use* is a property of the pair, not of the host - and it used to be decided in five modules, in

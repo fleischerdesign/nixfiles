@@ -116,7 +116,7 @@
         (import ./packages/custom)
       ];
 
-      # Zentrale Nixpkgs Instanz mit globaler Config
+      # Central nixpkgs instance with fleet-wide package configuration.
       pkgs = import nixpkgs-unstable {
         inherit system overlays;
         config = {
@@ -186,7 +186,11 @@
 
         sync-cloudflare = {
           type = "app";
-          program = "${self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package}/bin/cloudflare-sync";
+          program = "${
+            self.nixosConfigurations.${
+              self.nixosConfigurations.${builtins.head hostNames}.config.my.topology.ingressHost
+            }.config.my.features.system.networking.cloudflare.package
+          }/bin/cloudflare-sync";
           meta = {
             description = "Declarative Cloudflare Edge & DNS GitOps Reconciliation Tool";
           };
@@ -250,6 +254,10 @@
           topology-inventory = import ./checks/topology-inventory.nix checkArgs;
 
           telemetry-contract = import ./checks/telemetry-contract.nix checkArgs;
+
+          dependencies-contract = import ./checks/dependencies-contract.nix checkArgs;
+
+          backup-contract = import ./checks/backup-contract.nix checkArgs;
 
           custom-package-updater =
             pkgs.runCommandLocal "custom-package-updater-check"

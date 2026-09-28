@@ -1,4 +1,9 @@
-{ pkgs, lib, ... }:
+{
+  pkgs,
+  lib,
+  inputs,
+  ...
+}:
 let
   # Two users where the alphabetical first (alice) is NOT the primary (zoe): if the module
   # still picked by traversal order, fullName would say Alice. The fixture directory - not the
@@ -8,6 +13,7 @@ let
     (lib.evalModules {
       specialArgs = {
         inherit pkgs;
+        usersDir = ./fixtures/users;
         usersLib = import ../lib/users.nix { inherit lib; };
       };
       modules = [
@@ -49,7 +55,6 @@ let
             default = { };
           };
           config.my.user.primary = primary;
-          config.my.user.usersDir = ./fixtures/users;
           # The SOPS-derived password default is a production wiring concern, not part of this
           # fixture: pin it so the secret path is never read here.
           config.my.user.hashedPasswordFile = null;
@@ -76,10 +81,47 @@ let
     else
       throw "unknown primary 'mallory' was accepted"
   );
+
+  mkComposedHost =
+    homeUsers:
+    (import ../lib/mk-system.nix {
+      home-manager-unstable = inputs.home-manager-unstable;
+    }).mkSystem
+      {
+        hostname = "hom-wrk-01";
+        inherit inputs pkgs homeUsers;
+        usersDir = ./fixtures/users;
+        globalModules = [
+          inputs.sops-nix.nixosModules.sops
+          inputs.nod.nixosModules.default
+        ];
+        extraModules = [
+          ({ lib, ... }: {
+            my.user.primary = lib.mkForce "zoe";
+            my.user.hashedPasswordFile = lib.mkForce null;
+          })
+        ];
+      };
+
+  assignedHost = mkComposedHost [ { name = "zoe"; } ];
+  unassignedHost = mkComposedHost [ ];
+  duplicateAssignment = builtins.tryEval (
+    builtins.attrNames
+      (mkComposedHost [
+        { name = "zoe"; }
+        { name = "zoe"; }
+      ]).config.home-manager.users
+  );
+  composedUsersPass =
+    builtins.attrNames assignedHost.config.home-manager.users == [ "zoe" ]
+    && builtins.attrNames unassignedHost.config.home-manager.users == [ ]
+    && assignedHost.config.users.users ? alice
+    && assignedHost.config.users.users ? zoe
+    && !duplicateAssignment.success;
 in
-if checksPassed && !unknownPrimary.success then
+if checksPassed && !unknownPrimary.success && composedUsersPass then
   pkgs.runCommandLocal "users-check" { } ''
-    echo "explicit primary, per-user identity and unknown-user rejection passed" > "$out"
+    echo "shared identity source, explicit Home Manager selection, duplicate rejection and primary-user checks passed" > "$out"
   ''
 else
-  throw "users fixture failed: expected zoe as primary with distinct accounts, and a loud rejection of mallory"
+  throw "users fixture failed: expected shared-source accounts, explicit Home Manager assignments and loud ambiguity/unknown-primary rejection"

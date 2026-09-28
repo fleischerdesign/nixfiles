@@ -1,19 +1,19 @@
 {
   config,
   lib,
-  addresses,
   fleetConfigs,
   pkgs,
   ...
 }:
 let
+  serviceAddressLib = import ../../../contracts/topology/lib/service-address.nix { };
   cfg = config.my.features.services.crowdsec;
   isMaster = cfg.role == "master";
 
   # The master as this host reaches it: the LAN address while both are at home, otherwise the overlay
-  # address (lib/addresses.nix). The master normally sits in the cloud, so this is the overlay - and the
+  # address (the topology contract). The master normally sits in the cloud, so this is the overlay - and the
   # rule is stated once instead of here.
-  masterIP = addresses.serviceAddress {
+  masterIP = serviceAddressLib.serviceAddress {
     topology = config.my.topology;
     consumer = config.my.topology.hosts.${config.networking.hostName} or null;
     peer = config.my.topology.hosts.${cfg.masterHost};

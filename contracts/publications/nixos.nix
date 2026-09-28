@@ -7,8 +7,8 @@ let
     service:
     lib.types.submodule (submod: {
       imports = [
-        (import ../identity/endpoint.nix { inherit lib submod; })
-        (import ../ingress/endpoint.nix { inherit lib; })
+        (import ../identity/publication.nix { inherit lib submod; })
+        (import ../ingress/publication.nix { inherit lib; })
       ];
       options = {
         endpoint = lib.mkOption {
@@ -55,7 +55,8 @@ let
         extraDomains = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
-          description = "Additional DNS names associated with this publication";
+          apply = domains: lib.unique (domains ++ submod.config.aliases);
+          description = "Additional and legacy alias DNS names associated with this publication";
         };
 
         port = lib.mkOption {
@@ -125,11 +126,7 @@ let
             ep = if endpointExists then contract.endpoints.${pub.endpoint} else null;
           in
           lib.optional (!endpointExists) "${service}.publications.${name}: unknown endpoint '${pub.endpoint}'"
-          # `isolated` is the deliberate exception: a publication that names nothing - a
-          # mesh-reachable listener with no DNS face. Every projection already tolerates a null
-          # name (naming, DNS, Caddy, firewall and the one-endpoint-one-name grouping all filter
-          # it), so only this coherence check stood in the way of the documented meaning.
-          ++ lib.optional (endpointExists && pub.scope != "isolated" && pub.canonicalDomain == null) (
+          ++ lib.optional (endpointExists && pub.canonicalDomain == null) (
             "${service}.publications.${name}: scope '${pub.scope}' yields no DNS name; "
             + "give it a subdomain, an fqdn, or drop the publication"
           )

@@ -1,4 +1,4 @@
-# One rule for the name of an endpoint across the fleet.
+# contracts/endpoints/lib/identifiers.nix - stable identifiers projected from endpoint declarations.
 #
 # The same string is the blueprint's application slug, the Prometheus `service` label and the portal
 # tile id. Three consumers that must agree on it are three reasons to state it once: a rename that

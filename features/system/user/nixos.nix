@@ -4,6 +4,7 @@
   config,
   lib,
   usersLib,
+  usersDir ? ../../../user,
   pkgs,
   ...
 }:
@@ -20,7 +21,8 @@ in
   options.my.user = {
     usersDir = lib.mkOption {
       type = lib.types.path;
-      default = ../../../user;
+      default = usersDir;
+      readOnly = true;
       description = "Directory of user metadata subdirectories; the single discovery source.";
     };
 
@@ -96,6 +98,10 @@ in
           {
             assertion = builtins.elem cfg.primary discoveredUserNames;
             message = "my.user.primary '${cfg.primary}' on ${config.networking.hostName} names no user in ${toString cfg.usersDir}";
+          }
+          {
+            assertion = cfg.usersDir == usersDir;
+            message = "my.user.usersDir must match the usersDir supplied to mkSystem so system accounts and Home Manager share one source";
           }
         ];
       }

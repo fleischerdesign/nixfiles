@@ -5,7 +5,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
@@ -84,27 +83,28 @@ let
       lib.filter (contract: enabled contract && (backupOf contract).${field} != null) contracts
     );
 
-  # One script per phase, run by the backup job itself. `set -euo pipefail` makes the composite stop at
-  # the first hook that fails, instead of carrying on to back up half-written state and reporting success.
-  compositeHook =
-    field:
-    let
-      hooks = hooksOf field;
-    in
-    if hooks == [ ] then
-      null
-    else
-      pkgs.writeShellScript "restic-contract-${field}" ''
-        set -euo pipefail
-        ${lib.concatStringsSep "\n" hooks}
-      '';
-
-  preBackup = compositeHook "preBackup";
-  postBackup = compositeHook "postBackup";
-
-  restic = config.my.features.system.backups.restic;
+  backupProviders = config.my.contracts.backupProviders;
+  activeProvider = lib.any (provider: provider.enable) (lib.attrValues backupProviders);
+  declaredDecline = lib.any (provider: provider.declined != null) (lib.attrValues backupProviders);
 in
 {
+  options.my.contracts.backupProviders = lib.mkOption {
+    type = lib.types.attrsOf (
+      lib.types.submodule {
+        options = {
+          enable = lib.mkEnableOption "this backup provider";
+          declined = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "Explicit reason this host has no backup provider.";
+          };
+        };
+      }
+    );
+    default = { };
+    description = "Backup backends installed on this host and explicit no-backup decisions.";
+  };
+
   options.my.contracts.provides = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule {
@@ -117,33 +117,24 @@ in
     );
   };
 
-  config = lib.mkMerge [
-    {
-      # A host that declares state worth restoring and then runs no backup is a decision only if it is
-      # written down. This refuses the alternative - an omission that looks exactly like a policy.
-      assertions = [
-        {
-          assertion = (restic.enable or false) || allBackupPaths == [ ] || (restic.declined or null) != null;
-          message = ''
-            this host declares state that must be restorable (${lib.concatStringsSep ", " allBackupPaths})
-            but runs no restic backup. Either enable my.features.system.backups.restic, or state why this
-            host is deliberately without one (my.features.system.backups.restic.declined).
-          '';
-        }
-      ];
-    }
-    # `lib.mkIf` and not `lib.optionalAttrs`: the condition reads the restic feature through `config`, and
-    # `optionalAttrs` forces it while this module's config is being built - a fixpoint reached too early,
-    # which is an infinite recursion. `mkIf` keeps the condition lazy, the way the previous shape did.
-    (lib.mkIf (restic.enable or false) {
-      # Projection into the Restic feature when the host runs it. The hooks run inside the job, so a
-      # failed dump fails the backup rather than leaving a stale dump that looks fresh.
-      services.restic.backups.daily = {
-        paths = allBackupPaths;
-        exclude = allBackupExcludes;
+  config = {
+    my.contracts.projections.backup = {
+      paths = allBackupPaths;
+      exclude = allBackupExcludes;
+      preBackup = hooksOf "preBackup";
+      postBackup = hooksOf "postBackup";
+    };
+    # A host that declares state worth restoring and then runs no backup is a decision only if it is
+    # written down. This refuses the alternative - an omission that looks exactly like a policy.
+    assertions = [
+      {
+        assertion = activeProvider || allBackupPaths == [ ] || declaredDecline;
+        message = ''
+          this host declares state that must be restorable (${lib.concatStringsSep ", " allBackupPaths})
+          but has no enabled backup provider. Enable an appropriate backend or record an explicit
+          no-backup decision in my.contracts.backupProviders.<backend>.declined.
+        '';
       }
-      // lib.optionalAttrs (preBackup != null) { backupPrepareCommand = "${preBackup}"; }
-      // lib.optionalAttrs (postBackup != null) { backupCleanupCommand = "${postBackup}"; };
-    })
-  ];
+    ];
+  };
 }

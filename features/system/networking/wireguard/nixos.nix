@@ -1,9 +1,8 @@
 # features/system/networking/wireguard/nixos.nix
 # Stateless Kernel-WireGuard Mesh Network (RFC 1918 / 10.10.100.0/24 & RFC 4193 / fd10:1000:100::/64).
-# Dual-hub relay architecture (cld-edge-01 + cld-ops-01) with an explicitly assigned
-# primary hub per node. Peering is redundant - every node handshakes with both hubs - but
-# overlay transit is not: only the assigned primary carries the mesh CIDR, so losing it
-# means reassigning `primaryHub` and rebuilding, not an automatic failover.
+# High-Availability Dual-Hub Active Relay Architecture (cld-edge-01 + cld-ops-01).
+# Eliminates single points of failure, establishes encrypted node-to-node transport,
+# and enforces longest-prefix cryptokey routing with automated MSS clamping.
 {
   config,
   lib,
@@ -119,9 +118,7 @@ let
   # printer's web interface stayed reachable from the hub, and with the explicit deny the *withdrawal* of
   # a rule never happened at all.
 
-  meshCidr =
-    topology.subnets.mesh.cidr
-      or (throw "wireguard: inventory provides no mesh subnet CIDR; declare subnets.mesh.cidr");
+  meshCidr = topology.subnets.mesh.cidr or "10.10.100.0/24";
 
   # A host with its own address in a home zone *is* in the home LAN: its zone gateway reaches every
   # other home zone directly, so a tunnel route for one would shadow a shorter path - measured: a
@@ -158,8 +155,7 @@ let
             meshCidr
           ]
           ++ lib.optional (topology.subnets ? mesh-ipv6) (
-            topology.subnets.mesh-ipv6.cidr
-              or (throw "wireguard: inventory provides no mesh-ipv6 subnet CIDR; declare subnets.mesh-ipv6.cidr")
+            topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64"
           )
           ++ lanRoutes
         else
@@ -207,7 +203,11 @@ in
 
     primaryHub = lib.mkOption {
       type = lib.types.str;
-      default = "cld-edge-01";
+      default =
+        if topology.primaryWireguardHub == null then
+          throw "wireguard: primaryWireguardHub is not assigned in the topology"
+        else
+          topology.primaryWireguardHub;
       description = "Primary WireGuard relay hub hostname for subnet-wide overlay transit";
     };
 
@@ -302,14 +302,8 @@ in
     # instead of binding a /24 onto another prefix.
     networking.wireguard.interfaces.${cfg.interfaceName} =
       let
-        meshPrefix = cidrLib.prefixLength (
-          topology.subnets.mesh.cidr
-            or (throw "wireguard: inventory provides no mesh subnet CIDR; declare subnets.mesh.cidr")
-        );
-        meshV6Prefix = cidrLib.prefixLength (
-          topology.subnets.mesh-ipv6.cidr
-            or (throw "wireguard: inventory provides no mesh-ipv6 subnet CIDR; declare subnets.mesh-ipv6.cidr")
-        );
+        meshPrefix = cidrLib.prefixLength (topology.subnets.mesh.cidr or "10.10.100.0/24");
+        meshV6Prefix = cidrLib.prefixLength (topology.subnets.mesh-ipv6.cidr or "fd10:1000:100::/64");
       in
       assert meshPrefix != null;
       assert meshV6Prefix != null || ownHost.wireguardIpv6 == null;

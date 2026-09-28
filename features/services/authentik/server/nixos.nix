@@ -1,14 +1,13 @@
 {
   config,
   lib,
-  addresses,
-  endpointLib,
   pkgs,
   fleetConfigs,
   ...
 }:
 
 let
+  serviceAddressLib = import ../../../../contracts/topology/lib/service-address.nix { };
   cfg = config.my.features.services.authentik.server;
 
   # Constructors for blueprint entries. They belong to this feature, not to the framework: they encode
@@ -17,7 +16,7 @@ let
   blueprintLib = import ../lib/blueprint.nix { inherit lib; };
 
   # The core as this host reaches it: the LAN address while both sides are at home, otherwise the overlay
-  # address (lib/addresses.nix).
+  # address (the topology contract).
 
   # Blueprint application is asynchronous upstream: the API's apply endpoint and the hourly discovery both
   # only queue a task. The unit below queues the same task and then waits for the effect, so a deploy is
@@ -37,7 +36,6 @@ let
       lib
       pkgs
       blueprintLib
-      endpointLib
       fleetConfigs
       ;
   };
@@ -511,14 +509,14 @@ in
       default =
         let
           systems = fleetConfigs.systems config;
-          coreLib = import ../lib/core.nix { inherit fleetConfigs addresses; };
+          coreLib = import ../lib/core.nix { inherit fleetConfigs; };
           serverHost = coreLib.hostName systems;
         in
         if serverHost == config.networking.hostName then
           "127.0.0.1:${toString cfg.listenPort}"
         else
           "${
-            addresses.serviceAddress {
+            serviceAddressLib.serviceAddress {
               topology = config.my.topology;
               consumer = config.my.topology.hosts.${config.networking.hostName} or null;
               peer = config.my.topology.hosts.${serverHost};

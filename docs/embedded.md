@@ -53,7 +53,7 @@ render. The reconciler speaks the encrypted web API (RSA/AES handshake) through 
 - **The reconciler derives its target from the declared address.** It used to read a migration address
   from the topology; with that gone it addresses `ipv4`, which is where the device answers (measured).
 - **Run it directly, not through `nod`.** Both agentless reconcilers reject the `switch` action
-  argument - see the hazards in [operations.md](operations.md) §11.
+  argument - see the hazards in [operations.md](operations.md) §10.
 
 ## 4. Router
 
@@ -72,7 +72,7 @@ device, not a licence to change it by hand later.
 
 The engine is **diff-only for anything but these**: it reports what the device has and writes the
 desired state, and it refuses a non-empty port-forwarding list rather than guessing - see
-[operations.md](operations.md) §11 for the hazard that comes with applying it.
+[operations.md](operations.md) §10 for the hazard that comes with applying it.
 
 ## 5. Microcontrollers
 

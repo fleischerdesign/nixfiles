@@ -13,7 +13,8 @@ let
       hostname,
       inputs,
       flake ? null,
-      users ? [ ],
+      homeUsers ? null,
+      usersDir ? ../user,
       extraModules ? [ ],
       globalModules ? [ ],
     }:
@@ -34,6 +35,7 @@ let
         "subnets"
         "hosts"
         "devices"
+        "site"
       ];
 
       finalPkgs =
@@ -45,14 +47,13 @@ let
             config.allowUnfree = true;
           };
 
-      userDir = ../user;
-      # The same discovery the system module uses: who exists is decided once, from metadata.
-      # Home Manager is wired for every discovered user carrying a home profile; a missing
-      # home.nix fails loudly below instead of silently dropping the account's environment.
-      discoveredUsers = usersLib.discoverNames userDir;
+      # Account discovery and Home Manager assignment share usersDir. `homeUsers` selects which
+      # discovered accounts receive a Home Manager configuration; null means all, [] means none.
+      # System accounts remain the responsibility of the user identity module.
+      discoveredUsers = usersLib.discoverNames usersDir;
 
       normalizedUsers =
-        if users == [ ] then
+        if homeUsers == null then
           map (name: { inherit name; }) discoveredUsers
         else
           map (
@@ -61,40 +62,48 @@ let
             // {
               name = u.name or (throw "mkSystem: a users entry names no user: ${builtins.toJSON u}");
             }
-          ) users;
+          ) homeUsers;
 
-      homeManagerUsers = lib.listToAttrs (
-        lib.concatMap (
-          user:
-          let
-            homeFile = ../user + "/${user.name}/home.nix";
-          in
-          if builtins.pathExists homeFile then
-            [
-              {
-                inherit (user) name;
-                value = {
-                  imports = [ (import homeFile) ] ++ (user.homeModules or [ ]);
-                };
-              }
-            ]
-          else
-            throw "mkSystem: user/${user.name} has metadata but no home.nix"
-        ) normalizedUsers
+      duplicateUsers = lib.unique (
+        lib.filter (name: builtins.length (lib.filter (user: user.name == name) normalizedUsers) > 1) (
+          map (user: user.name) normalizedUsers
+        )
       );
+
+      homeManagerUsers =
+        if duplicateUsers != [ ] then
+          throw "mkSystem: duplicate user assignments: ${lib.concatStringsSep ", " duplicateUsers}"
+        else
+          lib.listToAttrs (
+            lib.concatMap (
+              user:
+              let
+                homeFile = usersDir + "/${user.name}/home.nix";
+              in
+              if builtins.pathExists homeFile then
+                [
+                  {
+                    inherit (user) name;
+                    value = {
+                      imports = [ (import homeFile) ] ++ (user.homeModules or [ ]);
+                    };
+                  }
+                ]
+              else
+                throw "mkSystem: ${toString usersDir}/${user.name} has metadata but no home.nix"
+            ) normalizedUsers
+          );
     in
     inputs.nixpkgs-unstable.lib.nixosSystem {
       inherit system;
       specialArgs = {
         inherit inputs hostname flake;
+        inherit usersDir;
         features = import ./feature-dependencies.nix { inherit lib; };
-        # Shared ownerless helpers, injected once: modules declare them in their arguments
-        # instead of importing lib/ by relative path. Domain-owned code (contracts/*/lib,
-        # features/*/lib) stays imported from its owner - that import names the coupling.
+        # Repository-wide composition helpers are injected once. Contract-owned policy helpers
+        # are imported by their consumers from contracts/<domain>/lib, making ownership explicit.
         fleetConfigs = import ./fleet-configs.nix { inherit lib; };
-        addresses = import ./addresses.nix { inherit lib; };
         cidrLib = import ./cidr.nix { inherit lib; };
-        endpointLib = import ./endpoints.nix { inherit lib; };
         inherit usersLib;
       };
       modules = [

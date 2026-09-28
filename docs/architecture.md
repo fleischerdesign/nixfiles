@@ -42,7 +42,7 @@ It is a node like the others; its WireGuard configuration is rendered as a wg-qu
 
 ## 3. Network model
 
-### 3.1 One Layer-2 segment, five zones
+### 3.1 One Layer-2 segment, three zones
 
 The house is **one flat Layer-2 segment**. Zones are *addressing and policy*, not separate broadcast
 domains: a zone is a named subnet with a trust level, plus the firewall rules that treat it.
@@ -125,11 +125,9 @@ Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no
   10.10.100.10    10.10.100.20     10.10.100.30
 ```
 
-- **Dual hub, assigned primary.** Every host peers with both cloud hosts. The *assigned*
-  primary hub (`primaryHub`, one per node) carries the overlay CIDR for transit; the secondary is
-  reached by its own `/32` only. Peering is therefore redundant, transit is not: losing the primary
-  hub means reassigning `primaryHub` and rebuilding the affected nodes. Automatic transit failover
-  is not claimed and not implemented.
+- **Dual hub.** Every host peers with both cloud hosts. The *primary* hub carries the overlay CIDR for
+  transit; the secondary is reached by its own `/32`. A hub can be taken out without reconfiguring a
+  spoke.
 - **Longest-prefix cryptokey routing.** A peer's `allowedIPs` is its overlay address plus whatever it
   carries (§ below). Traffic to a host's own `/32` goes direct; traffic to a prefix goes to whoever
   carries it.
@@ -198,7 +196,7 @@ network part.
 | Plane | Names | Published where | Answers |
 |---|---|---|---|
 | public | `<service>.vyrx.de` | Cloudflare | the ingress |
-| internal | `<service>.lan.vyrx.de`, `<service>.mesh.vyrx.de` | Blocky only, never Cloudflare | the LAN host, over the mesh for remote clients |
+| internal | `<service>.lan.vyrx.de`, `<service>.mesh.vyrx.de` | Knot Resolver only, never Cloudflare | the LAN host, over the mesh for remote clients |
 | node | `<host>.node.vyrx.de` | Cloudflare | the host's overlay address |
 | user public | `*.pub.<user>.ai.vyrx.de`, `<user>.ai.vyrx.de` | Cloudflare | the user's OpenClaw gateway |
 
@@ -256,14 +254,13 @@ overlay plane, blocklist included - and the home resolver serves the LAN. The cl
 that a door has to be opened to be a door: it listened on `10.10.100.1:53` while its firewall allowed
 only the DoT port, so every query to it was dropped.
 
-Every host resolves through that resolver. The list is declared once in the inventory
-(`my.topology.resolvers`) and `features/system/networking/static` hands it to **both** consumers:
-`networking.nameservers` (which systemd-resolved and NetworkManager read) and
-`networking.resolvconf.extraConfig` (openresolv, which is what actually owns `/etc/resolv.conf` on
-NixOS and does **not** read the former). Declaring only the first left the file to whatever wrote it
-last - a stale DHCP lease on `hom-srv-01` put the uplink's nameservers first and name resolution
-timed out (measured 2026-09-21). A roaming host is not static, so it keeps the resolver of the
-network it is on.
+Every host resolves through the doors derived by `features/system/networking/resolver` from the
+topology. `services.resolved` owns resolution and receives `networking.nameservers`; NetworkManager
+feeds per-link DNS to systemd-resolved rather than writing `/etc/resolv.conf`. The resolver module
+sets `FallbackDNS` empty and the global routing domain to `~.`, so DHCP-provided resolvers and public
+fallbacks are not used. A fixed home host uses the home door alone; a roaming home-zone client tries
+the home door first, then the mesh doors. The static-addressing module retains a resolvconf projection
+as a fallback only when the resolver feature is disabled; it is not the active fleet resolver path.
 
 ### 5.3 Certificates: one per name, issued where it terminates
 
@@ -294,7 +291,7 @@ Two rules keep resolution and service addressing from being decided twice:
   purpose - a fallback that knows none of our names would resolve the public internet and fail
   silently on everything internal - and `Domains=~.` keeps a link's DHCP-provided resolver out of the
   path. The DHCP answer hands out `my.topology.resolvers` and nothing else: ours, or none.
-- **A service uses an address the far side can actually reach** (`lib/addresses.nix`): the LAN address
+- **A service uses an address the far side can actually reach** (`contracts/topology/lib/service-address.nix`): the LAN address
   while both sides are in a home zone, the overlay address otherwise, because a cloud host cannot
   reach a home zone at all. That one rule replaced five modules that each decided for themselves.
 - **A rendered client is told a door instead of handed one.** Its wg-quick file carries the resolvers
@@ -317,12 +314,12 @@ twice, and no service module knows its host, its name or its neighbours.
 | Declaration | Meaning | Projected to |
 |---|---|---|
 | `my.contracts.provides.<svc>.endpoints` | listeners: port, transport and application protocol, direct network access. A listener is not a publication | firewall rules, telemetry targets, ingress upstreams |
-| `…publications.<name>` | a name on a listener: DNS identity, exposure plane, HTTP ingress policy and audience (`endpoint` references the listener); `scope = "isolated"` deliberately names nothing | DNS records, Caddy vHosts, firewall mesh reachability, access policies |
+| `…publications.<name>` | a name on a listener: DNS identity, exposure plane, HTTP ingress policy and audience (`endpoint` references the listener) | DNS records, Caddy vHosts, firewall mesh reachability, access policies |
 | `…identity.oidc.<name>` / `…identity.ldap.<name>` | application integrations referencing a publication | Authentik blueprints, directory consumers |
 | `…presentation.tiles.<name>`, `…presentation.readouts`, `…presentation.actions` | portal entries referencing an endpoint, plus service-level capabilities | portal inventory and adapter data |
 | `…telemetry.probes.<name>`, `…telemetry.scrapes.<name>` | named HTTP/TCP probes and metrics scrapes referencing an endpoint (no repeated port, no inferred HTTP probe) | Prometheus scrape jobs and portal monitoring state |
 | `…storage` | persistence needs and their tier | storage contracts, backup sets |
-| `…backup` | what must be restorable, with retention | restic jobs |
+| `…backup` | what must be restorable and which consistency hooks are required | backend-neutral path/hook projection; the selected backup adapter renders its own jobs |
 | `…dependsOn` | fleet-wide service references, validated against every host's declared services | portal dependencies |
 | `my.contracts.consumes.<svc>.postgresql.<db>` / `…ldap` | a database and user, or a directory identity with audience | provider resources, declared by the provider engine |
 
@@ -341,8 +338,8 @@ Consequences worth knowing:
 - a publication with `scope = "public"` gets a public name, a certificate and a proxy - it does
   not ask for them;
 - services never reference a host, so moving one is a one-line change in `hosts/`;
-- the FQDNs, the Caddy configuration, the Authentik blueprints and the backup jobs are all *functions*
-  of these declarations, which is why a rename is a derivation change rather than a migration;
+- the FQDNs, the Caddy configuration, the Authentik blueprints and backup requirements are all *functions*
+  of these declarations; a backend adapter turns backup requirements into its own jobs;
 - a path exempted from authentication (`unauthenticatedPaths`) is proxied **without** `forward_auth`,
   so it carries **no** identity headers. A page that reads identity must therefore never be exempted,
   and the set of exempted paths must equal the set the application declares public -
@@ -367,19 +364,18 @@ Every feature and contract is *loaded* on every host and *active* only where `en
 what makes `nix flake check` meaningful: a module that does not evaluate is caught for all five hosts at
 once, whether or not any of them enables it.
 
-Shared code follows one rule with two clauses. Ownerless helpers (`lib/addresses`,
-`lib/cidr`, `lib/endpoints`, `lib/users`, `lib/fleet-configs`) arrive exclusively through
-`specialArgs` from `lib/mk-system.nix` - a module declares them in its arguments and never
-imports `lib/` by relative path. Code with an owner (`contracts/*/lib`, `features/*/lib`)
-is imported relatively from its owner, so the import names the coupling instead of hiding it.
-Capabilities are discovered, facts are composed explicitly, shared code is injected: three
-categories, one mechanism each, no exceptions.
+Shared code follows ownership. Generic composition helpers (`lib/cidr`, `lib/users`,
+`lib/fleet-configs`) are injected through `specialArgs` from `lib/mk-system.nix`. Domain-owned
+helpers such as endpoint identifiers and service address selection are imported from their owning
+contract (`contracts/endpoints/lib`, `contracts/topology/lib`). Capability modules are discovered;
+site facts are composed explicitly; generic infrastructure is injected. Each category has one
+loading mechanism.
 
 The invariants (`contracts/*`) are evaluation-time assertions, not conventions: a service from the
 public plane without authentication, a name that cannot be derived, an endpoint on a host that does not
 serve it, or a subnet a reservation falls outside - each fails the build rather than the deployment.
 
-### 7.1 What is compiled, and what is still a setting
+### 6.1 What is compiled, and what is still a setting
 
 A projection earns its complexity only where it replaces a manual step. Measured 2026-09-20, service by
 service:

@@ -11,15 +11,31 @@
   lib,
   pkgs,
   blueprintLib,
-  endpointLib,
   fleetConfigs,
 }:
 let
   audience = import ../../../../contracts/identity/lib/audience.nix;
+  endpointIdentifiers = import ../../../../contracts/endpoints/lib/identifiers.nix { };
 
   authentikPackage = pkgs.authentik;
   directory = config.my.directory.ldap;
   consumerAccountName = name: "${config.my.directory.ldap.consumerAccountPrefix}${name}";
+
+  integrationForPublication =
+    kind: contract: publication: fallback:
+    let
+      integrations = builtins.attrValues (contract.identity.${kind} or { });
+      matching = lib.filter (
+        integration: integration.enable && integration.publication == publication
+      ) integrations;
+      cardinality = builtins.length matching;
+    in
+    if cardinality > 1 then
+      throw "Authentik blueprint compiler: publication '${publication}' has multiple enabled ${kind} integrations"
+    else if matching == [ ] then
+      fallback
+    else
+      builtins.head matching;
 
   blueprintExpectations = {
     # Relation sets (policy bindings, stage bindings) are no longer listed here: the apply derives them
@@ -62,14 +78,29 @@ let
             ep = pub // {
               displayName = if tile != null then tile.displayName else null;
               group = if tile != null then tile.category else "Services";
-              oidc =
-                contract.identity.oidc.${pubName} or {
-                  enable = false;
-                  redirectUris = [ ];
-                };
-              ldap = contract.identity.ldap.${pubName} or { enable = false; };
+              oidc = integrationForPublication "oidc" contract pubName {
+                enable = false;
+                clientId = null;
+                clientSecret = null;
+                clientSecretEnv = null;
+                redirectUris = [ ];
+                subMode = "hashed_user_id";
+                includeClaimsInIdToken = true;
+                grantTypes = [
+                  "authorization_code"
+                  "refresh_token"
+                ];
+                signingKey = null;
+                propertyMappings = [ ];
+              };
+              ldap = integrationForPublication "ldap" contract pubName {
+                enable = false;
+                accessGroups = [ ];
+                adminGroups = [ ];
+                secretPath = null;
+              };
             };
-            name = endpointLib.endpointName svcName pubName;
+            name = endpointIdentifiers.endpointName svcName pubName;
           }
         ) contract.publications
       ) provides
@@ -79,7 +110,7 @@ let
   # Filter forward-auth and OIDC endpoints
   rawAuthEndpointsList = lib.filter (
     item:
-    (item.ep.scope == "public" || item.ep.scope == "internal")
+    (item.ep.scope == "public" || item.ep.scope == "internal" || item.ep.scope == "mesh")
     && item.ep.auth == "authentik"
     && item.ep.canonicalDomain != null
   ) allClusterEndpointsList;
@@ -189,7 +220,7 @@ let
       true;
 
   # An audience group this compiler is the author of, because its name derives from an endpoint
-  # (`lib/endpoints.nix`, the reserved prefix). It is declared in the same blueprint as the binding that
+  # (`contracts/endpoints/lib/identifiers.nix`, the reserved prefix). It is declared in the same blueprint as the binding that
   # uses it, so a binding can never point at a group nobody creates - which was the one gap both the
   # role and the own-audience model shared: `!Find` resolves against the database, and a group that no
   # document declares is a dangling reference that evaluates, applies and leaves the service

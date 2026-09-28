@@ -1,4 +1,9 @@
-{ pkgs, lib, ... }:
+{
+  pkgs,
+  lib,
+  self,
+  ...
+}:
 let
   fixture =
     values:
@@ -70,18 +75,11 @@ let
       subdomain = "app";
     };
   };
-  nameless = fixture {
+  nameless = failures {
     inherit endpoints;
     publications.web = {
       endpoint = "web";
       scope = "isolated";
-    };
-  };
-  publicNameless = failures {
-    inherit endpoints;
-    publications.web = {
-      endpoint = "web";
-      scope = "public";
     };
   };
   wrongProtocol = failures {
@@ -118,6 +116,97 @@ let
       };
     };
   };
+  namingProjection = import ../contracts/naming/nixos.nix {
+    inherit lib;
+    config = {
+      my.topology = {
+        domain = "example.test";
+        ingressHost = "node-a";
+        devices = { };
+        hosts.node-a = {
+          ipv4 = "198.51.100.10";
+          wireguardIpv4 = "192.0.2.10";
+        };
+      };
+    };
+    fleetConfigs = {
+      systems = _: {
+        node-a.config.my.contracts.provides.demo = {
+          endpoints.web.directAccess.enable = false;
+          publications.web = {
+            endpoint = "web";
+            scope = "public";
+            canonicalDomain = "service.example.test";
+            fqdn = null;
+            extraDomains = [ "NODE-A.NODE.EXAMPLE.TEST" ];
+            aliases = [ ];
+            auth = "authentik";
+            publicExempt = null;
+          };
+        };
+      };
+      providesOf = host: host.config.my.contracts.provides;
+    };
+  };
+  nameCollision = lib.filter (assertion: !assertion.assertion) namingProjection.config.assertions;
+  aliasHost = self.nixosConfigurations.hom-srv-01.extendModules {
+    specialArgs.flake = fixtureFleet;
+    modules = [
+      {
+        my.contracts.provides.audit-alias = {
+          endpoints.web.port = 18999;
+          publications.web = {
+            endpoint = "web";
+            scope = "public";
+            subdomain = "audit-primary";
+            auth = "oidc";
+            accessGroups = [ "media-users" ];
+            aliases = [ "audit-legacy.vyrx.de" ];
+          };
+          identity.oidc.browser = {
+            enable = true;
+            publication = "web";
+            redirectPaths = [ "/callback" ];
+          };
+        };
+        my.contracts.provides.audit-mesh = {
+          endpoints.web.port = 18998;
+          publications.web = {
+            endpoint = "web";
+            scope = "mesh";
+            auth = "authentik";
+            accessGroups = [ "media-users" ];
+            subdomain = "audit-mesh";
+          };
+        };
+      }
+    ];
+  };
+  authentikHost = self.nixosConfigurations.cld-edge-01.extendModules {
+    specialArgs.flake = fixtureFleet;
+  };
+  fixtureFleet = self // {
+    nixosConfigurations = self.nixosConfigurations // {
+      hom-srv-01 = aliasHost;
+      cld-edge-01 = authentikHost;
+    };
+  };
+  aliasPublication = aliasHost.config.my.contracts.provides.audit-alias.publications.web;
+  aliasRedirects =
+    aliasHost.config.my.contracts.provides.audit-alias.identity.oidc.browser.redirectUris;
+  aliasDnsAnswers = aliasHost.config.my.features.services.dns.answers;
+  cloudflareRecords = authentikHost.config.my.features.system.networking.cloudflare.effectiveRecords;
+  authentikBlueprints = authentikHost.config.my.features.services.authentik.server.blueprintsDir;
+  blueprintRedirectCheck =
+    pkgs.runCommandLocal "publication-authentik-redirect-check"
+      {
+        nativeBuildInputs = [ pkgs.gnugrep ];
+      }
+      ''
+        grep -F 'https://audit-legacy.vyrx.de/callback' ${authentikBlueprints}/03-apps/oidc-apps-generated.yaml >/dev/null
+        grep -F 'https://audit-mesh.mesh.vyrx.de' ${authentikBlueprints}/03-apps/proxy-apps-generated.yaml >/dev/null
+        touch "$out"
+      '';
   contains = text: strings: lib.any (lib.hasInfix text) strings;
 in
 if
@@ -126,14 +215,22 @@ if
     (fixture valid).my.contracts.provides.example.publications.web.canonicalDomain == "app.example.test"
   && (fixture valid).my.contracts.provides.example.publications.web.port == 8080
   && contains "unknown endpoint 'missing'" unknown
-  && nameless.my.contracts.provides.example.publications.web.canonicalDomain == null
-  && contains "yields no DNS name" publicNameless
+  && contains "yields no DNS name" nameless
   && contains "ingress terminates HTTP" wrongProtocol
   && contains "enforced by the ingress" authWithoutIngress
   && contains "one endpoint, one name" duplicateName
+  && lib.any (assertion: lib.hasInfix "Naming I2" assertion.message) nameCollision
+  && builtins.elem "audit-legacy.vyrx.de" aliasPublication.extraDomains
+  && aliasHost.config.services.caddy.virtualHosts ? "audit-legacy.vyrx.de"
+  && aliasHost.config.services.caddy.virtualHosts ? "audit-mesh.mesh.vyrx.de"
+  && authentikHost.config.services.caddy.virtualHosts ? "audit-legacy.vyrx.de"
+  && builtins.elem "https://audit-legacy.vyrx.de/callback" aliasRedirects
+  && lib.any (answer: answer.name == "audit-legacy.vyrx.de." && answer.plane == "lan") aliasDnsAnswers
+  && lib.any (record: record.name == "audit-legacy.vyrx.de") cloudflareRecords
 then
   pkgs.runCommandLocal "publications-contract-check" { } ''
-    echo "publication references, ingress coherence, isolated namelessness and five independent negative controls passed" > "$out"
+    test -e ${blueprintRedirectCheck}
+    echo "publication references, DNS/Cloudflare/Caddy/Authentik projections, ingress coherence, namespace collisions and negative controls passed" > "$out"
   ''
 else
-  throw "publications contract fixture failed: expected a derived name, a null isolated name and five distinct errors"
+  throw "publication contract fixture failed: expected derived names, coherent ingress and fleet-wide name ownership"

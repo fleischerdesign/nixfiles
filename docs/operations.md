@@ -1,20 +1,20 @@
-# VYRX — Deployment & Operations Runbook
+# VYRX 2.0 — Deployment & Network Cutover Runbook
 
 > **Status:** Operational runbook (living document)
-> **Audience:** Operators and autonomous agents. Everything needed to deploy, verify and recover the fleet is here.
+> **Audience:** Operators and autonomous agents. Everything needed to finish (or recover) the 2.0 rollout is here.
 > **Companion docs:** `architecture.md` (the system and its vocabulary), `naming.md` (names and planes), `identity.md` (Authentik), `security.md` (the threat model), `embedded.md` (the device fleet), `practices.md` (how we work).
-> **Emergency?** Jump straight to [§9 Emergency Recovery](#9-emergency-recovery--regaining-access).
+> **Emergency?** Jump straight to [§11 Emergency Recovery](#11-emergency-recovery--regaining-access).
 
 ---
 
 ## 1. Purpose
 
-This fleet runs:
+The 2.0 migration moves a historically grown setup ("hosts named after musicians", fragmented domains, `192.168.178.0/24`) onto:
 - RFC 1178 host taxonomy and RFC 1918 zoning (`10.10.0.0/16`),
 - declarative NixOS + Home Manager,
 - a WireGuard mesh (`10.10.100.0/24`) as the transport, which also delivers the home LAN zones to
   roaming clients,
-- `hom-srv-01` as the LAN core (DHCP, DNS, NTP, gateway).
+- `hom-srv-01` taking over LAN services (DHCP, DNS, NTP, gateway) from the FRITZ!Box.
 
 This document is the **execution + safety guide**. It is deliberately explicit about **rollback and lockout avoidance**, because the rollout changes network services that can cut off the very access path you are deploying over.
 
@@ -24,14 +24,16 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 
 1. **Never remove your out-of-band path.** Before any network change you must have at least one working path that does *not* depend on the thing you are changing:
    - Public IP SSH (cloud hosts): `root@173.249.22.211`, `root@37.114.55.91`
-   - the WireGuard mesh (`root@10.10.100.x`) — the only overlay
+   - the WireGuard mesh (`root@10.10.100.x`) — the only overlay; Tailscale was retired 2026-09-20
    - Wired LAN access + a client with a **static IP** in the affected subnet
    - Physical console / keyboard for home hardware; LAN web UI for FRITZ!Box and RE330
-2. **The mesh is the transport.** The home LAN reaches roaming clients for the zones
+2. **The mesh is the transport.** Tailscale was removed on 2026-09-20; the four cutover criteria of
+   §10 were measured first (every host on 2.0, handshakes on both hubs, `10.10.100.x` reachable, deploy
+   targets resolving to reachable WG addresses). The home LAN reaches roaming clients for the zones
    that hold devices without an overlay identity (`announcedZones`, derived from the inventory);
    `my.topology.lanRouter` names the host that carries them - not a second router.
 3. **Exactly one DHCP server per L2 segment.** Never run FRITZ!Box DHCP and `hom-srv-01` Kea DHCP at the same time on the same subnet.
-4. **Never point DNS at a host that is not serving DNS yet.** FRITZ!Box DNS may only be set to `10.10.10.10` (the resolver) after the resolver answers queries.
+4. **Never point DNS at a host that is not serving DNS yet.** FRITZ!Box DNS may only be set to `10.10.10.10` (Knot Resolver) after the resolver answers queries.
 5. **The FRITZ!Box is the WAN modem.** The declarative engine only manages its **DNS, DHCP toggle and port forwards** — *never* its LAN IP, subnet or Wi-Fi. Do not change those.
 6. **Backups/rollback first.** Record the current generation and have a rollback path (see §7).
 7. **Preview before activating.** `nod switch <target> --dry-run` / `nod plan <target>` and `git status` clean.
@@ -54,6 +56,8 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | `hom-ap-01` | TP-Link RE330 AP | infra | `10.10.10.20` | – | – | `ap.lan.vyrx.de` |
 | `hom-rly-01..08` | Sonoff relais (ESPHome) | iot | `10.10.30.11..18` | – | – | `rly-0X.iot.vyrx.de` |
 
+> **Target vs. reality:** this table lists the **2.0 target identity**, which every host now runs. The narrative sections 7 and 8 that follow are the *record of the cutover* (state as of 2026-09-19, when only `cld-edge-01` was migrated); they are kept as history, not as instructions.
+
 ### 3.2 Subnets (`my.topology.subnets`)
 
 | Zone | CIDR | VLAN | Trust | Notes |
@@ -65,10 +69,13 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | `mesh-ipv6` | `fd10:1000:100::/64` | – | mesh | WireGuard overlay (RFC 4193 ULA). |
 | `guest` | `10.10.99.0/24` | 99 | guest | Internet-only. |
 
-### 3.3 Overlay — WireGuard only
+### 3.3 Overlay — WireGuard only (Tailscale retired 2026-09-20)
 
-The only overlay is the WireGuard mesh below; nothing in this repository or in the fleet reads any
-other. The overlay is `10.10.100.0/24` (`fd10:1000:100::/64`), relay hubs `cld-edge-01` and `cld-ops-01`, and
+The tailnet was removed once its four cutover criteria (§10) were met and measured. Remaining tailnet
+devices exist only in Tailscale's own admin console and must be deleted there; nothing in this
+repository or in the fleet reads them.
+
+The overlay is `10.10.100.0/24` (`fd10:1000:100::/64`), relay hubs `cld-edge-01` and `cld-ops-01`, and
 every host peers with both. NetworkManager gives wifi a route metric of 600, so the mesh interface
 carries 1000: a prefix the host can reach directly always wins, and the tunnel is used only when the
 LAN is elsewhere.
@@ -154,7 +161,7 @@ function builds the NixOS spokes' peers. Revocation is the inverse, plus the key
 
 ## 5. Pre-flight Checklist (every deploy session)
 
-- [ ] `git status` clean; changes committed (`git log --oneline -5`).
+- [ ] `git status` clean; 2.0 changes committed (`git log --oneline -5`).
 - [ ] `nix flake check` passes (eval all hosts + statix + deadnix).
 - [ ] Required SOPS secrets present and decryptable on the target host:
       `services/authentik/*`, `services/fritzbox/password`, `services/wifi/ap_password`,
@@ -170,12 +177,14 @@ function builds the NixOS spokes' peers. Revocation is the inverse, plus the key
 ## 6. Deployment Order & Dependencies
 
 ```
-1  cld-edge-01   – identity/ingress
-2  cld-ops-01    – observability/AI, second relay hub
-3  hom-srv-01    – LAN core (DHCP, DNS, gateway); a network change here affects every client
-4  hom-wrk-01    – desktop
-5  mob-nb-01     – notebook
-6  nodTargets (§8): fritzbox (hom-rt-01), tplink-ap (hom-ap-01), esphome relays, cloudflare
+Phase 0  Repository + secrets verified, Tailscale up, backups taken
+Phase 1  cld-edge-01        (DONE)  – identity/ingress
+Phase 2  cld-ops-01                 – observability/AI, second relay hub
+Phase 3  hom-srv-01                 – LAN core; ***network cutover, §8***
+Phase 4  hom-wrk-01                 – desktop
+Phase 5  mob-nb-01                  – notebook
+Phase 6  nodTargets (§9): fritzbox (hom-rt-01), tplink-ap (hom-ap-01), esphome relays, cloudflare
+Phase 7  WireGuard cutover (§10): verify all handshakes, then retire Tailscale
 ```
 
 Rationale: servers first (they carry contracts/outposts/relay hubs), the home LAN core before the clients that depend on its DHCP/DNS, clients afterwards, and the embedded network devices last (they change connectivity, so they need the servers healthy for rollback).
@@ -205,10 +214,10 @@ ssh root@$ADDR 'nixos-rebuild --rollback switch'
 ```
 Worst case: reboot and select the previous generation in the bootloader (GRUB).
 
-### 7.1 cld-edge-01
-Identity/ingress host. Authentik server + LDAP outpost. Apply path for identity changes: redeploy this host (see `identity.md`).
+### 7.1 cld-edge-01 — DONE
+Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints successful, outposts assigned, self-service recovery + passkeys active. Apply path for identity changes: redeploy this host (see `identity.md`).
 
-## 8. nodTargets (agentless reconcilers)
+## 7. nodTargets (agentless reconcilers)
 
 `flake.nix → nodTargets` (all `targetType = "agentless"`; `nod` builds `#nodTargets.<name>.package` and runs its single binary locally):
 
@@ -224,7 +233,7 @@ Identity/ingress host. Authentik server + LDAP outpost. Apply path for identity 
 > `nod switch <target>` works. The Authentik target had the same defect and was removed. Verify
 > `--dry-run` output before applying anything — both device reconcilers report a real diff now.
 
-### 8.1 OpenClaw node command surfaces (runtime, not Nix)
+### 7.1 OpenClaw node command surfaces (runtime, not Nix)
 
 A node advertises its command surface; the gateway's `gateway.nodes.commands.allow`, projected from
 `nodePolicy.capabilities` (`features/services/openclaw/lib/command-surface.nix`), decides which of
@@ -257,7 +266,7 @@ nix shell nixpkgs#sqlite -c sqlite3 "$DB" \
 The workstation's historic `jello` is the same kind of runtime state; correct it in the Control UI
 (Devices → rename) or with a pairing-scoped token.
 
-### 8.2 Instance identities, powers and the tunnel account
+### 7.2 Instance identities, powers and the tunnel account
 
 Every gateway and node instance runs as its own system user `openclaw-<instance>` with a private
 group. State directories, rendered env files and single-consumer secrets (for example
@@ -292,16 +301,17 @@ narrows an allowed forward - it does not re-enable one (measured 2026-09-24: the
 
 ---
 
-## 9. Emergency Recovery — Regaining Access
+## 8. Emergency Recovery — Regaining Access
 
 Order of attempts (stop as soon as one works):
 
 1. **User account, key-based** — always available, no password involved:
    `ssh -i ~/.ssh/id_rsa philipp@173.249.22.211` (edge) · `…@37.114.55.91` (ops) · `…@10.10.10.10` (hom-srv-01).
    On the home server this is root already: `ssh -i ~/.ssh/id_rsa root@10.10.10.10`.
-2. **WireGuard**: `ssh root@10.10.100.x` (only if peers handshake).
+2. **Tailscale**: `tailscale status` on any reachable node; `ssh <user>@100.x.x.x`.
+3. **WireGuard**: `ssh root@10.10.100.x` (only if peers handshake).
 
-### 9.1 Which key does root trust? (verified 2026-09-20)
+### 11.1 Which key does root trust? (verified 2026-09-20)
 
 | Host | root trusts | Note |
 |---|---|---|
@@ -322,7 +332,7 @@ root on every host, and the feature's lifecycle overwrote it. The operator key s
 everywhere as a fallback, and `~/.ssh/config` deliberately sets no `IdentitiesOnly`, so a mistake
 here cannot lock the fleet out.
 
-### 9.2 Recovering a lost account password
+### 11.2 Recovering a lost account password
 
 Needed when the declared hash and the host disagree, or when a password is not the intended one.
 `root` itself is not an option: `PermitRootLogin = prohibit-password` and no root password is
@@ -369,8 +379,8 @@ the next deploy. The declaration in SOPS is the source of truth; the host is a c
 store now holds the correct hash, so the password is enforced from then on and cannot drift again.
 That single activation also restores `ssh root@…` via the operator key, which unblocks the fleet key
 rotation and the fleet-wide rollout (`practices.md` §4).
-3. **Wired LAN** from a static-IP client: `ssh root@10.10.10.10` (hom-srv-01), FRITZ!Box UI `http://10.10.10.1`, AP UI `http://10.10.10.20`.
-4. **Physical console** for home hardware.
+4. **Wired LAN** from a static-IP client: `ssh root@10.10.10.10` (hom-srv-01), FRITZ!Box UI `http://10.10.10.1`, AP UI `http://10.10.10.20`.
+5. **Physical console** for home hardware.
 
 If a bad NixOS config is suspected:
 ```bash
@@ -380,7 +390,7 @@ ssh root@<reachable> 'nixos-rebuild --rollback switch'      # live rollback
 
 If a **network service** was misconfigured:
 - **DHCP gone:** statically configure a client, re-enable FRITZ!Box DHCP, disable Kea.
-- **DNS gone:** client DNS → `1.1.1.1`; re-point FRITZ!Box DNS to `1.1.1.1`; fix Blocky.
+- **DNS gone:** client DNS → `1.1.1.1`; re-point FRITZ!Box DNS to `1.1.1.1`; fix Knot Resolver.
 - **FRITZ!Box unreachable:** LAN `10.10.10.1`; restore config export; factory reset only as last resort (ISP/PVC credentials required).
 - **AP unreachable:** physical reset; re-run reconcile.
 - **Complete network loss at home:** the FRITZ!Box is still the modem; its default LAN `10.10.10.1` remains the anchor.
@@ -389,7 +399,7 @@ If a **network service** was misconfigured:
 
 ---
 
-## 10. Verification cheat-sheet
+## 9. Verification cheat-sheet
 
 ```bash
 # per host
@@ -410,7 +420,7 @@ curl -sk -o /dev/null -w '%{http_code}\n' https://auth.vyrx.de/
 
 ---
 
-## 11. Known hazards
+## 10. Known hazards
 
 Standing conditions that will bite an operator who does not know them. Resolved items do not belong
 here: they belong in the commit that resolved them.
@@ -428,10 +438,10 @@ here: they belong in the commit that resolved them.
 | The box's IPv6 settings are **set by hand**, and no TR-064 action exists for them | a firmware update or a reset brings back router advertisements and DHCPv6, and with them a second resolver that answers our names with the public address - silently, because a device learns it over the segment, not through us. Check with a router solicitation (`rdisc6 -1 <iface>` on a LAN host: nobody must answer, measured 2026-09-21) |
 | Nothing **forces** a device to use our resolver | DHCP offers only ours, the fleet hosts are configured for it, and the box no longer announces itself (no router advertisements, no DHCPv6). What remains is a device that is configured by hand to use `10.10.10.1`, or a hard-coded public resolver in a printer or TV - the segment is flat, so no rule of ours can stop it (see [architecture.md](architecture.md) §3.1). Outbound 53/853 to non-fleet destinations is not blocked, and DoH over 443 cannot be closed without breaking TLS; the real remedy is a second segment, not a firewall rule |
 | A device keeps the resolver a network once taught it | measured 2026-09-21: a phone held the uplink router's address in its DNS list for hours after the router stopped announcing it, resolved one of our names through it, and got the *public* answer - the lookup looked like ours and was not. After any change to what is announced, reconnect the device and read its resolver list (`dumpsys connectivity` for Android, `resolvectl status` elsewhere); the audit's router-solicitation probe covers the announcing side, not the learned side |
-| `nod switch` writes the boot entry but **advances no profile generation** | measured 2026-09-22: after many deploys, a reboot brought the hosts back on configurations from days earlier (Blocky instead of the resolver, iptables instead of nftables). The deployer runs `<closure>/bin/switch-to-configuration switch`, which installs the bootloader and writes an entry (`ssh_cli_deployer.rs`), but nothing in that path runs `nix-env -p /nix/var/nix/profiles/system --set <closure>` - the only `nix-env` calls are garbage collection. systemd-boot derives its `default` from the profile generation, so the entry for the new closure existed while the default kept pointing at the old one. `nixos-rebuild switch` does set the generation, which is why the same deploy behaves differently there. Until `nod` sets it, pin one by hand after a deploy: `nix-env -p /nix/var/nix/profiles/system --set <closure> && switch-to-configuration boot` |
+| `nod switch` writes the boot entry but **advances no profile generation** | measured 2026-09-22: after many deploys, a reboot brought the hosts back on configurations from days earlier (the previous DNS resolver instead of Knot Resolver, iptables instead of nftables). The deployer runs `<closure>/bin/switch-to-configuration switch`, which installs the bootloader and writes an entry (`ssh_cli_deployer.rs`), but nothing in that path runs `nix-env -p /nix/var/nix/profiles/system --set <closure>` - the only `nix-env` calls are garbage collection. systemd-boot derives its `default` from the profile generation, so the entry for the new closure existed while the default kept pointing at the old one. `nixos-rebuild switch` does set the generation, which is why the same deploy behaves differently there. Until `nod` sets it, pin one by hand after a deploy: `nix-env -p /nix/var/nix/profiles/system --set <closure> && switch-to-configuration boot` |
 | Nothing may write shell commands into the firewall | the whole policy is data, projected into the firewall's own rule options under the nftables implementation, which renders and applies one ruleset atomically. A command-shaped policy cost us the house's internet once (a syntax error stopped the firewall mid-reload and flushed the NAT of a zone) and left a withdrawn rule in the chain forever. The invariant `one firewall, rendered` and the `nftables-rules` check exist to keep it that way |
 
-## 12. Appendix — Files, Secrets, Commands
+## 11. Appendix — Files, Secrets, Commands
 
 **Key files**
 - `flake.nix` — hosts, `nodTargets`.
@@ -455,7 +465,9 @@ nod rollback <host>        # rollback
 ssh root@<addr> 'nixos-rebuild --rollback switch'   # manual rollback
 ```
 
-### 12.1 `exit 4` from the Caddy reload - and what it actually was
+**Change history of this runbook:** created during the initial 2.0 rollout (cld-edge-01 first). Keep it updated as hosts are migrated.
+
+### 13.1 `exit 4` from the Caddy reload - and what it actually was
 
 `nixos-rebuild switch` returned `exit 4` on every activation of `hom-srv-01`, next to "Failed to reload
 caddy.service". It is tempting to file that as a cosmetic quirk - systemd retrying a reload that the

@@ -75,13 +75,20 @@ let
   # I2 - one name, one owner, fleet-wide. A canonical name, an `extraDomain` and an `alias` are the same
   #      kind of fact - a name this fleet answers - so they compete for one namespace and are judged
   #      together, per owner. A name a publication repeats for itself is not a collision: it has one owner.
-  claimedNames = lib.concatMap (
-    e:
-    map (name: {
-      inherit name;
-      owner = label e;
-    }) ([ e.pub.canonicalDomain ] ++ e.pub.extraDomains ++ e.pub.aliases)
-  ) named;
+  nodeClaims = lib.mapAttrsToList (node: fqdn: {
+    name = lib.toLower (lib.removeSuffix "." fqdn);
+    owner = "node:${node}";
+  }) (hostFqdnOf // deviceFqdnOf);
+
+  claimedNames =
+    nodeClaims
+    ++ lib.concatMap (
+      e:
+      map (name: {
+        name = lib.toLower (lib.removeSuffix "." name);
+        owner = label e;
+      }) ([ e.pub.canonicalDomain ] ++ e.pub.extraDomains ++ e.pub.aliases)
+    ) named;
 
   ownersOfName =
     name: lib.unique (map (claim: claim.owner) (lib.filter (claim: claim.name == name) claimedNames));
@@ -157,38 +164,6 @@ let
     + lib.concatStringsSep ", " (map (e: if builtins.isString e then e else label e) items);
 in
 {
-  options.my.contracts.projections = lib.mkOption {
-    type = lib.types.submodule {
-      options = {
-        fqdns = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
-          description = "Every service FQDN derived from the contract fleet.";
-        };
-        hostFqdns = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
-          description = "Every host FQDN of the `node` plane (docs/architecture.md §3.3).";
-        };
-        hostFqdnOf = lib.mkOption {
-          type = lib.types.attrsOf lib.types.str;
-          description = ''
-            Host name -> FQDN of the `node` plane. A mapping so consumers do not have to pair two
-            lists by position, which is how a naming scheme drifts.
-          '';
-        };
-        deviceFqdnOf = lib.mkOption {
-          type = lib.types.attrsOf lib.types.str;
-          description = "Device name -> FQDN of the `node` plane (microcontrollers are nodes too).";
-        };
-        aliases = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
-          description = "Deprecation report: legacy names still published as aliases (I8).";
-        };
-      };
-    };
-    readOnly = true;
-    description = "Read-only naming projections, derived from topology and contracts.";
-  };
-
   config = {
     my.contracts.projections = {
       fqdns = lib.unique fqdns;

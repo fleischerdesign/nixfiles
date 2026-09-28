@@ -50,17 +50,16 @@ than any real defect.
 ## Layout
 
 ```
-flake.nix                 14 inputs, overlays, one mkSystem call per host
+flake.nix                 15 inputs, overlays, one mkSystem call per host
 hosts/<name>/             entry point: role + hardware + host-specific features
 roles/                    base → server | pc → desktop | notebook
 features/                 NixOS modules, discovered by the `nixos.nix` marker, each behind `enable`
   system/  services/  dev/  media/  desktop/
-contracts/                provides (endpoints, publications, identity, portal, telemetry,
-                          storage, backup, dependencies) / consumes / naming / ingress / directory
-inventory/                site facts (subnets, hosts, devices), composed explicitly, never discovered
-checks/                   the promises, measured: invariants, contract fixtures, portal artifact
-apps/                     operational programs (network/exposure audits, package updater)
-lib/                      mkSystem, module discovery, shared pure helpers (injected, never imported)
+contracts/                domain schemas, projections and owned libraries
+inventory/                 site facts (subnets, hosts, devices), composed explicitly, never discovered
+checks/                     evaluation fixtures and generated-artifact assertions
+apps/                       operational programs (network/exposure audits, package updater)
+lib/                        system composition, discovery and generic pure helpers
 user/<name>/              Home Manager: home.nix, packages, fish, editors
 secrets/                  SOPS-encrypted, one file
 docs/                     the specification, see docs/README.md
@@ -70,7 +69,7 @@ docs/                     the specification, see docs/README.md
 
 1. `features/services/<name>/nixos.nix` with an `enable` option.
 2. Declare what it offers and needs: `my.contracts.provides.<name>` (endpoints, publications,
-   identity, telemetry, storage, backup) and `my.contracts.consumes.<name>`. Caddy vHosts, Authentik blueprints and provider
+   identity, portal, telemetry, storage, backup) and `my.contracts.consumes.<name>`. Caddy vHosts, Authentik blueprints and provider
    resources (databases, users, buckets) are projected from those declarations - never written by hand.
 3. Enable it on the host that should run it. Nothing else: names, certificates, firewall rules and
    backup jobs follow from the contracts.

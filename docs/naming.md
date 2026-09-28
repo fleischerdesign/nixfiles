@@ -42,9 +42,9 @@ an undocumented rule is a document describing a violation that no longer exists.
 | Plane | `scope` value | Suffix | Authoritative | Published in Cloudflare | Reached via |
 |---|---|---|---|---|---|
 | public | `"public"` | `vyrx.de` (apex) | Cloudflare | **yes** | ingress host (reverse proxy) |
-| lan | `"internal"` | `lan.vyrx.de` | Blocky (split DNS) | **no** | home LAN |
-| mesh | `"mesh"` | `mesh.vyrx.de` | Blocky + our overlay DNS | **no** | WireGuard mesh |
-| iot | — *(device inventory, not an endpoint scope)* | `iot.vyrx.de` | Blocky | **no** | IoT segment |
+| lan | `"internal"` | `lan.vyrx.de` | Knot Resolver (split DNS) | **no** | home LAN |
+| mesh | `"mesh"` | `mesh.vyrx.de` | Knot Resolver | **no** | WireGuard mesh |
+| iot | — *(device inventory, not an endpoint scope)* | `iot.vyrx.de` | Knot Resolver | **no** | IoT segment |
 | node | — *(host plane from `my.topology.hosts`, device plane from `my.topology.devices`)* | `node.vyrx.de` | Cloudflare | **yes** | CNAME → overlay (VPN) address; SSH/admin only (§2) |
 | isolated | `"isolated"` | — | — | no | direct address/port only |
 
@@ -153,7 +153,7 @@ ingress shares the L2 segment, otherwise the mesh address).
 | Resolver | `public` name | `lan` / `mesh` / `iot` name |
 |---|---|---|
 | Cloudflare | ingress public IPv4 | *(NXDOMAIN — not published)* |
-| Blocky (local) | provider LAN/overlay IPv4 (split-horizon rewrite) | provider address in that plane |
+| Knot Resolver (local) | provider LAN/overlay IPv4 (source-selected view) | provider address in that plane |
 
 This is what makes `jellyfin.vyrx.de` resolve to `10.10.10.10` at home and to the ingress
 abroad (documented in §5), and it removes the entire `.lan`-duplicate class of aliases such
@@ -206,16 +206,11 @@ plus split horizon serves the same purpose without a second name at all.
 
 ### 5.1 The public catch-all conflicts with the internal planes (verified defect)
 
-**What the internal resolver does with undeclared names (measured 2026-09-20).** Blocky's `customDNS`
-resolves subdomains of a mapped name automatically, and the apex `${domain}` is itself mapped (the
-landing endpoint terminates on the ingress). Every `*.${domain}` therefore resolves to the ingress
-internally, declared or not: `zzz-nonsense-4711.${domain}` answers `10.10.100.1` inside the LAN while
-publicly returning NXDOMAIN. This is deliberate — a single refusal point instead of a DNS failure —
-and it discloses nothing beyond the existence of the zone. The ingress refuses a name it does not
-serve (TLS alert `internal error`, no certificate), which is why a mistyped public name shows as
-`ERR_SSL_PROTOCOL_ERROR` in a browser rather than as a certificate for a name we do not own. Removing
-this would mean un-mapping the apex and losing internal resolution for `${domain}` itself, so it
-stays - and is recorded here so the spec and the behaviour agree.
+**Undeclared names.** Knot Resolver receives explicit local records from the naming and topology
+projections. Wildcard names are not expanded into local records; dynamically minted names resolve
+through ordinary recursive lookup. A public wildcard record may therefore still send an undeclared
+public name to the ingress, while an internal-only name without a local record has no synthesized
+answer. Do not interpret recursive DNS success as evidence that a name is owned by a service.
 
 **Zones are addressing and policy, not a boundary (measured).** On one flat L2 every zone's subnet
 shares the broadcast domain, so devices in different zones reach each other directly and never pass
@@ -314,4 +309,3 @@ Read-only projections for inspection and tests: `my.contracts.projections.fqdns`
    place in the apex before mail features grow. *(open)*
 
 ---
-

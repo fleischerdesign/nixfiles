@@ -20,6 +20,7 @@
 {
   config,
   lib,
+  cidrLib,
   fleetConfigs,
   pkgs,
   ...
@@ -42,8 +43,7 @@ let
 
   # An address is a LAN address when it is on a private home subnet. A cloud host's `ipv4`
   # is its public address and must never be handed to a LAN client.
-  isLanAddress =
-    address: address != null && (lib.hasPrefix "10.10." address || lib.hasPrefix "192.168." address);
+  isLanAddress = address: address != null && lib.any (cidr: cidrLib.containsV4 cidr address) lanCidrs;
 
   ownHost = topology.hosts.${config.networking.hostName} or null;
   ownLanAddress = if ownHost != null && isLanAddress ownHost.ipv4 then ownHost.ipv4 else null;
@@ -182,7 +182,7 @@ let
             # an address where no DoT listener exists (measured 2026-09-21).
             mkRules
               (lib.filter (n: n != resolverName) (
-                lib.optionals (pub.canonicalDomain != null) [ pub.canonicalDomain ] ++ pub.extraDomains
+                lib.optionals (pub.canonicalDomain != null) ([ pub.canonicalDomain ] ++ pub.extraDomains)
               ))
               {
                 lan = lanPlaneAddress host;

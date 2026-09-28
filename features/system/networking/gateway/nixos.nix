@@ -11,24 +11,14 @@
 let
   cfg = config.my.features.system.networking.gateway;
   topology = config.my.topology;
-
-  # The uplink is the gateway of the zone it lives in. An explicitly set `uplinkGateway`
-  # wins; otherwise the inventory decides: the infra subnet's gateway is the next hop, because
-  # that is where the uplink router is declared. A missing inventory fact fails loudly instead
-  # of falling back to a literal that silently survives a renumbering.
-  effectiveUplink =
-    if cfg.uplinkGateway != null then
-      cfg.uplinkGateway
-    else
-      topology.subnets.infra.gateway
-        or (throw "gateway: no uplinkGateway set and inventory provides no infra subnet gateway; assign uplinkGateway explicitly");
+  ownHost = topology.hosts.${config.networking.hostName} or null;
 
   # Zones this host serves DHCP for, derived from the topology: the zone that holds the uplink (its
   # router is the uplink itself) plus the zones this host routes. Trust levels do not belong here -
   # they govern forwarding and NAT, not addressing, and the isolated iot zone still gets its
   # reservations. Adding a zone therefore needs no change in this file.
   uplinkZone = lib.findFirst (
-    zone: (topology.subnets.${zone}.gateway or null) == effectiveUplink
+    zone: (topology.subnets.${zone}.gateway or null) == cfg.uplinkGateway
   ) null (lib.attrNames topology.subnets);
 
   dhcpZones = lib.unique (lib.optional (uplinkZone != null) uplinkZone ++ cfg.routedZones);
@@ -124,25 +114,33 @@ in
 
     interface = lib.mkOption {
       type = lib.types.str;
-      default = "enp2s0";
+      default =
+        if ownHost == null || ownHost.interface == null then
+          throw "gateway: host interface is not declared in topology"
+        else
+          ownHost.interface;
       description = "Physical or primary network interface used for local subnet routing";
     };
 
     uplinkGateway = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = ''
-        Next-hop router/modem IP for WAN uplink (e.g. FRITZ!Box). Null derives the infra
-        subnet's gateway from the inventory, which is where the uplink router is declared.
-      '';
+      type = lib.types.str;
+      default =
+        let
+          router =
+            if topology.upstreamRouter == null then null else topology.hosts.${topology.upstreamRouter} or null;
+        in
+        if router != null && router.ipv4 != null then
+          router.ipv4
+        else
+          throw "gateway: upstreamRouter has no IPv4 address";
+      description = "Next-hop router/modem IP for WAN uplink (e.g. FRITZ!Box)";
     };
 
     routedZones = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [
-        "corp"
-        "iot"
-      ];
+      default = lib.filter (zone: topology.subnets.${zone}.gatewayHost == config.networking.hostName) (
+        builtins.attrNames topology.subnets
+      );
       description = ''
         Zones this host routes between. Each one contributes the router address declared for it by
         `my.topology.subnets.<zone>.gateway`: an address inside that zone, added to the interface
@@ -164,7 +162,11 @@ in
 
     defaultZone = lib.mkOption {
       type = lib.types.str;
-      default = "corp";
+      default =
+        if topology.defaultDhcpZone == null then
+          throw "gateway: defaultDhcpZone is not assigned in topology"
+        else
+          topology.defaultDhcpZone;
       description = ''
         Zone that receives clients whose MAC the inventory does not declare. Its subnet is bound to
         the complement class - the clients belonging to no other zone - rather than left classless,
@@ -395,8 +397,7 @@ in
         "time.cloudflare.com"
       ];
       extraConfig = ''
-        # Serve time to local RFC 1918 supernet
-        allow 10.10.0.0/16
+        ${lib.concatMapStringsSep "\n" (zone: "allow ${topology.subnets.${zone}.cidr}") topology.ntpZones}
         # Allow immediate time synchronization on startup
         makestep 1.0 3
       '';
