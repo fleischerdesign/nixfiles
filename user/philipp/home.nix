@@ -59,6 +59,16 @@
     ];
   };
 
+  # GNOME Shell extensions, through Home Manager's single list: it installs each package and
+  # enables the UUID derived from it. On hosts that do not run GNOME the list is inert.
+  programs.gnome-shell.extensions = [
+    { package = pkgs.gnomeExtensions.tiling-shell; }
+    { package = pkgs.gnomeExtensions.gsconnect; }
+    { package = pkgs.gnomeExtensions.vitals; }
+    { package = pkgs.gnomeExtensions.blur-my-shell; }
+    { package = pkgs.gnomeExtensions.dash2dock-lite; }
+  ];
+
   my.features.desktop.webapps = {
     enable = true;
     apps = {

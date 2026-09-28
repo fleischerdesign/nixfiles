@@ -50,17 +50,24 @@ colour scheme (`prefer-dark`) and the keyboard layout. GNOME on Wayland reads it
 
 Extensions are Home Manager's single list, `programs.gnome-shell.extensions`: it installs each
 package and enables the UUID derived from it, so the installed set and the enabled set cannot
-drift. This site ships **none** by default — the shared module writes
-`disable-user-extensions = true` while that list is empty, making "classic GNOME" a stated default
-rather than a side effect. Adding an extension is one entry in the user's `home.nix`; the "off"
-setting then yields to Home Manager's own.
+drift. The shared module ships **none** and writes `disable-user-extensions = true` while the list
+is empty, making "classic GNOME" a stated default rather than a side effect; the moment the list is
+non-empty that setting yields to Home Manager's own.
+
+The primary user enables five, all verified against the pinned GNOME Shell release: Tiling Shell,
+GSConnect, Vitals, Blur my Shell and Dash2Dock Animated. Per-extension settings are dconf keys under
+that extension's schema (`org.gnome.shell.extensions.<name>`), declared in the same `home.nix`;
+GSConnect keeps its state at runtime because pairing is not configuration.
 
 ## 5. Verification
 
-[`checks/gnome-desktop.nix`](../checks/gnome-desktop.nix) asserts the session, GDM, the exclusions,
-the user settings, the desktop exclusivity rule and the extension mechanism, each with a negative
-control. The desktop is a graphical session, so nothing short of logging in proves it on hardware:
-login, lock/unlock, keyring unlock, suspend/resume, external monitors, screen sharing, Bluetooth and
-brightness are exercised by the operator, not by evaluation.
+[`checks/gnome-desktop.nix`](../checks/gnome-desktop.nix) separates two kinds of statement: system
+invariants are read from the host (session, GDM, exclusions, the exclusivity rule, the unimported
+Axis module and its closed port), while module behaviour is read from fixtures whose values the
+check states itself - so changing a favourite, a wallpaper or an extension never edits the check.
+The extension list is only read to verify, per package metadata, that every enabled extension
+declares support for the pinned shell release. The desktop is a graphical session, so nothing short
+of logging in proves it on hardware: login, lock/unlock, keyring unlock, suspend/resume, external
+monitors, screen sharing, Bluetooth and brightness are exercised by the operator, not by evaluation.
 
 The Niri/Axis feature is retained in the tree, disabled, as the rollback path for this migration.
