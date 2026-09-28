@@ -108,6 +108,11 @@ if
   && sharedKeepsNoFavorites
   && withExtension."disable-user-extensions" == false
   && builtins.elem "fixture@example.invalid" enabledExtensionIds
+  # The dormant Axis module stays unimported: it applies its configuration without an enable
+  # guard, which is how wl-clipboard, mDNS publishing and TCP 7391 reached hosts that do not run
+  # Axis at all. Both the source and the effect are guarded.
+  && !(lib.hasInfix "axis.nixosModules" (builtins.readFile ../features/desktop/niri/nixos.nix))
+  && !(builtins.elem 7391 cfg.networking.firewall.allowedTCPPorts)
 then
   pkgs.runCommandLocal "gnome-desktop-check" { } ''
     echo "GNOME session/GDM, desktop exclusivity, user split and extension mechanism passed" > "$out"
