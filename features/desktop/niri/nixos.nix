@@ -44,17 +44,14 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Register with the desktop contract: this feature *is* the host's session, and the contract's
+    # one-session invariant reads that registration (`contracts/desktop/nixos.nix`). No module
+    # repeats the mutual-exclusion check.
+    my.desktop.environments.niri = true;
+
     # Dependencies
     my.features.system.wayland.enable = true;
     my.features.system.audio.enable = true;
-
-    # Conflicts
-    assertions = [
-      {
-        assertion = !config.my.features.desktop.gnome.enable;
-        message = "Niri cannot be enabled alongside Gnome.";
-      }
-    ];
 
     # System-level configuration for Niri
 

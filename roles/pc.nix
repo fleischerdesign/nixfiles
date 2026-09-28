@@ -30,6 +30,7 @@
     audio.enable = lib.mkDefault true;
     wayland.enable = lib.mkDefault true;
     printing.enable = lib.mkDefault true;
+    locate.enable = lib.mkDefault true;
   };
 
   my.features.desktop = {

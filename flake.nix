@@ -253,6 +253,8 @@
 
           topology-inventory = import ./checks/topology-inventory.nix checkArgs;
 
+          gnome-desktop = import ./checks/gnome-desktop.nix checkArgs;
+
           telemetry-contract = import ./checks/telemetry-contract.nix checkArgs;
 
           dependencies-contract = import ./checks/dependencies-contract.nix checkArgs;

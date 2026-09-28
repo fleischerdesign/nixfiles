@@ -30,8 +30,8 @@
 | `cld-edge-01` | server | `mesh` + public | `173.249.22.211` | `10.10.100.1` | Ingress (Caddy), Authentik core, CrowdSec master, observability stack, primary database, ntfy |
 | `cld-ops-01` | server | `mesh` + public | `37.114.55.91` | `10.10.100.2` | Observability collector, Attic binary cache, OpenClaw gateways, CrowdSec agent |
 | `hom-srv-01` | server | `infra` | `10.10.10.10` | `10.10.100.10` | LAN gateway (DHCP, DNS, NTP, NAT), media stack, Home Assistant, Klipper, local ingress, ESPHome flashing |
-| `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` | Niri desktop, development environment |
-| `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` | Roaming client; reaches the LAN over the mesh |
+| `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` | GNOME desktop, development environment |
+| `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` | GNOME notebook; reaches the LAN over the mesh |
 
 Devices that cannot run NixOS but belong to the LAN (printers, relays, access points) are declared in
 `my.topology.devices` and reconciled agentlessly; their own document is [embedded.md](embedded.md). A
@@ -322,12 +322,13 @@ twice, and no service module knows its host, its name or its neighbours.
 | `…backup` | what must be restorable and which consistency hooks are required | backend-neutral path/hook projection; the selected backup adapter renders its own jobs |
 | `…dependsOn` | fleet-wide service references, validated against every host's declared services | portal dependencies |
 | `my.contracts.consumes.<svc>.postgresql.<db>` / `…ldap` | a database and user, or a directory identity with audience | provider resources, declared by the provider engine |
+| `my.desktop.environments.<env>` | a desktop feature registering itself as the host's session | the one-session invariant, asserted by the desktop contract |
 
 Each domain owns its schema: listener facts live in `contracts/endpoints/`, named
 publications in `contracts/publications/`, ingress policy in `contracts/ingress/`, audience
 naming and directory consumers in `contracts/identity/`, presentation in `contracts/portal/`,
-observations in `contracts/telemetry/`, and service dependency references in
-`contracts/dependencies/`. Backend-specific option extensions such as Caddy proxy directives
+observations in `contracts/telemetry/`, service dependency references in
+`contracts/dependencies/`, and the desktop session invariant in `contracts/desktop/`. Backend-specific option extensions such as Caddy proxy directives
 and CrowdSec exemptions live with those features. References between domains are validated at
 evaluation: unknown endpoints, publications or services, nameless publications, an ingress on
 a non-HTTP listener, authentication without an ingress, ambiguous directory identities and

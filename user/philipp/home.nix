@@ -44,6 +44,21 @@
 
   my.features.dev.git.enable = true;
 
+  # GNOME personal choices. `enable` is inherited from the host's desktop feature, so this block is
+  # inert on hosts that do not run GNOME.
+  my.features.desktop.gnome = {
+    background = ../../media/wallpaper.jpg;
+    showBatteryPercentage = true;
+    favoriteApps = [
+      "org.gnome.Nautilus.desktop"
+      "codium.desktop"
+      "spotify.desktop"
+      "obsidian.desktop"
+      "google-chrome.desktop"
+      "com.mitchellh.ghostty.desktop"
+    ];
+  };
+
   my.features.desktop.webapps = {
     enable = true;
     apps = {
