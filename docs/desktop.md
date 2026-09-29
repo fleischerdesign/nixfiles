@@ -63,9 +63,27 @@ The same user file selects a wallpaper-derived palette with pure-black dark surf
 Control Center near its bar trigger, supplies the personal avatar from `media/avatar-philipp.jpg`
 and gives Noctalia an explicit geocoded address instead of IP-based location. The photograph is
 part of this repository and its Nix store closure; geocoding sends the declared address to the
-location service. Noctalia selects GTK 3/4, Btop, Ghostty, Niri, Qt and KColorScheme built-in
-templates, plus VSCode, Obsidian and Neovim community templates. Noctalia's runtime hooks may not
-be able to modify Home Manager-owned application configuration files.
+location service.
+
+The shell feature owns every seam between itself and an application. `home.nix` holds the shell and
+its Niri adapter; `features/desktop/noctalia/integrations/<app>.nix` holds one application each - the
+template it selects together with the configuration that makes that application consume the palette -
+and is active only where the application is enabled. An application feature therefore never names the
+shell, which `checks/niri-noctalia.nix` enforces with a grep over `features/`. Built-in templates
+whose seam is the template itself (Btop, KColorScheme, Niri, whose seam is the include in the
+adapter) are listed in `home.nix`.
+
+Where an application does not own its own configuration, the selection is declared here rather than
+left to a runtime hook: a Home Manager file is a symlink into the store and not writable, so
+Noctalia's hooks for Ghostty, Niri and Neovim cannot edit it. Ghostty's theme, the Niri include,
+qt6ct's colour scheme and Neovim's loader are therefore declarations; GTK, Btop and the KColorScheme
+consumer write their own files. The VS Code theme extension keeps a mutable extensions directory,
+because VS Code only accepts a theme file inside its extension directory; the two files that
+identify the extension stay Home Manager-owned, and the theme file is seeded once and owned by the
+shell after that. Community template files are downloaded after the first render, so a oneshot
+waits for the selected catalog to be cached and then triggers one apply; it fails loudly when that
+does not happen within its bound.
+
 Direct login does not unlock the user's Secret Service keyring with a password; persistent
 encrypted clipboard history therefore requires an independently unlocked keyring.
 

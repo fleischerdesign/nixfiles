@@ -1,4 +1,9 @@
-# features/desktop/noctalia/home.nix - shell settings and the Niri adapter.
+# features/desktop/noctalia/home.nix - the shell's own settings and its Niri adapter.
+#
+# The shell owns every seam to an application: see ./integrations/. Each integration
+# names the template it selects together with the configuration that makes the
+# application consume it, so an application feature never mentions the shell. What
+# stays here is the shell itself and the compositor it runs inside.
 {
   config,
   inputs,
@@ -10,8 +15,27 @@ let
   cfg = config.my.features.desktop.noctalia;
   niriEnabled = osConfig.my.features.desktop.niri.enable or false;
   noctalia = lib.getExe config.programs.noctalia.package;
+
+  # Built-in templates whose seam is the template itself: Noctalia writes the theme file
+  # *and* the application's own selection, and no Home Manager-owned file is involved.
+  # `niri` is one of them because its seam is the include in the adapter below.
+  unseamedBuiltinIds = [
+    "btop"
+    "kcolorscheme"
+    "niri"
+  ];
 in
 {
+  imports = [
+    ./integrations/community-templates.nix
+    ./integrations/ghostty.nix
+    ./integrations/gtk.nix
+    ./integrations/nvim.nix
+    ./integrations/obsidian.nix
+    ./integrations/qt.nix
+    ./integrations/vscode.nix
+  ];
+
   options.my.features.desktop.noctalia = {
     enable = lib.mkOption {
       type = lib.types.bool;
@@ -41,7 +65,14 @@ in
             };
             # The Noctalia backdrop is shown in Niri's overview by the layer rule below.
             backdrop.enabled = niriEnabled;
-            theme.mode = "dark";
+            theme = {
+              mode = "dark";
+              templates = {
+                enable_builtin_templates = true;
+                enable_community_templates = true;
+                builtin_ids = unseamedBuiltinIds;
+              };
+            };
           }
           // lib.optionalAttrs (cfg.wallpaper != null) {
             wallpaper = {
@@ -69,11 +100,20 @@ in
                 (leaf "xray" false)
               ])
             ])
+            # The file is created by Noctalia after Niri starts. Keep the include
+            # optional and absolute: the main config is a Nix-store symlink.
+            (leaf "include" [
+              { optional = true; }
+              "${config.xdg.configHome}/niri/noctalia.kdl"
+            ])
           ]
         );
 
         programs.niri.settings = with config.lib.niri.actions; {
           spawn-at-startup = [ { argv = [ noctalia ]; } ];
+
+          # The session environment is owned here because Niri starts the session.
+          environment.QT_QPA_PLATFORMTHEME = "qt6ct";
 
           # Allow Noctalia's notification actions to focus their target windows.
           debug.honor-xdg-activation-with-invalid-serial = [ ];

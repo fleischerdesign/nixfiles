@@ -11,9 +11,28 @@ let
   startup = user.programs.niri.settings.spawn-at-startup;
   shell = lib.getExe user.programs.noctalia.package;
   niriConfig = user.xdg.configFile.niri-config.source;
+  ghosttyConfig = user.xdg.configFile."ghostty/config".source;
   noctaliaConfig = user.xdg.configFile."noctalia/config.toml".source;
+  qt6ctConfig = user.xdg.configFile."qt6ct/qt6ct.conf".source;
   noctaliaSettings = user.programs.noctalia.settings;
   environment = cfg.my.desktop.environments;
+
+  # The template selection is derived from the integrations, so the expected set is
+  # spelled out here once and must match what the modules produce.
+  expectedBuiltinIds = builtins.sort builtins.lessThan [
+    "btop"
+    "ghostty"
+    "gtk3"
+    "gtk4"
+    "kcolorscheme"
+    "niri"
+    "qt"
+  ];
+  expectedCommunityIds = builtins.sort builtins.lessThan [
+    "neovim"
+    "obsidian"
+    "vscode"
+  ];
 in
 if
   cfg.my.features.desktop.niri.enable
@@ -32,11 +51,23 @@ if
   && user.programs.noctalia.settings.shell.polkit_agent
   && noctaliaSettings.theme.source == "wallpaper"
   && noctaliaSettings.theme.pure_black_dark
+  && noctaliaSettings.theme.templates.enable_builtin_templates
+  && noctaliaSettings.theme.templates.enable_community_templates
+  &&
+    builtins.sort builtins.lessThan noctaliaSettings.theme.templates.builtin_ids == expectedBuiltinIds
+  &&
+    builtins.sort builtins.lessThan noctaliaSettings.theme.templates.community_ids
+    == expectedCommunityIds
   && noctaliaSettings.shell.panel.control_center_placement == "attached"
   && noctaliaSettings.shell.panel.open_near_click_control_center
   && !noctaliaSettings.location.auto_locate
   && noctaliaSettings.location.address == "Hufelandstraße 55, 17036 Neubrandenburg, Deutschland"
   && user.programs.noctalia.settings.backdrop.enabled
+  # Integrations: each application consumes the palette through a declared seam.
+  && user.programs.vscode.mutableExtensionsDir
+  && user.programs.vscode.profiles.default.userSettings."workbench.colorTheme" == "NoctaliaTheme"
+  && lib.any (p: lib.hasInfix "base16-nvim" (p.name or "")) user.programs.nixvim.extraPlugins
+  && lib.hasInfix "matugen" user.programs.nixvim.extraConfigLuaPost
   && startup == [ { argv = [ shell ]; } ]
   && !(builtins.elem 7391 cfg.networking.firewall.allowedTCPPorts)
   && cfg.networking.networkmanager.enable
@@ -46,7 +77,9 @@ if
 then
   pkgs.runCommandLocal "niri-noctalia-check"
     {
-      nativeBuildInputs = [ pkgs.gnugrep ];
+      nativeBuildInputs = [
+        pkgs.gnugrep
+      ];
     }
     ''
       fail=0
@@ -67,6 +100,15 @@ then
         echo 'niri-noctalia: the configured avatar is not an installed file' >&2
         fail=1
       fi
+      if ! grep -F 'color_scheme_path=' ${qt6ctConfig} >/dev/null \
+        || ! grep -F 'qt6ct/colors/noctalia.conf' ${qt6ctConfig} >/dev/null; then
+        echo 'niri-noctalia: qt6ct does not select the generated Noctalia palette' >&2
+        fail=1
+      fi
+      if ! grep -F 'theme = noctalia' ${ghosttyConfig} >/dev/null; then
+        echo 'niri-noctalia: generated Ghostty config does not select the Noctalia theme' >&2
+        fail=1
+      fi
       if ! grep -F 'spawn-at-startup "${shell}"' ${niriConfig} >/dev/null; then
         echo 'niri-noctalia: generated Niri config does not start the selected shell' >&2
         fail=1
@@ -80,7 +122,9 @@ then
         'xray false' \
         'open-floating true' \
         'Mod+Shift+Comma' \
-        'Alt+Tab'; do
+        'Alt+Tab' \
+        'QT_QPA_PLATFORMTHEME' \
+        "include \"${user.xdg.configHome}/niri/noctalia.kdl\" optional=true"; do
         if ! grep -F -- "$expected" ${niriConfig} >/dev/null; then
           echo "niri-noctalia: generated Niri config is missing $expected" >&2
           fail=1
@@ -88,6 +132,13 @@ then
       done
       if grep -Ei 'axis-shell|\.config/axis|org\.axis' ${niriConfig} >&2; then
         echo 'niri-noctalia: generated Niri config contains Axis' >&2
+        fail=1
+      fi
+      # The shell owns every seam to an application. A feature outside this shell's own
+      # directory naming it means that ownership has leaked.
+      if grep -ril 'noctalia' ${lib.escapeShellArg (toString self)}/features --exclude-dir=noctalia > leaked.log; then
+        cat leaked.log >&2
+        echo 'niri-noctalia: a feature outside features/desktop/noctalia mentions the shell' >&2
         fail=1
       fi
       [ "$fail" -eq 0 ] || exit 1

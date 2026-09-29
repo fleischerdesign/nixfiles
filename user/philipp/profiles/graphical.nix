@@ -30,7 +30,6 @@
     enable = true;
     enableFishIntegration = true;
     settings = {
-      theme = "Dark Modern";
       font-family = "JetBrainsMono Nerd Font";
       font-size = 10;
       keybind = [

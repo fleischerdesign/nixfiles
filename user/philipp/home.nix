@@ -84,28 +84,12 @@
   my.features.desktop.noctalia.wallpaper = ../../media/wallpaper.jpg;
 
   # Personal Noctalia defaults. GUI changes in settings.toml may still override these.
+  # Which templates are selected and how each application consumes them is owned by the
+  # Noctalia feature (`features/desktop/noctalia`), not by a user file.
   programs.noctalia.settings = lib.mkIf osConfig.my.features.desktop.noctalia.enable {
     theme = {
       source = "wallpaper";
       pure_black_dark = true;
-      templates = {
-        enable_builtin_templates = true;
-        builtin_ids = [
-          "gtk3"
-          "gtk4"
-          "btop"
-          "ghostty"
-          "niri"
-          "qt"
-          "kcolorscheme"
-        ];
-        enable_community_templates = true;
-        community_ids = [
-          "vscode"
-          "obsidian"
-          "neovim"
-        ];
-      };
     };
     shell = {
       avatar_path = "${../../media/avatar-philipp.jpg}";
