@@ -93,11 +93,13 @@ then triggers one apply; it fails loudly when that does not happen within its bo
 
 The shell's plugin selection is declared the same way. Each plugin integration adds its own entry to
 `settings.plugins.enabled` together with the packages that plugin needs as a prerequisite -
-`bitwarden-cli` for Bitwarden, `scrcpy` and `kdeconnect-kde` for Phone Operate,
-`system-config-printer` for Printers - and `settings.plugins.auto_update = "none"` keeps the plugin
-code at the revision it was first fetched, so updates are an explicit act. Per-plugin options live
-under `settings.plugin_settings.<author>/<plugin>`, keyed exactly as the plugin's manifest declares
-them.
+`bitwarden-cli` for Bitwarden, `scrcpy` for Phone Operate, `system-config-printer` for Printers - and
+`settings.plugins.auto_update = "none"` keeps the plugin code at the revision it was first fetched, so
+updates are an explicit act. A prerequisite that is a system service rather than a package is
+declared where it belongs: `programs.kdeconnect` in the host's configuration owns KDE Connect's
+daemon and opens its ports, because that is a machine decision with a firewall consequence, not a
+user package. Per-plugin options live under `settings.plugin_settings.<author>/<plugin>`, keyed
+exactly as the plugin's manifest declares them.
 
 One plugin needs a secret: Home Assistant's access token. It cannot be written into a store file, so
 `features/desktop/noctalia/config.nix` generates the configuration, has sops-nix render it with the

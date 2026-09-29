@@ -87,6 +87,9 @@ let
     "plugin-settings-belong-to-enabled-plugins" = builtins.all (
       id: builtins.elem id enabledPlugins
     ) settingsPlugins;
+    # A plugin whose user interface needs a system service must find that service enabled.
+    "phone-plugin-has-its-system-service" =
+      !(lib.elem "icefish/phone-operate" enabledPlugins) || cfg.programs.kdeconnect.enable;
     "named-widgets-are-referenced" = builtins.all (name: builtins.elem name laneEntries) namedWidgets;
 
     # A configured avatar must be an installed file; an unset one is fine.

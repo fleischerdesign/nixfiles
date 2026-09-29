@@ -41,6 +41,11 @@
   };
   my.features.desktop.noctalia.enable = true;
 
+  # KDE Connect is the daemon behind the Noctalia Phone Operate plugin. Its ports
+  # (TCP and UDP 1714-1764) and the system-wide client are a machine decision, so the
+  # module owns them instead of a second copy of the package in the user's list.
+  programs.kdeconnect.enable = true;
+
   my.features.services.attic.client = {
     enable = true;
     autoPush = true;

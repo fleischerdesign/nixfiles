@@ -1,5 +1,6 @@
-# Phone Operate. Mirroring uses scrcpy and device actions use KDE Connect, so both are the
-# plugin's prerequisites; pairing a phone is runtime state and is not declared here.
+# Phone Operate. Mirroring uses scrcpy; device actions use KDE Connect, whose daemon and
+# ports the host enables with programs.kdeconnect, so only the mirroring tool is declared
+# here. Pairing a phone is runtime state and is not declared either.
 {
   config,
   lib,
@@ -13,9 +14,6 @@ in
   config = lib.mkIf cfg.enable {
     my.features.desktop.noctalia.settings.plugins.enabled = [ "icefish/phone-operate" ];
 
-    home.packages = [
-      pkgs.scrcpy
-      pkgs.kdePackages.kdeconnect-kde
-    ];
+    home.packages = [ pkgs.scrcpy ];
   };
 }
