@@ -12,12 +12,13 @@ let
   shell = lib.getExe user.programs.noctalia.package;
   niriConfig = user.xdg.configFile.niri-config.source;
   ghosttyConfig = user.xdg.configFile."ghostty/config".source;
-  noctaliaConfig = user.xdg.configFile."noctalia/config.toml".source;
   qt6ctConfig = user.xdg.configFile."qt6ct/qt6ct.conf".source;
-  noctaliaSettings = user.programs.noctalia.settings;
+  configLink = user.xdg.configFile."noctalia/config.toml".source;
+  configTemplate = user.sops.templates."noctalia-config.toml";
+  noctaliaSettings = user.my.features.desktop.noctalia.settings;
   environment = cfg.my.desktop.environments;
 
-  # The template selection is derived from the integrations, so the expected set is
+  # The template selection is derived from the integrations, so the expected sets are
   # spelled out here once and must match what the modules produce.
   expectedBuiltinIds = builtins.sort builtins.lessThan [
     "btop"
@@ -32,8 +33,23 @@ let
     "obsidian"
     "vscode"
   ];
+  expectedPlugins = builtins.sort builtins.lessThan [
+    "andrewdems/printers"
+    "icefish/phone-operate"
+    "noctalia/bitwarden"
+    "pozzoo/hassio"
+    "weinguyen/opencode-companion"
+  ];
 
   nvimTemplate = noctaliaSettings.theme.templates.user.nvim_base16;
+
+  # The rendered configuration exists only in the session, so validation uses the same
+  # generation with a placeholder token instead of the secret.
+  validationToml = (pkgs.formats.toml { }).generate "noctalia-validation.toml" (
+    lib.recursiveUpdate noctaliaSettings {
+      plugin_settings."pozzoo/hassio".ha_token = "validation-placeholder";
+    }
+  );
 in
 if
   cfg.my.features.desktop.niri.enable
@@ -49,7 +65,7 @@ if
   && !cfg.services.desktopManager.gnome.enable
   && user.programs.noctalia.enable
   && !user.programs.noctalia.systemd.enable
-  && user.programs.noctalia.settings.shell.polkit_agent
+  && noctaliaSettings.shell.polkit_agent
   && noctaliaSettings.theme.source == "wallpaper"
   && noctaliaSettings.theme.pure_black_dark
   && noctaliaSettings.theme.templates.enable_builtin_templates
@@ -63,7 +79,16 @@ if
   && noctaliaSettings.shell.panel.open_near_click_control_center
   && !noctaliaSettings.location.auto_locate
   && noctaliaSettings.location.address == "Hufelandstraße 55, 17036 Neubrandenburg, Deutschland"
-  && user.programs.noctalia.settings.backdrop.enabled
+  && noctaliaSettings.backdrop.enabled
+  # Plugin selection and its options, including the injected secret.
+  && builtins.sort builtins.lessThan noctaliaSettings.plugins.enabled == expectedPlugins
+  && noctaliaSettings.plugins.auto_update == "none"
+  &&
+    noctaliaSettings.plugin_settings."pozzoo/hassio".ha_url == "https://hass.${cfg.my.topology.domain}"
+  && builtins.hasAttr "services/home/moonraker_hass_token" user.sops.secrets
+  && user.sops.templates ? "noctalia-config.toml"
+  && configTemplate.mode == "0400"
+  && lib.hasInfix "sops-nix/secrets/rendered/noctalia-config.toml" configTemplate.path
   # Integrations: each application consumes the palette through a declared seam.
   && user.programs.vscode.mutableExtensionsDir
   && user.programs.vscode.profiles.default.userSettings."workbench.colorTheme" == "NoctaliaTheme"
@@ -90,17 +115,29 @@ then
         echo 'niri-noctalia: generated Niri config is invalid' >&2
         fail=1
       fi
-      if ! ${shell} config validate ${noctaliaConfig} > validator.log 2>&1; then
+      if ! ${shell} config validate ${validationToml} > validator.log 2>&1; then
         cat validator.log >&2
         echo 'niri-noctalia: generated Noctalia config is invalid' >&2
         fail=1
       fi
-      if grep -E '(^|[[:space:]])WARN([[:space:]]|$)' validator.log >&2; then
+      # Plugin settings for a plugin that is not loaded in this sandbox are expected; any
+      # other warning is not.
+      if grep -E '(^|[[:space:]])WARN([[:space:]]|$)' validator.log \
+        | grep -v 'no loaded plugin with this id' > unexpected.log; then
+        cat unexpected.log >&2
         echo 'niri-noctalia: Noctalia ignored or migrated a declared setting' >&2
         fail=1
       fi
       if [ ! -f ${lib.escapeShellArg noctaliaSettings.shell.avatar_path} ]; then
         echo 'niri-noctalia: the configured avatar is not an installed file' >&2
+        fail=1
+      fi
+      if [ "$(readlink ${lib.escapeShellArg (toString configLink)})" != ${lib.escapeShellArg configTemplate.path} ]; then
+        echo 'niri-noctalia: the shell config link does not point at the rendered file' >&2
+        fail=1
+      fi
+      if ! grep -F '<SOPS:' ${lib.escapeShellArg (toString configTemplate.file)} >/dev/null; then
+        echo 'niri-noctalia: the config template does not carry a secret placeholder' >&2
         fail=1
       fi
       if ! grep -F 'color_scheme_path=' ${qt6ctConfig} >/dev/null \

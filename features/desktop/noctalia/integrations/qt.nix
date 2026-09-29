@@ -12,7 +12,7 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
-    programs.noctalia.settings.theme.templates.builtin_ids = [ "qt" ];
+    my.features.desktop.noctalia.settings.theme.templates.builtin_ids = [ "qt" ];
 
     home.packages = [ pkgs.qt6Packages.qt6ct ];
 

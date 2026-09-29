@@ -124,6 +124,18 @@ let
             backupFileExtension = "hm-backup";
             extraSpecialArgs = { inherit inputs hostname; };
             users = homeManagerUsers;
+            # User-level secrets are decrypted by the user's own age identity, not the host key
+            # the system module uses. Nothing is decrypted until a user module declares a secret.
+            sharedModules = [
+              inputs.sops-nix.homeManagerModules.sops
+              (
+                { config, ... }:
+                {
+                  sops.age.keyFile = "/home/${config.home.username}/.config/sops/age/keys.txt";
+                  sops.defaultSopsFile = ../secrets/secrets.yaml;
+                }
+              )
+            ];
           };
         }
       ];

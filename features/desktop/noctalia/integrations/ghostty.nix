@@ -11,7 +11,7 @@ let
 in
 {
   config = lib.mkIf (cfg.enable && config.programs.ghostty.enable) {
-    programs.noctalia.settings.theme.templates.builtin_ids = [ "ghostty" ];
+    my.features.desktop.noctalia.settings.theme.templates.builtin_ids = [ "ghostty" ];
 
     programs.ghostty.settings.theme = lib.mkDefault "noctalia";
   };

@@ -20,7 +20,7 @@ let
 in
 {
   config = lib.mkIf (cfg.enable && config.programs.vscode.enable) {
-    programs.noctalia.settings.theme.templates.community_ids = [ "vscode" ];
+    my.features.desktop.noctalia.settings.theme.templates.community_ids = [ "vscode" ];
 
     programs.vscode = {
       mutableExtensionsDir = lib.mkForce true;

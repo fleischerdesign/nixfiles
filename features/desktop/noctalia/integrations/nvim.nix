@@ -20,7 +20,7 @@ in
     # The upstream community template is not selected: its apply hook appends a loader to
     # ~/.config/nvim/init.lua, which Home Manager owns. The vendored template renders the
     # same module without a hook, and the plugin and loader are declared below.
-    programs.noctalia.settings.theme.templates.user.nvim_base16 = {
+    my.features.desktop.noctalia.settings.theme.templates.user.nvim_base16 = {
       input_path = "${../templates/neovim-base16.lua}";
       output_path = "$XDG_CONFIG_HOME/nvim/lua/matugen.lua";
     };

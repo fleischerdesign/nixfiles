@@ -12,7 +12,7 @@ let
 in
 {
   config = lib.mkIf (cfg.enable && config.programs.obsidian.enable) {
-    programs.noctalia.settings.theme.templates.community_ids = [ "obsidian" ];
+    my.features.desktop.noctalia.settings.theme.templates.community_ids = [ "obsidian" ];
 
     home.packages = [ pkgs.python3 ];
   };

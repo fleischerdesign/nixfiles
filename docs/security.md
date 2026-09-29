@@ -54,8 +54,14 @@ SOPS with age, one file (`secrets/secrets.yaml`), keys derived from identities t
 | Key | Derived from | Used by |
 |---|---|---|
 | host key | the host's own `/etc/ssh/ssh_host_ed25519_key`, converted with `ssh-to-age` | every host decrypts its own secrets |
-| operator key | the administrator's personal key | break-glass, adding keys |
+| operator key | the administrator's personal key at `~/.config/sops/age/keys.txt` | break-glass, adding keys, and user-level secrets in Home Manager |
 | deploy keys | generated per purpose, authorised via `deployKeys` in the ssh feature | root access during deployment |
+
+The system module decrypts as root with the host key; the Home Manager module decrypts as the user
+with that user's own key, because a user process cannot read a host key. Nothing is decrypted until
+a user module declares a secret, so importing the module is inert on its own. The user identity is
+the same key that already decrypts the file for editing - it is the same person, and the key
+already grants that access; using it here adds no reach, only a second place it is read.
 
 There are no hardware tokens in the current setup: the operator key is a file. That is a deviation from
 what this document claimed earlier, and it is stated here rather than left implied.

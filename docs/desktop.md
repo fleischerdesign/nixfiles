@@ -91,6 +91,23 @@ an activation entry removes exactly that link before linking the new layout. Com
 are downloaded after the first render, so a oneshot waits for the selected catalog to be cached and
 then triggers one apply; it fails loudly when that does not happen within its bound.
 
+The shell's plugin selection is declared the same way. Each plugin integration adds its own entry to
+`settings.plugins.enabled` together with the packages that plugin needs as a prerequisite -
+`bitwarden-cli` for Bitwarden, `scrcpy` and `kdeconnect-kde` for Phone Operate,
+`system-config-printer` for Printers - and `settings.plugins.auto_update = "none"` keeps the plugin
+code at the revision it was first fetched, so updates are an explicit act. Per-plugin options live
+under `settings.plugin_settings.<author>/<plugin>`, keyed exactly as the plugin's manifest declares
+them.
+
+One plugin needs a secret: Home Assistant's access token. It cannot be written into a store file, so
+`features/desktop/noctalia/config.nix` generates the configuration, has sops-nix render it with the
+user's own age identity, and links `~/.config/noctalia/config.toml` at the rendered file through a
+Home Manager out-of-store symlink. `my.features.desktop.noctalia.settings` remains the single
+declaration, `programs.noctalia.settings` is deliberately unused, and `checks/niri-noctalia.nix`
+validates the rendered generation with a placeholder token instead of the secret. The token is
+Klipper's Moonraker token by explicit decision: one credential now has two consumers, which
+[security.md](security.md) §3.1 records rather than hides.
+
 Direct login does not unlock the user's Secret Service keyring with a password; persistent
 encrypted clipboard history therefore requires an independently unlocked keyring.
 

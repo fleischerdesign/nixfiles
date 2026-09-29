@@ -5,7 +5,7 @@
 # the bound is reached the unit fails loudly.
 #
 # This is a module of its own rather than part of home.nix: a module that both defines
-# `programs.noctalia.settings` and reads it back in a condition is a cycle.
+# `my.features.desktop.noctalia.settings` and reads it back in a condition is a cycle.
 {
   config,
   lib,
@@ -17,7 +17,7 @@ let
   cfg = config.my.features.desktop.noctalia;
   niriEnabled = osConfig.my.features.desktop.niri.enable or false;
   noctalia = lib.getExe config.programs.noctalia.package;
-  communityIds = config.programs.noctalia.settings.theme.templates.community_ids or [ ];
+  communityIds = config.my.features.desktop.noctalia.settings.theme.templates.community_ids or [ ];
 
   applyCommunityTemplates = pkgs.writeShellApplication {
     name = "noctalia-apply-community-templates";

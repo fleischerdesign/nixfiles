@@ -9,6 +9,7 @@
   inputs,
   lib,
   osConfig ? { },
+  pkgs,
   ...
 }:
 let
@@ -27,11 +28,17 @@ let
 in
 {
   imports = [
+    ./config.nix
+    ./integrations/bitwarden.nix
     ./integrations/community-templates.nix
     ./integrations/ghostty.nix
     ./integrations/gtk.nix
+    ./integrations/hassio.nix
     ./integrations/nvim.nix
     ./integrations/obsidian.nix
+    ./integrations/opencode-companion.nix
+    ./integrations/phone-operate.nix
+    ./integrations/printers.nix
     ./integrations/qt.nix
     ./integrations/vscode.nix
   ];
@@ -49,6 +56,16 @@ in
       default = null;
       description = "Initial wallpaper for this account; null leaves Noctalia's default.";
     };
+
+    settings = lib.mkOption {
+      type = (pkgs.formats.toml { }).type;
+      default = { };
+      description = ''
+        Noctalia's declarative configuration. The shell feature owns this option instead of
+        `programs.noctalia.settings` because the file is rendered in the session, not built
+        into the store: see ./config.nix.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable (
@@ -58,27 +75,29 @@ in
           enable = true;
           # The compositor starts the shell. Never start a second copy via systemd.
           systemd.enable = false;
-          settings = {
-            shell = {
-              polkit_agent = true;
-              setup_wizard_enabled = false;
+        };
+
+        my.features.desktop.noctalia.settings = {
+          shell = {
+            polkit_agent = true;
+            setup_wizard_enabled = false;
+          };
+          # The Noctalia backdrop is shown in Niri's overview by the layer rule below.
+          backdrop.enabled = niriEnabled;
+          theme = {
+            mode = "dark";
+            templates = {
+              enable_builtin_templates = true;
+              enable_community_templates = true;
+              builtin_ids = unseamedBuiltinIds;
             };
-            # The Noctalia backdrop is shown in Niri's overview by the layer rule below.
-            backdrop.enabled = niriEnabled;
-            theme = {
-              mode = "dark";
-              templates = {
-                enable_builtin_templates = true;
-                enable_community_templates = true;
-                builtin_ids = unseamedBuiltinIds;
-              };
-            };
-          }
-          // lib.optionalAttrs (cfg.wallpaper != null) {
-            wallpaper = {
-              enabled = true;
-              default.path = toString cfg.wallpaper;
-            };
+          };
+          plugins.auto_update = "none";
+        }
+        // lib.optionalAttrs (cfg.wallpaper != null) {
+          wallpaper = {
+            enabled = true;
+            default.path = toString cfg.wallpaper;
           };
         };
       }

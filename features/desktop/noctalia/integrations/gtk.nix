@@ -11,7 +11,7 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
-    programs.noctalia.settings.theme.templates.builtin_ids = [
+    my.features.desktop.noctalia.settings.theme.templates.builtin_ids = [
       "gtk3"
       "gtk4"
     ];
