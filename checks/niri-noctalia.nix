@@ -87,6 +87,7 @@ if
     noctaliaSettings.plugin_settings."pozzoo/hassio".ha_url == "https://hass.${cfg.my.topology.domain}"
   && builtins.hasAttr "services/home/moonraker_hass_token" user.sops.secrets
   && user.sops.templates ? "noctalia-config.toml"
+  && user.systemd.user.services ? "noctalia-config-reload"
   && configTemplate.mode == "0400"
   && lib.hasInfix "sops-nix/secrets/rendered/noctalia-config.toml" configTemplate.path
   # Integrations: each application consumes the palette through a declared seam.

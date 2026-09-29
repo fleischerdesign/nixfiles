@@ -33,6 +33,10 @@ let
       )
     else
       null;
+
+  # The generated input changes with the declared settings, so it is what a switch has to
+  # notice; the linked file itself is stable and only exists at runtime.
+  configSource = if haEnabled then secretToml else plainToml;
 in
 {
   config = lib.mkIf cfg.enable {
@@ -52,5 +56,27 @@ in
         config.lib.file.mkOutOfStoreSymlink config.sops.templates."noctalia-config.toml".path
       else
         plainToml;
+
+    # The running shell does not notice that its configuration file was replaced - it is a
+    # symlink whose target moved - so a switch has to tell it. The unit restarts when the
+    # configuration content changes, waits for the shell, and fails loudly if it never
+    # answers.
+    systemd.user.services.noctalia-config-reload = {
+      Unit = {
+        Description = "Reload Noctalia's configuration after it changed";
+        After = [ "graphical-session.target" ];
+        PartOf = [ "graphical-session.target" ];
+        X-Restart-Triggers = [ configSource ];
+        StartLimitBurst = 30;
+        StartLimitIntervalSec = 120;
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = "${lib.getExe config.programs.noctalia.package} msg config-reload";
+        Restart = "on-failure";
+        RestartSec = 2;
+      };
+      Install.WantedBy = [ "graphical-session.target" ];
+    };
   };
 }

@@ -106,7 +106,10 @@ Home Manager out-of-store symlink. `my.features.desktop.noctalia.settings` remai
 declaration, `programs.noctalia.settings` is deliberately unused, and `checks/niri-noctalia.nix`
 validates the rendered generation with a placeholder token instead of the secret. The token is
 Klipper's Moonraker token by explicit decision: one credential now has two consumers, which
-[security.md](security.md) §3.1 records rather than hides.
+[security.md](security.md) §3.1 records rather than hides. A running shell does not notice that its
+configuration file was replaced, because the file is a symlink whose target moved, so a user service
+restarts when the generated configuration changes, tells the shell to reload, and fails loudly if it
+never answers.
 
 Direct login does not unlock the user's Secret Service keyring with a password; persistent
 encrypted clipboard history therefore requires an independently unlocked keyring.
