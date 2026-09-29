@@ -23,28 +23,20 @@
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
-  my.features.desktop.niri = {
-    enable = true;
-    outputs = {
-      "DP-1".position = {
-        x = 320;
-        y = 0;
+  # The session comes from the desktop role; only the output layout is a fact of this host.
+  my.features.desktop.niri.outputs = {
+    "DP-1".position = {
+      x = 320;
+      y = 0;
+    };
+    "HDMI-A-2" = {
+      position = {
+        x = 0;
+        y = 1080;
       };
-      "HDMI-A-2" = {
-        position = {
-          x = 0;
-          y = 1080;
-        };
-        focus-at-startup = true;
-      };
+      focus-at-startup = true;
     };
   };
-  my.features.desktop.noctalia.enable = true;
-
-  # KDE Connect is the daemon behind the Noctalia Phone Operate plugin. Its ports
-  # (TCP and UDP 1714-1764) and the system-wide client are a machine decision, so the
-  # module owns them instead of a second copy of the package in the user's list.
-  programs.kdeconnect.enable = true;
 
   my.features.services.attic.client = {
     enable = true;

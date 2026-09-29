@@ -35,7 +35,15 @@
 
   my.features.desktop = {
     webapps.enable = lib.mkDefault true;
+    # Every personal computer runs the same graphical session: Niri with the Noctalia shell.
+    # A host may override it, but the default is the session, not a per-host copy.
+    niri.enable = lib.mkDefault true;
+    noctalia.enable = lib.mkDefault true;
   };
+
+  # The shell's Phone Operate plugin talks to KDE Connect, so the daemon and its ports are a
+  # prerequisite of the session on every personal computer, not of one host.
+  programs.kdeconnect.enable = lib.mkDefault true;
 
   my.features.dev = {
     containers.enable = lib.mkDefault true;

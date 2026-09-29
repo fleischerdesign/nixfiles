@@ -13,29 +13,29 @@ registers itself under `my.desktop.environments` when it is enabled, and the con
 where more than one has. The contract holds no list of the environments it knows, so adding a
 desktop is one feature and one host switch, never an edit to a central list.
 
-`hom-wrk-01` runs **Niri** with **Noctalia Shell**. greetd starts Niri directly as the host's
-primary user, without an authentication screen: physical access after boot means access to that
-account. The Niri and Noctalia feature switches live in the host's `configuration.nix`.
-`mob-nb-01` runs **GNOME** with **GDM**.
+`hom-wrk-01` and `mob-nb-01` run **Niri** with **Noctalia Shell**: every personal computer takes the
+same session from `roles/pc.nix`, and a host states only its output layout. greetd starts Niri
+directly as the host's primary user, without an authentication screen, and the shell starts locked, so
+the one password the lock screen takes unlocks the session and the keyring. The Niri and Noctalia
+feature switches default in that role; a host may override them.
 
 ## 2. What each layer owns
 
 | Layer | Owns | Where |
 |---|---|---|
-| Nixpkgs GNOME module | the session's services: dconf, Polkit, xdg portals, gvfs, keyring, power profiles, NetworkManager, GNOME Shell | pinned `nixpkgs-unstable`, not repeated here |
+| Nixpkgs Niri module | the session's services: xdg portals, gvfs, keyring, power profiles, NetworkManager, Bluetooth | pinned `nixpkgs-unstable`, not repeated here |
 | `contracts/desktop/nixos.nix` | the one-session invariant, fed by the features' self-registration | contract |
-| `features/desktop/gnome/nixos.nix` | GDM, the session pinned by name, the set of core apps this site does not install | system |
-| `features/desktop/gnome/home.nix` | GNOME defaults and the typed options for personal settings | per user |
+| `roles/pc.nix` | the session every personal computer runs, plus the service prerequisites of its shell | role |
 | `features/desktop/niri/nixos.nix` | Niri session, greetd direct start as the primary user, Niri services and portals | system |
-| `features/desktop/niri/home.nix` | Compositor layout, keyboard, navigation and window rules | per user |
+| `features/desktop/niri/home.nix` | Compositor layout, keyboard, navigation, window rules and the background-effect projection | per user |
 | `features/desktop/noctalia/nixos.nix` | the Noctalia feature switch; no second session | system |
 | `features/desktop/noctalia/home.nix` | Noctalia's Home Manager module and Niri-specific startup/IPC adapter | per user |
-| `user/<name>/home.nix` | the actual personal choices: wallpaper, favourites, battery indicator | per user |
-| host configuration | session and shell choice, monitor and hardware facts | host |
+| `user/<name>/home.nix` | the actual personal choices: wallpaper, favourites, bar layout | per user |
+| host configuration | output layout and hardware facts | host |
 
-The system module sets only what the GNOME module does not. This is deliberate: a module that
-re-states `services.gvfs.enable` or `programs.dconf.enable` would look authoritative while saying
-nothing, and would drift the day upstream changes.
+The system module sets only what the pinned Nixpkgs session modules do not. This is deliberate: a
+module that re-states `services.gvfs.enable` or `programs.dconf.enable` would look authoritative
+while saying nothing, and would drift the day upstream changes.
 
 ## 3. Niri and Noctalia
 
@@ -147,54 +147,27 @@ that wants a secret would raise its own unlock dialog. The shell therefore start
 password the lock screen already takes unlocks the session and the keyring together, because that
 unlock runs `pam_gnome_keyring`, and Noctalia's encrypted clipboard storage opens with it.
 
-## 4. GNOME user settings
+## 4. GNOME
 
-The Home Manager half is imported on every host, but its `enable` option defaults to
-`osConfig.my.features.desktop.gnome.enable`. On a host that does not run GNOME the options exist and
-their settings are inert, so a user file can declare personal GNOME configuration unconditionally.
+GNOME remains an available desktop feature with its own GDM session and per-user options, but no host
+enables it: both personal computers take the session from `roles/pc.nix`. Its Home Manager half is
+imported everywhere and inert wherever `my.features.desktop.gnome.enable` is false, so a future host
+could run it without touching the Niri side.
 
-`features/desktop/gnome/home.nix` defines the options; it does not choose values. Favourites,
-wallpaper and the battery indicator are written only when the user declared them, which is what
-keeps one account from inheriting another's choices.
-
-Two settings are structural rather than personal and therefore default in the shared module: the
-colour scheme (`prefer-dark`) and the keyboard layout. GNOME on Wayland reads its layout from
-`org.gnome.desktop.input-sources`, **not** from `services.xserver.xkb`, so
-`my.features.desktop.gnome.inputSources` is the declaration that actually reaches the session.
-
-## 5. GNOME Shell extensions
-
-Extensions are Home Manager's single list, `programs.gnome-shell.extensions`: it installs each
-package and enables the UUID derived from it, so the installed set and the enabled set cannot
-drift. The shared module ships **none** and writes `disable-user-extensions = true` while the list
-is empty, making "classic GNOME" a stated default rather than a side effect; the moment the list is
-non-empty that setting yields to Home Manager's own.
-
-On the notebook the primary user enables five, all verified against the pinned GNOME Shell release:
-Tiling Shell, GSConnect, Vitals, Blur my Shell and Dash to Dock. Per-extension settings are dconf keys under
-that extension's schema (`org.gnome.shell.extensions.<name>`), declared in the same `home.nix`;
-GSConnect keeps its state at runtime because pairing is not configuration.
-
-## 6. Verification
-
-[`checks/gnome-desktop.nix`](../checks/gnome-desktop.nix) separates two kinds of statement: system
-invariants are read from the notebook (session, GDM, exclusions, the exclusivity rule), while
-module behaviour is read from fixtures whose values the check states itself - so changing a
-favourite, a wallpaper or an extension never edits the check.
-The extension list is only read to verify, per package metadata, that every enabled extension
-declares support for the pinned shell release. The desktop is a graphical session, so nothing short
-of logging in proves it on hardware: login, lock/unlock, keyring unlock, suspend/resume, external
-monitors, screen sharing, Bluetooth and brightness are exercised by the operator, not by evaluation.
+## 5. Verification
 
 [`checks/niri-noctalia.nix`](../checks/niri-noctalia.nix) states properties, not a copy of the
-configuration. A claim is either a relation between two declarations - an integration that selects a
-template must also wire the application that reads it, and a bar widget that names a plugin must name
-an enabled one - or a requirement the design cannot work without. Personal values (which widget sits
-in which lane, which address is configured) are deliberately not asserted: changing them is not a
-defect, and asserting them would only mean editing the check every time a preference changes. A
-violated claim is named in the error; that is how a bar widget that addressed a misspelled plugin id
-was found. The check validates the generated Niri KDL and Noctalia TOML with their pinned
-executables, and treats every Noctalia warning as a failure except the one the sandbox must produce
-per declared plugin setting, because the validator exits successfully even for settings it ignored.
-Evaluation cannot prove that the compositor, lock screen, outputs, keyring and suspend work on
-physical hardware; they require a local login.
+configuration, and runs for **every** host whose contract registration says Niri - the list is
+derived, so switching a host's session covers it without editing the check. A claim is either a
+relation between two declarations - an integration that selects a template must also wire the
+application that reads it, and a bar widget that names a plugin must name an enabled one - or a
+requirement the design cannot work without. Personal values (which widget sits in which lane, which
+address is configured) are deliberately not asserted: changing them is not a defect, and asserting
+them would only mean editing the check every time a preference changes. A violated claim is named
+with its host; that is how a bar widget that addressed a misspelled plugin id was found. The check
+validates each host's generated Niri KDL and Noctalia TOML with their pinned executables, and treats
+every Noctalia warning as a failure except the one the sandbox must produce per declared plugin
+setting, because the validator exits successfully even for settings it ignored.
+The desktop is a graphical session, so nothing short of logging in proves it on hardware: login,
+lock/unlock, keyring unlock, suspend/resume, external monitors, screen sharing, Bluetooth and
+brightness are exercised by the operator, not by evaluation.

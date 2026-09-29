@@ -248,8 +248,6 @@
 
           topology-inventory = import ./checks/topology-inventory.nix checkArgs;
 
-          gnome-desktop = import ./checks/gnome-desktop.nix checkArgs;
-
           niri-noctalia = import ./checks/niri-noctalia.nix checkArgs;
 
           telemetry-contract = import ./checks/telemetry-contract.nix checkArgs;
