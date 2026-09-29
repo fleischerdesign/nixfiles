@@ -29,10 +29,11 @@ let
     "qt"
   ];
   expectedCommunityIds = builtins.sort builtins.lessThan [
-    "neovim"
     "obsidian"
     "vscode"
   ];
+
+  nvimTemplate = noctaliaSettings.theme.templates.user.nvim_base16;
 in
 if
   cfg.my.features.desktop.niri.enable
@@ -68,6 +69,8 @@ if
   && user.programs.vscode.profiles.default.userSettings."workbench.colorTheme" == "NoctaliaTheme"
   && lib.any (p: lib.hasInfix "base16-nvim" (p.name or "")) user.programs.nixvim.extraPlugins
   && lib.hasInfix "matugen" user.programs.nixvim.extraConfigLuaPost
+  && nvimTemplate.output_path == "$XDG_CONFIG_HOME/nvim/lua/matugen.lua"
+  && !(nvimTemplate ? post_hook)
   && startup == [ { argv = [ shell ]; } ]
   && !(builtins.elem 7391 cfg.networking.firewall.allowedTCPPorts)
   && cfg.networking.networkmanager.enable
@@ -103,6 +106,10 @@ then
       if ! grep -F 'color_scheme_path=' ${qt6ctConfig} >/dev/null \
         || ! grep -F 'qt6ct/colors/noctalia.conf' ${qt6ctConfig} >/dev/null; then
         echo 'niri-noctalia: qt6ct does not select the generated Noctalia palette' >&2
+        fail=1
+      fi
+      if [ ! -f ${lib.escapeShellArg nvimTemplate.input_path} ]; then
+        echo 'niri-noctalia: the vendored Neovim template is not an installed file' >&2
         fail=1
       fi
       if ! grep -F 'theme = noctalia' ${ghosttyConfig} >/dev/null; then

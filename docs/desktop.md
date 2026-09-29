@@ -77,12 +77,19 @@ Where an application does not own its own configuration, the selection is declar
 left to a runtime hook: a Home Manager file is a symlink into the store and not writable, so
 Noctalia's hooks for Ghostty, Niri and Neovim cannot edit it. Ghostty's theme, the Niri include,
 qt6ct's colour scheme and Neovim's loader are therefore declarations; GTK, Btop and the KColorScheme
-consumer write their own files. The VS Code theme extension keeps a mutable extensions directory,
-because VS Code only accepts a theme file inside its extension directory; the two files that
-identify the extension stay Home Manager-owned, and the theme file is seeded once and owned by the
-shell after that. Community template files are downloaded after the first render, so a oneshot
-waits for the selected catalog to be cached and then triggers one apply; it fails loudly when that
-does not happen within its bound.
+consumer write their own files. Neovim's community template is vendored here as
+`templates/neovim-base16.lua` and rendered as a user template without a hook: that template's hook
+registers its loader by appending to `~/.config/nvim/init.lua`, which Home Manager owns and the hook
+can therefore never change, so selecting it as a community template would only produce a failing
+hook on every palette change.
+
+The VS Code theme extension keeps a mutable extensions directory, because VS Code only accepts a
+theme file inside its extension directory; the two files that identify the extension stay Home
+Manager-owned, and the theme file is seeded once and owned by the shell after that. A Home Manager
+generation that managed the extensions directory immutably leaves a store symlink at that path, so
+an activation entry removes exactly that link before linking the new layout. Community template files
+are downloaded after the first render, so a oneshot waits for the selected catalog to be cached and
+then triggers one apply; it fails loudly when that does not happen within its bound.
 
 Direct login does not unlock the user's Secret Service keyring with a password; persistent
 encrypted clipboard history therefore requires an independently unlocked keyring.
