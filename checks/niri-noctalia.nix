@@ -72,18 +72,20 @@ let
 
       # Each claim is a property. The error names the ones that do not hold.
       claims = {
-        # The session belongs to Niri alone, and greetd starts it directly as the primary user.
+        # The session belongs to Niri alone, and greetd asks for credentials through the
+        # greeter, which then starts that session. A direct start would leave the login
+        # keyring locked, because PAM would receive no password.
         "one-graphical-environment" =
           environment.niri
           && builtins.length (lib.attrNames (lib.filterAttrs (_: running: running) environment)) == 1;
-        "greetd-starts-the-shell-directly" =
+        "greeter-owns-the-login" =
           cfg.services.greetd.enable
-          && cfg.services.greetd.settings.default_session.user == cfg.my.user.primary
-          &&
-            cfg.services.greetd.settings.default_session.command
-            == "${cfg.programs.niri.package}/bin/niri-session"
+          && cfg.services.displayManager.noctalia-greeter.enable
+          && lib.hasInfix "noctalia-greeter-session" cfg.services.greetd.settings.default_session.command
           && !cfg.services.displayManager.gdm.enable
           && !cfg.services.desktopManager.gnome.enable;
+        "greeter-offers-this-session" =
+          cfg.services.displayManager.noctalia-greeter.settings.session.default == "niri";
 
         # The shell is the session's, runs once, and owns the Polkit prompt.
         "shell-runs-once-in-the-session" =

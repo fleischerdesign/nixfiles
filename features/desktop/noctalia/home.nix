@@ -83,6 +83,9 @@ in
           shell = {
             polkit_agent = true;
             setup_wizard_enabled = false;
+            # The greeter is the same shell at the login screen; keep its look in step
+            # automatically instead of syncing by hand after every palette change.
+            greeter_sync.auto_sync = true;
             # The shell captures screenshots itself. Copying is the minimum that
             # makes a capture usable; whether it is also written to a file is a
             # personal choice and stays out of this declaration.

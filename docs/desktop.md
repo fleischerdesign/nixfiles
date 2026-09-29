@@ -14,10 +14,11 @@ where more than one has. The contract holds no list of the environments it knows
 desktop is one feature and one host switch, never an edit to a central list.
 
 `hom-wrk-01` and `mob-nb-01` run **Niri** with **Noctalia Shell**: every personal computer takes the
-same session from `roles/pc.nix`, and a host states only its output layout. greetd starts Niri
-directly as the host's primary user, without an authentication screen, and the shell starts locked, so
-the one password the lock screen takes unlocks the session and the keyring. The Niri and Noctalia
-feature switches default in that role; a host may override them.
+same session from `roles/pc.nix`, and a host states only its output layout. greetd asks for the
+credentials through the **Noctalia Greeter** and then starts that session, so login and desktop look
+alike. The greeter is the reason the login keyring is unlocked when the session begins: a password at
+login gives `pam_gnome_keyring` the authtok it needs, which a direct start without credentials could
+never provide. The Niri and Noctalia feature switches default in the role; a host may override them.
 
 ## 2. What each layer owns
 
@@ -26,7 +27,7 @@ feature switches default in that role; a host may override them.
 | Nixpkgs Niri module | the session's services: xdg portals, gvfs, keyring, power profiles, NetworkManager, Bluetooth | pinned `nixpkgs-unstable`, not repeated here |
 | `contracts/desktop/nixos.nix` | the one-session invariant, fed by the features' self-registration | contract |
 | `roles/pc.nix` | the session every personal computer runs, plus the service prerequisites of its shell | role |
-| `features/desktop/niri/nixos.nix` | Niri session, greetd direct start as the primary user, Niri services and portals | system |
+| `features/desktop/niri/nixos.nix` | Niri session, Niri services and portals | system |
 | `features/desktop/niri/home.nix` | Compositor layout, keyboard, navigation, window rules and the background-effect projection | per user |
 | `features/desktop/noctalia/nixos.nix` | the Noctalia feature switch; no second session | system |
 | `features/desktop/noctalia/home.nix` | Noctalia's Home Manager module and Niri-specific startup/IPC adapter | per user |
@@ -142,10 +143,17 @@ toggles plus the microphone mute; power profiles are not worth a slot on a deskt
 entities are deliberately not declared - which entity a toggle means is a personal decision, so it is
 chosen in the shell, not in this repository.
 
-Direct login passes no password to PAM, so the login keyring is locked at boot and the first client
-that wants a secret would raise its own unlock dialog. The shell therefore starts locked: the one
-password the lock screen already takes unlocks the session and the keyring together, because that
-unlock runs `pam_gnome_keyring`, and Noctalia's encrypted clipboard storage opens with it.
+The login is a password login, and that is what the keyring needs. `pam_gnome_keyring` unlocks the
+`login` keyring from the authtok the authenticating stack obtained; `greetd` includes the `login`
+stack, so the greeter's password reaches it. A direct start, as the site ran before, passed no
+password and left the keyring locked until the first client raised its own dialog. Noctalia's
+encrypted clipboard storage opens with the keyring, so it works from the first login on.
+
+The greeter shares the desktop's appearance instead of copying it: `appearance.scheme = "Synced"`
+lets the shell write its palette, wallpaper, font and monitor layout into the mutable `sync.toml`
+next to the declarative `greeter.toml`, and `security.polkit` authorises the constrained apply helper
+for the primary user, so no admin prompt is needed for what that user's own session looks like.
+`greeter.toml` keeps the session, keyboard layout and cursor and always wins where it sets a value.
 
 ## 4. GNOME
 

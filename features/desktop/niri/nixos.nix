@@ -35,15 +35,8 @@ in
     services = {
       xserver.enable = false;
       gvfs.enable = true;
-      # This site deliberately starts Niri directly as the primary user. The session
-      # command is owned here, not by the optional desktop shell.
-      greetd = {
-        enable = true;
-        settings.default_session = {
-          command = "${pkgs.niri}/bin/niri-session";
-          user = config.my.user.primary;
-        };
-      };
+      # Niri is a session, not a login. greetd owns the seat; which greeter asks for the
+      # credentials is a desktop decision and lives with the desktop feature.
       upower.enable = true;
       power-profiles-daemon.enable = true;
       gnome.gnome-keyring.enable = true;
