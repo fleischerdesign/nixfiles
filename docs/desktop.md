@@ -58,9 +58,13 @@ compositor rules: `my.desktop.effects` states which surface or window wants one 
 and the Niri feature projects every entry into exactly one layer or window rule, so no entry names a
 compositor. The shell registers its own surfaces and its settings window, a user registers personal
 windows, and every entry samples `behind` - what is really under the surface, which is upstream's
-recommendation for a realistic blur. A window's transparency is its own: Ghostty paints its background
-translucent and the compositor only blurs what shows through, so other applications are not globally
-blurred. Non-xray blur is experimental upstream and disappears during window open and close
+recommendation for a realistic blur. One level, `my.desktop.frost`, decides how translucent every
+frosted surface paints its background: the contract derives its alpha, and each owner maps that to its
+own knob, so bar, panels, notifications, OSD, dock and the terminal cannot drift apart. A window's
+transparency is its own: Ghostty paints its background translucent and the compositor only blurs what
+shows through, and only the background is transparent - no window content is dimmed. Other applications
+are not globally blurred. Non-xray blur is experimental upstream and disappears during window open and
+close
 animations; the wallpaper-only mode exists for a surface that must not flicker, and nothing here uses
 it. `my.features.desktop.niri.blur` tunes the shared blur and writes nothing unless set, so Niri's own
 defaults stand. These compositor rules leave Niri usable without Noctalia.

@@ -324,6 +324,7 @@ twice, and no service module knows its host, its name or its neighbours.
 | `my.contracts.consumes.<svc>.postgresql.<db>` / `…ldap` | a database and user, or a directory identity with audience | provider resources, declared by the provider engine |
 | `my.desktop.environments.<env>` | a desktop feature registering itself as the host's session | the one-session invariant, asserted by the desktop contract |
 | `my.desktop.effects.<name>` | a shell layer surface or a user window asking for a background effect, and what it samples | the compositor's layer and window rules, projected by its feature (account scope) |
+| `my.desktop.frost` | one translucency level for every frosted surface; the contract derives its alpha | bar, panel, notification, OSD, dock and terminal opacity, each mapped by its owner (account scope) |
 
 Each domain owns its schema: listener facts live in `contracts/endpoints/`, named
 publications in `contracts/publications/`, ingress policy in `contracts/ingress/`, audience

@@ -17,6 +17,10 @@ let
   niriEnabled = osConfig.my.features.desktop.niri.enable or false;
   noctalia = lib.getExe config.programs.noctalia.package;
 
+  # The one frost level every translucent surface derives from, and its numeric projection.
+  frost = config.my.desktop.frost;
+  frostAlpha = config.my.desktop.frostAlpha;
+
   # Built-in templates whose seam is the template itself: Noctalia writes the theme file
   # *and* the application's own selection, and no Home Manager-owned file is involved.
   # `niri` is one of them because its seam is the include in the adapter below.
@@ -80,14 +84,18 @@ in
           shell = {
             polkit_agent = true;
             setup_wizard_enabled = false;
-            # Drawn translucent so the compositor blur behind it becomes visible; the
-            # effect itself is requested at the end of this module, not configured here.
-            settings_window_translucent = true;
+            # Derived from the one frost level, never written by hand.
+            settings_window_translucent = frost != "solid";
+            panel.transparency_mode = frost;
             # The shell captures screenshots itself. Copying is the minimum that
             # makes a capture usable; whether it is also written to a file is a
             # personal choice and stays out of this declaration.
             screenshot.copy_to_clipboard = true;
           };
+          bar.default.background_opacity = frostAlpha;
+          notification.background_opacity = frostAlpha;
+          osd.background_opacity = frostAlpha;
+          dock.background_opacity = frostAlpha;
           # The Noctalia backdrop is shown in Niri's overview by the layer rule below.
           backdrop.enabled = niriEnabled;
           theme = {

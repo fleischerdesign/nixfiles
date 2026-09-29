@@ -154,6 +154,10 @@
     hooks.started = "${lib.getExe config.programs.noctalia.package} msg session lock";
   };
 
+  # One frost level for every translucent surface; the alpha it maps to is derived in the
+  # contract, so bar, panels, OSD, dock and the terminal agree by construction.
+  my.desktop.frost = "glass";
+
   # Personal taste belongs in the registry: the compositor draws this window frosted,
   # and the terminal itself is not configured for it.
   my.desktop.effects = lib.mkIf osConfig.my.features.desktop.niri.enable {
