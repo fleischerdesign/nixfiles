@@ -111,6 +111,15 @@ configuration file was replaced, because the file is a symlink whose target move
 restarts when the generated configuration changes, tells the shell to reload, and fails loudly if it
 never answers.
 
+The bar is a personal choice and lives in `user/philipp/home.nix`: workspaces at the start, media and
+the anchored clock in the centre, then state - system indicators first, then the plugin states - and
+finally attention and action (notifications, clipboard, control center, session). The launcher and
+wallpaper widgets are dropped: the launcher is reached with `Mod+Space`, and the wallpaper is declared
+in this repository, so a button for it would only invite drift. The control center carries the useful
+toggles plus the microphone mute; power profiles are not worth a slot on a desktop. Home Assistant's
+entities are deliberately not declared - which entity a toggle means is a personal decision, so it is
+chosen in the shell, not in this repository.
+
 Direct login does not unlock the user's Secret Service keyring with a password; persistent
 encrypted clipboard history therefore requires an independently unlocked keyring.
 

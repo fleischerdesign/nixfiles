@@ -43,6 +43,36 @@ let
 
   nvimTemplate = noctaliaSettings.theme.templates.user.nvim_base16;
 
+  # The bar is a user choice, so the expected layout is stated once and must match.
+  expectedBarStart = [ "workspaces" ];
+  expectedBarCenter = [
+    "media"
+    "clock"
+  ];
+  expectedBarEnd = [
+    "tray"
+    "network"
+    "bluetooth"
+    "volume"
+    "brightness"
+    "battery"
+    "icefish/phone-operate:status"
+    "andrewdms/printers:printer"
+    "weinguyen/opencode-companion:widget"
+    "notifications"
+    "clipboard"
+    "control-center"
+    "session"
+  ];
+  expectedShortcuts = [
+    "wifi"
+    "bluetooth"
+    "caffeine"
+    "nightlight"
+    "notification"
+    "mic_mute"
+  ];
+
   # The rendered configuration exists only in the session, so validation uses the same
   # generation with a placeholder token instead of the secret.
   validationToml = (pkgs.formats.toml { }).generate "noctalia-validation.toml" (
@@ -80,6 +110,13 @@ if
   && !noctaliaSettings.location.auto_locate
   && noctaliaSettings.location.address == "Hufelandstraße 55, 17036 Neubrandenburg, Deutschland"
   && noctaliaSettings.backdrop.enabled
+  # The bar layout and the control-center toggles.
+  && noctaliaSettings.bar.default.position == "top"
+  && noctaliaSettings.bar.default.start == expectedBarStart
+  && noctaliaSettings.bar.default.center == expectedBarCenter
+  && noctaliaSettings.bar.default.end == expectedBarEnd
+  && noctaliaSettings.widget.clock.anchor
+  && map (shortcut: shortcut.type) noctaliaSettings.control_center.shortcuts == expectedShortcuts
   # Plugin selection and its options, including the injected secret.
   && builtins.sort builtins.lessThan noctaliaSettings.plugins.enabled == expectedPlugins
   && noctaliaSettings.plugins.auto_update == "none"
@@ -131,6 +168,14 @@ then
       fi
       if [ ! -f ${lib.escapeShellArg noctaliaSettings.shell.avatar_path} ]; then
         echo 'niri-noctalia: the configured avatar is not an installed file' >&2
+        fail=1
+      fi
+      if ! grep -F 'end = ["tray", "network", "bluetooth", "volume", "brightness", "battery", "icefish/phone-operate:status", "andrewdms/printers:printer", "weinguyen/opencode-companion:widget", "notifications", "clipboard", "control-center", "session"]' ${validationToml} >/dev/null; then
+        echo 'niri-noctalia: the generated bar layout differs from the declared one' >&2
+        fail=1
+      fi
+      if ! grep -F 'type = "mic_mute"' ${validationToml} >/dev/null; then
+        echo 'niri-noctalia: the control-center shortcuts are not the declared ones' >&2
         fail=1
       fi
       if [ "$(readlink ${lib.escapeShellArg (toString configLink)})" != ${lib.escapeShellArg configTemplate.path} ]; then

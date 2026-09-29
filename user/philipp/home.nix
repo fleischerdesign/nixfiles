@@ -102,6 +102,48 @@
       auto_locate = false;
       address = "Hufelandstraße 55, 17036 Neubrandenburg, Deutschland";
     };
+
+    # The bar: navigation, then time and media, then state (system, then applications),
+    # then attention, then action. `wallpaper` is dropped because the wallpaper is declared
+    # in this repository; the launcher is dropped because it is reached with Mod+Space.
+    bar.default = {
+      position = "top";
+      start = [ "workspaces" ];
+      center = [
+        "media"
+        "clock"
+      ];
+      end = [
+        "tray"
+        "network"
+        "bluetooth"
+        "volume"
+        "brightness"
+        "battery"
+        "icefish/phone-operate:status"
+        "andrewdms/printers:printer"
+        "weinguyen/opencode-companion:widget"
+        "notifications"
+        "clipboard"
+        "control-center"
+        "session"
+      ];
+    };
+
+    # Keeps the clock in the true centre when the media widget appears beside it.
+    widget.clock.anchor = true;
+
+    # Power profiles are not worth a slot on a desktop; the microphone mute is a real
+    # toggle the bar does not cover. Home Assistant's entities are chosen in the shell, not
+    # declared here, because which entity is meant is a personal decision.
+    control_center.shortcuts = [
+      { type = "wifi"; }
+      { type = "bluetooth"; }
+      { type = "caffeine"; }
+      { type = "nightlight"; }
+      { type = "notification"; }
+      { type = "mic_mute"; }
+    ];
   };
 
   my.features.desktop.webapps = {
