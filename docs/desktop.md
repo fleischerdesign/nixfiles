@@ -47,6 +47,15 @@ desktop shell does not open a network port. The workstation already enables Netw
 Bluetooth, UPower, and a power-profile service through its existing modules; Noctalia does not
 enable another copy of these services.
 
+The Niri adapter floats Noctalia's settings window, honors its notification-driven window
+activation, and maps launcher, control center, settings, window switcher, lock, audio and
+brightness shortcuts. `Mod+Comma` stays Niri's consume-window action; Noctalia settings use
+`Mod+Shift+Comma`. The overview uses Noctalia's blurred wallpaper backdrop, with its own
+background layer placed inside Niri's backdrop. On Niri 26.04, Noctalia surfaces use non-xray
+blur so the content behind them is sampled instead of the wallpaper; other applications are not
+globally blurred. These compositor rules live in the shell adapter and leave Niri usable without
+Noctalia.
+
 Noctalia reads declarative `~/.config/noctalia/config.toml`, then overlays mutable settings in
 `~/.local/state/noctalia/settings.toml`. GUI changes therefore take precedence over the declared
 defaults. The personal wallpaper is set in `user/philipp/home.nix`, not the shared feature.

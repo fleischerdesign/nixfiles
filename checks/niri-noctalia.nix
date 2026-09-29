@@ -29,6 +29,7 @@ if
   && user.programs.noctalia.enable
   && !user.programs.noctalia.systemd.enable
   && user.programs.noctalia.settings.shell.polkit_agent
+  && user.programs.noctalia.settings.backdrop.enabled
   && startup == [ { argv = [ shell ]; } ]
   && !(builtins.elem 7391 cfg.networking.firewall.allowedTCPPorts)
   && cfg.networking.networkmanager.enable
@@ -59,6 +60,21 @@ then
         echo 'niri-noctalia: generated Niri config does not start the selected shell' >&2
         fail=1
       fi
+      for expected in \
+        'honor-xdg-activation-with-invalid-serial' \
+        'match namespace="^noctalia-backdrop"' \
+        'place-within-backdrop true' \
+        'match namespace="^noctalia-window-switcher$"' \
+        'background-effect' \
+        'xray false' \
+        'open-floating true' \
+        'Mod+Shift+Comma' \
+        'Alt+Tab'; do
+        if ! grep -F -- "$expected" ${niriConfig} >/dev/null; then
+          echo "niri-noctalia: generated Niri config is missing $expected" >&2
+          fail=1
+        fi
+      done
       if grep -Ei 'axis-shell|\.config/axis|org\.axis' ${niriConfig} >&2; then
         echo 'niri-noctalia: generated Niri config contains Axis' >&2
         fail=1
