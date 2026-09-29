@@ -10,6 +10,9 @@
 let
   cfg = config.my.features.services.attic.client;
 
+  # The cache's name lives with the service, not with each consumer.
+  cache = config.my.features.services.attic.server.cache;
+
   pushScript = pkgs.writeShellApplication {
     name = "attic-auto-push";
     runtimeInputs = [
@@ -31,7 +34,7 @@ let
       if [ ! -f "$STAMP" ]; then
         echo "Pushing current system closure $CURRENT_SYSTEM to Attic cache..."
         for i in 1 2 3; do
-          if attic push nixfiles "$CURRENT_SYSTEM"; then
+          if attic push ${cache} "$CURRENT_SYSTEM"; then
             touch "$STAMP"
             echo "Successfully pushed $CURRENT_SYSTEM to Attic cache."
             exit 0

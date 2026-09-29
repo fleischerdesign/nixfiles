@@ -565,5 +565,26 @@
           ];
           package = devPkg;
         }) self.nixosConfigurations.hom-srv-01.config.my.features.services.esphome.devicePackages);
+
+      # The binary cache CI pulls from, derived from the service contract so the workflow names no
+      # contract path of its own: a reshape changes this definition, not the workflow. The one
+      # provider comes from the feature switch, never from a host literal.
+      binaryCache =
+        let
+          providers = builtins.filter (host: host.config.my.features.services.attic.server.enable or false) (
+            builtins.attrValues self.nixosConfigurations
+          );
+          provider = builtins.head providers;
+          endpoint = "https://${provider.config.my.contracts.provides.attic.publications.web.canonicalDomain}";
+        in
+        assert
+          builtins.length providers == 1
+          || throw "binaryCache: expected exactly one Attic server, found ${toString (builtins.length providers)}";
+        {
+          inherit endpoint;
+          cache = provider.config.my.features.services.attic.server.cache;
+          substituter = "${endpoint}/${provider.config.my.features.services.attic.server.cache}";
+          keys = provider.config.nix.settings.trusted-public-keys;
+        };
     };
 }

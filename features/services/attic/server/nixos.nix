@@ -12,6 +12,16 @@ in
 {
   options.my.features.services.attic.server = {
     enable = lib.mkEnableOption "Attic Nix binary cache server";
+
+    cache = lib.mkOption {
+      type = lib.types.str;
+      default = "nixfiles";
+      description = ''
+        Name of the cache this server serves. Clients push to and substitute from it, and the
+        flake's `binaryCache` output derives the substituter URL from it, so the name is stated
+        once here rather than repeated by every consumer.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {

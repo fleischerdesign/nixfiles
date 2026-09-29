@@ -53,7 +53,7 @@ runs:
         chmod 600 ~/.config/attic/config.toml
 
         for i in 1 2 3; do
-          nix shell --inputs-from . nixpkgs-unstable#attic-client -c attic push -j 2 nixfiles ./result && exit 0
+          nix shell --inputs-from . nixpkgs-unstable#attic-client -c attic push -j 2 "$ATTIC_CACHE" ./result && exit 0
           echo "Push attempt $i failed, retrying in 10s..."
           sleep 10
         done
