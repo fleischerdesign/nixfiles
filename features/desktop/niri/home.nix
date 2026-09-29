@@ -1,6 +1,5 @@
 # features/desktop/niri/home.nix - the per-user half of the Niri feature.
 {
-  inputs,
   pkgs,
   config,
   lib,
@@ -13,26 +12,13 @@ let
 in
 {
   home.packages = [
-    inputs.axis.packages.${pkgs.stdenv.hostPlatform.system}.default
     pkgs.adwaita-icon-theme
-    pkgs.brightnessctl
-    pkgs.libnotify
     pkgs.sushi
-    pkgs.polkit_gnome
-  ];
-
-  programs.niri.config = lib.mkOptionDefault [
-    {
-      name = "include";
-      arguments = [ "~/.config/axis/niri.kdl" ];
-      properties = {
-        optional = true;
-      };
-      children = [ ];
-    }
   ];
 
   programs.niri.settings = with config.lib.niri.actions; {
+    input.keyboard.xkb.layout = "de";
+
     cursor = {
       theme = "Adwaita";
       size = 24;
@@ -68,41 +54,14 @@ in
       }
     ];
 
-    spawn-at-startup = [
-      # Start Polkit Agent
-      {
-        argv = [
-          "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1"
-        ];
-      }
-      {
-        argv = [
-          "axis-shell"
-          "--wallpaper"
-          "${../../../media/wallpaper.jpg}"
-          "--locked"
-        ];
-      }
-    ];
-
     inherit (sys) outputs;
 
     binds = {
       "Mod+Return".action = spawn "ghostty";
-      "Mod+Space".action =
-        spawn-sh "busctl --user call org.axis.Shell /org/axis/Shell org.axis.Shell ToggleLauncher";
-
       "Mod+Shift+Slash".action = show-hotkey-overlay;
-      "Super+Alt+L".action =
-        spawn-sh "busctl --user call org.axis.Shell /org/axis/Shell org.axis.Shell Lock";
 
-      "XF86AudioRaiseVolume".action = spawn-sh "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 0.1+";
-      "XF86AudioLowerVolume".action = spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-";
-      "XF86AudioMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle";
       "XF86AudioMicMute".action = spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle";
 
-      "XF86MonBrightnessUp".action = spawn-sh "brightnessctl set 15%+";
-      "XF86MonBrightnessDown".action = spawn-sh "brightnessctl set 15%-";
       "Mod+Q".action = close-window;
 
       "Mod+Left".action = focus-column-left;

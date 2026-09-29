@@ -3,8 +3,7 @@
 # The file draws a hard line between two kinds of statement:
 #
 #   * system invariants are read from the real host: which session runs, which display manager owns
-#     it, that the previous desktop is off, which apps are excluded, and that the dormant Axis
-#     module neither is imported nor opens a port;
+#     it, that Niri is off, and which apps are excluded;
 #   * module behaviour is read from fixtures whose values this check sets itself. Nothing here
 #     asserts a personal preference of the primary user - adding or removing a favourite, a
 #     wallpaper or an extension must never require touching this file.
@@ -19,7 +18,7 @@
   ...
 }:
 let
-  host = self.nixosConfigurations.hom-wrk-01;
+  host = self.nixosConfigurations.mob-nb-01;
   cfg = host.config;
   philipp = cfg.home-manager.users.philipp;
 
@@ -138,11 +137,8 @@ if
   && !cfg.my.features.desktop.niri.enable
   && cfg.my.desktop.environments.gnome
   && cfg.environment.gnome.excludePackages == cfg.my.features.desktop.gnome.excludePackages
-  # The dormant Axis module stays unimported and its port stays closed: it applied its
-  # configuration with no enable guard, which is how wl-clipboard, mDNS publishing and TCP 7391
-  # reached hosts that do not run Axis at all.
-  && !(lib.hasInfix "axis.nixosModules" (builtins.readFile ../features/desktop/niri/nixos.nix))
-  && !(builtins.elem 7391 cfg.networking.firewall.allowedTCPPorts)
+  && !cfg.my.features.desktop.noctalia.enable
+  && !philipp.programs.noctalia.enable
   # The per-user module is actually wired for the real account (the value is the user's business).
   && philipp.programs.gnome-shell.enable
   && philipp.dconf.settings ? "org/gnome/desktop/interface"

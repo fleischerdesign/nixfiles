@@ -49,11 +49,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    axis = {
-      url = "github:fleischerdesign/Axis/develop";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
     vyrx-landing = {
       url = "github:fleischerdesign/vyrx.de";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -254,6 +249,8 @@
           topology-inventory = import ./checks/topology-inventory.nix checkArgs;
 
           gnome-desktop = import ./checks/gnome-desktop.nix checkArgs;
+
+          niri-noctalia = import ./checks/niri-noctalia.nix checkArgs;
 
           telemetry-contract = import ./checks/telemetry-contract.nix checkArgs;
 

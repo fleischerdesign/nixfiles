@@ -21,10 +21,7 @@ in
   config = lib.mkIf cfg.enable {
     services.locate = {
       enable = true;
-      # `mkDefault` because the dormant Niri module still declares the same package; while both
-      # existed, one had to yield, and the generic tool belongs to this feature, not to a desktop.
-      # The value is identical either way - this only decides who is allowed to state it.
-      package = lib.mkDefault pkgs.plocate;
+      package = pkgs.plocate;
     };
   };
 }

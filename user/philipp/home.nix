@@ -3,6 +3,7 @@
   pkgs,
   osConfig,
   inputs,
+  lib,
   ...
 }:
 {
@@ -61,7 +62,7 @@
 
   # GNOME Shell extensions, through Home Manager's single list: it installs each package and
   # enables the UUID derived from it. On hosts that do not run GNOME the list is inert.
-  programs.gnome-shell.extensions = [
+  programs.gnome-shell.extensions = lib.optionals osConfig.my.features.desktop.gnome.enable [
     { package = pkgs.gnomeExtensions.tiling-shell; }
     { package = pkgs.gnomeExtensions.gsconnect; }
     { package = pkgs.gnomeExtensions.vitals; }
@@ -70,7 +71,7 @@
   ];
 
   # Dash to Dock and its blur integration, as the user had them before the desktop was rebuilt.
-  dconf.settings = {
+  dconf.settings = lib.optionalAttrs osConfig.my.features.desktop.gnome.enable {
     "org/gnome/shell/extensions/dash-to-dock" = {
       apply-custom-theme = true;
       intellihide-mode = "ALL_WINDOWS";
@@ -79,6 +80,8 @@
       blur = true;
     };
   };
+
+  my.features.desktop.noctalia.wallpaper = ../../media/wallpaper.jpg;
 
   my.features.desktop.webapps = {
     enable = true;

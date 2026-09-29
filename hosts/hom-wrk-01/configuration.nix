@@ -23,7 +23,23 @@
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
-  my.features.desktop.gnome.enable = true;
+  my.features.desktop.niri = {
+    enable = true;
+    outputs = {
+      "DP-1".position = {
+        x = 320;
+        y = 0;
+      };
+      "HDMI-A-2" = {
+        position = {
+          x = 0;
+          y = 1080;
+        };
+        focus-at-startup = true;
+      };
+    };
+  };
+  my.features.desktop.noctalia.enable = true;
 
   my.features.services.attic.client = {
     enable = true;

@@ -50,7 +50,7 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | `cld-edge-01` | server (identity/ingress) | mesh | 10.10.100.1 (WG) | relay hub | `173.249.22.211` | `edge.vyrx.de`, `auth.vyrx.de` |
 | `cld-ops-01` | server (observability/AI) | mesh | 10.10.100.2 (WG) | relay hub | `37.114.55.91` | `ops.vyrx.de` |
 | `hom-srv-01` | server (LAN core, media) | infra | `10.10.10.10` | 10.10.100.10 | – | `srv.lan.vyrx.de` |
-| `hom-wrk-01` | desktop (GNOME) | corp | `10.10.20.10` | 10.10.100.20 | – | `wrk.lan.vyrx.de` |
+| `hom-wrk-01` | desktop (Niri + Noctalia) | corp | `10.10.20.10` | 10.10.100.20 | – | `wrk.lan.vyrx.de` |
 | `mob-nb-01` | notebook | corp (roaming) | DHCP | 10.10.100.30 | – | – |
 | `hom-rt-01` | FRITZ!Box (WAN modem) | infra | `10.10.10.1` | – | – | `rt.lan.vyrx.de` |
 | `hom-ap-01` | TP-Link RE330 AP | infra | `10.10.10.20` | – | – | `ap.lan.vyrx.de` |
