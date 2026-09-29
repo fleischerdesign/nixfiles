@@ -50,6 +50,17 @@ let
   settingsPlugins = lib.attrNames (settings.plugin_settings or { });
   namedWidgets = lib.attrNames (settings.widget or { });
 
+  # The phone plugin is a plugin that runs external tools; on NixOS each has to be in the
+  # session profile, so the check verifies the profile rather than the declaration.
+  phonePlugin = "icefish/phone-operate";
+  phonePluginEnabled = lib.elem phonePlugin enabledPlugins;
+  phoneTools = [
+    "scrcpy"
+    "adb"
+    "sshfs"
+    "gdbus"
+  ];
+
   # Each claim is a property. The error names the ones that do not hold.
   claims = {
     # The session belongs to Niri alone, and greetd starts it directly as the primary user.
@@ -213,6 +224,14 @@ else
         echo 'niri-noctalia: an application feature names the shell' >&2
         fail=1
       fi
+      ${lib.optionalString phonePluginEnabled ''
+        for tool in ${lib.concatStringsSep " " phoneTools}; do
+          if [ ! -x ${lib.escapeShellArg "${user.home.path}/bin"}/"$tool" ]; then
+            echo "niri-noctalia: the phone plugin needs $tool in the session profile" >&2
+            fail=1
+          fi
+        done
+      ''}
       [ "$fail" -eq 0 ] || exit 1
       echo 'Niri session and the delivered shell configuration validated' > "$out"
     ''

@@ -95,7 +95,10 @@ The shell's plugin selection is declared the same way. Each plugin integration a
 `settings.plugins.enabled` together with the packages that plugin needs as a prerequisite -
 `bitwarden-cli` for Bitwarden, `scrcpy` for Phone Operate, `system-config-printer` for Printers - and
 `settings.plugins.auto_update = "none"` keeps the plugin code at the revision it was first fetched, so
-updates are an explicit act. A prerequisite that is a system service rather than a package is
+updates are an explicit act. The phone plugin needs more than its own package: it calls `scrcpy`,
+`adb`, `sshfs` and `gdbus` as external commands, and on NixOS none of those arrives with another
+package's PATH, so each is declared and the check verifies the built session profile actually exposes
+them. A prerequisite that is a system service rather than a package is
 declared where it belongs: `programs.kdeconnect` in the host's configuration owns KDE Connect's
 daemon and opens its ports, because that is a machine decision with a firewall consequence, not a
 user package. Per-plugin options live under `settings.plugin_settings.<author>/<plugin>`, keyed
