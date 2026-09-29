@@ -97,6 +97,13 @@
           "ghostty"
           "niri"
           "qt"
+          "kcolorscheme"
+        ];
+        enable_community_templates = true;
+        community_ids = [
+          "vscode"
+          "obsidian"
+          "neovim"
         ];
       };
     };
