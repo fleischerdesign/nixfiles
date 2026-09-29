@@ -14,7 +14,11 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
-    my.features.desktop.noctalia.settings.plugins.enabled = [ "icefish/phone-operate" ];
+    my.features.desktop.noctalia.settings = {
+      plugins.enabled = [ "icefish/phone-operate" ];
+      # Percentage only; the other options are icon_and_percent, icon and hidden.
+      plugin_settings."icefish/phone-operate".battery_display = "percent";
+    };
 
     home.packages = [
       pkgs.scrcpy

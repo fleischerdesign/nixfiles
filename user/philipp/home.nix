@@ -108,6 +108,7 @@
     # in this repository; the launcher is dropped because it is reached with Mod+Space.
     bar.default = {
       position = "top";
+      widget_spacing = 10;
       start = [ "workspaces" ];
       center = [
         "media"
