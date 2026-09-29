@@ -88,6 +88,17 @@
     theme = {
       source = "wallpaper";
       pure_black_dark = true;
+      templates = {
+        enable_builtin_templates = true;
+        builtin_ids = [
+          "gtk3"
+          "gtk4"
+          "btop"
+          "ghostty"
+          "niri"
+          "qt"
+        ];
+      };
     };
     shell = {
       avatar_path = "${../../media/avatar-philipp.jpg}";

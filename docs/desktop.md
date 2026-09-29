@@ -63,8 +63,9 @@ The same user file selects a wallpaper-derived palette with pure-black dark surf
 Control Center near its bar trigger, supplies the personal avatar from `media/avatar-philipp.jpg`
 and gives Noctalia an explicit geocoded address instead of IP-based location. The photograph is
 part of this repository and its Nix store closure; geocoding sends the declared address to the
-location service. Built-in and community templates are not enabled: their runtime hooks must not
-rewrite Home Manager-owned configuration files.
+location service. GTK 3/4, Btop, Ghostty, Niri and Qt built-in templates are selected in Noctalia;
+community templates are not enabled. Noctalia's runtime hooks may not be able to modify
+Home Manager-owned application configuration files.
 Direct login does not unlock the user's Secret Service keyring with a password; persistent
 encrypted clipboard history therefore requires an independently unlocked keyring.
 
