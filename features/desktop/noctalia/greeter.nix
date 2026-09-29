@@ -41,7 +41,11 @@ in
         keyboard.layout = "de";
         # `Synced` is what lets the shell's palette reach this screen; a built-in scheme here
         # would win over the synced values and the sync would have nothing to show.
-        appearance.scheme = "Synced";
+        appearance = {
+          scheme = "Synced";
+          # The shell shows no brand mark, so the login screen does not invent one.
+          hide_logo = true;
+        };
       };
 
       # The constrained appearance-sync action is authorised for the primary user, because
