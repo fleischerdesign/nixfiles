@@ -33,6 +33,20 @@ in
         "${extensionSource}/noctalialogo.png";
     };
 
+    # A Home Manager generation that managed the extensions directory immutably left
+    # `~/.vscode/extensions` as a symlink into the store, and the mutable layout below
+    # cannot create a directory inside it. Remove exactly that link before linkGeneration
+    # recreates the directory; a real directory or a foreign link is never touched.
+    home.activation.noctaliaVSCodeExtensionDir =
+      lib.hm.dag.entryBetween [ "linkGeneration" ] [ "writeBoundary" ]
+        ''
+          if [ -L "$HOME/.vscode/extensions" ]; then
+            case "$(readlink -f "$HOME/.vscode/extensions")" in
+              /nix/store/*) rm -- "$HOME/.vscode/extensions" ;;
+            esac
+          fi
+        '';
+
     # Noctalia takes ownership of the theme file from the first render on; the seed only
     # has to exist so VS Code can discover the extension before that render happens.
     home.activation.seedNoctaliaVSCodeTheme = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
