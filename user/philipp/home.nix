@@ -131,8 +131,14 @@
       ];
     };
 
-    # Keeps the clock in the true centre when the media widget appears beside it.
-    widget.clock.anchor = true;
+    # The bar shows only what is happening: idle indicators and empty states stay out.
+    widget = {
+      clock.anchor = true;
+      privacy.hide_inactive = true;
+      bluetooth.hide_when_no_connected_device = true;
+      notifications.hide_when_no_unread = true;
+      media.hide_when_no_media = true;
+    };
 
     # Power profiles are not worth a slot on a desktop; the microphone mute is a real
     # toggle the bar does not cover. Home Assistant's entities are chosen in the shell, not
