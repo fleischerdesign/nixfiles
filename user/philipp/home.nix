@@ -123,6 +123,7 @@
         "battery"
         "icefish/phone-operate:status"
         "andrewdems/printers:printer"
+        "privacy"
         "notifications"
         "clipboard"
         "control-center"
@@ -144,6 +145,13 @@
       { type = "notification"; }
       { type = "mic_mute"; }
     ];
+
+    # A session without a greeter passes no password to PAM, so the login keyring
+    # is locked at boot and the first client that wants a secret would raise its
+    # own unlock dialog. Starting the shell locked means the one password the lock
+    # screen already takes unlocks the session and the keyring together, because
+    # its PAM stack includes pam_gnome_keyring.
+    hooks.started = "${lib.getExe config.programs.noctalia.package} msg session lock";
   };
 
   my.features.desktop.webapps = {

@@ -80,6 +80,10 @@ in
           shell = {
             polkit_agent = true;
             setup_wizard_enabled = false;
+            # The shell captures screenshots itself. Copying is the minimum that
+            # makes a capture usable; whether it is also written to a file is a
+            # personal choice and stays out of this declaration.
+            screenshot.copy_to_clipboard = true;
           };
           # The Noctalia backdrop is shown in Niri's overview by the layer rule below.
           backdrop.enabled = niriEnabled;
@@ -160,6 +164,9 @@ in
             "Mod+S".action = spawn noctalia "msg" "panel-toggle" "control-center";
             "Mod+Shift+Comma".action = spawn noctalia "msg" "settings-toggle";
             "Alt+Tab".action = spawn noctalia "msg" "window-switcher";
+            "Print".action = spawn noctalia "msg" "screenshot-region";
+            "Shift+Print".action = spawn noctalia "msg" "screenshot-fullscreen";
+            "Ctrl+Print".action = spawn noctalia "msg" "screenshot-annotate";
             "XF86AudioRaiseVolume".action = spawn noctalia "msg" "volume-up";
             "XF86AudioLowerVolume".action = spawn noctalia "msg" "volume-down";
             "XF86AudioMute".action = spawn noctalia "msg" "volume-mute";

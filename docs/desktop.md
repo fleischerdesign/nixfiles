@@ -40,7 +40,7 @@ nothing, and would drift the day upstream changes.
 ## 3. Niri and Noctalia
 
 Niri is independent of a particular shell: the host declares output positions, Niri owns its
-Wayland session and navigation, and Noctalia owns its package, launcher/lock/media keybindings,
+Wayland session and navigation, and Noctalia owns its package, launcher/lock/media/screenshot keybindings,
 wallpaper, notifications and Polkit prompt. Its Home Manager module installs the pinned nixpkgs
 package; Niri starts it exactly once, rather than enabling a second systemd user service. The
 desktop shell does not open a network port. The workstation already enables NetworkManager,
@@ -48,8 +48,10 @@ Bluetooth, UPower, and a power-profile service through its existing modules; Noc
 enable another copy of these services.
 
 The Niri adapter floats Noctalia's settings window, honors its notification-driven window
-activation, and maps launcher, control center, settings, window switcher, lock, audio and
-brightness shortcuts. `Mod+Comma` stays Niri's consume-window action; Noctalia settings use
+activation, and maps launcher, control center, settings, window switcher, screenshots, lock, audio and
+brightness shortcuts. The shell captures through the compositor's image-copy protocol, so no external
+screenshot tool is installed; a capture is copied by default, and the annotation editor is bound too.
+`Mod+Comma` stays Niri's consume-window action; Noctalia settings use
 `Mod+Shift+Comma`. The overview uses Noctalia's blurred wallpaper backdrop, with its own
 background layer placed inside Niri's backdrop. On Niri 26.04, Noctalia surfaces use non-xray
 blur so the content behind them is sampled instead of the wallpaper; other applications are not
@@ -118,15 +120,17 @@ never answers.
 
 The bar is a personal choice and lives in `user/philipp/home.nix`: workspaces at the start, media and
 the anchored clock in the centre, then state - system indicators first, then the plugin states - and
-finally attention and action (notifications, clipboard, control center, session). The launcher and
+finally attention and action (the privacy indicator, notifications, clipboard, control center, session). The launcher and
 wallpaper widgets are dropped: the launcher is reached with `Mod+Space`, and the wallpaper is declared
 in this repository, so a button for it would only invite drift. The control center carries the useful
 toggles plus the microphone mute; power profiles are not worth a slot on a desktop. Home Assistant's
 entities are deliberately not declared - which entity a toggle means is a personal decision, so it is
 chosen in the shell, not in this repository.
 
-Direct login does not unlock the user's Secret Service keyring with a password; persistent
-encrypted clipboard history therefore requires an independently unlocked keyring.
+Direct login passes no password to PAM, so the login keyring is locked at boot and the first client
+that wants a secret would raise its own unlock dialog. The shell therefore starts locked: the one
+password the lock screen already takes unlocks the session and the keyring together, because that
+unlock runs `pam_gnome_keyring`, and Noctalia's encrypted clipboard storage opens with it.
 
 ## 4. GNOME user settings
 
