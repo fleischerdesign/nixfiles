@@ -66,6 +66,16 @@ let
           alone, which is cheaper and stays steady while a window animates.
         '';
       };
+
+      popups = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Whether this surface's menus and tooltips are frosted as well. Only true xdg
+          pop-ups are affected, and the compositor has to make them translucent itself,
+          so the pop-up content loses some opacity.
+        '';
+      };
     };
   };
 in

@@ -18,6 +18,9 @@ let
   kdl = inputs.niri.lib.kdl;
   blur = config.my.features.desktop.niri.blur;
 
+  # A frosted surface's pop-ups use the same one transparency value as everything else.
+  surfaceOpacity = config.my.desktop.surfaceOpacity;
+
   # `auto` leaves blur to the surface's own request; only `on` or `off` speak for it.
   backgroundEffect =
     effect:
@@ -25,6 +28,21 @@ let
       lib.optional (effect.blur == "on") (kdl.leaf "blur" true)
       ++ lib.optional (effect.blur == "off") (kdl.leaf "blur" false)
       ++ [ (kdl.leaf "xray" (effect.sample == "backdrop")) ]
+    );
+
+  # Niri makes a pop-up translucent itself, because the application draws it opaque, so a
+  # frosted pop-up loses some content opacity; that is why it is only written when the session
+  # is frosted at all.
+  popups =
+    effect:
+    lib.optional (effect.popups && surfaceOpacity < 1.0) (
+      kdl.plain "popups" [
+        (kdl.leaf "opacity" surfaceOpacity)
+        (kdl.plain "background-effect" [
+          (kdl.leaf "blur" true)
+          (kdl.leaf "xray" false)
+        ])
+      ]
     );
 
   # A window that asks for a background effect gets its border drawn as an outline: a border
@@ -43,6 +61,7 @@ let
         kdl.leaf "draw-border-with-background" false
       )
       ++ [ (backgroundEffect effect) ]
+      ++ popups effect
     );
 
   # Niri's own defaults hold until a value is set, so this node exists only then.

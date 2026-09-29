@@ -158,13 +158,16 @@
   # terminal all read it, so they cannot drift apart.
   my.desktop.surfaceOpacity = 0.85;
 
-  # Personal taste belongs in the registry: the compositor draws this window frosted,
-  # and the terminal itself is not configured for it.
+  # Personal taste belongs in the registry: the compositor blurs behind every window, and
+  # only the ones that paint a translucent background (Ghostty, and GTK applications through
+  # the shell's frost stylesheet) actually show it. The pop-ups are frosted with the same
+  # transparency value, so no second number appears anywhere.
   my.desktop.effects = lib.mkIf osConfig.my.features.desktop.niri.enable {
-    ghostty = {
+    frosted-windows = {
       kind = "window";
-      ids = [ "^com\\.mitchellh\\.ghostty$" ];
+      ids = [ "^.*$" ];
       blur = "on";
+      popups = true;
     };
   };
 

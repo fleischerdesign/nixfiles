@@ -63,9 +63,12 @@ frosted surface paints its background; each owner maps it to its own knob, so ba
 notifications, OSD, dock and the terminal cannot drift apart, and a consumer whose model is discrete
 does its own translation. A window's
 transparency is its own: Ghostty paints its background translucent and the compositor only blurs what
-shows through, and only the background is transparent - no window content is dimmed. Other applications
-are not globally blurred. Non-xray blur is experimental upstream and disappears during window open and
-close
+shows through, and only the background is transparent - no window content is dimmed. GTK applications
+get the same treatment from the shell's frost stylesheet, which a second `gtk.css` import pulls in
+alongside the palette; because no layout has to name them, the registration blurs behind every window
+and an application that stays opaque simply shows nothing. A window may also frost its pop-ups, where
+the compositor has to make the pop-up translucent itself, so a menu loses some opacity. Non-xray blur is
+experimental upstream and disappears during window open and close
 animations; the wallpaper-only mode exists for a surface that must not flicker, and nothing here uses
 it. `my.features.desktop.niri.blur` tunes the shared blur and writes nothing unless set, so Niri's own
 defaults stand. These compositor rules leave Niri usable without Noctalia.
