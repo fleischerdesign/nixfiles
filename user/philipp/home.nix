@@ -131,13 +131,15 @@
       ];
     };
 
-    # The bar shows only what is happening: idle indicators and empty states stay out.
+    # The bar shows only what is happening: idle indicators, empty states and workspace
+    # numbers stay out - an unlabelled pill reads the same on both screens.
     widget = {
       clock.anchor = true;
       privacy.hide_inactive = true;
       bluetooth.hide_when_no_connected_device = true;
       notifications.hide_when_no_unread = true;
       media.hide_when_no_media = true;
+      workspaces.show_labels = false;
     };
 
     # Power profiles are not worth a slot on a desktop; the microphone mute is a real
