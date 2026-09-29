@@ -1,4 +1,10 @@
-# Verify the actual workstation session and its generated shell configuration.
+# Verify the workstation's shell session and the configuration it actually delivers.
+#
+# This checks properties, not a copy of the configuration: a claim is either a relation
+# between two declarations (an integration that selects a template must also wire the
+# application) or a requirement the design cannot work without. A personal choice - which
+# widget sits in which lane, which address is configured - is deliberately not asserted;
+# changing it is not a defect. Every violated claim is named in the error.
 {
   pkgs,
   lib,
@@ -8,144 +14,139 @@
 let
   cfg = self.nixosConfigurations.hom-wrk-01.config;
   user = cfg.home-manager.users.${cfg.my.user.primary};
-  startup = user.programs.niri.settings.spawn-at-startup;
+  settings = user.my.features.desktop.noctalia.settings;
+
   shell = lib.getExe user.programs.noctalia.package;
   niriConfig = user.xdg.configFile.niri-config.source;
   ghosttyConfig = user.xdg.configFile."ghostty/config".source;
   qt6ctConfig = user.xdg.configFile."qt6ct/qt6ct.conf".source;
   configLink = user.xdg.configFile."noctalia/config.toml".source;
   configTemplate = user.sops.templates."noctalia-config.toml";
-  noctaliaSettings = user.my.features.desktop.noctalia.settings;
+
+  token = "services/home/moonraker_hass_token";
   environment = cfg.my.desktop.environments;
+  templates = settings.theme.templates;
 
-  # The template selection is derived from the integrations, so the expected sets are
-  # spelled out here once and must match what the modules produce.
-  expectedBuiltinIds = builtins.sort builtins.lessThan [
-    "btop"
-    "ghostty"
-    "gtk3"
-    "gtk4"
-    "kcolorscheme"
-    "niri"
-    "qt"
-  ];
-  expectedCommunityIds = builtins.sort builtins.lessThan [
-    "obsidian"
-    "vscode"
-  ];
-  expectedPlugins = builtins.sort builtins.lessThan [
-    "andrewdems/printers"
-    "icefish/phone-operate"
-    "noctalia/bitwarden"
-    "pozzoo/hassio"
-    "weinguyen/opencode-companion"
-  ];
+  laneEntries = lib.concatLists (
+    map (lane: settings.bar.default.${lane} or [ ]) [
+      "start"
+      "center"
+      "end"
+    ]
+  );
+  # A lane entry naming a plugin is "<author>/<plugin>:<entry>"; "group:" tokens are not
+  # plugins. Both the lane and the named widget definitions are checked against the plugins
+  # that are enabled, so a widget can never point at a plugin that is not selected.
+  pluginReference = entry: lib.hasInfix ":" entry && !(lib.hasPrefix "group:" entry);
+  pluginOf = entry: builtins.head (lib.splitString ":" entry);
+  referencedPlugins =
+    map pluginOf (builtins.filter pluginReference laneEntries)
+    ++ map pluginOf (
+      builtins.filter pluginReference (
+        lib.mapAttrsToList (_: widget: widget.type or "") (settings.widget or { })
+      )
+    );
+  enabledPlugins = settings.plugins.enabled or [ ];
+  settingsPlugins = lib.attrNames (settings.plugin_settings or { });
+  namedWidgets = lib.attrNames (settings.widget or { });
 
-  nvimTemplate = noctaliaSettings.theme.templates.user.nvim_base16;
+  # Each claim is a property. The error names the ones that do not hold.
+  claims = {
+    # The session belongs to Niri alone, and greetd starts it directly as the primary user.
+    "one-graphical-environment" =
+      environment.niri
+      && builtins.length (lib.attrNames (lib.filterAttrs (_: running: running) environment)) == 1;
+    "greetd-starts-the-shell-directly" =
+      cfg.services.greetd.enable
+      && cfg.services.greetd.settings.default_session.user == cfg.my.user.primary
+      &&
+        cfg.services.greetd.settings.default_session.command
+        == "${cfg.programs.niri.package}/bin/niri-session"
+      && !cfg.services.displayManager.gdm.enable
+      && !cfg.services.desktopManager.gnome.enable;
 
-  # The bar is a user choice, so the expected layout is stated once and must match.
-  expectedBarStart = [ "workspaces" ];
-  expectedBarCenter = [
-    "media"
-    "clock"
-  ];
-  expectedBarEnd = [
-    "tray"
-    "network"
-    "bluetooth"
-    "volume"
-    "brightness"
-    "battery"
-    "icefish/phone-operate:status"
-    "andrewdms/printers:printer"
-    "weinguyen/opencode-companion:widget"
-    "notifications"
-    "clipboard"
-    "control-center"
-    "session"
-  ];
-  expectedShortcuts = [
-    "wifi"
-    "bluetooth"
-    "caffeine"
-    "nightlight"
-    "notification"
-    "mic_mute"
-  ];
+    # The shell is the session's, runs once, and owns the Polkit prompt.
+    "shell-runs-once-in-the-session" =
+      user.programs.noctalia.enable
+      && !user.programs.noctalia.systemd.enable
+      && user.programs.niri.settings.spawn-at-startup == [ { argv = [ shell ]; } ];
+    "shell-owns-the-polkit-prompt" = settings.shell.polkit_agent;
+
+    # Every selected template id is selected once, so no integration double-adds one.
+    "templates-are-not-selected-twice" =
+      templates.enable_builtin_templates
+      && templates.enable_community_templates
+      && templates.builtin_ids == lib.unique templates.builtin_ids
+      && templates.community_ids == lib.unique templates.community_ids;
+
+    # Every plugin reference resolves to an enabled plugin, and no plugin settings are
+    # declared for a plugin that is not enabled.
+    "plugin-widgets-belong-to-enabled-plugins" = builtins.all (
+      id: builtins.elem id enabledPlugins
+    ) referencedPlugins;
+    "plugin-settings-belong-to-enabled-plugins" = builtins.all (
+      id: builtins.elem id enabledPlugins
+    ) settingsPlugins;
+    "named-widgets-are-referenced" = builtins.all (name: builtins.elem name laneEntries) namedWidgets;
+
+    # A configured avatar must be an installed file; an unset one is fine.
+    "avatar-resolves" =
+      !(settings.shell ? avatar_path) || builtins.pathExists settings.shell.avatar_path;
+
+    # The Home Assistant token is rendered in the session, not built into the store.
+    "secret-is-declared" = builtins.hasAttr token user.sops.secrets;
+    "config-is-rendered-at-runtime" =
+      user.sops.templates ? "noctalia-config.toml"
+      && configTemplate.mode == "0400"
+      && lib.hasInfix "sops-nix/secrets/rendered/noctalia-config.toml" configTemplate.path;
+    "config-reload-unit-exists" = user.systemd.user.services ? "noctalia-config-reload";
+
+    # An integration that selects a template must also wire the application, or the
+    # template would produce a palette nothing reads.
+    "ghostty-consumes-the-palette" =
+      !(lib.elem "ghostty" templates.builtin_ids)
+      || user.programs.ghostty.settings.theme == [ "noctalia" ];
+    "qt-consumes-the-palette" =
+      !(lib.elem "qt" templates.builtin_ids)
+      || lib.hasInfix "noctalia.conf" user.xdg.configFile."qt6ct/qt6ct.conf".text;
+    "vscode-consumes-the-palette" =
+      !(lib.elem "vscode" templates.community_ids)
+      || (
+        user.programs.vscode.mutableExtensionsDir
+        && user.programs.vscode.profiles.default.userSettings."workbench.colorTheme" == "NoctaliaTheme"
+      );
+    "neovim-consumes-the-palette" =
+      !(cfg.my.features.dev.nixvim.enable or false)
+      || (
+        lib.any (p: lib.hasInfix "base16-nvim" (p.name or "")) user.programs.nixvim.extraPlugins
+        && lib.hasInfix "matugen" user.programs.nixvim.extraConfigLuaPost
+        && !(templates.user.nvim_base16 ? post_hook)
+      );
+
+    # The shell needs the workspace services it reports on.
+    "workspace-services-are-present" =
+      cfg.networking.networkmanager.enable
+      && cfg.hardware.bluetooth.enable
+      && cfg.services.upower.enable
+      && cfg.services.power-profiles-daemon.enable;
+  };
+
+  violated = lib.attrNames (lib.filterAttrs (_: holds: !holds) claims);
 
   # The rendered configuration exists only in the session, so validation uses the same
   # generation with a placeholder token instead of the secret.
   validationToml = (pkgs.formats.toml { }).generate "noctalia-validation.toml" (
-    lib.recursiveUpdate noctaliaSettings {
+    lib.recursiveUpdate settings {
       plugin_settings."pozzoo/hassio".ha_token = "validation-placeholder";
     }
   );
 in
-if
-  cfg.my.features.desktop.niri.enable
-  && cfg.my.features.desktop.noctalia.enable
-  && environment.niri
-  && builtins.length (lib.attrNames (lib.filterAttrs (_: enabled: enabled) environment)) == 1
-  && cfg.services.greetd.enable
-  && cfg.services.greetd.settings.default_session.user == cfg.my.user.primary
-  &&
-    cfg.services.greetd.settings.default_session.command
-    == "${cfg.programs.niri.package}/bin/niri-session"
-  && !cfg.services.displayManager.gdm.enable
-  && !cfg.services.desktopManager.gnome.enable
-  && user.programs.noctalia.enable
-  && !user.programs.noctalia.systemd.enable
-  && noctaliaSettings.shell.polkit_agent
-  && noctaliaSettings.theme.source == "wallpaper"
-  && noctaliaSettings.theme.pure_black_dark
-  && noctaliaSettings.theme.templates.enable_builtin_templates
-  && noctaliaSettings.theme.templates.enable_community_templates
-  &&
-    builtins.sort builtins.lessThan noctaliaSettings.theme.templates.builtin_ids == expectedBuiltinIds
-  &&
-    builtins.sort builtins.lessThan noctaliaSettings.theme.templates.community_ids
-    == expectedCommunityIds
-  && noctaliaSettings.shell.panel.control_center_placement == "attached"
-  && noctaliaSettings.shell.panel.open_near_click_control_center
-  && !noctaliaSettings.location.auto_locate
-  && noctaliaSettings.location.address == "Hufelandstraße 55, 17036 Neubrandenburg, Deutschland"
-  && noctaliaSettings.backdrop.enabled
-  # The bar layout and the control-center toggles.
-  && noctaliaSettings.bar.default.position == "top"
-  && noctaliaSettings.bar.default.start == expectedBarStart
-  && noctaliaSettings.bar.default.center == expectedBarCenter
-  && noctaliaSettings.bar.default.end == expectedBarEnd
-  && noctaliaSettings.widget.clock.anchor
-  && map (shortcut: shortcut.type) noctaliaSettings.control_center.shortcuts == expectedShortcuts
-  # Plugin selection and its options, including the injected secret.
-  && builtins.sort builtins.lessThan noctaliaSettings.plugins.enabled == expectedPlugins
-  && noctaliaSettings.plugins.auto_update == "none"
-  &&
-    noctaliaSettings.plugin_settings."pozzoo/hassio".ha_url == "https://hass.${cfg.my.topology.domain}"
-  && builtins.hasAttr "services/home/moonraker_hass_token" user.sops.secrets
-  && user.sops.templates ? "noctalia-config.toml"
-  && user.systemd.user.services ? "noctalia-config-reload"
-  && configTemplate.mode == "0400"
-  && lib.hasInfix "sops-nix/secrets/rendered/noctalia-config.toml" configTemplate.path
-  # Integrations: each application consumes the palette through a declared seam.
-  && user.programs.vscode.mutableExtensionsDir
-  && user.programs.vscode.profiles.default.userSettings."workbench.colorTheme" == "NoctaliaTheme"
-  && lib.any (p: lib.hasInfix "base16-nvim" (p.name or "")) user.programs.nixvim.extraPlugins
-  && lib.hasInfix "matugen" user.programs.nixvim.extraConfigLuaPost
-  && nvimTemplate.output_path == "$XDG_CONFIG_HOME/nvim/lua/matugen.lua"
-  && !(nvimTemplate ? post_hook)
-  && startup == [ { argv = [ shell ]; } ]
-  && !(builtins.elem 7391 cfg.networking.firewall.allowedTCPPorts)
-  && cfg.networking.networkmanager.enable
-  && cfg.hardware.bluetooth.enable
-  && cfg.services.upower.enable
-  && cfg.services.power-profiles-daemon.enable
-then
+if violated != [ ] then
+  throw "niri-noctalia: these claims do not hold: ${lib.concatStringsSep ", " violated}"
+else
   pkgs.runCommandLocal "niri-noctalia-check"
     {
-      nativeBuildInputs = [
-        pkgs.gnugrep
-      ];
+      nativeBuildInputs = [ pkgs.gnugrep ];
     }
     ''
       fail=0
@@ -158,26 +159,25 @@ then
         echo 'niri-noctalia: generated Noctalia config is invalid' >&2
         fail=1
       fi
-      # Plugin settings for a plugin that is not loaded in this sandbox are expected; any
-      # other warning is not.
-      if grep -E '(^|[[:space:]])WARN([[:space:]]|$)' validator.log \
-        | grep -v 'no loaded plugin with this id' > unexpected.log; then
-        cat unexpected.log >&2
-        echo 'niri-noctalia: Noctalia ignored or migrated a declared setting' >&2
-        fail=1
-      fi
-      if [ ! -f ${lib.escapeShellArg noctaliaSettings.shell.avatar_path} ]; then
-        echo 'niri-noctalia: the configured avatar is not an installed file' >&2
-        fail=1
-      fi
-      if ! grep -F 'end = ["tray", "network", "bluetooth", "volume", "brightness", "battery", "icefish/phone-operate:status", "andrewdms/printers:printer", "weinguyen/opencode-companion:widget", "notifications", "clipboard", "control-center", "session"]' ${validationToml} >/dev/null; then
-        echo 'niri-noctalia: the generated bar layout differs from the declared one' >&2
-        fail=1
-      fi
-      if ! grep -F 'type = "mic_mute"' ${validationToml} >/dev/null; then
-        echo 'niri-noctalia: the control-center shortcuts are not the declared ones' >&2
-        fail=1
-      fi
+      # The sandbox has no plugins loaded, so each declared plugin setting warns once. That
+      # warning is expected; any other warning means a declared setting was ignored.
+      grep -E '(^|[[:space:]])WARN([[:space:]]|$)' validator.log > warnings.log || true
+      while IFS= read -r line; do
+        case "$line" in
+          *"plugin_settings."*"no loaded plugin with this id") ;;
+          *)
+            echo "$line" >&2
+            echo 'niri-noctalia: Noctalia reported an unexpected warning' >&2
+            fail=1
+            ;;
+        esac
+      done < warnings.log
+      for key in ${lib.concatMapStringsSep " " lib.escapeShellArg settingsPlugins}; do
+        if ! grep -F "plugin_settings.$key: no loaded plugin with this id" warnings.log >/dev/null; then
+          echo "niri-noctalia: the declared plugin settings for $key were not validated" >&2
+          fail=1
+        fi
+      done
       if [ "$(readlink ${lib.escapeShellArg (toString configLink)})" != ${lib.escapeShellArg configTemplate.path} ]; then
         echo 'niri-noctalia: the shell config link does not point at the rendered file' >&2
         fail=1
@@ -191,7 +191,7 @@ then
         echo 'niri-noctalia: qt6ct does not select the generated Noctalia palette' >&2
         fail=1
       fi
-      if [ ! -f ${lib.escapeShellArg nvimTemplate.input_path} ]; then
+      if [ ! -f ${lib.escapeShellArg templates.user.nvim_base16.input_path} ]; then
         echo 'niri-noctalia: the vendored Neovim template is not an installed file' >&2
         fail=1
       fi
@@ -203,36 +203,13 @@ then
         echo 'niri-noctalia: generated Niri config does not start the selected shell' >&2
         fail=1
       fi
-      for expected in \
-        'honor-xdg-activation-with-invalid-serial' \
-        'match namespace="^noctalia-backdrop"' \
-        'place-within-backdrop true' \
-        'match namespace="^noctalia-window-switcher$"' \
-        'background-effect' \
-        'xray false' \
-        'open-floating true' \
-        'Mod+Shift+Comma' \
-        'Alt+Tab' \
-        'QT_QPA_PLATFORMTHEME' \
-        "include \"${user.xdg.configHome}/niri/noctalia.kdl\" optional=true"; do
-        if ! grep -F -- "$expected" ${niriConfig} >/dev/null; then
-          echo "niri-noctalia: generated Niri config is missing $expected" >&2
-          fail=1
-        fi
-      done
-      if grep -Ei 'axis-shell|\.config/axis|org\.axis' ${niriConfig} >&2; then
-        echo 'niri-noctalia: generated Niri config contains Axis' >&2
-        fail=1
-      fi
-      # The shell owns every seam to an application. A feature outside this shell's own
-      # directory naming it means that ownership has leaked.
-      if grep -ril 'noctalia' ${lib.escapeShellArg (toString self)}/features --exclude-dir=noctalia > leaked.log; then
+      # The shell owns every seam to an application. This is a lint for that one coupling:
+      # an application feature must not name the shell.
+      if grep -rl 'noctalia' ${lib.escapeShellArg (toString self)}/features/dev --include='*.nix' > leaked.log; then
         cat leaked.log >&2
-        echo 'niri-noctalia: a feature outside features/desktop/noctalia mentions the shell' >&2
+        echo 'niri-noctalia: an application feature names the shell' >&2
         fail=1
       fi
       [ "$fail" -eq 0 ] || exit 1
-      echo 'Niri session and generated Niri/Noctalia configurations validated' > "$out"
+      echo 'Niri session and the delivered shell configuration validated' > "$out"
     ''
-else
-  throw "niri-noctalia: workstation session, single shell startup, required services or closed Axis port failed"

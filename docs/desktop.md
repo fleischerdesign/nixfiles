@@ -162,8 +162,15 @@ declares support for the pinned shell release. The desktop is a graphical sessio
 of logging in proves it on hardware: login, lock/unlock, keyring unlock, suspend/resume, external
 monitors, screen sharing, Bluetooth and brightness are exercised by the operator, not by evaluation.
 
-[`checks/niri-noctalia.nix`](../checks/niri-noctalia.nix) reads the workstation's evaluated
-session, user, single shell startup and dependencies; it validates the generated Niri KDL and
-Noctalia TOML with their pinned executables. Noctalia's validator exits successfully even for
-unknown keys, so the check also rejects warnings. Evaluation cannot prove that the compositor,
-lock screen, outputs, keyring and suspend work on physical hardware; they require a local login.
+[`checks/niri-noctalia.nix`](../checks/niri-noctalia.nix) states properties, not a copy of the
+configuration. A claim is either a relation between two declarations - an integration that selects a
+template must also wire the application that reads it, and a bar widget that names a plugin must name
+an enabled one - or a requirement the design cannot work without. Personal values (which widget sits
+in which lane, which address is configured) are deliberately not asserted: changing them is not a
+defect, and asserting them would only mean editing the check every time a preference changes. A
+violated claim is named in the error; that is how a bar widget that addressed a misspelled plugin id
+was found. The check validates the generated Niri KDL and Noctalia TOML with their pinned
+executables, and treats every Noctalia warning as a failure except the one the sandbox must produce
+per declared plugin setting, because the validator exits successfully even for settings it ignored.
+Evaluation cannot prove that the compositor, lock screen, outputs, keyring and suspend work on
+physical hardware; they require a local login.
