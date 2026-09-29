@@ -83,6 +83,25 @@
 
   my.features.desktop.noctalia.wallpaper = ../../media/wallpaper.jpg;
 
+  # Personal Noctalia defaults. GUI changes in settings.toml may still override these.
+  programs.noctalia.settings = lib.mkIf osConfig.my.features.desktop.noctalia.enable {
+    theme = {
+      source = "wallpaper";
+      pure_black_dark = true;
+    };
+    shell = {
+      avatar_path = "${../../media/avatar-philipp.jpg}";
+      panel = {
+        control_center_placement = "attached";
+        open_near_click_control_center = true;
+      };
+    };
+    location = {
+      auto_locate = false;
+      address = "Hufelandstraße 55, 17036 Neubrandenburg, Deutschland";
+    };
+  };
+
   my.features.desktop.webapps = {
     enable = true;
     apps = {

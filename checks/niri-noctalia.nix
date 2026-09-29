@@ -12,6 +12,7 @@ let
   shell = lib.getExe user.programs.noctalia.package;
   niriConfig = user.xdg.configFile.niri-config.source;
   noctaliaConfig = user.xdg.configFile."noctalia/config.toml".source;
+  noctaliaSettings = user.programs.noctalia.settings;
   environment = cfg.my.desktop.environments;
 in
 if
@@ -29,6 +30,12 @@ if
   && user.programs.noctalia.enable
   && !user.programs.noctalia.systemd.enable
   && user.programs.noctalia.settings.shell.polkit_agent
+  && noctaliaSettings.theme.source == "wallpaper"
+  && noctaliaSettings.theme.pure_black_dark
+  && noctaliaSettings.shell.panel.control_center_placement == "attached"
+  && noctaliaSettings.shell.panel.open_near_click_control_center
+  && !noctaliaSettings.location.auto_locate
+  && noctaliaSettings.location.address == "Hufelandstraße 55, 17036 Neubrandenburg, Deutschland"
   && user.programs.noctalia.settings.backdrop.enabled
   && startup == [ { argv = [ shell ]; } ]
   && !(builtins.elem 7391 cfg.networking.firewall.allowedTCPPorts)
@@ -54,6 +61,10 @@ then
       fi
       if grep -E '(^|[[:space:]])WARN([[:space:]]|$)' validator.log >&2; then
         echo 'niri-noctalia: Noctalia ignored or migrated a declared setting' >&2
+        fail=1
+      fi
+      if [ ! -f ${lib.escapeShellArg noctaliaSettings.shell.avatar_path} ]; then
+        echo 'niri-noctalia: the configured avatar is not an installed file' >&2
         fail=1
       fi
       if ! grep -F 'spawn-at-startup "${shell}"' ${niriConfig} >/dev/null; then
