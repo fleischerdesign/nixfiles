@@ -56,13 +56,14 @@ screenshot tool is installed; a capture is copied by default, and the annotation
 background layer placed inside Niri's backdrop. Background effects are declared, not written as
 compositor rules: `my.desktop.effects` states which surface or window wants one and what it samples,
 and the Niri feature projects every entry into exactly one layer or window rule, so no entry names a
-compositor. The shell registers its own surfaces, a user registers personal windows, and the shell's
-surfaces sample `behind` while letting Noctalia request the blur itself - other applications are not
-globally blurred. A window that asks for `backdrop` samples the wallpaper instead, which is cheaper
-and does not vanish while it animates; non-xray blur is experimental upstream and does disappear
-during window open and close animations. `my.features.desktop.niri.blur` tunes the shared blur and
-writes nothing unless set, so Niri's own defaults stand. These compositor rules leave Niri usable
-without Noctalia.
+compositor. The shell registers its own surfaces and its settings window, a user registers personal
+windows, and every entry samples `behind` - what is really under the surface, which is upstream's
+recommendation for a realistic blur. A window's transparency is its own: Ghostty paints its background
+translucent and the compositor only blurs what shows through, so other applications are not globally
+blurred. Non-xray blur is experimental upstream and disappears during window open and close
+animations; the wallpaper-only mode exists for a surface that must not flicker, and nothing here uses
+it. `my.features.desktop.niri.blur` tunes the shared blur and writes nothing unless set, so Niri's own
+defaults stand. These compositor rules leave Niri usable without Noctalia.
 
 Noctalia reads declarative `~/.config/noctalia/config.toml`, then overlays mutable settings in
 `~/.local/state/noctalia/settings.toml`. GUI changes therefore take precedence over the declared

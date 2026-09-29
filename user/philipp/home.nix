@@ -161,8 +161,6 @@
       kind = "window";
       ids = [ "^com\\.mitchellh\\.ghostty$" ];
       blur = "on";
-      sample = "backdrop";
-      opacity = 0.9;
     };
   };
 

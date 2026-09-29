@@ -27,26 +27,11 @@ let
       ++ [ (kdl.leaf "xray" (effect.sample == "backdrop")) ]
     );
 
-  popups =
-    effect:
-    lib.optional effect.popups.enable (
-      kdl.plain "popups" (
-        lib.optional (effect.popups.opacity != null) (kdl.leaf "opacity" effect.popups.opacity)
-        ++ [
-          (kdl.plain "background-effect" [
-            (kdl.leaf "blur" true)
-            (kdl.leaf "xray" false)
-          ])
-        ]
-      )
-    );
-
-  # An opaque surface hides whatever was sampled, so a translucent entry also has its border
-  # drawn as an outline rather than as a filled rectangle behind the surface.
+  # A window that asks for a background effect gets its border drawn as an outline: a border
+  # filled with background would cover exactly the effect the window asked for.
   rule =
     effect:
     let
-      translucent = effect.opacity != null && effect.opacity < 1.0;
       matches =
         map (id: kdl.leaf "match" { app-id = id; }) effect.ids
         ++ map (title: kdl.leaf "match" { title = title; }) effect.titles
@@ -54,10 +39,10 @@ let
     in
     kdl.plain (if effect.kind == "window" then "window-rule" else "layer-rule") (
       matches
-      ++ lib.optional (effect.opacity != null) (kdl.leaf "opacity" effect.opacity)
-      ++ lib.optional translucent (kdl.leaf "draw-border-with-background" false)
+      ++ lib.optional (effect.kind == "window" && effect.blur != "off") (
+        kdl.leaf "draw-border-with-background" false
+      )
       ++ [ (backgroundEffect effect) ]
-      ++ popups effect
     );
 
   # Niri's own defaults hold until a value is set, so this node exists only then.

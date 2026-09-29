@@ -32,6 +32,9 @@
     settings = {
       font-family = "JetBrainsMono Nerd Font";
       font-size = 10;
+      # The window paints its own background translucent; the compositor blurs what shows
+      # through. A terminal does not request blur itself, so the registry asks for it.
+      background-opacity = 0.8;
       keybind = [
         "alt+h=goto_split:left"
         "alt+l=goto_split:right"

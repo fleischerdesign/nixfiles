@@ -12,8 +12,6 @@
 # to discovery or system composition is involved.
 { lib, config, ... }:
 let
-  fraction = lib.types.addCheck lib.types.float (value: value >= 0.0 && value <= 1.0);
-
   entry = lib.types.submodule {
     options = {
       kind = lib.mkOption {
@@ -67,30 +65,6 @@ let
           stacking a window over it changes the result; `backdrop` takes the wallpaper
           alone, which is cheaper and stays steady while a window animates.
         '';
-      };
-
-      opacity = lib.mkOption {
-        type = lib.types.nullOr fraction;
-        default = null;
-        description = ''
-          Transparency of the selected surface. An effect is invisible without it: an opaque
-          window covers whatever was sampled. Null leaves the surface as it is.
-        '';
-      };
-
-      popups = lib.mkOption {
-        type = lib.types.submodule {
-          options = {
-            enable = lib.mkEnableOption "a background effect on this surface's pop-ups";
-            opacity = lib.mkOption {
-              type = lib.types.nullOr fraction;
-              default = null;
-              description = "Transparency for the pop-ups, on top of the surface's own.";
-            };
-          };
-        };
-        default = { };
-        description = "Menus and tooltips of the selected surface.";
       };
     };
   };

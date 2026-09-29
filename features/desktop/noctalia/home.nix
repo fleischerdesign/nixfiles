@@ -115,19 +115,16 @@ in
             kind = "layer";
             namespaces = [ "^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$" ];
             blur = "auto";
-            sample = "behind";
           };
           noctalia-window-switcher = {
             kind = "layer";
             namespaces = [ "^noctalia-window-switcher$" ];
             blur = "on";
-            sample = "behind";
           };
           noctalia-settings = {
             kind = "window";
             ids = [ "^dev\\.noctalia\\.Noctalia$" ];
             blur = "on";
-            sample = "backdrop";
           };
         };
 
