@@ -79,35 +79,16 @@ in
     '';
   };
 
-  # One level for every surface that paints a translucent background. The knobs differ - an
-  # alpha for bars, notifications, the OSD, the dock and a terminal's background, an enum for a
-  # shell's panels - so the level is the single source of truth and `frostAlpha` is its one
-  # numeric projection, computed here so no consumer repeats the table.
-  options.my.desktop.frost = lib.mkOption {
-    type = lib.types.enum [
-      "solid"
-      "soft"
-      "glass"
-    ];
-    default = "solid";
-    description = "How translucent frosted surfaces are: solid keeps today's appearance.";
-  };
-
-  options.my.desktop.frostAlpha = lib.mkOption {
-    type = lib.types.float;
-    readOnly = true;
-    description = "The alpha `frost` maps to; the only place the table lives.";
+  # How opaque every frosted surface paints its background. One number for the bar, the panels,
+  # notifications, the OSD, the dock and a terminal; 1.0 is the default and writes nothing. A
+  # consumer whose model is discrete translates it itself, so the schema speaks no shell's words.
+  options.my.desktop.surfaceOpacity = lib.mkOption {
+    type = lib.types.addCheck lib.types.float (value: value >= 0.0 && value <= 1.0);
+    default = 1.0;
+    description = "Opacity of every frosted background; 1.0 leaves the surfaces as they are.";
   };
 
   config = {
-    my.desktop.frostAlpha =
-      {
-        solid = 1.0;
-        soft = 0.95;
-        glass = 0.85;
-      }
-      .${config.my.desktop.frost};
-
     assertions = [
       {
         assertion = builtins.all (

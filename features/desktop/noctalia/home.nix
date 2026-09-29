@@ -17,9 +17,8 @@ let
   niriEnabled = osConfig.my.features.desktop.niri.enable or false;
   noctalia = lib.getExe config.programs.noctalia.package;
 
-  # The one frost level every translucent surface derives from, and its numeric projection.
-  frost = config.my.desktop.frost;
-  frostAlpha = config.my.desktop.frostAlpha;
+  # The one transparency value every frosted surface uses; 1.0 means nothing is written.
+  surfaceOpacity = config.my.desktop.surfaceOpacity;
 
   # Built-in templates whose seam is the template itself: Noctalia writes the theme file
   # *and* the application's own selection, and no Home Manager-owned file is involved.
@@ -84,18 +83,17 @@ in
           shell = {
             polkit_agent = true;
             setup_wizard_enabled = false;
-            # Derived from the one frost level, never written by hand.
-            settings_window_translucent = frost != "solid";
-            panel.transparency_mode = frost;
             # The shell captures screenshots itself. Copying is the minimum that
             # makes a capture usable; whether it is also written to a file is a
             # personal choice and stays out of this declaration.
             screenshot.copy_to_clipboard = true;
+          }
+          # Only written when there is something to frost. Noctalia's panel model is
+          # discrete, so this is where that one translation lives, not in the schema.
+          // lib.optionalAttrs (surfaceOpacity < 1.0) {
+            settings_window_translucent = true;
+            panel.transparency_mode = if surfaceOpacity <= 0.9 then "glass" else "soft";
           };
-          bar.default.background_opacity = frostAlpha;
-          notification.background_opacity = frostAlpha;
-          osd.background_opacity = frostAlpha;
-          dock.background_opacity = frostAlpha;
           # The Noctalia backdrop is shown in Niri's overview by the layer rule below.
           backdrop.enabled = niriEnabled;
           theme = {
@@ -107,6 +105,12 @@ in
             };
           };
           plugins.auto_update = "none";
+        }
+        // lib.optionalAttrs (surfaceOpacity < 1.0) {
+          bar.default.background_opacity = surfaceOpacity;
+          notification.background_opacity = surfaceOpacity;
+          osd.background_opacity = surfaceOpacity;
+          dock.background_opacity = surfaceOpacity;
         }
         // lib.optionalAttrs (cfg.wallpaper != null) {
           wallpaper = {
