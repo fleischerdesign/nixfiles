@@ -53,10 +53,16 @@ brightness shortcuts. The shell captures through the compositor's image-copy pro
 screenshot tool is installed; a capture is copied by default, and the annotation editor is bound too.
 `Mod+Comma` stays Niri's consume-window action; Noctalia settings use
 `Mod+Shift+Comma`. The overview uses Noctalia's blurred wallpaper backdrop, with its own
-background layer placed inside Niri's backdrop. On Niri 26.04, Noctalia surfaces use non-xray
-blur so the content behind them is sampled instead of the wallpaper; other applications are not
-globally blurred. These compositor rules live in the shell adapter and leave Niri usable without
-Noctalia.
+background layer placed inside Niri's backdrop. Background effects are declared, not written as
+compositor rules: `my.desktop.effects` states which surface or window wants one and what it samples,
+and the Niri feature projects every entry into exactly one layer or window rule, so no entry names a
+compositor. The shell registers its own surfaces, a user registers personal windows, and the shell's
+surfaces sample `behind` while letting Noctalia request the blur itself - other applications are not
+globally blurred. A window that asks for `backdrop` samples the wallpaper instead, which is cheaper
+and does not vanish while it animates; non-xray blur is experimental upstream and does disappear
+during window open and close animations. `my.features.desktop.niri.blur` tunes the shared blur and
+writes nothing unless set, so Niri's own defaults stand. These compositor rules leave Niri usable
+without Noctalia.
 
 Noctalia reads declarative `~/.config/noctalia/config.toml`, then overlays mutable settings in
 `~/.local/state/noctalia/settings.toml`. GUI changes therefore take precedence over the declared

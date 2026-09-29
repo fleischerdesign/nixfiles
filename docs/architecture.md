@@ -323,6 +323,7 @@ twice, and no service module knows its host, its name or its neighbours.
 | `…dependsOn` | fleet-wide service references, validated against every host's declared services | portal dependencies |
 | `my.contracts.consumes.<svc>.postgresql.<db>` / `…ldap` | a database and user, or a directory identity with audience | provider resources, declared by the provider engine |
 | `my.desktop.environments.<env>` | a desktop feature registering itself as the host's session | the one-session invariant, asserted by the desktop contract |
+| `my.desktop.effects.<name>` | a shell layer surface or a user window asking for a background effect, and what it samples | the compositor's layer and window rules, projected by its feature (account scope) |
 
 Each domain owns its schema: listener facts live in `contracts/endpoints/`, named
 publications in `contracts/publications/`, ingress policy in `contracts/ingress/`, audience
@@ -333,6 +334,13 @@ and CrowdSec exemptions live with those features. References between domains are
 evaluation: unknown endpoints, publications or services, nameless publications, an ingress on
 a non-HTTP listener, authentication without an ingress, ambiguous directory identities and
 duplicate Prometheus job names or OIDC client IDs all fail the build with a named offender.
+
+A domain whose schema is account-scope carries a `home.nix` half beside its `nixos.nix`. The system
+builder attaches those halves through `home-manager.sharedModules` and leaves them out where that
+module is absent, because a contract is also evaluated in fixtures; discovery therefore reads a
+second marker without that marker ever implying a NixOS module. The desktop domain's
+`my.desktop.effects` is the first such schema: the host half keeps the one-session invariant, the
+account half states the background effects the shell and the user request.
 
 Consequences worth knowing:
 

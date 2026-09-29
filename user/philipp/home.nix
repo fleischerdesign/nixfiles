@@ -154,6 +154,18 @@
     hooks.started = "${lib.getExe config.programs.noctalia.package} msg session lock";
   };
 
+  # Personal taste belongs in the registry: the compositor draws this window frosted,
+  # and the terminal itself is not configured for it.
+  my.desktop.effects = lib.mkIf osConfig.my.features.desktop.niri.enable {
+    ghostty = {
+      kind = "window";
+      ids = [ "^com\\.mitchellh\\.ghostty$" ];
+      blur = "on";
+      sample = "backdrop";
+      opacity = 0.9;
+    };
+  };
+
   my.features.desktop.webapps = {
     enable = true;
     apps = {

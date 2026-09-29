@@ -1,4 +1,5 @@
-# Recursive NixOS module discovery: a regular file named `nixos.nix` marks a module.
+# Recursive module discovery: a regular file named `nixos.nix` marks a NixOS module, and a
+# regular `home.nix` beside it marks the account-scope half of the same directory.
 #
 # The marker is a name of its own on purpose. When the scanner looked for `default.nix`, the same name
 # meant "NixOS module" under `features/` and "importable package or library" everywhere else, so a helper
@@ -8,25 +9,27 @@
 { lib }:
 
 let
-  marker = "nixos.nix";
-
-  findModules =
-    dir:
+  # A file that shares a marker's name but is not a regular file is a mistake, not something to
+  # skip quietly, so every marker goes through the same check.
+  findNamed =
+    fileName: dir:
     let
       entries = builtins.readDir dir;
       here =
-        if !(entries ? ${marker}) then
+        if !(entries ? ${fileName}) then
           [ ]
-        else if entries.${marker} == "regular" then
-          [ (dir + "/${marker}") ]
+        else if entries.${fileName} == "regular" then
+          [ (dir + "/${fileName}") ]
         else
-          # A directory or a symlink named like the marker is a mistake, not a module to skip quietly.
-          throw "module discovery: ${toString dir}/${marker} is a ${entries.${marker}}, not a regular file";
+          throw "module discovery: ${toString dir}/${fileName} is a ${entries.${fileName}}, not a regular file";
       subdirs = lib.filterAttrs (_: value: value == "directory") entries;
-      subModules = lib.concatMap (name: findModules (dir + "/${name}")) (builtins.attrNames subdirs);
+      subModules = lib.concatMap (name: findNamed fileName (dir + "/${name}")) (
+        builtins.attrNames subdirs
+      );
     in
     here ++ subModules;
 in
 {
-  inherit findModules;
+  inherit findNamed;
+  findModules = findNamed "nixos.nix";
 }

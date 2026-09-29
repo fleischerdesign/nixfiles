@@ -80,6 +80,9 @@ in
           shell = {
             polkit_agent = true;
             setup_wizard_enabled = false;
+            # Drawn translucent so the compositor blur behind it becomes visible; the
+            # effect itself is requested at the end of this module, not configured here.
+            settings_window_translucent = true;
             # The shell captures screenshots itself. Copying is the minimum that
             # makes a capture usable; whether it is also written to a file is a
             # personal choice and stays out of this declaration.
@@ -105,23 +108,32 @@ in
         };
       }
       (lib.mkIf niriEnabled {
-        # niri-flake's typed settings do not yet expose Niri 26.04's
-        # background-effect rules. Extend its generated KDL rather than
-        # replacing the rest of the compositor configuration.
+        # The compositor renders the effects; the shell only states which of its own
+        # surfaces want one and leaves the vocabulary to `features/desktop/niri`.
+        my.desktop.effects = {
+          noctalia-surfaces = {
+            kind = "layer";
+            namespaces = [ "^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$" ];
+            blur = "auto";
+            sample = "behind";
+          };
+          noctalia-window-switcher = {
+            kind = "layer";
+            namespaces = [ "^noctalia-window-switcher$" ];
+            blur = "on";
+            sample = "behind";
+          };
+          noctalia-settings = {
+            kind = "window";
+            ids = [ "^dev\\.noctalia\\.Noctalia$" ];
+            blur = "on";
+            sample = "backdrop";
+          };
+        };
+
         programs.niri.config = lib.mkOptionDefault (
           with inputs.niri.lib.kdl;
           [
-            (plain "layer-rule" [
-              (leaf "match" { namespace = "^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"; })
-              (plain "background-effect" [ (leaf "xray" false) ])
-            ])
-            (plain "layer-rule" [
-              (leaf "match" { namespace = "^noctalia-window-switcher$"; })
-              (plain "background-effect" [
-                (leaf "blur" true)
-                (leaf "xray" false)
-              ])
-            ])
             # The file is created by Noctalia after Niri starts. Keep the include
             # optional and absolute: the main config is a Nix-store symlink.
             (leaf "include" [

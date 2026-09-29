@@ -28,6 +28,12 @@ let
       allContractModules =
         if builtins.pathExists contractsDir then loader.findModules contractsDir else [ ];
 
+      # A contract may carry an account-scope half beside its host half. The system builder attaches
+      # those, because a contract is also evaluated in fixtures that have no `home-manager` module;
+      # attaching there instead of inside the contract keeps that host option out of the schema.
+      contractHomeModules =
+        if builtins.pathExists contractsDir then loader.findNamed "home.nix" contractsDir else [ ];
+
       # The site inventory, composed explicitly and never auto-discovered: subnets, hosts and
       # devices are facts, not modules, so they do not match the nixos.nix marker and are
       # listed here by path instead.
@@ -135,7 +141,8 @@ let
                   sops.defaultSopsFile = ../secrets/secrets.yaml;
                 }
               )
-            ];
+            ]
+            ++ contractHomeModules;
           };
         }
       ];
