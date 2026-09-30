@@ -7,6 +7,8 @@
   ...
 }:
 {
+  imports = [ ../firefox.nix ];
+
   home.packages = with pkgs; [
     telegram-desktop
     google-chrome
@@ -30,12 +32,6 @@
     cameractrls-gtk4
     dbeaver-bin
   ];
-
-  programs.firefox = {
-    enable = true;
-    # Keep existing profiles at Firefox's traditional location.
-    configPath = ".mozilla/firefox";
-  };
 
   programs.ghostty = {
     enable = true;
