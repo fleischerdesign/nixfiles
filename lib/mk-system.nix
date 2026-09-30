@@ -42,6 +42,7 @@ let
         "hosts"
         "devices"
         "site"
+        "dns"
       ];
 
       finalPkgs =

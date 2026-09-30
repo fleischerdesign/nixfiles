@@ -248,6 +248,13 @@ reports planned changes and explicitly states that nothing was applied; live fai
 through the adapter to nod. `checks/cloudflare.nix` exercises the action contract and reconciliation
 against isolated fixtures, including idempotency and protection of foreign and ACME records.
 
+`inventory/dns.nix` declares external-provider DNS requirements separately from the reconciler:
+SMTP2GO's sender-domain return-path, DKIM and tracking CNAMEs, using the provider-specified TTLs.
+Names derive from the site's domain; all three records are DNS-only (not proxied). Reconcile these
+records and confirm their public answers before requesting sender-domain verification in SMTP2GO.
+These DNS records do not configure SMTP credentials or change any application's outbound transport;
+existing MX, SPF and DMARC records are not replaced by this declaration.
+
 ### 7.1 OpenClaw node command surfaces (runtime, not Nix)
 
 A node advertises its command surface; the gateway's `gateway.nodes.commands.allow`, projected from
