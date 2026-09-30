@@ -170,7 +170,50 @@ enables it: both personal computers take the session from `roles/pc.nix`. Its Ho
 imported everywhere and inert wherever `my.features.desktop.gnome.enable` is false, so a future host
 could run it without touching the Niri side.
 
-## 5. Verification
+## 5. Native Firefox webapps
+
+`features/desktop/webapps/home.nix` owns desktop launchers; personal app declarations remain in
+`user/philipp/home.nix`. Each app inherits `defaultBrowser` unless it explicitly selects another
+engine. The personal default is Firefox, and ordinary HTTP, HTTPS and HTML links also select Firefox.
+Chrome remains installed independently; switching webapps does not delete its profiles or cookies.
+
+When a Firefox app is declared, the feature locks `browser.taskbarTabs.enabled` to true through
+Firefox's existing policy surface. The launchers use the same configured Firefox package as the
+browser, preserving its extension policies and Noctalia integration. No browser profile is declared,
+replaced or edited: Firefox's ordinary profile selection applies. Container `0` shares the normal
+browser session; `firefoxContainer` can select an existing container instead. Chromium-style
+`isolated` directories are rejected for Firefox rather than silently ignored.
+
+The native command-line contract is documented by Mozilla's
+[Web Apps architecture](https://firefox-source-docs.mozilla.org/browser/components/taskbartabs/docs/architecture.html).
+`firefox-args.nix` supplies `-taskbar-tab nix-webapp-bootstrap -new-window <origin> -container <id>`.
+The bootstrap token is deliberately not a registered UUID. Firefox's missing-ID handler finds an
+existing app by URL scope and container, or creates one with its own UUID. It is not a persistent
+identity maintained by Nix. Subsequent launches reuse Firefox's registration, including registrations
+created interactively. Firefox may log the missing bootstrap ID before successfully resolving it.
+
+Firefox owns its mutable registry, icons and native desktop entries. Nothing writes or symlinks
+`taskbartabs.json`; Nix supplies stable launcher aliases with the declared names and icons. Firefox
+also creates its own `org.mozilla.firefox.webapp-<uuid>.desktop` entry, so the application menu may
+show both the alias and Firefox's native entry. Native window grouping follows that Firefox entry,
+not the legacy Chromium `wmClass`. Removing a Nix declaration removes its launcher, not Firefox's
+registration; remove a registered app through Firefox if desired.
+
+Bootstrap without a manifest creates a website-origin app, not an arbitrary deep-link app. Firefox
+URLs therefore must be HTTP(S) origins, with an optional trailing slash. Once registered, Firefox's
+stored start URL is authoritative. Logins and extensions are shared with the selected profile;
+Chrome's existing login sessions do not transfer to Firefox.
+
+`checks/webapps.nix` verifies both graphical host classes' generated launchers, default inheritance,
+explicit browser overrides, unsupported isolation and MIME defaults. It also starts the actual pinned
+Firefox twice in a disposable profile against a local HTTP fixture: the expected result is a native
+`minimal-ui` window in that profile and one stable Firefox-owned registration across both starts.
+This headless check does not prove Niri's live dock grouping. After deployment, restart Firefox so
+the policy is loaded, launch an app, and verify its app window, Noctalia launcher/dock identity and
+shared session. Existing user profiles and Chrome launchers must not be manually deleted as part of
+that verification.
+
+## 6. Verification
 
 [`checks/niri-noctalia.nix`](../checks/niri-noctalia.nix) states properties, not a copy of the
 configuration, and runs for **every** host whose contract registration says Niri - the list is

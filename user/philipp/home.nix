@@ -174,6 +174,7 @@
 
   my.features.desktop.webapps = {
     enable = true;
+    defaultBrowser = "firefox";
     apps = {
       ai = {
         displayName = "AI Assistant";

@@ -7,6 +7,13 @@
   ...
 }:
 let
+  browserType = lib.types.enum [
+    "chrome"
+    "brave"
+    "firefox"
+    "epiphany"
+  ];
+  firefoxArgs = import ./firefox-args.nix;
   appSubmodule =
     { name, ... }:
     {
@@ -22,13 +29,8 @@ let
         };
 
         browser = lib.mkOption {
-          type = lib.types.enum [
-            "chrome"
-            "brave"
-            "firefox"
-            "epiphany"
-          ];
-          default = "chrome";
+          type = browserType;
+          default = userCfg.defaultBrowser;
           description = "Browser engine to launch the web application.";
         };
 
@@ -61,7 +63,13 @@ let
         isolated = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "If true, creates an isolated browser user-data-dir session profile.";
+          description = "Create an isolated user-data directory (Chrome and Brave only).";
+        };
+
+        firefoxContainer = lib.mkOption {
+          type = lib.types.ints.unsigned;
+          default = 0;
+          description = "Existing Firefox container ID; 0 shares the ordinary browser session.";
         };
 
         extraArgs = lib.mkOption {
@@ -84,21 +92,16 @@ let
         else if appCfg.browser == "brave" then
           "${pkgs.brave}/bin/brave"
         else if appCfg.browser == "firefox" then
-          "${pkgs.firefox}/bin/firefox"
-        else if appCfg.browser == "epiphany" then
-          "${pkgs.epiphany}/bin/epiphany"
+          lib.getExe config.programs.firefox.finalPackage
         else
-          "${pkgs.google-chrome}/bin/google-chrome-stable";
-
-      profileArg =
-        if appCfg.isolated then [ "--user-data-dir=\${HOME}/.config/webapps/${appName}" ] else [ ];
+          "${pkgs.epiphany}/bin/epiphany";
 
       browserArgs =
         if appCfg.browser == "firefox" then
-          [
-            "--new-window"
-            appCfg.url
-          ]
+          firefoxArgs {
+            inherit (appCfg) url;
+            container = appCfg.firefoxContainer;
+          }
           ++ appCfg.extraArgs
         else if appCfg.browser == "epiphany" then
           [
@@ -113,10 +116,16 @@ let
             "--class=${appCfg.wmClass}"
             "--name=${appCfg.wmClass}"
           ]
-          ++ profileArg
           ++ appCfg.extraArgs;
 
-      execStr = "${browserBin} " + lib.concatStringsSep " " browserArgs;
+      # A shell wrapper preserves argument boundaries (desktop Exec quoting is
+      # not shell quoting) and expands HOME only for Chromium's isolated profile.
+      launcher = pkgs.writeShellApplication {
+        name = "webapp-${appName}";
+        text = ''
+          exec ${lib.escapeShellArg browserBin} ${lib.escapeShellArgs browserArgs} ${lib.optionalString appCfg.isolated ''"--user-data-dir=$HOME/.config/webapps/${appName}"''}
+        '';
+      };
 
       isPathIcon = builtins.isPath appCfg.icon || lib.isDerivation appCfg.icon;
 
@@ -125,7 +134,7 @@ let
       desktopItem = pkgs.makeDesktopItem {
         name = "webapp-${appName}";
         desktopName = appCfg.displayName;
-        exec = execStr;
+        exec = lib.getExe launcher;
         icon = iconName;
         comment = appCfg.comment;
         categories = appCfg.categories;
@@ -143,6 +152,8 @@ let
       installPhase = ''
         runHook preInstall
         mkdir -p $out/share/applications
+        mkdir -p $out/bin
+        ln -s ${lib.getExe launcher} $out/bin/webapp-${appName}
         copyDesktopItems
         ${lib.optionalString isPathIcon ''
           mkdir -p $out/share/icons/hicolor/512x512/apps
@@ -162,12 +173,7 @@ in
     enable = lib.mkEnableOption "Declarative PWA / WebApp desktop entry manager";
 
     defaultBrowser = lib.mkOption {
-      type = lib.types.enum [
-        "chrome"
-        "brave"
-        "firefox"
-        "epiphany"
-      ];
+      type = browserType;
       default = "chrome";
       description = "Default browser engine used for web applications.";
     };
@@ -180,6 +186,39 @@ in
   };
 
   config = lib.mkIf (userCfg.enable && role != "server") {
+    assertions = lib.concatLists (
+      lib.mapAttrsToList (name: app: [
+        {
+          assertion =
+            !app.isolated
+            || lib.elem app.browser [
+              "chrome"
+              "brave"
+            ];
+          message = "Webapp ${name}: isolated user-data directories require Chrome or Brave; use firefoxContainer for Firefox.";
+        }
+        {
+          assertion = app.browser != "firefox" || config.programs.firefox.enable;
+          message = "Webapp ${name}: enable programs.firefox before selecting native Firefox webapps.";
+        }
+        {
+          assertion = app.browser != "firefox" || builtins.match "https?://[^/?#]+/?" app.url != null;
+          message = "Webapp ${name}: native Firefox bootstrap requires a website origin URL (no path, query or fragment).";
+        }
+        {
+          assertion = builtins.match "[A-Za-z0-9_-]+" name != null;
+          message = "Webapp ${name}: names must contain only letters, digits, underscores and hyphens.";
+        }
+      ]) userCfg.apps
+    );
+    programs.firefox.policies.Preferences =
+      lib.mkIf (lib.any (app: app.browser == "firefox") (lib.attrValues userCfg.apps))
+        {
+          "browser.taskbarTabs.enabled" = {
+            Value = true;
+            Status = "locked";
+          };
+        };
     home.packages = lib.mapAttrsToList buildLauncher userCfg.apps;
   };
 }
