@@ -18,6 +18,7 @@ agentic contributors).
 | How do we work here - what counts as verified, what are the failure patterns? | [practices.md](practices.md) |
 | Who is a user, what is a service account, how does authentication and authorisation work? | [identity.md](identity.md) |
 | What is the security model, layer by layer? | [security.md](security.md) |
+| How are password vault access, OIDC and recovery configured? | [vaultwarden.md](vaultwarden.md) |
 | Which desktop runs, who owns the session, where do user settings live? | [desktop.md](desktop.md) |
 | What are the microcontrollers, the access point, the router - and how are they configured? | [embedded.md](embedded.md) |
 | Which coding-agent interfaces are installed, and how do they receive credentials? | [coding-agents.md](coding-agents.md) |

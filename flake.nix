@@ -255,6 +255,7 @@
           dependencies-contract = import ./checks/dependencies-contract.nix checkArgs;
 
           backup-contract = import ./checks/backup-contract.nix checkArgs;
+          vaultwarden = import ./checks/vaultwarden.nix checkArgs;
 
           custom-package-updater =
             pkgs.runCommandLocal "custom-package-updater-check"

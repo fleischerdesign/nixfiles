@@ -98,6 +98,25 @@
           ];
           description = "Authentik scope mappings attached to the provider to populate scopes and claims (e.g. openid, email, profile)";
         };
+
+        accessTokenValidity = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Authentik access token lifetime; null preserves the provider default.";
+        };
+
+        scopeMappings = lib.mkOption {
+          type = lib.types.attrsOf (
+            lib.types.submodule {
+              options = {
+                scopeName = lib.mkOption { type = lib.types.str; };
+                expression = lib.mkOption { type = lib.types.lines; };
+              };
+            }
+          );
+          default = { };
+          description = "Application-specific OIDC scope mappings compiled alongside the provider.";
+        };
       };
       config = {
         redirectUris =

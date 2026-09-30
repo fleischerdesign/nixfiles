@@ -5,6 +5,15 @@ let
 in
 {
   options = {
+    accessAuthenticated = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Admit every active authenticated human through an explicit Authentik policy,
+        excluding service accounts. Mutually exclusive with accessGroups and accessUsers.
+      '';
+    };
+
     # Who may use this publication. One declaration per service, projected three ways: the ingress gate
     # (an Authentik policy binding on the application for `auth = "authentik"` or `"oidc"`), the
     # directory filter (an LDAP consumer's memberOf), and the portal (vyrx.de shows a user only what

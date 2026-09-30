@@ -49,6 +49,7 @@ let
     policyBinding = "authentik_policies.policybinding";
     certificateKeyPair = "authentik_crypto.certificatekeypair";
     scopeMapping = "authentik_providers_oauth2.scopemapping";
+    expressionPolicy = "authentik_policies_expression.expressionpolicy";
     # The base the binding points at. A Flow has two identities - its own `flow_uuid` and the
     # `PolicyBindingModel.pbm_uuid` a PolicyBinding's `target` is keyed on - so a tombstone has to
     # reference the base model, never the flow itself.
@@ -350,6 +351,7 @@ let
       ],
       signingKey ? null,
       propertyMappings ? [ ],
+      accessTokenValidity ? null,
     }:
     entry {
       inherit id;
@@ -366,6 +368,7 @@ let
         grant_types = grantTypes;
       }
       // lib.optionalAttrs (signingKey != null) { signing_key = signingKey; }
+      // lib.optionalAttrs (accessTokenValidity != null) { access_token_validity = accessTokenValidity; }
       // lib.optionalAttrs (propertyMappings != [ ]) { property_mappings = propertyMappings; };
     };
 

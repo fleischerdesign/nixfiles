@@ -255,9 +255,16 @@ groups it accepts. Renaming a group in the interface removes access for everyone
 red. Renaming a group in this repository means a new entry **and** `state: absent` for the old one — otherwise
 the old name stays behind and can still grant access.
 
-**Access runs only through membership.** There are no per-user application bindings, because that would be a
+**Group-restricted access runs through membership.** There are no per-user application bindings, because that would be a
 second mechanism next to the group filter — and two mechanisms are two truths. A service declares which groups
 it accepts; a human is put into one of them.
+
+An explicitly universal audience is different from a missing audience: `accessAuthenticated = true`
+admits active authenticated humans through a generated expression-policy binding and excludes service
+accounts. It is mutually exclusive with `accessGroups` and `accessUsers`; ordinary group-restricted
+applications retain their membership-based policy. Vaultwarden uses this universal audience, as
+specified in [vaultwarden.md](vaultwarden.md). Application-specific OIDC scope mappings and access-token
+lifetimes are declared in the identity contract and compiled alongside their provider.
 
 **An audience a resource declares about itself is topology, and it is declared.** `accessUsers` names the
 accounts a service belongs to. The contract turns each username into its own group
@@ -268,9 +275,10 @@ the test that separates them is §11.2's: "this gateway belongs to kai" is a sen
 "katja is in the film group" is not. The role groups stay untouched and interface-owned, because nothing
 declares their members.
 
-**And it is enforced at the ingress, not only described.** Every publication that authenticates through authentik
+**And it is enforced at the ingress, not only described.** A group-restricted publication that authenticates through authentik
 declares `accessGroups` on the publication; the compiler projects them into a `PolicyBinding` per group on the
-generated application and refuses to build a gated service that names no audience (`blueprints.nix`,
+generated application. An explicitly universal human audience uses the expression-policy binding described
+above. The compiler refuses to build a gated service that names neither audience (`blueprints.nix`,
 `ingressPolicyCheck`). Until 2026-09-22 the generated applications carried no binding at all, so authentik's
 `AppAccessWithoutBindings` opened every service to any authenticated user - measured before: zero bindings on
 all 17 applications, and a user in no group passed every one. Measured after: `philipp` passes `grafana`,

@@ -1,103 +1,177 @@
 {
   config,
   lib,
+  pkgs,
   features,
+  fleetConfigs,
   ...
 }:
-
 let
   cfg = config.my.features.services.vaultwarden;
-  topologyDomain = config.my.topology.domain;
-  authHost = "auth.${topologyDomain}";
+  contract = config.my.contracts.provides.vaultwarden;
+  oidc = contract.identity.oidc.web;
+  database = config.my.contracts.consumes.vaultwarden.postgresql.main;
+  systems = fleetConfigs.systems config;
+  authentik = import ../authentik/lib/core.nix { inherit fleetConfigs; };
+  authPublication =
+    (fleetConfigs.providesOf systems.${authentik.hostName systems}).authentik.publications.web;
+  identifiers = import ../../../contracts/endpoints/lib/identifiers.nix { };
+  application = identifiers.endpointName "vaultwarden" oidc.publication;
+  dataDir = "/var/lib/${config.systemd.services.vaultwarden.serviceConfig.StateDirectory}";
+  snapshotDir = "/var/backup/vaultwarden";
+  socketDir = "/run/postgresql";
+  snapshot = pkgs.writeShellApplication {
+    name = "vaultwarden-snapshot";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.rsync
+      pkgs.util-linux
+      pkgs.systemd
+      config.services.postgresql.package
+    ];
+    text = builtins.readFile ./snapshot.sh;
+  };
 in
 {
-  options.my.features.services.vaultwarden = {
-    enable = lib.mkEnableOption "Vaultwarden";
-    ssoAuthority = lib.mkOption {
-      type = lib.types.str;
-      default = "https://${authHost}/application/o/vaultwarden/";
-      description = "OIDC Issuer/Authority URL for single sign-on.";
-    };
-  };
+  options.my.features.services.vaultwarden.enable =
+    lib.mkEnableOption "Vaultwarden with Authentik SSO";
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
       (features.requires [ "services.postgresql" ] config)
-
       {
         services.vaultwarden = {
           enable = true;
           dbBackend = "postgresql";
           config = {
-            DOMAIN = "https://${config.my.contracts.provides.vaultwarden.publications.web.canonicalDomain}";
-            SIGNUPS_ALLOWED = false;
+            DOMAIN = contract.publications.web.publicUrl;
+            ROCKET_ADDRESS = "127.0.0.1";
+            ROCKET_PORT = contract.endpoints.web.port;
+            DATABASE_URL = "postgresql:///${database.database}?host=${socketDir}";
 
-            # OIDC / Authentik
+            SIGNUPS_ALLOWED = false;
             SSO_ENABLED = true;
             SSO_ONLY = true;
-            SSO_AUTHORITY = cfg.ssoAuthority;
-            SSO_SCOPES = "email profile offline_access";
+            SSO_SIGNUPS_ALLOWED = true;
+            SSO_SIGNUPS_MATCH_EMAIL = false;
+            # Authentik's application-specific email scope makes no verification claim.
+            # Matching initialized non-SSO vaults by email is disabled.
             SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION = true;
+            SSO_AUTHORITY = "${authPublication.publicUrl}/application/o/${application}/";
+            SSO_CLIENT_ID = oidc.clientId;
+            SSO_SCOPES = lib.concatStringsSep " " (
+              oidc.propertyMappings ++ map (mapping: mapping.scopeName) (lib.attrValues oidc.scopeMappings)
+            );
+            SSO_PKCE = true;
+            SSO_DEBUG_TOKENS = false;
 
-            DATABASE_URL = "postgresql://%2Frun%2Fpostgresql/vaultwarden";
-
-            ROCKET_ADDRESS = "127.0.0.1";
-            ROCKET_PORT = 8082;
+            # Admin is disabled. A store-owned empty override file also prevents a
+            # writable config.json from becoming a second configuration authority.
+            CONFIG_FILE = toString (pkgs.writeText "vaultwarden-config.json" "{}");
+            DISABLE_ADMIN_TOKEN = false;
+            IP_HEADER = "X-Forwarded-For";
+            IP_HEADER_TRUSTED_PROXIES = "127.0.0.1";
+            REQUIRE_DEVICE_EMAIL = false;
+            SHOW_PASSWORD_HINT = false;
           };
-          environmentFile = config.sops.secrets."services/apps/vaultwarden_env".path;
+          environmentFile = config.sops.templates."vaultwarden.env".path;
         };
 
-        my.contracts.consumes.vaultwarden.postgresql.main = {
-          database = "vaultwarden";
-          user = "vaultwarden";
+        sops.secrets.${oidc.secretPath} = { };
+        sops.templates."vaultwarden.env" = {
+          content = ''
+            SSO_CLIENT_SECRET=${config.sops.placeholder.${oidc.secretPath}}
+          '';
         };
 
-        # Service Contract for Caddy, Firewall & OIDC
-        my.contracts.provides.vaultwarden = {
-          publications."web" = {
-            endpoint = "web";
-            auth = "oidc";
-            accessGroups = [ "family" ];
-            subdomain = "vault";
-            extraDomains = [
-              "vault.${topologyDomain}"
+        systemd.services.vaultwarden = {
+          after = [ "postgresql.service" ];
+          requires = [ "postgresql.service" ];
+          restartTriggers = [ config.sops.templates."vaultwarden.env".file ];
+        };
+
+        systemd.services.vaultwarden-snapshot = {
+          description = "Create a consistent Vaultwarden database and file snapshot";
+          after = [ "postgresql.service" ];
+          requires = [ "postgresql.service" ];
+          serviceConfig = {
+            Type = "oneshot";
+            UMask = "0077";
+            ExecStart = lib.escapeShellArgs [
+              (lib.getExe snapshot)
+              dataDir
+              snapshotDir
+              database.database
+              database.user
+              socketDir
             ];
+          };
+        };
 
+        my.contracts.consumes.vaultwarden.postgresql.main.database = "vaultwarden";
+        my.contracts.provides.vaultwarden = {
+          dependsOn = [
+            "authentik"
+            "postgresql"
+          ];
+          endpoints.web.port = 8082;
+          publications.web = {
+            endpoint = "web";
+            scope = "public";
+            subdomain = "vault";
+            auth = "oidc";
+            accessAuthenticated = true;
           };
           identity.oidc.web = {
             publication = "web";
             enable = true;
-            clientId = "IW0W9V9cLTDaMbdtXy7lGwHi55Vakio8E2tTSvsg";
-            clientSecretEnv = "AUTHENTIK_OIDC_VAULTWARDEN_SECRET";
-            secretPath = "services/apps/vaultwarden_env";
+            clientId = "vaultwarden";
+            secretPath = "services/apps/vaultwarden_oidc_secret";
             redirectPaths = [ "/identity/connect/oidc-signin" ];
-            subMode = "user_username";
-            includeClaimsInIdToken = true;
+            propertyMappings = [
+              "openid"
+              "profile"
+              "offline_access"
+            ];
+            accessTokenValidity = "minutes=15";
+            scopeMappings.email = {
+              scopeName = "email";
+              expression = ''
+                return {"email": request.user.email}
+              '';
+            };
           };
-          presentation.tiles."web" = {
+          presentation.tiles.web = {
             endpoint = "web";
             description = {
-              de = "Passwort-Tresor im eigenen Netz.";
-              en = "Password vault in your own network.";
+              de = "Passwort-Tresor mit Authentik-Anmeldung.";
+              en = "Password vault with Authentik sign-in.";
             };
             show = true;
             displayName = "Vaultwarden";
             category = "Security";
             icon = "vaultwarden";
           };
-          endpoints.web = {
-            port = 8082;
-            protocol = "tcp";
+          telemetry.probes.web-http = {
+            endpoint = "web";
+            kind = "http";
+            path = "/alive";
           };
           storage = {
-            stateDirs = [ "/var/lib/vaultwarden" ];
+            dataDirs = [ dataDir ];
+            cacheDirs = [
+              "${dataDir}/icon_cache"
+              "${dataDir}/tmp"
+            ];
           };
-        };
-
-        # Secrets
-        # Should contain SSO_CLIENT_ID and SSO_CLIENT_SECRET
-        sops.secrets."services/apps/vaultwarden_env" = {
-          owner = "vaultwarden";
+          backup = {
+            paths = [ snapshotDir ];
+            exclude = [
+              dataDir
+              "${snapshotDir}/.staging"
+            ];
+            preBackup = "${pkgs.systemd}/bin/systemctl start vaultwarden-snapshot.service";
+          };
         };
       }
     ]

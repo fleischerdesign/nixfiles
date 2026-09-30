@@ -27,7 +27,7 @@
 
 | Host | Role | Zone | Address | Mesh | Runs |
 |---|---|---|---|---|---|
-| `cld-edge-01` | server | `mesh` + public | `173.249.22.211` | `10.10.100.1` | Ingress (Caddy), Authentik core, CrowdSec master, observability stack, primary database, ntfy |
+| `cld-edge-01` | server | `mesh` + public | `173.249.22.211` | `10.10.100.1` | Ingress (Caddy), Authentik core, CrowdSec master, observability stack, primary database, ntfy, Vaultwarden |
 | `cld-ops-01` | server | `mesh` + public | `37.114.55.91` | `10.10.100.2` | Observability collector, Attic binary cache, OpenClaw gateways, CrowdSec agent |
 | `hom-srv-01` | server | `infra` | `10.10.10.10` | `10.10.100.10` | LAN gateway (DHCP, DNS, NTP, NAT), media stack, Home Assistant, Klipper, local ingress, ESPHome flashing |
 | `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` | GNOME desktop, development environment |

@@ -211,7 +211,9 @@ let
   ingressPolicyCheck =
     let
       unstated = map (item: item.name) (
-        lib.filter (item: item.ep.accessGroups == [ ]) (rawAuthEndpointsList ++ rawOidcEndpointsList)
+        lib.filter (item: item.ep.accessGroups == [ ] && !item.ep.accessAuthenticated) (
+          rawAuthEndpointsList ++ rawOidcEndpointsList
+        )
       );
     in
     if unstated != [ ] then
@@ -326,6 +328,11 @@ let
 
   audiencePolicyCheck =
     let
+      mixedAudience = map (item: item.name) (
+        lib.filter (
+          item: item.ep.accessAuthenticated && item.ep.accessGroups != [ ]
+        ) allClusterEndpointsList
+      );
       audienceUsernames = rbacUsernames;
       audiences = lib.concatMap (
         item:
@@ -354,12 +361,16 @@ let
       adminOutsideAccess = lib.unique (
         map (item: item.name) (
           lib.filter (
-            item: !(lib.all (groupName: builtins.elem groupName item.ep.accessGroups) item.ep.adminGroups)
+            item:
+            !item.ep.accessAuthenticated
+            && !(lib.all (groupName: builtins.elem groupName item.ep.accessGroups) item.ep.adminGroups)
           ) allClusterEndpointsList
         )
       );
     in
-    if undeclaredRole != [ ] then
+    if mixedAudience != [ ] then
+      throw "Authentik compiler error: ${lib.concatStringsSep ", " mixedAudience} combines authenticated-human access with group access"
+    else if undeclaredRole != [ ] then
       throw "Authentik compiler error: ${lib.concatStringsSep ", " undeclaredRole} names an audience group that neither the RBAC document declares nor this compiler derives from an endpoint"
     else if ownerlessAudience != [ ] then
       throw "Authentik compiler error: ${lib.concatStringsSep ", " ownerlessAudience} derives an own audience from a username the RBAC document does not seed"
@@ -373,20 +384,45 @@ let
   # `pbm_uuid` (blueprint.nix `policyTargetBySlug`).
   audienceBindings =
     name: ep:
-    map (
-      groupName:
-      blueprintLib.groupBinding {
-        target = blueprintLib.refs.policyTargetBySlug "application" name;
-        # The group this compiler declares is referenced by its id in this same blueprint; a role group
-        # is authored by the RBAC document and looked up in the database. One author per name, always.
-        group =
-          if audience.isAudienceGroup groupName then
-            blueprintLib.refs.sameBlueprint "audience_${safeAudienceId groupName}"
-          else
-            blueprintLib.refs.byName blueprintLib.models.group groupName;
-        order = 0;
-      }
-    ) ep.accessGroups;
+    if ep.accessAuthenticated then
+      [
+        (blueprintLib.entry {
+          id = "audience_${name}_authenticated";
+          model = blueprintLib.models.expressionPolicy;
+          identifiers.name = "${name}-authenticated-humans";
+          attrs.expression = ''
+            return bool(request.user.is_authenticated and request.user.is_active and request.user.type != "service_account")
+          '';
+        })
+        (blueprintLib.entry {
+          model = blueprintLib.models.policyBinding;
+          identifiers = {
+            target = blueprintLib.refs.policyTargetBySlug "application" name;
+            policy = blueprintLib.refs.sameBlueprint "audience_${name}_authenticated";
+            order = 0;
+          };
+          attrs = {
+            enabled = true;
+            negate = false;
+            timeout = 30;
+          };
+        })
+      ]
+    else
+      map (
+        groupName:
+        blueprintLib.groupBinding {
+          target = blueprintLib.refs.policyTargetBySlug "application" name;
+          # The group this compiler declares is referenced by its id in this same blueprint; a role group
+          # is authored by the RBAC document and looked up in the database. One author per name, always.
+          group =
+            if audience.isAudienceGroup groupName then
+              blueprintLib.refs.sameBlueprint "audience_${safeAudienceId groupName}"
+            else
+              blueprintLib.refs.byName blueprintLib.models.group groupName;
+          order = 0;
+        }
+      ) ep.accessGroups;
 
   # Blueprints must be *.yaml: authentik's discovery and the blueprint migration only scan for that
   # extension, while everything else about the encoding lives in the constructors.
@@ -547,7 +583,19 @@ let
               else
                 null;
           in
-          [
+          (lib.mapAttrsToList (
+            mappingName: mapping:
+            blueprintLib.entry {
+              id = "scope_${safeId}_${mappingName}";
+              model = blueprintLib.models.scopeMapping;
+              identifiers.name = "${name}-${mappingName}";
+              attrs = {
+                scope_name = mapping.scopeName;
+                inherit (mapping) expression;
+              };
+            }
+          ) ep.oidc.scopeMappings)
+          ++ [
             (blueprintLib.oauth2Provider {
               id = "provider_${safeId}";
               name = "Provider for ${displayName}";
@@ -562,16 +610,21 @@ let
               subMode = ep.oidc.subMode;
               includeClaimsInIdToken = ep.oidc.includeClaimsInIdToken;
               grantTypes = ep.oidc.grantTypes;
+              accessTokenValidity = ep.oidc.accessTokenValidity;
               signingKey =
                 if ep.oidc.signingKey != null then
                   blueprintLib.refs.byName blueprintLib.models.certificateKeyPair ep.oidc.signingKey
                 else
                   null;
-              propertyMappings = map (
-                scope:
-                blueprintLib.refs.byField blueprintLib.models.scopeMapping "managed"
-                  "goauthentik.io/providers/oauth2/scope-${scope}"
-              ) ep.oidc.propertyMappings;
+              propertyMappings =
+                map (
+                  scope:
+                  blueprintLib.refs.byField blueprintLib.models.scopeMapping "managed"
+                    "goauthentik.io/providers/oauth2/scope-${scope}"
+                ) ep.oidc.propertyMappings
+                ++ lib.mapAttrsToList (
+                  mappingName: _: blueprintLib.refs.sameBlueprint "scope_${safeId}_${mappingName}"
+                ) ep.oidc.scopeMappings;
             })
             (blueprintLib.application {
               slug = name;
