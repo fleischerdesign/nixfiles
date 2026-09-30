@@ -205,7 +205,8 @@ def main():
     pruned = 0
     for r in stale:
         if args.prune:
-            print(f"  [-] Delete {r['type']} {r['name']} (stale; {r.get('comment')!r})")
+            verb = "Would delete" if args.dry_run else "Delete"
+            print(f"  [-] {verb} {r['type']} {r['name']} (stale; {r.get('comment')!r})")
             if not args.dry_run:
                 api_request(
                     token,
@@ -247,9 +248,10 @@ def main():
         }
 
         if not existing:
+            verb = "Would create" if args.dry_run else "Create"
             print(
-                f"  [+] Create {rec['type']} {fqdn} -> {rec['content']} (proxied:"
-                f" {rec['proxied']})"
+                f"  [+] {verb} {rec['type']} {fqdn} -> {rec['content']} (proxied:"
+                f" {payload['proxied']})"
             )
             if not args.dry_run:
                 api_request(
@@ -266,8 +268,9 @@ def main():
                 or existing.get("ttl") != payload["ttl"]
             )
             if needs_update:
+                verb = "Would update" if args.dry_run else "Update"
                 print(
-                    f"  [~] Update {rec['type']} {fqdn} -> {payload['content']}"
+                    f"  [~] {verb} {rec['type']} {fqdn} -> {payload['content']}"
                     f" (proxied: {payload['proxied']})"
                 )
                 if not args.dry_run:
@@ -281,10 +284,18 @@ def main():
             else:
                 unchanged += 1
 
-    print(
-        f"==> DNS Sync Complete: {created} created, {updated} updated,"
-        f" {unchanged} unchanged, {len(stale)} stale, {pruned} deleted."
-    )
+    if args.dry_run:
+        deletions = len(stale) if args.prune else 0
+        print(
+            f"==> DNS Preview Complete: {created} creations, {updated} updates,"
+            f" {deletions} deletions planned; {unchanged} unchanged, {len(stale)} stale."
+            " No changes applied."
+        )
+    else:
+        print(
+            f"==> DNS Sync Complete: {created} created, {updated} updated,"
+            f" {unchanged} unchanged, {len(stale)} stale, {pruned} deleted."
+        )
 
 
 if __name__ == "__main__":

@@ -256,6 +256,7 @@
 
           backup-contract = import ./checks/backup-contract.nix checkArgs;
           vaultwarden = import ./checks/vaultwarden.nix checkArgs;
+          cloudflare = import ./checks/cloudflare.nix checkArgs;
 
           custom-package-updater =
             pkgs.runCommandLocal "custom-package-updater-check"
@@ -524,8 +525,12 @@
               "dns"
               "gitops"
             ];
-            package =
-              self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package;
+            package = import ./features/system/networking/cloudflare/target.nix {
+              inherit pkgs;
+              lib = nixpkgs-unstable.lib;
+              reconciler =
+                self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package;
+            };
           };
 
           hom-rt-01 = {

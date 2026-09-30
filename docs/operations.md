@@ -219,19 +219,34 @@ Identity/ingress host. Authentik server + LDAP outpost. Verified: all blueprints
 
 ## 7. nodTargets (agentless reconcilers)
 
-`flake.nix → nodTargets` (all `targetType = "agentless"`; `nod` builds `#nodTargets.<name>.package` and runs its single binary locally):
+`flake.nix → nodTargets` (all `targetType = "agentless"`; `nod` builds
+`#nodTargets.<name>.package` and invokes its activation entrypoint locally with the action argument).
+Cloudflare provides `bin/activate`; the device reconcilers accept the action on their own CLI.
 
 | Target | Host | Package | Changes |
 |---|---|---|---|
 | `hom-rt-01` | 10.10.10.1 | `fritzbox-sync` | FRITZ!Box DNS / DHCP toggle / port forwards (TR-064) |
 | `hom-ap-01` | 10.10.10.20 | `tplink-ap-sync` | RE330 SSID / bands |
 | `hom-rly-01..08` | 10.10.30.11..18 | ESPHome device packages | Relay firmware/config (OTA) |
-| `cloudflare` | api.cloudflare.com | `cloudflare-sync` | DNS records |
+| `cloudflare` | api.cloudflare.com | `activate` → `cloudflare-sync` | DNS records and zone settings |
 
-> **Resolved 2026-09-19:** the reconcilers (`fritzbox-sync`, `tplink-ap-sync`, the ESPHome sync
-> scripts) now accept the deployment action as an optional positional argument, so
-> `nod switch <target>` works. The Authentik target had the same defect and was removed. Verify
-> `--dry-run` output before applying anything — both device reconcilers report a real diff now.
+Cloudflare's `features/system/networking/cloudflare/target.nix` implements nod's activation contract:
+`bin/activate switch` runs the existing reconciler with ownership-scoped `--prune`. Unsupported
+actions fail without invoking the reconciler. SOPS is part of the activation package's runtime PATH;
+activation runs from the repository so the operator's age identity can decrypt the existing token.
+The standalone `sync-cloudflare` app and the host's systemd job continue to use the same reconciler.
+
+`nod switch cloudflare --dry-run` previews deployment orchestration, not DNS changes: nod does not
+invoke the activation package in that mode. Preview the actual DNS/settings diff with:
+
+```fish
+nix develop --command nix run .#sync-cloudflare -- --dry-run --prune
+```
+
+After reviewing the complete diff, apply with `nod switch cloudflare`. The reconciler's preview
+reports planned changes and explicitly states that nothing was applied; live failures propagate
+through the adapter to nod. `checks/cloudflare.nix` exercises the action contract and reconciliation
+against isolated fixtures, including idempotency and protection of foreign and ACME records.
 
 ### 7.1 OpenClaw node command surfaces (runtime, not Nix)
 
