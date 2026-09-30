@@ -34,6 +34,7 @@ in
     ./config.nix
     ./integrations/bitwarden.nix
     ./integrations/community-templates.nix
+    ./integrations/firefox.nix
     ./integrations/ghostty.nix
     ./integrations/gtk.nix
     ./integrations/hassio.nix

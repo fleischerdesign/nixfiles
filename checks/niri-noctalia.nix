@@ -140,6 +140,17 @@ let
             user.programs.vscode.mutableExtensionsDir
             && user.programs.vscode.profiles.default.userSettings."workbench.colorTheme" == "NoctaliaTheme"
           );
+        "firefox-consumes-the-palette" =
+          !(lib.elem "pywalfox" templates.community_ids)
+          || (
+            user.programs.firefox.enable
+            &&
+              (user.programs.firefox.policies.ExtensionSettings."pywalfox@frewacom.org".installation_mode or "")
+              == "force_installed"
+            &&
+              (user.programs.firefox.policies.ExtensionSettings."pywalfox@frewacom.org".install_url or "") != ""
+            && !(user.home.file ? ".mozilla/native-messaging-hosts/pywalfox.json")
+          );
         "neovim-consumes-the-palette" =
           !(cfg.my.features.dev.nixvim.enable or false)
           || (
@@ -232,6 +243,34 @@ let
           fi
         ''}
 
+        ${lib.optionalString (lib.elem "pywalfox" templates.community_ids) ''
+          # Exercise the delivered host installer in an isolated home. The template uses
+          # this same manifest; its executable and extension identity must agree.
+          mkdir -p firefox-${name}
+          if ! HOME="$PWD/firefox-${name}" ${shell} firefox-theme install; then
+            echo 'niri-noctalia[${name}]: Firefox native host installation failed' >&2
+            fail=1
+          elif ! jq -e --arg hostPrefix ${lib.escapeShellArg "${user.programs.noctalia.package}/bin/"} '
+            .name == "pywalfox" and .type == "stdio"
+            and (.path | startswith($hostPrefix))
+            and .allowed_extensions == ["pywalfox@frewacom.org"]
+          ' firefox-${name}/.mozilla/native-messaging-hosts/pywalfox.json >/dev/null; then
+            echo 'niri-noctalia[${name}]: Firefox native manifest does not identify the delivered host' >&2
+            fail=1
+          elif ! test -x "$(jq -r '.path' firefox-${name}/.mozilla/native-messaging-hosts/pywalfox.json)"; then
+            echo 'niri-noctalia[${name}]: Firefox native host is not executable' >&2
+            fail=1
+          fi
+          if ! jq -e '
+            .policies.ExtensionSettings["pywalfox@frewacom.org"]
+            | .installation_mode == "force_installed"
+              and (.install_url | startswith("https://addons.mozilla.org/"))
+          ' ${user.programs.firefox.finalPackage}/lib/firefox/distribution/policies.json >/dev/null; then
+            echo 'niri-noctalia[${name}]: delivered Firefox policy does not install Pywalfox' >&2
+            fail=1
+          fi
+        ''}
+
         if ! grep -F 'spawn-at-startup "${shell}"' ${niriConfig} >/dev/null; then
           echo 'niri-noctalia[${name}]: generated Niri config does not start the selected shell' >&2
           fail=1
@@ -262,7 +301,10 @@ if violations != [ ] then
 else
   pkgs.runCommandLocal "niri-noctalia-check"
     {
-      nativeBuildInputs = [ pkgs.gnugrep ];
+      nativeBuildInputs = [
+        pkgs.gnugrep
+        pkgs.jq
+      ];
     }
     ''
       fail=0

@@ -10,7 +10,6 @@
   home.packages = with pkgs; [
     telegram-desktop
     google-chrome
-    firefox
     nerd-fonts.jetbrains-mono
     gimp
     obsidian
@@ -31,6 +30,12 @@
     cameractrls-gtk4
     dbeaver-bin
   ];
+
+  programs.firefox = {
+    enable = true;
+    # Keep existing profiles at Firefox's traditional location.
+    configPath = ".mozilla/firefox";
+  };
 
   programs.ghostty = {
     enable = true;

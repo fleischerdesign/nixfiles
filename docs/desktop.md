@@ -109,6 +109,14 @@ an activation entry removes exactly that link before linking the new layout. Com
 are downloaded after the first render, so a oneshot waits for the selected catalog to be cached and
 then triggers one apply; it fails loudly when that does not happen within its bound.
 
+Firefox uses the `pywalfox` community template and the Pywalfox extension, installed through
+Firefox policies without declaring or replacing browser profiles. The template's `firefox-theme`
+post-action uses Noctalia's built-in native messaging host; no Python Pywalfox package is needed.
+Noctalia owns the writable `~/.mozilla/native-messaging-hosts/pywalfox.json` manifest and refreshes
+it when applying the palette. Home Manager must not make that file a store symlink. Existing foreign
+native hosts are left untouched by Noctalia. Only Theme API colours are configured here, not custom
+`userChrome.css` or `userContent.css`.
+
 The shell's plugin selection is declared the same way. Each plugin integration adds its own entry to
 `settings.plugins.enabled` together with the packages that plugin needs as a prerequisite -
 `bitwarden-cli` for Bitwarden, `scrcpy` for Phone Operate, `system-config-printer` for Printers - and
