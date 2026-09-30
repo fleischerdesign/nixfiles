@@ -10,6 +10,7 @@
   home.packages = with pkgs; [
     telegram-desktop
     google-chrome
+    firefox
     nerd-fonts.jetbrains-mono
     gimp
     obsidian
