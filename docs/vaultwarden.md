@@ -41,6 +41,24 @@ Mobile push through Bitwarden's relay is not enabled. These capabilities are not
 An immutable empty `CONFIG_FILE` prevents admin-generated JSON from overriding the declared
 environment. Caddy overwrites `X-Forwarded-For`; Vaultwarden trusts it only from its loopback proxy.
 
+## Desktop clients
+
+The graphical user profile installs the Bitwarden desktop app; the Firefox extension is installed
+through browser policies. Select the self-hosted server using the public `web` publication's URL
+before signing in to the desktop app or extension. Browser, desktop and CLI sessions are independent;
+SSO authentication does not replace the master password needed to unlock the vault.
+
+Noctalia's `noctalia/bitwarden` plugin is reached from the launcher with `/bw`, not through a bar
+widget. Its integration installs `bitwarden-cli` and derives `server_url` from the fleet's unique
+Vaultwarden `web` publication. Before an API-key login, the plugin runs `bw config server` with that
+URL. Obtain the personal API key in the web vault under Settings → Security → Keys; enter it in the
+plugin's login panel, then unlock with the master password. Do not put API keys or vault sessions
+into Nix configuration. Existing CLI sessions are not automatically logged out or migrated.
+
+The plugin uses `bw serve` on loopback. While unlocked, local processes that can reach its port can
+read vault data, so lock the vault when it is not needed. Declarative plugin settings are defaults;
+Noctalia's mutable user settings may override them.
+
 ## Persistence, backup and recovery
 
 PostgreSQL is local, using a contract-provisioned database and matching peer-authenticated role.

@@ -10,6 +10,7 @@
   imports = [ ../firefox.nix ];
 
   home.packages = with pkgs; [
+    bitwarden-desktop
     telegram-desktop
     google-chrome
     nerd-fonts.jetbrains-mono
