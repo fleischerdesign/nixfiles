@@ -20,6 +20,7 @@ agentic contributors).
 | What is the security model, layer by layer? | [security.md](security.md) |
 | How do applications send mail and share SMTP credentials? | [smtp.md](smtp.md) |
 | Which desktop runs, who owns the session, where do user settings live? | [desktop.md](desktop.md) |
+| How are Google Drive and server files mounted on PCs? | [rclone.md](rclone.md) |
 | What are the microcontrollers, the access point, the router - and how are they configured? | [embedded.md](embedded.md) |
 | Which coding-agent interfaces are installed, and how do they receive credentials? | [coding-agents.md](coding-agents.md) |
 | What do the interfaces look like, which tokens and typography? | [design.md](design.md) |

@@ -31,6 +31,7 @@
     wayland.enable = lib.mkDefault true;
     printing.enable = lib.mkDefault true;
     locate.enable = lib.mkDefault true;
+    rclone.enable = lib.mkDefault true;
   };
 
   my.features.desktop = {

@@ -185,6 +185,10 @@ Existing user profiles must not be manually deleted as part of that verification
 
 ## 6. Verification
 
+Google Drive and server file browsing use [user-scoped rclone mounts](rclone.md). Nautilus bookmarks
+are appended by the personal graphical profile; mount services and credentials are independent of
+Nautilus and owned by the system rclone feature's Home Manager half.
+
 [`checks/niri-noctalia.nix`](../checks/niri-noctalia.nix) states properties, not a copy of the
 configuration, and runs for **every** host whose contract registration says Niri - the list is
 derived, so switching a host's session covers it without editing the check. A claim is either a

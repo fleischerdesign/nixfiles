@@ -7,7 +7,10 @@
   ...
 }:
 {
-  imports = [ ../chrome.nix ];
+  imports = [
+    ../chrome.nix
+    ../rclone-bookmarks.nix
+  ];
 
   home.packages = with pkgs; [
     telegram-desktop

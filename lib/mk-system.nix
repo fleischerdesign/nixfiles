@@ -44,6 +44,7 @@ let
         "site"
         "dns"
         "smtp"
+        "ssh"
       ];
 
       finalPkgs =
