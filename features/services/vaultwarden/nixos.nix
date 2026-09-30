@@ -8,6 +8,7 @@
 }:
 let
   cfg = config.my.features.services.vaultwarden;
+  smtp = config.my.features.system.smtp;
   contract = config.my.contracts.provides.vaultwarden;
   oidc = contract.identity.oidc.web;
   database = config.my.contracts.consumes.vaultwarden.postgresql.main;
@@ -40,11 +41,17 @@ in
     lib.mkMerge [
       (features.requires [ "services.postgresql" ] config)
       {
+        my.features.system.smtp.enable = true;
         services.vaultwarden = {
           enable = true;
           dbBackend = "postgresql";
           config = {
             DOMAIN = contract.publications.web.publicUrl;
+            SMTP_HOST = smtp.host;
+            SMTP_PORT = smtp.port;
+            SMTP_SECURITY = if smtp.tls == "starttls" then "starttls" else "force_tls";
+            SMTP_FROM = smtp.fromAddress;
+            SMTP_FROM_NAME = "Vaultwarden";
             ROCKET_ADDRESS = "127.0.0.1";
             ROCKET_PORT = contract.endpoints.web.port;
             DATABASE_URL = "postgresql:///${database.database}?host=${socketDir}";
@@ -79,8 +86,11 @@ in
 
         sops.secrets.${oidc.secretPath} = { };
         sops.templates."vaultwarden.env" = {
+          restartUnits = [ "vaultwarden.service" ];
           content = ''
             SSO_CLIENT_SECRET=${config.sops.placeholder.${oidc.secretPath}}
+            SMTP_USERNAME=${config.sops.placeholder.${smtp.usernameSecret}}
+            SMTP_PASSWORD=${config.sops.placeholder.${smtp.passwordSecret}}
           '';
         };
 

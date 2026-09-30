@@ -60,8 +60,14 @@ let
       && lib.any (
         user: user.name == database.user && user.ensureDBOwnership
       ) cfg.services.postgresql.ensureUsers;
-    "no-admin-or-smtp" =
-      !(settings ? ADMIN_TOKEN) && !settings.DISABLE_ADMIN_TOKEN && !(settings ? SMTP_HOST);
+    "no-admin" = !(settings ? ADMIN_TOKEN) && !settings.DISABLE_ADMIN_TOKEN;
+    "shared-smtp" =
+      settings.SMTP_HOST == cfg.my.features.system.smtp.host
+      && settings.SMTP_PORT == cfg.my.features.system.smtp.port
+      && settings.SMTP_SECURITY == "starttls"
+      && settings.SMTP_FROM == cfg.my.features.system.smtp.fromAddress
+      && !(settings ? SMTP_PASSWORD)
+      && !(settings ? SMTP_USERNAME);
     "secret-is-runtime-only" =
       !(settings ? SSO_CLIENT_SECRET)
       &&

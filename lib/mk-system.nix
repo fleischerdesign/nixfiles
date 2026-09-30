@@ -43,6 +43,7 @@ let
         "devices"
         "site"
         "dns"
+        "smtp"
       ];
 
       finalPkgs =

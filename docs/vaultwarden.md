@@ -36,7 +36,8 @@ vault by email is disabled. Upstream still permits association with uninitialize
 this is not proof of mailbox ownership. Vaultwarden identifies an SSO account by issuer and subject; changing either
 requires an explicit account-association recovery procedure, not a silent configuration change.
 
-SMTP is not configured: invitation, verification, security and recovery emails are unavailable.
+SMTP uses the [shared outbound transport](smtp.md) for invitation, verification, security and recovery
+emails; SMTP authentication is rendered into the runtime environment file by SOPS.
 Mobile push through Bitwarden's relay is not enabled. These capabilities are not implied by SSO.
 An immutable empty `CONFIG_FILE` prevents admin-generated JSON from overriding the declared
 environment. Caddy overwrites `X-Forwarded-For`; Vaultwarden trusts it only from its loopback proxy.

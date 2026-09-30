@@ -9,6 +9,7 @@
 let
   serviceAddressLib = import ../../../../contracts/topology/lib/service-address.nix { };
   cfg = config.my.features.services.authentik.server;
+  smtp = config.my.features.system.smtp;
 
   # Constructors for blueprint entries. They belong to this feature, not to the framework: they encode
   # authentik's rules, and they exist so that a model name, a reference kind and the placement of a field
@@ -310,6 +311,7 @@ let
   authentikEnvironmentFiles = [
     config.sops.secrets."services/authentik/core_env".path
     config.sops.templates."authentik_secrets.env".path
+    config.sops.templates."authentik-smtp.env".path
   ];
 
   authentikDatabaseEnvironment = [
@@ -322,7 +324,7 @@ let
 
   authentikBlueprintEnvironment = [
     "AUTHENTIK_BOOTSTRAP_EMAIL=${cfg.adminEmail}"
-    "AUTHENTIK_RECOVERY_FROM_ADDRESS=noreply@${config.my.topology.domain}"
+    "AUTHENTIK_RECOVERY_FROM_ADDRESS=${smtp.fromAddress}"
     "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
   ];
 
@@ -533,6 +535,23 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    my.features.system.smtp.enable = true;
+    sops.templates."authentik-smtp.env" = {
+      owner = "authentik";
+      restartUnits = [
+        "authentik-server.service"
+        "authentik-worker.service"
+      ];
+      content = ''
+        AUTHENTIK_EMAIL__HOST=${smtp.host}
+        AUTHENTIK_EMAIL__PORT=${toString smtp.port}
+        AUTHENTIK_EMAIL__USE_TLS=${if smtp.tls == "starttls" then "true" else "false"}
+        AUTHENTIK_EMAIL__USE_SSL=${if smtp.tls == "implicit" then "true" else "false"}
+        AUTHENTIK_EMAIL__FROM=${smtp.fromAddress}
+        AUTHENTIK_EMAIL__USERNAME=${config.sops.placeholder.${smtp.usernameSecret}}
+        AUTHENTIK_EMAIL__PASSWORD=${config.sops.placeholder.${smtp.passwordSecret}}
+      '';
+    };
     # The directory's structure is not projected from here: the provider and its consumers usually run
     # on different hosts, so anything a consumer needs must live in the directory contract itself.
 
@@ -588,7 +607,10 @@ in
           ++ authentikBlueprintEnvironment;
         Restart = "always";
       };
-      restartTriggers = [ cfg.blueprintsDir ];
+      restartTriggers = [
+        cfg.blueprintsDir
+        config.sops.templates."authentik-smtp.env".file
+      ];
     };
 
     # 3. Authentik Worker Service
@@ -625,7 +647,10 @@ in
           ++ authentikBlueprintEnvironment;
         Restart = "always";
       };
-      restartTriggers = [ cfg.blueprintsDir ];
+      restartTriggers = [
+        cfg.blueprintsDir
+        config.sops.templates."authentik-smtp.env".file
+      ];
     };
 
     # Blueprint application, tied to the deployment.

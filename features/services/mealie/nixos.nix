@@ -5,6 +5,7 @@
 }:
 let
   cfg = config.my.features.services.mealie;
+  smtp = config.my.features.system.smtp;
   topologyDomain = config.my.topology.domain;
   authHost = "auth.${topologyDomain}";
 in
@@ -13,7 +14,7 @@ in
     enable = lib.mkEnableOption "Mealie Recipe Manager";
     smtpFromEmail = lib.mkOption {
       type = lib.types.str;
-      default = if topologyDomain != null then "noreply@${topologyDomain}" else "noreply@localhost";
+      default = smtp.fromAddress;
       description = "From address for SMTP outgoing mails.";
     };
     ssoConfigurationUrl = lib.mkOption {
@@ -24,15 +25,17 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    my.features.system.smtp.enable = true;
     # 1. Load individual secrets from sops file
-    sops.secrets."services/apps/mealie_smtp_password" = { };
     sops.secrets."services/apps/mealie_oidc_secret" = { };
     sops.secrets."services/apps/mealie_openai_key" = { };
 
     # 2. Create a template file that combines them into ENV format
     sops.templates."mealie.env" = {
+      restartUnits = [ "mealie.service" ];
       content = ''
-        SMTP_PASSWORD=${config.sops.placeholder."services/apps/mealie_smtp_password"}
+        SMTP_USER=${config.sops.placeholder.${smtp.usernameSecret}}
+        SMTP_PASSWORD=${config.sops.placeholder.${smtp.passwordSecret}}
         OIDC_CLIENT_SECRET=${config.sops.placeholder."services/apps/mealie_oidc_secret"}
         OPENAI_API_KEY=${config.sops.placeholder."services/apps/mealie_openai_key"}
       '';
@@ -56,12 +59,11 @@ in
           lib.mkIf (pub.publicUrl != null) pub.publicUrl;
 
         # SMTP Configuration
-        SMTP_HOST = "mail.smtp2go.com";
-        SMTP_PORT = "2525";
+        SMTP_HOST = smtp.host;
+        SMTP_PORT = toString smtp.port;
         SMTP_FROM_NAME = "Mealie";
-        SMTP_AUTH_STRATEGY = "TLS";
+        SMTP_AUTH_STRATEGY = if smtp.tls == "starttls" then "TLS" else "SSL";
         SMTP_FROM_EMAIL = cfg.smtpFromEmail;
-        SMTP_USER = "ancoris";
 
         # OIDC Configuration
         OIDC_AUTH_ENABLED = "True";
@@ -90,6 +92,7 @@ in
     # when NLTK_DATA points to a read-only Nix store path.
     # TODO: remove when nixpkgs fixes this upstream.
     systemd.services.mealie.environment.HOME = "/var/lib/mealie";
+    systemd.services.mealie.restartTriggers = [ config.sops.templates."mealie.env".file ];
 
     # Register with Caddy & Firewall via Service Contract
     my.contracts.provides.mealie = {
