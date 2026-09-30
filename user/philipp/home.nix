@@ -55,7 +55,7 @@
       "codium.desktop"
       "spotify.desktop"
       "obsidian.desktop"
-      "google-chrome.desktop"
+      "firefox.desktop"
       "com.mitchellh.ghostty.desktop"
     ];
   };

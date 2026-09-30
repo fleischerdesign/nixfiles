@@ -175,7 +175,8 @@ could run it without touching the Niri side.
 `features/desktop/webapps/home.nix` owns desktop launchers; personal app declarations remain in
 `user/philipp/home.nix`. Each app inherits `defaultBrowser` unless it explicitly selects another
 engine. The personal default is Firefox, and ordinary HTTP, HTTPS and HTML links also select Firefox.
-Chrome remains installed independently; switching webapps does not delete its profiles or cookies.
+Chrome is not installed by the graphical user profile. Its existing profiles and cookies are not
+deleted; an explicitly selected Chrome webapp would still bring its own browser dependency.
 
 When a Firefox app is declared, the feature locks `browser.taskbarTabs.enabled` to true through
 Firefox's existing policy surface. The launchers use the same configured Firefox package as the
