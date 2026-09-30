@@ -46,7 +46,6 @@
     dot = true;
   };
   my.features.services.obsidian-livesync.enable = true;
-  my.features.services.vaultwarden.enable = true;
 
   my.features.services.ntfy.enable = true;
   my.features.system.backups.restic = {

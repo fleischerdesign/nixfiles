@@ -1,0 +1,24 @@
+version: 1
+metadata:
+  name: vyrx-retired-applications
+  labels:
+    vyrx: owned
+entries:
+  # Omission does not remove persisted Authentik objects. Application deletion
+  # cascades to its policy bindings; the remaining objects have unique identities.
+  - model: authentik_core.application
+    state: absent
+    identifiers:
+      slug: vaultwarden
+  - model: authentik_providers_oauth2.oauth2provider
+    state: absent
+    identifiers:
+      name: Provider for Vaultwarden
+  - model: authentik_policies_expression.expressionpolicy
+    state: absent
+    identifiers:
+      name: vaultwarden-authenticated-humans
+  - model: authentik_providers_oauth2.scopemapping
+    state: absent
+    identifiers:
+      name: vaultwarden-email

@@ -5,9 +5,8 @@
   ...
 }:
 let
-  firefoxArgs = import ../features/desktop/webapps/firefox-args.nix;
-  fakeFirefox = pkgs.writeShellApplication {
-    name = "firefox";
+  fakeChrome = pkgs.writeShellApplication {
+    name = "google-chrome-stable";
     text = ''
       printf '%s\n' "$@" > "$CALL_LOG"
       exit "''${BROWSER_EXIT:-0}"
@@ -17,7 +16,9 @@ let
     browser: isolated:
     lib.evalModules {
       specialArgs = {
-        inherit pkgs;
+        pkgs = pkgs // {
+          google-chrome = fakeChrome;
+        };
         osConfig.my.role = "desktop";
       };
       modules = [
@@ -29,51 +30,37 @@ let
               default = [ ];
             };
             home.packages = lib.mkOption { type = lib.types.listOf lib.types.package; };
-            programs.firefox = {
-              enable = lib.mkOption { type = lib.types.bool; };
-              package = lib.mkOption { type = lib.types.package; };
-              finalPackage = lib.mkOption { type = lib.types.package; };
-              policies = lib.mkOption {
-                type = lib.types.attrs;
-                default = { };
-              };
-            };
           };
-          config = {
-            programs.firefox = {
-              enable = true;
-              package = fakeFirefox;
-              finalPackage = fakeFirefox;
-            };
-            my.features.desktop.webapps = {
-              enable = true;
-              defaultBrowser = browser;
-              apps.fixture = {
-                displayName = "Test webapp";
-                url = "https://webapp.example.test";
-                inherit isolated;
-                extraArgs = [ "argument with spaces" ];
-              };
+          config.my.features.desktop.webapps = {
+            enable = true;
+            defaultBrowser = browser;
+            apps.fixture = {
+              displayName = "Test webapp";
+              url = "https://webapp.example.test/path";
+              inherit isolated;
+              extraArgs = [ "argument with spaces" ];
             };
           };
         }
       ];
     };
-  inherited = fixture "firefox" false;
-  rejected = fixture "firefox" true;
+  inherited = fixture "chrome" false;
+  isolated = fixture "chrome" true;
+  rejected = fixture "epiphany" true;
   overridden = inherited.extendModules {
-    modules = [ { my.features.desktop.webapps.apps.fixture.browser = "chrome"; } ];
+    modules = [ { my.features.desktop.webapps.apps.fixture.browser = "brave"; } ];
   };
-  invalidUrl = inherited.extendModules {
+  invalidName = inherited.extendModules {
     modules = [
-      { my.features.desktop.webapps.apps.fixture.url = lib.mkForce "https://webapp.example.test/path"; }
+      {
+        my.features.desktop.webapps.apps."invalid name".displayName = "Invalid";
+        my.features.desktop.webapps.apps."invalid name".url = "https://example.test";
+      }
     ];
   };
-  missingBrowser = inherited.extendModules {
-    modules = [ { programs.firefox.enable = lib.mkForce false; } ];
-  };
-  # Only build webapp packages, not the rest of a user's desktop closure.
-  graphicalHosts = lib.filterAttrs (_: cfg: cfg.config.my.role != "server") self.nixosConfigurations;
+  graphicalHosts = lib.filterAttrs (
+    _: host: host.config.my.role != "server"
+  ) self.nixosConfigurations;
   checkHost =
     name: host:
     let
@@ -82,57 +69,58 @@ let
       packages = builtins.filter (
         package: lib.hasPrefix "webapp-package-" package.name
       ) user.home.packages;
-      firefox = lib.getExe user.programs.firefox.finalPackage;
     in
-    assert
-      user.programs.firefox.policies.Preferences."browser.taskbarTabs.enabled" == {
-        Value = true;
-        Status = "locked";
-      };
-    assert lib.all (mime: user.xdg.mimeApps.defaultApplications.${mime} == [ "firefox.desktop" ]) [
-      "text/html"
-      "x-scheme-handler/http"
-      "x-scheme-handler/https"
-    ];
+    assert !user.programs.firefox.enable;
+    assert !(lib.elem "noctalia/bitwarden" user.my.features.desktop.noctalia.settings.plugins.enabled);
+    assert lib.all (mime: user.xdg.mimeApps.defaultApplications.${mime} == [ "google-chrome.desktop" ])
+      [
+        "text/html"
+        "x-scheme-handler/http"
+        "x-scheme-handler/https"
+      ];
     assert builtins.length packages == builtins.length (lib.attrNames apps);
     lib.concatMapStringsSep "\n" (
       package:
       let
         appName = lib.removePrefix "webapp-package-" package.name;
         app = apps.${appName};
-        arguments =
-          (firefoxArgs {
-            inherit (app) url;
-            container = app.firefoxContainer;
-          })
-          ++ app.extraArgs;
-        expectedExec = "exec ${lib.escapeShellArg firefox} ${lib.escapeShellArgs arguments}";
+        expectedExec = "exec ${lib.escapeShellArg "${pkgs.google-chrome}/bin/google-chrome-stable"} ${
+          lib.escapeShellArgs (
+            [
+              "--app=${app.url}"
+              "--class=${app.wmClass}"
+              "--name=${app.wmClass}"
+            ]
+            ++ app.extraArgs
+          )
+        }";
       in
-      assert app.browser == "firefox";
+      assert app.browser == "chrome";
       ''
-        # Inspect the built artifact, including the policy-wrapped browser path.
         test -x ${package}/bin/webapp-${appName}
-          grep -Fq -- ${lib.escapeShellArg expectedExec} ${package}/bin/webapp-${appName}
-          grep -Fxq -- "Exec=$(readlink -f ${package}/bin/webapp-${appName})" ${package}/share/applications/webapp-${appName}.desktop
+        grep -Fq -- ${lib.escapeShellArg expectedExec} ${package}/bin/webapp-${appName}
+        grep -Fxq -- "Exec=$(readlink -f ${package}/bin/webapp-${appName})" ${package}/share/applications/webapp-${appName}.desktop
       ''
     ) packages
     + ''
-      echo '${name}: ${toString (builtins.length packages)} Firefox launchers and MIME defaults checked'
+      echo '${name}: ${toString (builtins.length packages)} Chrome launchers and MIME defaults checked'
     '';
   expected = pkgs.writeText "webapp-expected-arguments" (
-    lib.concatStringsSep "\n" (
-      (firefoxArgs { url = "https://webapp.example.test"; }) ++ [ "argument with spaces" ]
-    )
+    lib.concatStringsSep "\n" [
+      "--app=https://webapp.example.test/path"
+      "--class=fixture"
+      "--name=fixture"
+      "argument with spaces"
+    ]
     + "\n"
   );
 in
-assert inherited.config.my.features.desktop.webapps.apps.fixture.browser == "firefox";
-assert overridden.config.my.features.desktop.webapps.apps.fixture.browser == "chrome";
-assert (fixture "chrome" false).config.my.features.desktop.webapps.apps.fixture.browser == "chrome";
+assert inherited.config.my.features.desktop.webapps.apps.fixture.browser == "chrome";
+assert overridden.config.my.features.desktop.webapps.apps.fixture.browser == "brave";
 assert lib.all (claim: claim.assertion) inherited.config.assertions;
+assert lib.all (claim: claim.assertion) isolated.config.assertions;
 assert !(lib.all (claim: claim.assertion) rejected.config.assertions);
-assert !(lib.all (claim: claim.assertion) invalidUrl.config.assertions);
-assert !(lib.all (claim: claim.assertion) missingBrowser.config.assertions);
+assert !(lib.all (claim: claim.assertion) invalidName.config.assertions);
 pkgs.runCommandLocal "webapps-check"
   {
     nativeBuildInputs = [
@@ -152,6 +140,11 @@ pkgs.runCommandLocal "webapps-check"
       test "$actual_status" -eq "$expected_status"
       diff -u ${expected} "$CALL_LOG"
     done
+    export BROWSER_EXIT=0
+    ${builtins.head isolated.config.home.packages}/bin/webapp-fixture
+    cat ${expected} > isolated-expected
+    printf '%s\n' "--user-data-dir=$HOME/.config/webapps/fixture" >> isolated-expected
+    diff -u isolated-expected "$CALL_LOG"
     ${lib.concatStringsSep "\n" (lib.mapAttrsToList checkHost graphicalHosts)}
     touch "$out"
   ''

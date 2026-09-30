@@ -262,8 +262,7 @@ it accepts; a human is put into one of them.
 An explicitly universal audience is different from a missing audience: `accessAuthenticated = true`
 admits active authenticated humans through a generated expression-policy binding and excludes service
 accounts. It is mutually exclusive with `accessGroups` and `accessUsers`; ordinary group-restricted
-applications retain their membership-based policy. Vaultwarden uses this universal audience, as
-specified in [vaultwarden.md](vaultwarden.md). Application-specific OIDC scope mappings and access-token
+applications retain their membership-based policy. Application-specific OIDC scope mappings and access-token
 lifetimes are declared in the identity contract and compiled alongside their provider.
 
 **An audience a resource declares about itself is topology, and it is declared.** `accessUsers` names the
@@ -341,6 +340,10 @@ This is the inventory that closes that last row. Every row here has been measure
 | `core_default_app_access` (`AppAccessWithoutBindings`) | tenant flag, default `true`, `authentik/core/apps.py`; read by `providers/ldap/api.py` | relied on: the LDAP application carries no binding, so it is open to every user and access is decided by the consumer's `memberOf` filter |
 
 ### 11.7 What this does not close
+
+The owned `00-system/retired-applications.yaml` blueprint enforces the absence of Vaultwarden's
+application, OAuth2 provider, human-access policy and email scope mapping. Application deletion
+also removes its policy bindings; these tombstones prevent stale access objects surviving a deploy.
 
 - **Direct SQL writes stay invisible.** No event, no blueprint. The rule "the database is not a change path"
   plus the event arm of the drift report are the only countermeasures.

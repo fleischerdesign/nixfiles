@@ -55,7 +55,7 @@
       "codium.desktop"
       "spotify.desktop"
       "obsidian.desktop"
-      "firefox.desktop"
+      "google-chrome.desktop"
       "com.mitchellh.ghostty.desktop"
     ];
   };
@@ -174,7 +174,7 @@
 
   my.features.desktop.webapps = {
     enable = true;
-    defaultBrowser = "firefox";
+    defaultBrowser = "chrome";
     apps = {
       ai = {
         displayName = "AI Assistant";

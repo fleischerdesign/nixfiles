@@ -10,10 +10,8 @@ let
   browserType = lib.types.enum [
     "chrome"
     "brave"
-    "firefox"
     "epiphany"
   ];
-  firefoxArgs = import ./firefox-args.nix;
   appSubmodule =
     { name, ... }:
     {
@@ -66,12 +64,6 @@ let
           description = "Create an isolated user-data directory (Chrome and Brave only).";
         };
 
-        firefoxContainer = lib.mkOption {
-          type = lib.types.ints.unsigned;
-          default = 0;
-          description = "Existing Firefox container ID; 0 shares the ordinary browser session.";
-        };
-
         extraArgs = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
@@ -91,19 +83,11 @@ let
           "${pkgs.google-chrome}/bin/google-chrome-stable"
         else if appCfg.browser == "brave" then
           "${pkgs.brave}/bin/brave"
-        else if appCfg.browser == "firefox" then
-          lib.getExe config.programs.firefox.finalPackage
         else
           "${pkgs.epiphany}/bin/epiphany";
 
       browserArgs =
-        if appCfg.browser == "firefox" then
-          firefoxArgs {
-            inherit (appCfg) url;
-            container = appCfg.firefoxContainer;
-          }
-          ++ appCfg.extraArgs
-        else if appCfg.browser == "epiphany" then
+        if appCfg.browser == "epiphany" then
           [
             "--application-mode"
             appCfg.url
@@ -195,15 +179,7 @@ in
               "chrome"
               "brave"
             ];
-          message = "Webapp ${name}: isolated user-data directories require Chrome or Brave; use firefoxContainer for Firefox.";
-        }
-        {
-          assertion = app.browser != "firefox" || config.programs.firefox.enable;
-          message = "Webapp ${name}: enable programs.firefox before selecting native Firefox webapps.";
-        }
-        {
-          assertion = app.browser != "firefox" || builtins.match "https?://[^/?#]+/?" app.url != null;
-          message = "Webapp ${name}: native Firefox bootstrap requires a website origin URL (no path, query or fragment).";
+          message = "Webapp ${name}: isolated user-data directories require Chrome or Brave.";
         }
         {
           assertion = builtins.match "[A-Za-z0-9_-]+" name != null;
@@ -211,14 +187,6 @@ in
         }
       ]) userCfg.apps
     );
-    programs.firefox.policies.Preferences =
-      lib.mkIf (lib.any (app: app.browser == "firefox") (lib.attrValues userCfg.apps))
-        {
-          "browser.taskbarTabs.enabled" = {
-            Value = true;
-            Status = "locked";
-          };
-        };
     home.packages = lib.mapAttrsToList buildLauncher userCfg.apps;
   };
 }

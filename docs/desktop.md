@@ -109,17 +109,9 @@ an activation entry removes exactly that link before linking the new layout. Com
 are downloaded after the first render, so a oneshot waits for the selected catalog to be cached and
 then triggers one apply; it fails loudly when that does not happen within its bound.
 
-Firefox uses the `pywalfox` community template and the Pywalfox extension, installed through
-Firefox policies without declaring or replacing browser profiles. The template's `firefox-theme`
-post-action uses Noctalia's built-in native messaging host; no Python Pywalfox package is needed.
-Noctalia owns the writable `~/.mozilla/native-messaging-hosts/pywalfox.json` manifest and refreshes
-it when applying the palette. Home Manager must not make that file a store symlink. Existing foreign
-native hosts are left untouched by Noctalia. Only Theme API colours are configured here, not custom
-`userChrome.css` or `userContent.css`.
-
 The shell's plugin selection is declared the same way. Each plugin integration adds its own entry to
 `settings.plugins.enabled` together with the packages that plugin needs as a prerequisite -
-`bitwarden-cli` for Bitwarden, `scrcpy` for Phone Operate, `system-config-printer` for Printers - and
+`scrcpy` for Phone Operate, `system-config-printer` for Printers - and
 `settings.plugins.auto_update = "none"` keeps the plugin code at the revision it was first fetched, so
 updates are an explicit act. The phone plugin needs more than its own package: it calls `scrcpy`,
 `adb`, `sshfs` and `gdbus` as external commands, and on NixOS none of those arrives with another
@@ -170,46 +162,25 @@ enables it: both personal computers take the session from `roles/pc.nix`. Its Ho
 imported everywhere and inert wherever `my.features.desktop.gnome.enable` is false, so a future host
 could run it without touching the Niri side.
 
-## 5. Native Firefox webapps
+## 5. Browser and webapps
 
 `features/desktop/webapps/home.nix` owns desktop launchers; personal app declarations remain in
 `user/philipp/home.nix`. Each app inherits `defaultBrowser` unless it explicitly selects another
-engine. The personal default is Firefox, and ordinary HTTP, HTTPS and HTML links also select Firefox.
-Chrome is not installed by the graphical user profile. Its existing profiles and cookies are not
-deleted; an explicitly selected Chrome webapp would still bring its own browser dependency.
+engine. The personal default is Google Chrome. `user/philipp/chrome.nix` installs the browser and
+sets ordinary HTTP, HTTPS and HTML MIME defaults to `google-chrome.desktop`.
 
-When a Firefox app is declared, the feature locks `browser.taskbarTabs.enabled` to true through
-Firefox's existing policy surface. The launchers use the same configured Firefox package as the
-browser, preserving its extension policies and Noctalia integration. No browser profile is declared,
-replaced or edited: Firefox's ordinary profile selection applies. Container `0` shares the normal
-browser session; `firefoxContainer` can select an existing container instead. Chromium-style
-`isolated` directories are rejected for Firefox rather than silently ignored.
-
-The native command-line contract is documented by Mozilla's
-[Web Apps architecture](https://firefox-source-docs.mozilla.org/browser/components/taskbartabs/docs/architecture.html).
-`firefox-args.nix` supplies `-taskbar-tab nix-webapp-bootstrap -new-window <origin> -container <id>`.
-The bootstrap token is deliberately not a registered UUID. Firefox's missing-ID handler finds an
-existing app by URL scope and container, or creates one with its own UUID. It is not a persistent
-identity maintained by Nix. Subsequent launches reuse Firefox's registration, including registrations
-created interactively. Firefox may log the missing bootstrap ID before successfully resolving it.
-
-Firefox owns its mutable registry, icons and native desktop entries. Nothing writes or symlinks
-`taskbartabs.json`; Nix supplies stable launcher aliases with the declared names and icons. Firefox
-also creates its own `org.mozilla.firefox.webapp-<uuid>.desktop` entry, so the application menu may
-show both the alias and Firefox's native entry. Native window grouping follows that Firefox entry,
-not the legacy Chromium `wmClass`. Removing a Nix declaration removes its launcher, not Firefox's
-registration; remove a registered app through Firefox if desired.
-
-Bootstrap without a manifest creates a website-origin app, not an arbitrary deep-link app. Firefox
-URLs therefore must be HTTP(S) origins, with an optional trailing slash. Once registered, Firefox's
-stored start URL is authoritative. Logins and extensions are shared with the selected profile;
-Chrome's existing login sessions do not transfer to Firefox.
+Chrome and Brave launch with `--app=<url>`, `--class=<wmClass>` and `--name=<wmClass>`; Epiphany
+uses `--application-mode`. Shell wrappers preserve argument boundaries and propagate the browser's
+exit status. Chrome webapps use the ordinary browser profile by default, sharing its logins and
+extensions. Explicit `isolated = true` gives Chrome or Brave a separate profile under
+`~/.config/webapps/<name>`; unsupported isolation is rejected at evaluation time. No browser profile
+is replaced, migrated or deleted by this feature.
 
 `checks/webapps.nix` verifies both graphical host classes' generated launchers, default inheritance,
 explicit browser overrides, unsupported isolation and MIME defaults. A shell-only fixture verifies
 argument boundaries and propagation of the browser's exit status; it does not start a browser or
-require Python, Selenium or Geckodriver. After deployment, restart Firefox so the policy is loaded,
-launch an app, and verify that it opens a native app window using the normal browser session.
+require Python, Selenium or Geckodriver. After deployment, launch an app and verify that it opens
+a Chrome app window using the normal browser session.
 Existing user profiles must not be manually deleted as part of that verification.
 
 ## 6. Verification

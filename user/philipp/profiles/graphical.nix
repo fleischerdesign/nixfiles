@@ -7,10 +7,9 @@
   ...
 }:
 {
-  imports = [ ../firefox.nix ];
+  imports = [ ../chrome.nix ];
 
   home.packages = with pkgs; [
-    bitwarden-desktop
     telegram-desktop
     nerd-fonts.jetbrains-mono
     gimp

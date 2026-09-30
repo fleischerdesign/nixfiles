@@ -255,7 +255,6 @@
           dependencies-contract = import ./checks/dependencies-contract.nix checkArgs;
 
           backup-contract = import ./checks/backup-contract.nix checkArgs;
-          vaultwarden = import ./checks/vaultwarden.nix checkArgs;
           cloudflare = import ./checks/cloudflare.nix checkArgs;
           webapps = import ./checks/webapps.nix checkArgs;
 
