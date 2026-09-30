@@ -9,12 +9,8 @@ let
   fakeFirefox = pkgs.writeShellApplication {
     name = "firefox";
     text = ''
-      ${pkgs.python3}/bin/python3 - "$@" <<'PY'
-      import json, os, sys
-      from pathlib import Path
-      Path(os.environ["CALL_LOG"]).write_text(json.dumps(sys.argv[1:]))
-      sys.exit(int(os.environ.get("BROWSER_EXIT", "0")))
-      PY
+      printf '%s\n' "$@" > "$CALL_LOG"
+      exit "''${BROWSER_EXIT:-0}"
     '';
   };
   fixture =
@@ -78,33 +74,56 @@ let
   };
   # Only build webapp packages, not the rest of a user's desktop closure.
   graphicalHosts = lib.filterAttrs (_: cfg: cfg.config.my.role != "server") self.nixosConfigurations;
-  hosts = lib.mapAttrs (
-    _: host:
+  checkHost =
+    name: host:
     let
       user = host.config.home-manager.users.${host.config.my.user.primary};
-    in
-    {
       apps = user.my.features.desktop.webapps.apps;
-      packages = map toString (
-        builtins.filter (package: lib.hasPrefix "webapp-package-" package.name) user.home.packages
-      );
-      enabled = user.programs.firefox.policies.Preferences."browser.taskbarTabs.enabled";
-      mime = user.xdg.mimeApps.defaultApplications;
+      packages = builtins.filter (
+        package: lib.hasPrefix "webapp-package-" package.name
+      ) user.home.packages;
       firefox = lib.getExe user.programs.firefox.finalPackage;
-    }
-  ) graphicalHosts;
-  nativeFirefox =
-    let
-      host = graphicalHosts.${builtins.head (lib.attrNames graphicalHosts)}.config;
     in
-    host.home-manager.users.${host.my.user.primary}.programs.firefox.finalPackage;
-  manifest = pkgs.writeText "webapps-test.json" (
-    builtins.toJSON {
-      inherit hosts;
-      arguments = firefoxArgs { url = "http://webapp.example.test"; };
-      fixture = "${builtins.head inherited.config.home.packages}/bin/webapp-fixture";
-      expected = (firefoxArgs { url = "https://webapp.example.test"; }) ++ [ "argument with spaces" ];
-    }
+    assert
+      user.programs.firefox.policies.Preferences."browser.taskbarTabs.enabled" == {
+        Value = true;
+        Status = "locked";
+      };
+    assert lib.all (mime: user.xdg.mimeApps.defaultApplications.${mime} == [ "firefox.desktop" ]) [
+      "text/html"
+      "x-scheme-handler/http"
+      "x-scheme-handler/https"
+    ];
+    assert builtins.length packages == builtins.length (lib.attrNames apps);
+    lib.concatMapStringsSep "\n" (
+      package:
+      let
+        appName = lib.removePrefix "webapp-package-" package.name;
+        app = apps.${appName};
+        arguments =
+          (firefoxArgs {
+            inherit (app) url;
+            container = app.firefoxContainer;
+          })
+          ++ app.extraArgs;
+        expectedExec = "exec ${lib.escapeShellArg firefox} ${lib.escapeShellArgs arguments}";
+      in
+      assert app.browser == "firefox";
+      ''
+        # Inspect the built artifact, including the policy-wrapped browser path.
+        test -x ${package}/bin/webapp-${appName}
+          grep -Fq -- ${lib.escapeShellArg expectedExec} ${package}/bin/webapp-${appName}
+          grep -Fxq -- "Exec=$(readlink -f ${package}/bin/webapp-${appName})" ${package}/share/applications/webapp-${appName}.desktop
+      ''
+    ) packages
+    + ''
+      echo '${name}: ${toString (builtins.length packages)} Firefox launchers and MIME defaults checked'
+    '';
+  expected = pkgs.writeText "webapp-expected-arguments" (
+    lib.concatStringsSep "\n" (
+      (firefoxArgs { url = "https://webapp.example.test"; }) ++ [ "argument with spaces" ]
+    )
+    + "\n"
   );
 in
 assert inherited.config.my.features.desktop.webapps.apps.fixture.browser == "firefox";
@@ -117,16 +136,22 @@ assert !(lib.all (claim: claim.assertion) missingBrowser.config.assertions);
 pkgs.runCommandLocal "webapps-check"
   {
     nativeBuildInputs = [
-      (pkgs.python3.withPackages (ps: [ ps.selenium ]))
-      nativeFirefox
-      pkgs.geckodriver
+      pkgs.diffutils
+      pkgs.gnugrep
     ];
   }
   ''
-    export HOME="$TMPDIR/home"
-    mkdir -p "$HOME"
-    export FONTCONFIG_FILE=${pkgs.makeFontsConf { fontDirectories = [ pkgs.dejavu_fonts ]; }}
-    export MOZ_DISABLE_CONTENT_SANDBOX=1
-    python3 ${./webapps.py} ${nativeFirefox}/lib/firefox/firefox ${pkgs.geckodriver}/bin/geckodriver ${manifest}
+    export CALL_LOG="$TMPDIR/arguments"
+    for expected_status in 0 17; do
+      export BROWSER_EXIT="$expected_status"
+      if ${builtins.head inherited.config.home.packages}/bin/webapp-fixture; then
+        actual_status=0
+      else
+        actual_status=$?
+      fi
+      test "$actual_status" -eq "$expected_status"
+      diff -u ${expected} "$CALL_LOG"
+    done
+    ${lib.concatStringsSep "\n" (lib.mapAttrsToList checkHost graphicalHosts)}
     touch "$out"
   ''

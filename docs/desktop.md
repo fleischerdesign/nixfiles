@@ -205,13 +205,11 @@ stored start URL is authoritative. Logins and extensions are shared with the sel
 Chrome's existing login sessions do not transfer to Firefox.
 
 `checks/webapps.nix` verifies both graphical host classes' generated launchers, default inheritance,
-explicit browser overrides, unsupported isolation and MIME defaults. It also starts the actual pinned
-Firefox twice in a disposable profile against a local HTTP fixture: the expected result is a native
-`minimal-ui` window in that profile and one stable Firefox-owned registration across both starts.
-This headless check does not prove Niri's live dock grouping. After deployment, restart Firefox so
-the policy is loaded, launch an app, and verify its app window, Noctalia launcher/dock identity and
-shared session. Existing user profiles and Chrome launchers must not be manually deleted as part of
-that verification.
+explicit browser overrides, unsupported isolation and MIME defaults. A shell-only fixture verifies
+argument boundaries and propagation of the browser's exit status; it does not start a browser or
+require Python, Selenium or Geckodriver. After deployment, restart Firefox so the policy is loaded,
+launch an app, and verify that it opens a native app window using the normal browser session.
+Existing user profiles must not be manually deleted as part of that verification.
 
 ## 6. Verification
 
