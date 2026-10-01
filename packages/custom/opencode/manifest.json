@@ -1,0 +1,20 @@
+{
+  "name": "opencode",
+  "upstream": {
+    "type": "flake-package",
+    "package": "opencode",
+    "dependencyAttributes": {
+      "node_modules": "node_modules"
+    }
+  },
+  "dependencyHashes": {
+    "x86_64-linux": {
+      "node_modules": "sha256-q9F04B8xHQWDw+0HF0UeAJ7JX5xBHl3b2VdrUdwDl5I="
+    }
+  },
+  "dependencyDerivations": {
+    "x86_64-linux": {
+      "node_modules": "/nix/store/ah96makci5dh05pmfcfhd2jm61lgdbak-opencode-node_modules-2.0.18+39021df.drv"
+    }
+  }
+}

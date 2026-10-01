@@ -87,6 +87,7 @@
               (builtins.fromJSON (builtins.readFile "${inputs.opencode}/package.json")).packageManager
             );
             upstream = inputs.opencode.packages.${system}.opencode;
+            manifest = builtins.fromJSON (builtins.readFile ./packages/custom/opencode/manifest.json);
           in
           {
             opencode-v2 =
@@ -98,8 +99,7 @@
                   bun = final.bun;
                   node_modules = upstream.node_modules.override {
                     bun = final.bun;
-                    # Upstream's fixed-output hash describes Bun 1.3.13's dependency layout.
-                    hash = "sha256-q9F04B8xHQWDw+0HF0UeAJ7JX5xBHl3b2VdrUdwDl5I=";
+                    hash = manifest.dependencyHashes.${system}.node_modules or "";
                   };
                 }).overrideAttrs
                   (_: {

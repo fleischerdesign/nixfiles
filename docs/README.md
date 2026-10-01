@@ -16,6 +16,7 @@ agentic contributors).
 | What may a name look like, which plane does it live in, who owns it? | [naming.md](naming.md) |
 | How do I deploy, reach a host, verify a change, recover a host I locked myself out of? | [operations.md](operations.md) |
 | How do we work here - what counts as verified, what are the failure patterns? | [practices.md](practices.md) |
+| How are flake inputs and custom package dependency hashes updated? | [package-updates.md](package-updates.md) |
 | Who is a user, what is a service account, how does authentication and authorisation work? | [identity.md](identity.md) |
 | What is the security model, layer by layer? | [security.md](security.md) |
 | How do applications send mail and share SMTP credentials? | [smtp.md](smtp.md) |

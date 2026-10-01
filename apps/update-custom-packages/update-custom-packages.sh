@@ -10,6 +10,7 @@
 #   pypi             — PyPI package, single or multi-package manifests
 #   obsidian-plugin  — GitHub Release assets (main.js, manifest.json, styles.css)
 #   npm              — Package published to the npm registry (tarball as source)
+#   flake-package    — Flake-managed source, manifest-managed dependency hashes
 #
 # github-source manifests support .upstream.tagPrefix (default "v") for repos
 # tagging releases under a non-default prefix (e.g. "dsh-v"); with a custom
@@ -172,10 +173,48 @@ refresh_fixed_hash() {
     echo "No unique measured SHA256 hash for $drv; refusing to update $manifest" >&2
     return 1
   fi
-  jq --arg key "$key" --arg hash "$hash" '.[$key] = $hash' "$manifest" > "$work/manifest.json"
+  jq --arg key "$key" --arg hash "$hash" 'setpath($key | split("."); $hash)' "$manifest" > "$work/manifest.json"
   cp "$work/manifest.json" "$manifest"
   nix build --no-link --print-build-logs ".#${package}.${attribute}"
 }
+
+# A fake-hash derivation path fingerprints the actual dependency recipe:
+# source, toolchain, platform and build instructions, not just a release name.
+# Keep hashes platform-specific and publish only after verified builds. The
+# source remains owned by flake.lock; this updater never selects another rev.
+refresh_flake_package() (
+  set -euo pipefail
+  local manifest="$1" package system work complete=false name attribute key drv previous
+  package="$(jq -er '.upstream.package' "$manifest")"
+  system="$(nix eval --raw ".#${package}.system")"
+  work="$(mktemp -d)"
+  cp "$manifest" "$work/original.json"
+  trap 'if [ "$complete" != true ]; then cp "$work/original.json" "$manifest"; fi; rm -rf "$work"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  jq -e '.upstream.dependencyAttributes | type == "object" and length > 0 and all(.[]; type == "string" and length > 0)' "$manifest" > /dev/null
+  while IFS=$'\t' read -r name attribute; do
+    key="dependencyHashes.$system.$name"
+    previous="$(jq -r --arg system "$system" --arg name "$name" '.dependencyDerivations[$system][$name] // empty' "$work/original.json")"
+    jq --arg key "$key" 'setpath($key | split("."); "")' "$manifest" > "$work/manifest.json"
+    cp "$work/manifest.json" "$manifest"
+    drv="$(nix eval --raw ".#${package}.${attribute}.drvPath")"
+    if [ "$drv" = "$previous" ]; then
+      jq --slurpfile original "$work/original.json" --arg key "$key" '
+        ($key | split(".")) as $path | setpath($path; $original[0] | getpath($path))
+      ' "$manifest" > "$work/manifest.json"
+      cp "$work/manifest.json" "$manifest"
+      echo "  ✅ $package/$name ($system) has unchanged build inputs."
+    else
+      refresh_fixed_hash "$manifest" "$package" "$key" "$attribute" "$work"
+      jq --arg system "$system" --arg name "$name" --arg drv "$drv" '
+        .dependencyDerivations[$system][$name] = $drv
+      ' "$manifest" > "$work/manifest.json"
+      cp "$work/manifest.json" "$manifest"
+    fi
+  done < <(jq -r '.upstream.dependencyAttributes | to_entries[] | [.key, .value] | @tsv' "$manifest")
+  complete=true
+)
 
 # Publish a version only when all declared source/dependency hashes work.
 # Restore the original manifest on any error, including interruption.
@@ -240,10 +279,17 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
   upstream_type="$(jq -r '.upstream.type // "none"' "$manifest_path")"
 
   # =========================================================================
+  # flake-package — source owned by flake.lock, dependencies owned by manifest
+  # =========================================================================
+
+  if [ "$upstream_type" = "flake-package" ]; then
+    refresh_flake_package "$manifest_path"
+
+  # =========================================================================
   # github-release — AppImage asset from GitHub Release
   # =========================================================================
 
-  if [ "$upstream_type" = "github-release" ]; then
+  elif [ "$upstream_type" = "github-release" ]; then
     owner="$(jq -r '.upstream.owner' "$manifest_path")"
     repo="$(jq -r '.upstream.repo' "$manifest_path")"
     current_version="$(jq -r '.version' "$manifest_path")"
