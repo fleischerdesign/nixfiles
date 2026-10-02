@@ -31,6 +31,7 @@ let
   builtinsPluginIds = [
     "openai"
     "openrouter"
+    "opencode-go"
     "browser"
     "web-readability"
     "memory-core"
@@ -83,6 +84,9 @@ in
         OPENAI_API_KEY = "ai/openai_api_key";
         DEEPSEEK_API_KEY = "ai/deepseek_api_key";
         OPENROUTER_API_KEY = "ai/openrouter_api_key";
+        # OpenCode's Zen and Go catalogs share one credential; Go entitlement is decided by the
+        # account/workspace the key belongs to, not by a Go-specific key.
+        OPENCODE_API_KEY = "ai/opencode_api_key";
         GH_TOKEN = "users/philipp/github_pat";
         OPENCLAW_GATEWAY_PASSWORD = "ai/openclaw/gateway_password";
       };
