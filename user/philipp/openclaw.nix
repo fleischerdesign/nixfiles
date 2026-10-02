@@ -127,6 +127,40 @@ in
             providers.openai.apiKey = envSecret "OPENAI_API_KEY";
           };
         };
+        # Durable transcripts are the source the session-recall paths index; without them
+        # `rememberAcrossConversations` has nothing to read. Durable, explicit, and not inferred.
+        transcripts.enabled = true;
+        # File logs hold detail (level info) while the journal stays quiet; a stable path under the
+        # state directory keeps diagnostics with the runtime they describe instead of a volatile
+        # /tmp default. `redactPatterns` keep credential-shaped material out of both.
+        logging = {
+          level = "info";
+          consoleLevel = "warn";
+          file = "${instance.stateDir}/logs/gateway.log";
+          maxFileBytes = 16777216;
+          redactPatterns = [
+            "sk-[A-Za-z0-9]{16,}"
+            "oc_sk_[A-Za-z0-9]{16,}"
+            "ghp_[A-Za-z0-9]{16,}"
+            "-----BEGIN [A-Z ]*PRIVATE KEY-----"
+            "[Bb]earer [A-Za-z0-9._-]{16,}"
+          ];
+        };
+        session = {
+          # Reset is a named action, never an accident; every spelling is listed because aliases are
+          # not added automatically. Everything else - scope, sharing, store - is chosen by the
+          # runtime's documented defaults, which fit one operator on one gateway.
+          resetTriggers = [
+            "/new"
+            "/reset"
+          ];
+        };
+        # Anhängsel wachsen den Zustand direkt; sieben Tage reichen für Medien- und Dokumentenkontext,
+        # und ältere Dateien sind nicht die Quelle der Wahrheit - die Sitzungen sind es.
+        attachments.ttlHours = 168;
+        # Managed worktrees belong to the runtime, not the workspace of one agent.
+        worktreeRoot = "${instance.stateDir}/worktrees";
+        worktreeAcceleration = true;
         agents = {
           ownership = "explicit";
           defaults = {
