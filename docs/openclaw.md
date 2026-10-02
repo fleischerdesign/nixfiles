@@ -89,11 +89,13 @@ The audit's `secretDiagnostics` about `gateway.auth.password` are expected: the 
 receive the SOPS environment, so it reports the reference as unresolved. The running unit resolves it.
 
 OpenClaw owns mutable state below `/var/lib/openclaw/instances/<username>`: conversations,
-memory, automation, workspaces, devices and native credentials. Native nodes use the primary
-user's `~/.local/share/openclaw/nodes/<gateway-host>/<username>` directory. Runtime wrappers
-select the appropriate state and configuration; they read private credential files literally,
-never as shell code. SOPS supplies provider and integration secrets. Secret values are not
-written into generated JSON or the Nix store.
+memory, automation, workspaces, devices and native credentials. Native nodes keep their device
+identity and managed worktrees below `/var/lib/openclaw-nodes/<username>/<gateway>/<instance>`.
+Both are service state, not user data: every level is declared with its runtime owner, so the chain
+is correct on first boot and systemd-tmpfiles never has to create a root-owned directory below a
+user-owned one. Runtime wrappers select the appropriate state and configuration; they read private
+credential files literally, never as shell code. SOPS supplies provider and integration secrets.
+Secret values are not written into generated JSON or the Nix store.
 
 ## Authentication boundaries
 

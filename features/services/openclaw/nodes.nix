@@ -15,7 +15,13 @@ let
     _: node:
     let
       id = "openclaw-node-${node.gateway}-${node.instance}-${user}";
-      stateDir = "${account.home}/.local/share/openclaw/nodes/${node.gateway}/${node.instance}";
+      # Node state is service state: it holds the device identity and managed worktrees, so it lives
+      # under /var/lib rather than in the user's home. Putting it under `~/.local/share` lets
+      # systemd-tmpfiles create parent directories as root below a user-owned tree - an ownership
+      # transition it refuses as unsafe - and the working directory then never exists on a fresh
+      # host. Every level below is declared here with the node's owner, so the chain is correct on
+      # first boot as well as on later ones.
+      stateDir = "/var/lib/openclaw-nodes/${user}/${node.gateway}/${node.instance}";
       host = config.my.topology.hosts.${node.gateway}.wireguardIpv4;
       port =
         systems.${node.gateway}.config.my.contracts.provides."openclaw-${node.instance}".endpoints.web.port;
@@ -67,9 +73,14 @@ in
     environment.etc = lib.listToAttrs (
       map (node: lib.nameValuePair "openclaw/${node.id}.json" { source = node.built.source; }) nodes
     );
-    systemd.tmpfiles.rules = lib.concatMap (node: [
-      "d ${node.stateDir} 0700 ${user} ${account.group} - -"
-    ]) nodes;
+    systemd.tmpfiles.rules = lib.unique (
+      lib.concatMap (node: [
+        "d /var/lib/openclaw-nodes 0711 root root - -"
+        "d /var/lib/openclaw-nodes/${user} 0750 ${user} ${account.group} - -"
+        "d ${builtins.dirOf node.stateDir} 0750 ${user} ${account.group} - -"
+        "d ${node.stateDir} 0700 ${user} ${account.group} - -"
+      ]) nodes
+    );
     systemd.services = lib.listToAttrs (
       map (
         node:
