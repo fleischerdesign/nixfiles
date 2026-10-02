@@ -78,10 +78,21 @@ let
 
     ${relationsPython}
 
+    ${directoryPython}
+
     paths = owned_paths()
     if not paths:
         print("FAILED: no owned blueprints in " + str(CONFIG.get("blueprints_dir")))
         sys.exit(1)
+
+    preflight = directory_observations()
+    if preflight["failures"]:
+        for failure in preflight["failures"]:
+            print("FAILED directory preflight: " + failure, file=sys.stderr)
+        sys.exit(1)
+    for category in ("pending", "inactive"):
+        for observation in preflight[category]:
+            print(f"DIRECTORY {category}: {observation}")
 
     # The worker's discovery creates the instance rows, asynchronously and not necessarily before this unit
     # starts on a fresh database. Wait for every owned file to be instantiated before applying any of them.
@@ -172,6 +183,8 @@ let
     # relation_diffs), so a relation this repository does not declare - like the 2026-09-20 orphaned
     # bindings on the shared authorization flow - fails the deploy instead of denying every login.
     failures.extend(relation_diffs(paths))
+    # The preflight is an observation, not a lock against concurrent UI updates.
+    failures.extend(directory_observations()["failures"])
 
     provider = LDAPProvider.objects.first()
     expect("an LDAP provider exists", provider is not None)
@@ -222,6 +235,8 @@ let
 
     ${relationsPython}
 
+    ${directoryPython}
+
     def scalar(value):
         """Only plain values are compared. References, files, lists and FKs are not drift."""
         return isinstance(value, (str, bool, int)) and not isinstance(value, YAMLTag)
@@ -264,6 +279,7 @@ let
 
     # The same derived relation inventory the apply enforces, reported instead of corrected.
     findings.extend(relation_diffs(paths))
+    findings.extend(directory_observations()["failures"])
 
     def publish_metric(count):
         """Publish the finding count for the node-exporter textfile collector.
@@ -306,6 +322,37 @@ let
     sys.exit(0)
   '';
 
+  directoryPython = ''
+    import json
+
+    ${builtins.readFile ../../../../contracts/directory/lib/preflight.py}
+
+    def directory_observations():
+        from authentik.core.models import Group, User, UserTypes
+
+        def users(username):
+            return [
+                {"human": user.type in (UserTypes.INTERNAL, UserTypes.EXTERNAL), "active": user.is_active}
+                for user in User.objects.filter(username=username)[:2]
+            ]
+
+        def groups(name):
+            return list(Group.objects.filter(name=name).values_list("pk", flat=True)[:2])
+
+        directory = json.loads(${builtins.toJSON (builtins.toJSON config.my.directory)})
+        return directory_preflight(directory, users, groups)
+  '';
+
+  directoryReportScript = pkgs.writeText "authentik-directory-report.py" ''
+    import sys
+
+    ${directoryPython}
+
+    result = directory_observations()
+    print(json.dumps(result, sort_keys=True))
+    sys.exit(1 if any(result.values()) else 0)
+  '';
+
   # The environment every authentik process shares. Defined once so the four units cannot drift apart;
   # `authentikBlueprintEnvironment` holds what a process needs while it applies or bootstraps.
   authentikEnvironmentFiles = [
@@ -327,6 +374,16 @@ let
     "AUTHENTIK_RECOVERY_FROM_ADDRESS=${smtp.fromAddress}"
     "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}"
   ];
+
+  authentikShellServiceConfig = {
+    Type = "oneshot";
+    User = "authentik";
+    Group = "authentik";
+    WorkingDirectory = "/var/lib/authentik";
+    EnvironmentFile = authentikEnvironmentFiles;
+    Environment = authentikDatabaseEnvironment;
+    ExecStart = "${lib.getExe authentikPackage} shell";
+  };
 
   # The ownership reader, defined once and interpolated into both scripts, so the apply and the drift
   # report can never disagree about which blueprints this repository owns.
@@ -361,6 +418,8 @@ let
   # and returns what differs from the database. The apply fails on a non-empty result; the drift report
   # prints it. Only objects our entries touch are asserted, because upstream owns its own bindings.
   relationsPython = ''
+    ${builtins.readFile ../lib/membership.py}
+
     def relation_diffs(paths):
         """Declared-vs-actual relation differences for the owned blueprints; empty means they match."""
         from django.apps import apps
@@ -369,6 +428,7 @@ let
         from authentik.blueprints.v1.importer import Importer
         from authentik.flows.models import Flow, FlowStageBinding
         from authentik.policies.models import PolicyBinding, PolicyBindingModel
+        from authentik.core.models import Group, User
 
         flow_model = "authentik_flows.flow"
         binding_model = "authentik_policies.policybinding"
@@ -402,6 +462,15 @@ let
             return f"{key[0]} {key[1]}={key[2]}"
 
         diffs = []
+        memberships = []
+        def lookup_members(name):
+            group = Group.objects.filter(name=name).first()
+            return None if group is None else group.users.values_list("username", flat=True)
+
+        def resolve_username(key):
+            obj = resolve(key)
+            return obj.username if isinstance(obj, User) else None
+
         for path in paths:
             blueprint = Importer.from_string((root / path).read_text(encoding="utf-8"), {}).blueprint
             index = {}
@@ -426,6 +495,10 @@ let
                 # contributes a target to assert on.
                 if entry.get_state(blueprint) == BlueprintEntryDesiredState.ABSENT:
                     continue
+                if model == "authentik_core.group" and "users" in (entry.attrs or {}):
+                    memberships.append((identifiers.get("name"), [
+                        key_of(reference, index) for reference in entry.attrs["users"]
+                    ]))
                 # An object we declare: we own its relation sets.
                 if len(identifiers) == 1 and not any(isinstance(v, (Find, KeyOf)) for v in identifiers.values()):
                     field, value = next(iter(identifiers.items()))
@@ -466,7 +539,7 @@ let
                     diffs.append(
                         f"stage bindings on {description}: {found} in the database, {expected} declared"
                     )
-        return diffs
+        return diffs + group_membership_diffs(memberships, lookup_members, resolve_username)
   '';
 
   # The directory's structure comes from the fleet-wide contract, never from a literal here.
@@ -499,6 +572,11 @@ in
       type = lib.types.str;
       default = "philipp@vyrx.de";
       description = "Email address applied to the bootstrapped `akadmin` account.";
+    };
+    superuserGroups = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Present directory groups whose members receive Authentik superuser privileges; this mapping does not grant Linux or fleet SSH access.";
     };
     listenPort = lib.mkOption {
       type = lib.types.port;
@@ -673,16 +751,20 @@ in
 
       restartTriggers = [ cfg.blueprintsDir ];
 
-      serviceConfig = {
-        Type = "oneshot";
-        User = "authentik";
-        Group = "authentik";
-        WorkingDirectory = "/var/lib/authentik";
+      serviceConfig = authentikShellServiceConfig // {
         TimeoutStartSec = toString (blueprintsApplyTimeoutSeconds + 60);
-        EnvironmentFile = authentikEnvironmentFiles;
         Environment = authentikDatabaseEnvironment ++ authentikBlueprintEnvironment;
-        ExecStart = "${lib.getExe authentikPackage} shell";
         StandardInput = "file:${blueprintsApplyScript}";
+      };
+    };
+
+    # On-demand, read-only directory diagnosis. It neither starts nor requires the apply unit.
+    systemd.services.authentik-directory-report = {
+      description = "Diagnose declared directory references, creation and suspension without applying";
+      after = [ "authentik-worker.service" ];
+      unitConfig.Requisite = "authentik-worker.service";
+      serviceConfig = authentikShellServiceConfig // {
+        StandardInput = "file:${directoryReportScript}";
       };
     };
 
@@ -704,14 +786,8 @@ in
         "authentik-blueprints-apply.service"
       ];
       restartTriggers = [ cfg.blueprintsDir ];
-      serviceConfig = {
-        Type = "oneshot";
-        User = "authentik";
-        Group = "authentik";
-        WorkingDirectory = "/var/lib/authentik";
-        EnvironmentFile = authentikEnvironmentFiles;
+      serviceConfig = authentikShellServiceConfig // {
         Environment = authentikDatabaseEnvironment ++ [ "AUTHENTIK_BLUEPRINTS_DIR=${cfg.blueprintsDir}" ];
-        ExecStart = "${lib.getExe authentikPackage} shell";
         StandardInput = "file:${driftReportScript}";
       };
     };

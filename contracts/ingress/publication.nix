@@ -2,6 +2,11 @@
 { lib }:
 {
   options = {
+    ingressOnly = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Terminate this public publication only on the central ingress, including LAN and overlay DNS answers. Used when the ingress network identity is an authentication boundary.";
+    };
     ingress = lib.mkOption {
       type = lib.types.bool;
       default = true;

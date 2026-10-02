@@ -221,13 +221,8 @@ let
     else
       true;
 
-  # An audience group this compiler is the author of, because its name derives from an endpoint
-  # (`contracts/endpoints/lib/identifiers.nix`, the reserved prefix). It is declared in the same blueprint as the binding that
-  # uses it, so a binding can never point at a group nobody creates - which was the one gap both the
-  # role and the own-audience model shared: `!Find` resolves against the database, and a group that no
-  # document declares is a dangling reference that evaluates, applies and leaves the service
-  # unreachable for everyone.
-  safeAudienceId = groupName: builtins.replaceStrings [ "-" "." ] [ "_" "_" ] groupName;
+  # Derived personal groups are owned by the directory blueprint. Application blueprints
+  # depend on that blueprint and use cross-file lookups, just like ordinary role groups.
 
   # Retiring an audience is a declaration, not an omission. The apply adds and updates; it never deletes
   # a binding that is no longer named, so a migration that merely stops declaring a group leaves the
@@ -252,10 +247,10 @@ let
     map (
       groupName:
       blueprintLib.entry {
-        id = "audience_${safeAudienceId groupName}";
         model = blueprintLib.models.group;
         identifiers.name = groupName;
         attrs = {
+          is_superuser = false;
           attributes.description = "Audience declared by the contracts; its member is the account its name derives from.";
           # The membership is declared here, which is what makes a deploy leave no empty group behind:
           # an audience group that nobody is in binds its application shut for everyone, including the
@@ -269,62 +264,17 @@ let
       }
     ) (lib.filter audience.isAudienceGroup ep.accessGroups);
 
-  # The role groups are declared exactly once, in the RBAC document, which is hand-written. Reading the
-  # names from it keeps that one declaration instead of restating them here. The guard is the point: a
-  # change of the document's shape must fail the evaluation, because an empty set would quietly turn the
-  # check below into a no-op that passes everything.
-  rbacRoleGroupNames =
-    let
-      document = builtins.readFile ./blueprints/01-rbac/users-and-groups.yaml;
-      nameOfBlock =
-        block:
-        let
-          # The block's own `name:` follows its `identifiers:` key. Everything after the first
-          # `identifiers:` is this group's slice; the users that trail the last group block come later,
-          # so the first `name:` inside the slice is the group's.
-          after = builtins.elemAt (lib.splitString "identifiers:" block) 1;
-          # `builtins.match` answers with the capture groups, not with the match: one group here, so the
-          # name is the head of the head. Reading it as a plain string made every role look undeclared.
-          captures = builtins.filter (found: found != null) (
-            map (line: builtins.match "[[:space:]]+name: \"(.*)\"" line) (lib.splitString "\n" after)
-          );
-        in
-        if captures == [ ] then null else builtins.head (builtins.head captures);
-      names = builtins.filter (found: found != null) (
-        map nameOfBlock (lib.drop 1 (lib.splitString "- model: authentik_core.group" document))
-      );
-    in
-    if names == [ ] then
-      throw "Authentik compiler error: 01-rbac/users-and-groups.yaml yielded no group names - the document's shape changed, and every audience check would pass vacuously"
-    else
-      names;
+  rbacRoleGroupNames = lib.attrNames (
+    lib.filterAttrs (_: group: group.state == "present") config.my.directory.groups
+  );
 
   # Three ways to name an audience that exists only in the declaration, each one silent until now: a
   # misspelt role (the binding points at nothing, the service becomes unreachable for everyone, and the
   # deploy reports success), an own-audience name that belongs to no endpoint, and an admin group
   # outside the access group it administers - which the schema describes as a rule but never enforced.
-  # The usernames a derived audience may name, read from the same document that seeds the accounts: a
-  # group named after a person who does not exist binds an application shut for everyone.
-  rbacUsernames =
-    let
-      document = builtins.readFile ./blueprints/01-rbac/users-and-groups.yaml;
-      nameOfBlock =
-        block:
-        let
-          after = builtins.elemAt (lib.splitString "identifiers:" block) 1;
-          captures = builtins.filter (found: found != null) (
-            map (line: builtins.match "[[:space:]]+username: \"(.*)\"" line) (lib.splitString "\n" after)
-          );
-        in
-        if captures == [ ] then null else builtins.head (builtins.head captures);
-      names = builtins.filter (found: found != null) (
-        map nameOfBlock (lib.drop 1 (lib.splitString "- model: authentik_core.user" document))
-      );
-    in
-    if names == [ ] then
-      throw "Authentik compiler error: 01-rbac/users-and-groups.yaml yielded no usernames - the document's shape changed, and a derived audience would bind an application shut"
-    else
-      names;
+  # Referenced human identities come from the directory catalog, including UI-created
+  # accounts registered without a seed. Runtime membership verification proves their existence.
+  rbacUsernames = lib.attrNames config.my.directory.users;
 
   audiencePolicyCheck =
     let
@@ -413,13 +363,7 @@ let
         groupName:
         blueprintLib.groupBinding {
           target = blueprintLib.refs.policyTargetBySlug "application" name;
-          # The group this compiler declares is referenced by its id in this same blueprint; a role group
-          # is authored by the RBAC document and looked up in the database. One author per name, always.
-          group =
-            if audience.isAudienceGroup groupName then
-              blueprintLib.refs.sameBlueprint "audience_${safeAudienceId groupName}"
-            else
-              blueprintLib.refs.byName blueprintLib.models.group groupName;
+          group = blueprintLib.refs.byName blueprintLib.models.group groupName;
           order = 0;
         }
       ) ep.accessGroups;
@@ -431,15 +375,11 @@ let
     let
       serialized = pkgs.writeText "${name}.json" (builtins.toJSON blueprint);
     in
-    pkgs.runCommandLocal "${name}.yaml" { } ''
-      # The schema line is what editors and any JSON-Schema checker key on; authentik itself ignores it.
-      # Field-level validation still happens where it can: in the apply, which is part of the deploy, so a
-      # wrong field name fails a deployment rather than producing a blueprint that never applies.
-      {
-        echo '# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json'
-        sed 's/"@@YAML_TAG@@\([^"]*\)"/\1/g' ${serialized}
-      } > "$out"
-    '';
+    pkgs.runCommandLocal "${name}.yaml"
+      { nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ]; }
+      ''
+        python3 ${../lib/render-blueprint.py} ${serialized} > "$out"
+      '';
 
   # authentik does not guarantee any apply order across blueprints (docs:
   # "discovery and evaluation is not guaranteed to follow any specific order").
@@ -492,7 +432,6 @@ let
       name = "vyrx-apps-proxy";
       entries =
         providerFlowDependencies
-        ++ lib.unique (lib.concatMap (name: audienceGroupEntries authEndpoints.${name}) sortedEndpointNames)
         ++ (lib.replicate 2 orphanedAuthorizationFlowBinding)
         ++ (lib.concatMap (
           name:
@@ -558,9 +497,6 @@ let
       name = "vyrx-apps-oidc";
       entries =
         providerFlowDependencies
-        ++ lib.unique (
-          lib.concatMap (name: audienceGroupEntries oidcEndpoints.${name}) sortedOidcEndpointNames
-        )
         ++ lib.concatMap (
           name:
           let
@@ -887,6 +823,54 @@ let
   generatedLdapConsumerBlueprint = toBlueprintYaml "ldap-consumers-generated" ldapConsumerBlueprint;
 
   # Merged blueprints directory containing upstream base blueprints, custom blueprints and generated applications
+  directoryBlueprint =
+    assert lib.assertMsg (lib.all (name: !audience.isAudienceGroup name) (
+      lib.attrNames config.my.directory.groups
+    )) "Directory role groups may not use the reserved personal audience prefix.";
+    assert lib.assertMsg (lib.all (name: lib.elem name rbacRoleGroupNames)
+      config.my.features.services.authentik.server.superuserGroups
+    ) "Authentik superuserGroups must reference present directory groups.";
+    blueprintLib.blueprint {
+      name = "vyrx-rbac-groups-and-users";
+      entries =
+        lib.mapAttrsToList (
+          username: user:
+          blueprintLib.entry {
+            model = blueprintLib.models.user;
+            identifiers = { inherit username; };
+            state = "created";
+            attrs = {
+              name = user.initialProfile.displayName;
+              inherit (user.initialProfile) email;
+            };
+          }
+        ) (lib.filterAttrs (_: user: user.initialProfile != null) config.my.directory.users)
+        ++ lib.mapAttrsToList (
+          name: group:
+          blueprintLib.entry {
+            model = blueprintLib.models.group;
+            identifiers.name = name;
+            inherit (group) state;
+            attrs =
+              if group.state == "absent" then
+                null
+              else
+                {
+                  is_superuser = lib.elem name config.my.features.services.authentik.server.superuserGroups;
+                  attributes.description = group.description;
+                }
+                // lib.optionalAttrs (group.members != null) {
+                  users = map (
+                    username: blueprintLib.refs.byField blueprintLib.models.user "username" username
+                  ) group.members;
+                };
+          }
+        ) config.my.directory.groups
+        # Personal audiences share this one owner across proxy, OIDC and LDAP consumers.
+        ++ lib.unique (lib.concatMap (item: audienceGroupEntries item.ep) allClusterEndpointsList);
+    };
+  generatedDirectoryBlueprint = toBlueprintYaml "users-and-groups" directoryBlueprint;
+
   effectiveBlueprintsDir = pkgs.runCommandLocal "authentik-blueprints" { } ''
     mkdir -p "$out"
     # 1. Inherit upstream system and default blueprints (required for initial flows and setup)
@@ -896,7 +880,10 @@ let
     # 2. Overlay VYRX custom blueprints
     cp -r ${./blueprints}/* "$out/"
 
-    # 3. Inject compiled application blueprints
+    # 3. Inject the compiled directory and applications
+    mkdir -p "$out/01-rbac"
+    chmod u+w "$out/01-rbac"
+    cp ${generatedDirectoryBlueprint} "$out/01-rbac/users-and-groups.yaml"
     mkdir -p "$out/03-apps"
     cp ${generatedProxyBlueprint} "$out/03-apps/proxy-apps-generated.yaml"
     cp ${generatedOidcBlueprint} "$out/03-apps/oidc-apps-generated.yaml"

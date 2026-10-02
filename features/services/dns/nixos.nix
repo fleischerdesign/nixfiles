@@ -185,8 +185,8 @@ let
                 lib.optionals (pub.canonicalDomain != null) ([ pub.canonicalDomain ] ++ pub.extraDomains)
               ))
               {
-                lan = lanPlaneAddress host;
-                overlay = overlayAddress host;
+                lan = lanPlaneAddress (if pub.ingressOnly then ingressHost else host);
+                overlay = overlayAddress (if pub.ingressOnly then ingressHost else host);
                 public = if pub.scope == "public" then ingressAddress else null;
               }
           ) (lib.attrValues contract.publications)

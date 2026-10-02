@@ -45,6 +45,7 @@ let
         "dns"
         "smtp"
         "ssh"
+        "identity"
       ];
 
       finalPkgs =

@@ -39,7 +39,9 @@ let
   terminatedPublications =
     lib.concatMap (
       contract:
-      lib.filter (pub: pub.ingress && pub.canonicalDomain != null) (lib.attrValues contract.publications)
+      lib.filter (pub: pub.ingress && (!pub.ingressOnly || isIngress) && pub.canonicalDomain != null) (
+        lib.attrValues contract.publications
+      )
     ) (lib.attrValues (config.my.contracts.provides or { }))
     ++ lib.optionals isIngress (
       lib.concatLists (
@@ -66,6 +68,8 @@ let
       ) terminatedPublications
     )
   );
+  certificateNames = lib.filter (name: !isIngress || lib.hasPrefix "*." name) publicNames;
+  certificateId = name: lib.replaceStrings [ "*." ] [ "wildcard." ] name;
 in
 {
   options.my.contracts.provides = lib.mkOption {
@@ -147,6 +151,7 @@ in
               lib.filter (
                 pub:
                 pub.ingress
+                && (!pub.ingressOnly || isIngress)
                 && builtins.elem pub.scope [
                   "public"
                   "internal"
@@ -215,6 +220,8 @@ in
                     lib.optionalString (conf.unauthenticatedPaths != [ ]) ''
                       @unauthenticatedRoute path ${lib.concatStringsSep " " conf.unauthenticatedPaths}
                       handle @unauthenticatedRoute {
+                        request_header -X-Authentik-*
+                        request_header -X-OpenClaw-Scopes
                         ${proxy}
                       }
                     ''
@@ -225,6 +232,8 @@ in
                         not header Origin *
                       }
                       handle @nonBrowserWebsocket {
+                        request_header -X-Authentik-*
+                        request_header -X-OpenClaw-Scopes
                         ${proxy}
                       }
                     '';
@@ -236,6 +245,8 @@ in
                     import authentik
                     ${exemptHandlers}
                     handle {
+                      request_header -X-Authentik-*
+                      request_header -X-OpenClaw-Scopes
                       forward_auth ${cfg.authentikOutpostAddress} {
                         uri /outpost.goauthentik.io/auth/caddy
                         copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
@@ -255,7 +266,9 @@ in
           # public CA can validate - are served by Caddy's own CA.
           tlsFor =
             domain:
-            if isIngress then
+            if lib.elem domain certificateNames then
+              "tls /var/lib/acme/${certificateId domain}/fullchain.pem /var/lib/acme/${certificateId domain}/key.pem\n"
+            else if isIngress then
               # The ingress is where public names resolve, so Caddy's automatic HTTPS (HTTP-01)
               # already works there and is the right challenge for it. Only a host that cannot be
               # reached for validation - because split horizon sends the name elsewhere - needs a
@@ -263,7 +276,7 @@ in
               # satisfy; none of them copies key material from another.
               ""
             else if lib.elem domain publicNames then
-              "tls /var/lib/acme/${domain}/fullchain.pem /var/lib/acme/${domain}/key.pem\n"
+              "tls /var/lib/acme/${certificateId domain}/fullchain.pem /var/lib/acme/${certificateId domain}/key.pem\n"
             else if
               lib.hasInfix ".lan." domain || lib.hasInfix ".mesh." domain || lib.hasInfix ".iot." domain
             then
@@ -329,10 +342,10 @@ in
       # The ingress declares none: its names resolve to it, so Caddy's automatic HTTPS already
       # obtains and renews them there, and declaring them again would issue a second, redundant set.
       # Every other host declares one certificate per public name it terminates.
-      certs = lib.mkIf (!isIngress) (
-        lib.genAttrs publicNames (name: {
-          domain = name;
-        })
+      certs = (
+        lib.listToAttrs (
+          map (name: lib.nameValuePair (certificateId name) { domain = name; }) certificateNames
+        )
       );
     };
 

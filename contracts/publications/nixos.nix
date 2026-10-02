@@ -138,6 +138,9 @@ let
             "${service}.publications.${name}: auth '${pub.auth}' is enforced by the ingress, "
             + "which this publication disables"
           )
+          ++ lib.optional (
+            pub.ingressOnly && (!pub.ingress || pub.scope != "public")
+          ) "${service}.publications.${name}: ingressOnly requires a public HTTP ingress"
         ) contract.publications
       )
       ++ lib.concatLists (

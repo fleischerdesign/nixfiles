@@ -11,4 +11,19 @@ rec {
   sourcesOfTrust =
     topology: levels:
     lib.unique (lib.concatMap (level: topology.sourcesByTrust.${level} or [ ]) levels);
+
+  sourcesOfHosts =
+    topology: names:
+    lib.unique (
+      lib.concatMap (
+        name:
+        let
+          host = topology.hosts.${name};
+        in
+        lib.filter (address: address != null) [
+          host.wireguardIpv4
+          host.wireguardIpv6
+        ]
+      ) names
+    );
 }

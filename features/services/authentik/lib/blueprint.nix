@@ -15,9 +15,11 @@
 # the blueprint directory before and after and comparing the files.
 { lib }:
 let
-  # authentik serializes a blueprint to JSON and strips this marker in a sed pass, which is how YAML tags
-  # reach the file unquoted.
-  marker = value: "@@YAML_TAG@@${value}";
+  # References are structured data, not magic strings or fragments of YAML syntax.
+  reference = tag: value: {
+    __authentikTag = tag;
+    inherit value;
+  };
 
   # Ownership marker. Every blueprint this repository owns carries it; the apply reads it to separate our
   # declarations from authentik's own defaults, whose objects an administrator may edit in the interface
@@ -58,12 +60,18 @@ let
 
   refs = {
     # Points at an entry declared in the same blueprint, by its `id`.
-    sameBlueprint = id: marker "!KeyOf ${id}";
+    sameBlueprint = id: reference "KeyOf" id;
 
     # Looks an object up in the database, which is the only reference that works across blueprints.
     byField =
       model: field: value:
-      marker "!Find [${model}, [${field}, ${value}]]";
+      reference "Find" [
+        model
+        [
+          field
+          value
+        ]
+      ];
 
     byName = model: name: refs.byField model "name" name;
     bySlug = model: slug: refs.byField model "slug" slug;
@@ -74,9 +82,9 @@ let
     # Resolve through the base model instead; `child` is the reverse accessor (`flow`, `application`, ...).
     policyTargetBySlug = child: slug: refs.byField models.policyBindingModel "${child}__slug" slug;
 
-    file = path: marker "!File ${path}";
-    env = name: marker "!Env ${name}";
-    context = key: marker "!Context ${key}";
+    file = path: reference "File" path;
+    env = name: reference "Env" name;
+    context = key: reference "Context" key;
   };
 
   # A raw entry. Fields that are not needed are omitted rather than set to null: the importer hands the

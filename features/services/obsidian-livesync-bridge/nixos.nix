@@ -67,7 +67,7 @@ let
         couchdb = {
           url = lib.mkOption {
             type = lib.types.str;
-            default = "https://livesync.${config.my.topology.domain}";
+            default = "https://livesync.${osConfig.my.topology.domain}";
             description = "CouchDB server URL.";
           };
 
@@ -103,6 +103,12 @@ let
             Filesystem path to synchronize notes into.
             Defaults to /var/lib/openclaw/instances/<name>/obsidian.
           '';
+        };
+
+        replicaOnly = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Treat the vault as regenerable only when no local writer produces unreproduced changes.";
         };
 
         user = lib.mkOption {
@@ -162,7 +168,12 @@ in
     # the directory is regenerable and the origin - CouchDB on the edge - is the thing that is backed up.
     # Declared as regenerable rather than left for a host's broad backup path to sweep in.
     my.contracts.provides.obsidian-livesync-bridge = {
-      storage.regenerableDirs = lib.mapAttrsToList effectiveVaultPath enabledInstances;
+      storage.regenerableDirs = lib.mapAttrsToList effectiveVaultPath (
+        lib.filterAttrs (_: inst: inst.replicaOnly) enabledInstances
+      );
+      storage.dataDirs = lib.mapAttrsToList effectiveVaultPath (
+        lib.filterAttrs (_: inst: !inst.replicaOnly) enabledInstances
+      );
     };
 
     # Ensure SOPS secrets used by any instance are registered
@@ -214,7 +225,11 @@ in
       ) (lib.attrValues enabledInstances)
     );
 
-    # Ensure vault and state directories exist with correct user ownership
+    # Ensure the vault directory exists with correct user ownership. The bridge's own state and cache
+    # directories are created and owned by systemd (`StateDirectory=`, `CacheDirectory=`), which is
+    # what keeps a stale owner from a removed account out of the Deno cache: a manual tmpfiles rule
+    # sets the directory's owner once and leaves whatever is inside it untouched, and a UID that is
+    # later reused by an unrelated account turns that into a silent read-only cache.
     systemd.tmpfiles.rules = lib.concatMap (
       name:
       let
@@ -222,7 +237,6 @@ in
       in
       [
         "d ${inst._targetVaultPath} 0770 ${inst.user} ${inst.group} - -"
-        "d /var/lib/obsidian-livesync-bridge/${name} 0750 ${inst.user} ${inst.group} - -"
       ]
     ) (lib.attrNames enabledInstances);
 
@@ -234,6 +248,7 @@ in
           inst = enabledInstances.${name};
           configFile = osConfig.sops.templates."obsidian_livesync_bridge_${name}_config".path;
           stateDir = "/var/lib/obsidian-livesync-bridge/${name}";
+          cacheDir = "/var/cache/obsidian-livesync-bridge/${name}";
         in
         {
           name = "obsidian-livesync-bridge-${name}";
@@ -245,8 +260,10 @@ in
 
             environment = {
               LSB_CONFIG = configFile;
-              LSB_HEALTH_FILE = "${stateDir}/health.json";
-              DENO_DIR = "${stateDir}/.deno";
+              LSB_HEALTH_FILE = "${cacheDir}/health.json";
+              # Deno's module cache and offline scan state both live here; `CacheDirectory` above
+              # guarantees the running user owns it.
+              DENO_DIR = cacheDir;
               HOME = stateDir;
             };
 
@@ -254,6 +271,10 @@ in
               User = inst.user;
               Group = inst.group;
               WorkingDirectory = stateDir;
+              StateDirectory = "obsidian-livesync-bridge-${name}";
+              StateDirectoryMode = "0750";
+              CacheDirectory = "obsidian-livesync-bridge-${name}";
+              CacheDirectoryMode = "0750";
               ExecStart = "${inst.package}/bin/livesync-bridge";
               Restart = "always";
               RestartSec = 5;

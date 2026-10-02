@@ -71,6 +71,12 @@ let
             `interface`, and this says who of the mesh may actually use it.
           '';
         };
+
+        fromHosts = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Inventory hosts admitted over the mesh, in addition to explicitly selected trust levels. A host selection alone does not imply every trust level.";
+        };
       };
 
       localUrl = lib.mkOption {

@@ -22,6 +22,7 @@
   };
 
   my.features.services.attic.server.enable = true;
+  my.features.services.openclaw.enable = true;
 
   my.features.services.crowdsec = {
     enable = true;
@@ -43,14 +44,11 @@
 
   my.features.services.obsidian-livesync-bridge = {
     enable = true;
-    instances.philipp = {
-      enable = true;
-      user = "obsidian-bridge";
-      group = "obsidian-bridge";
-      vaultPath = "/var/lib/obsidian-vaults/philipp";
-      couchdb.url = "https://livesync.vyrx.de";
-      couchdb.database = "obsidian-vault";
-    };
+    # The instance name is the owner, which is also the OpenClaw gateway instance name. The vault path,
+    # the run-as account and the CouchDB connection therefore all follow from the defaults: the vault
+    # lives in the gateway's own state directory (only OpenClaw writes it), the integration assigns
+    # the gateway account, and the CouchDB URL derives from the topology domain.
+    instances.philipp.enable = true;
   };
 
   my.features.services.searxng = {
@@ -63,13 +61,13 @@
     enableJsonApi = true;
   };
 
-  # This host runs no Restic, and that is a decision rather than an omission (review decision D13): its
-  # services hold no state that is not regenerable or reproduced elsewhere. The Attic binary cache and
-  # the search index are rebuilt, and the LiveSync vault is a replica of the CouchDB database on
-  # `cld-edge-01`, which is backed up. The backup contract refuses a host that declares restorable
-  # state without saying either "back it up" or "this is why not".
-  my.features.system.backups.restic.declined =
-    "state on this host is regenerable or reproduced from the backed-up CouchDB on cld-edge-01";
+  # Personal gateway state and locally edited vaults require offsite backup. The repository
+  # credential is shared with the edge; Restic retention groups snapshots by host and paths.
+  my.features.system.backups.restic = {
+    enable = true;
+    environmentFile = "backups/restic/cld-edge-01";
+    paths = [ ];
+  };
 
   system.stateVersion = "24.11";
 }

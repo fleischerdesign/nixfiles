@@ -78,9 +78,19 @@ let
         else
           [ ep.directAccess.protocol ];
       # An empty `from` means every declared trust level; a publication additionally implies `mesh`.
-      declaredLevels = if ep.directAccess.from == [ ] then allTrustLevels else ep.directAccess.from;
-      levels = lib.unique (declaredLevels ++ lib.optional item.proxied "mesh");
-      meshSources = accessSources.sourcesOfTrust config.my.topology levels;
+      declaredLevels =
+        if !ep.directAccess.enable then
+          [ ]
+        else if ep.directAccess.from == [ ] && ep.directAccess.fromHosts == [ ] then
+          allTrustLevels
+        else
+          ep.directAccess.from;
+      meshSources = lib.unique (
+        accessSources.sourcesOfTrust config.my.topology declaredLevels
+        ++ accessSources.sourcesOfHosts config.my.topology (
+          ep.directAccess.fromHosts ++ lib.optional item.proxied config.my.topology.ingressHost
+        )
+      );
       v4 = lib.filter (address: !(lib.hasInfix ":" address)) meshSources;
       v6 = lib.filter (address: lib.hasInfix ":" address) meshSources;
       dport = toString ep.port;

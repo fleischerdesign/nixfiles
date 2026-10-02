@@ -1,16 +1,19 @@
 # Identity and access
 
-> **System:** Authentik · **Portal:** `auth.vyrx.de` · **Font of truth:** the blueprint files in
-> `features/services/authentik/server/blueprints/` plus the generated ones
+> **System:** Authentik · **Portal:** `auth.vyrx.de` · **Source of truth:**
+> `inventory/identity.nix`, service contracts, and the owned Authentik blueprints
 >
 > This document records how identity works here **and** the constraints that were expensive to learn.
 > The code is normative; where it and this text disagree, the code is right.
 
 ## 1. The GitOps axiom
 
-Authentik's PostgreSQL database is **ephemeral runtime state**. Every provider, outpost, group, service
-account, role binding and application is declarative code in this repository, applied idempotently when
-the server starts. Losing the database costs a restart, not an afternoon of clicking.
+Directory identities and role groups are declared in `inventory/identity.nix` through the
+provider-neutral `my.directory` contract. Authentik compiles them into native blueprints. Providers,
+outposts, service accounts, bindings and applications are projected from service contracts or owned
+blueprints. Configuration is applied idempotently, but **the database is durable personal state**:
+credentials, passkeys, sessions, UI-created users and UI-owned memberships require database backup.
+Reapplying configuration is not a substitute for restoring that state.
 
 The reason is not elegance: an identity system configured through a web UI is the one component whose
 configuration cannot be reconstructed from the repository, and it is the component that gates
@@ -20,17 +23,18 @@ everything else.
 
 ```
 features/services/authentik/
-├── server/blueprints/            hand-written; order across files is declared, never assumed
+├── server/blueprints/            hand-written adapter configuration; dependencies are explicit
 │   ├── 00-system/brand.yaml      title, design tokens, favicon
-│   ├── 01-rbac/users-and-groups.yaml
 │   └── 02-flows/                 enrollment, recovery, remember-me, passkey autofill
-├── server/default.nix            runtime + the blueprint compiler
+├── server/nixos.nix              runtime, apply verification and drift reporting
+├── server/blueprints.nix         directory and service-contract compiler
 ├── outpost/proxy/                per-host forward-auth where the embedded outpost cannot reach
 └── outpost/ldap/                 per-host LDAP outposts
 ```
 
-`03-apps/*.yaml` (`proxy-apps-generated.yaml`, `oidc-apps-generated.yaml`,
-`ldap-outposts-generated.yaml`) does not exist in the tree: the compiler in `server/default.nix` emits
+`01-rbac/users-and-groups.yaml` is generated from the directory inventory, including derived personal
+audience groups. `03-apps/*.yaml` (`proxy-apps-generated.yaml`, `oidc-apps-generated.yaml`,
+`ldap-outposts-generated.yaml`) does not exist in the tree: the compiler in `server/blueprints.nix` emits
 it **from the service contracts** - every service that declares an OIDC integration or a forward-auth publication gets a
 provider and an application without writing any blueprint. That is the whole point of the contract
 layer - see [architecture.md](architecture.md) §6.1.
@@ -43,7 +47,7 @@ hard way.
 | Constraint | Consequence |
 |---|---|
 | Authentik's blueprint YAML knows `!KeyOf`, `!Find`, `!Env`, `!File`, `!Context` - **not `!Key`** | an unknown tag breaks the `authentik_blueprints.0001_initial` migration, which parses every blueprint; the failure appears as the whole server failing to start |
-| Only `*.yaml` is discovered; JSON cannot carry YAML tags | generated blueprints are emitted as tagged YAML through a sentinel-and-rewrite step, not as JSON |
+| Only `*.yaml` is discovered; JSON cannot carry YAML tags | structured reference nodes are rendered as native tagged YAML with a safe dumper, not string replacement |
 | Blueprint application is **unordered** | dependencies must be declared explicitly with `authentik_blueprints.metaapplyblueprint` - the default provider flows and the RBAC group are declared that way |
 | `authorization_flow` **and** `invalidation_flow` are both required on a provider | a provider without them fails at apply time, not at parse time |
 | `redirect_uris` are objects (`{matching_mode, url}`), not strings | a plain string list is silently ignored |
@@ -64,23 +68,108 @@ and the consuming service reads the same secret. Neither side needs a human.
 
 ### 4.2 People - the shell is declarative, the credential is not
 
-Username, display name and e-mail are **initialized, not declared**: the entry carries `state: created`, so
+For entries with `my.directory.users.<username>.initialProfile`, display name and e-mail are
+**initialized, not enforced**: the generated entry carries `state: created`, so
 the value is written when the account is first created and never again. The account therefore exists after
 the first apply, and everything about it afterwards - name, address, credential, avatar - belongs to the
-person and to whoever administers identities in the interface. This is an initialization, not a hand-off
+person and to whoever administers identities in the interface. Infrastructure references use the
+username as their stable key: renaming that login requires updating its declarations and consumers,
+not treating it as a display-name change. This is an initialization, not a hand-off
 of a fact: the repository makes a statement about the default for a new object, never about the object's
 current value (§11.4). A `state: created` entry is the only initialization this repository uses;
 `features/services/authentik/lib/blueprints-check.py` fails a build that seeds a topology object or
 declares a person.
 
-**Group membership is not declared at all** - it is the assignment of people to policy and therefore people
-data, not configuration; see section 11 for the whole boundary. The **passkey cannot be declared**: FIDO2
+The inventory is **not an exhaustive user list**. Users can be created in the UI or through enrollment.
+An inventory entry with `initialProfile = null` references an existing UI-created human without
+creating or modifying the account. Register such a username before using it in a declarative group or
+personal service audience; actual existence is verified when resolving the generated membership.
+
+Group definitions use `my.directory.groups.<name>`. `members = null` leaves membership UI-owned;
+`members = [ ... ]` owns the exact set, including an explicitly empty list. The compiler writes the
+group's `users` field, never the human's complete `groups` field. Other memberships, profile fields
+and credentials remain untouched. `state = "absent"` explicitly retires a group; deleting an inventory
+entry alone is not a deletion request. Service audiences retain the reserved `svc-` prefix and are
+derived, not manually declared. The **passkey cannot be declared**: FIDO2
 is bound to a secure element and created through an interactive challenge-response ceremony in the
-browser. A person therefore exists immediately with every right they will have, and registers their
-passkey at first login through the standard WebAuthn flow.
+browser. Initial account existence does not imply role membership or enrollment; passkeys are registered
+interactively through the WebAuthn flow.
 
 There are no enforced password policies: the primary factor is a passkey, and a policy that only
 constrains the fallback path would be friction without security.
+
+### 4.3 Registering UI-created identities for infrastructure
+
+Create the person through the UI or enrollment. To reference that person in Nix, add
+`my.directory.users.<username> = { };` to the identity inventory: the default `initialProfile = null`
+does not create a replacement account or reset their email. Add the stable username to the intended
+group's explicit `members` list only when that membership is meant to be Nix-owned. Ordinary UI-created
+users need no inventory entry until infrastructure references them. Group membership alone never
+creates a Linux account or grants a provider credential.
+
+### 4.4 Lifecycle and ownership
+
+| Operation | Authority and required action | What it does not imply |
+|---|---|---|
+| Change email, display name, avatar or credentials | Person or identity administrator through Authentik | No change to the infrastructure login key or resource ownership |
+| Create a human | UI/enrollment, or an optional `initialProfile` seed | No Linux account, gateway, role grant or provider credential without the corresponding declaration |
+| Rename a login used by infrastructure | Coordinated change of the existing account and all inventory/service references; keep the same database account | No automatic rename inferred from a removed and added Nix key; an old seed left in place can recreate the old login |
+| Suspend a human | UI-owned `is_active = false`; seeds never reactivate existing accounts | No removal of their declared infrastructure, data or credentials; no claim that every previously issued application token or session has been revoked |
+| Revoke a UI-owned role | Remove its membership in Authentik | No change to Nix-owned memberships or resource placement |
+| Revoke a Nix-owned role | Remove the username from that group's explicit list and apply the identity host | No deletion of the person or memberships in other groups |
+| Stop personal provisioning | Remove provisioning membership and deploy every affected resource host, including node hosts | Updating Authentik alone does not stop gateways/nodes or invalidate independently authenticated native devices |
+| Retire a group | Stop all consumers first, retain `state = "absent"` until removal is verified | Deleting an inventory entry is not a tombstone; a retired group cannot carry a managed membership list |
+| Retire a human | Suspend access, revoke memberships and consumers, preserve required backups, remove the seed/reference declaration, then explicitly delete in the UI only if intended | Removing a declaration does not delete the account; deleting an account while keeping its seed causes recreation without the original credentials |
+
+Account deletion, login renaming, credential erasure and personal-data retention are not inferred from
+inventory diffs. Nix owns infrastructure configuration, not a garbage collector for personal state.
+Stopping a service and revoking an identity are distinct operations. Existing sessions, OIDC tokens,
+provider credentials and native node approvals need their own explicit revocation and consumer-level
+verification; a correct directory membership is not evidence of universal logout.
+
+### 4.5 Read-only preflight and diagnosis
+
+The provider-neutral preflight in `contracts/directory/lib/preflight.py` classifies observed state as:
+
+- `failures`: missing UI-reference accounts, service-account collisions, ambiguous logins or group names;
+- `pending`: missing seeds and present group definitions that an apply can create;
+- `inactive`: UI-suspended humans, which an apply must preserve rather than reactivate.
+
+The Authentik adapter reads exact login matches and maps provider-specific account types into human
+observations. The same preflight runs before the explicit apply queues any blueprint tasks and contributes
+invalid-reference findings to drift reporting. Missing seeds are valid on a fresh database. Suspension
+is an operational observation, not configuration drift or a reason to undo an administrator's decision.
+
+For on-demand diagnosis on the identity host:
+
+```bash
+systemctl start authentik-directory-report.service
+journalctl -u authentik-directory-report.service --no-pager
+```
+
+The worker must already be active: the report has `Requisite`, not a dependency that starts it. The report
+does not depend on the apply unit, does not enqueue blueprint tasks, and only queries database objects.
+It emits a JSON result with the three categories, without profile values or credentials. Exit status is
+zero only when all categories are empty; pending creation, suspension and invalid references produce a
+nonzero verdict. Backend/query errors fail loudly rather than becoming an empty successful report.
+
+This preflight is not a fleet transaction or a global interlock: Authentik's native worker can independently
+discover/apply blueprints, and concurrent UI changes can occur after the observation. Post-apply verification
+therefore remains mandatory. The directory report establishes identity-reference readiness only, not
+gateway availability, browser authentication, OAuth enrollment or end-to-end integration health.
+
+`checks.directory` tests the schema and membership verifier's negative cases.
+`checks.directory-runtime` compiles each Authentik host with isolated test identities added, then applies
+that directory blueprint with the packaged Authentik importer against disposable PostgreSQL. It uses
+the native user serializer to create additional people and
+measures repeated-apply preservation of changed names, emails, passwords, attributes, stored WebAuthn
+records, UI suspension and UI-owned membership. It tests missing-reference and service-account-collision
+preflight failures before applying, and distinguishes expected seed creation from an invalid reference.
+It also measures managed-set correction, empty sets, existing UI-user
+references, missing groups and explicit retirement. This is a backend-state test, not a browser login
+or a cryptographic WebAuthn ceremony. A logical dump restored into a separate fresh database must
+preserve those identities, credential records and memberships before and after another apply; this
+does not prove retrieval of the production backup repository or whole-host disaster recovery.
 
 ## 5. Two outpost models, deliberately
 
@@ -120,12 +209,13 @@ Nothing is generated at runtime that would have to be recovered later.
 - **Break-glass.** `akadmin` is the only account that can always get in, and it belongs to
   `authentik Admins`. Its password is `AUTHENTIK_BOOTSTRAP_PASSWORD` in the `services/authentik/core_env`
   secret; authentik consumes it only while `akadmin` does not exist, so it never resets a password that has
-  already been changed. `infra-admins` is a **separate** cluster-admin group: the fleet's administrators
-  are not the same set as Authentik's own administrators, and conflating them would make the identity
-  system unable to lock anyone out of itself. To make a person a fleet administrator, put them into
-  `infra-admins` in the interface - that single membership is the whole answer.
-- **Family accounts** (`family`, `media-users`) are created through the enrollment invitation and carry
-  no password until they register a passkey.
+  already been changed. `infra-admins` is a separately named group whose current adapter mapping in
+  `my.features.services.authentik.server.superuserGroups` also grants **Authentik superuser** rights.
+  This mapping is provider-specific, not a generic directory-group property, and does not itself
+  grant Linux sudo or fleet SSH access. Its membership is UI-owned.
+- **Enrollment** creates users through invitations and assigns the UI-owned `media-users` group.
+  It does not automatically assign `family`, administration or `ai-users`. The five inventory seeds
+  are independent of enrollment; creating them does not replay its group assignment.
 - **Self-service:** e-mail recovery wired to the brand, invitation enrollment, passkey autofill
   (conditional UI) and remember-me (`session_duration = 7 days`, `remember_me_offset = 30 days`).
 
@@ -139,7 +229,7 @@ what its closure contains. See [operations.md](operations.md).
 
 | Situation | Before | Now |
 |---|---|---|
-| database lost | every client, token and outpost clicked back by hand | restart: the blueprints are applied idempotently |
+| database lost | configuration and personal state mixed together | restore the database for personal state; reapply the declarative configuration |
 | new service | provider, redirect URI and secret by hand | the service declares a publication and an OIDC integration; the provider is generated |
 | new outpost | token generated in the UI, copied into SOPS | the token already exists; the outpost reads it |
 | "who may access what" | visible only in database rows | a Git commit, reviewable |
@@ -231,7 +321,9 @@ created`: a default for a new object, never enforced, never drift). The two neve
 - **Which roles a person has** — who is in which role group. That membership is the assignment of people to
   policy, and it is the access decision: a service accepts a group, a human decides who is in it. An audience
   the repository declares *about a resource* (`accessUsers`) is the other half and is not this — it says who a
-  resource belongs to, which is §11.2's test answered with yes, and it is declared (§11.3).
+  resource belongs to, which is §11.2's test answered with yes, and it is declared (§11.3). Explicit
+  groups with an explicit `my.directory.groups.<name>.members` list are repository-owned, including
+  provisioning groups whose membership determines infrastructure existence.
 - **Own credentials and devices** — app passwords, TOTP, WebAuthn, sessions. Nobody else can hold these; the
   bootstrap admin password exists here only as a hash.
 - **Invitations** — an invitation link is a document, not system state.
@@ -272,7 +364,10 @@ value; the compiler creates that group *with* the membership, so no deploy leave
 has to click before a new personal service works. It is still one mechanism — both halves are memberships — and
 the test that separates them is §11.2's: "this gateway belongs to kai" is a sentence a reviewer comments on,
 "katja is in the film group" is not. The role groups stay untouched and interface-owned, because nothing
-declares their members.
+declares their members. Groups with an explicit member list, such as `ai-users`, are different:
+`inventory/identity.nix` declares its members, the directory compiler writes that exact membership, and
+OpenClaw provisions one isolated gateway per member. Editing this membership only in the interface
+neither provisions a NixOS service nor survives the next blueprint apply.
 
 **And it is enforced at the ingress, not only described.** A group-restricted publication that authenticates through authentik
 declares `accessGroups` on the publication; the compiler projects them into a `PolicyBinding` per group on the
@@ -307,8 +402,8 @@ interface?" in one sentence.
 | Model | Object owner | Relationships we set | May a human change it? |
 |---|---|---|---|
 | `authentik_brands.brand` | repository | `flow_recovery` | no - topology and branding |
-| `authentik_core.group` | repository | - | the definition: no. **Membership: yes** - that is an interface decision |
-| `authentik_core.user` (people) | repository seeds existence | - (`groups` is deliberately absent) | yes - name, address, password, avatar, group membership |
+| `authentik_core.group` | repository | `users` only for derived audiences or explicit member lists | definition: no. Membership: UI-owned when omitted, otherwise Nix-owned |
+| `authentik_core.user` (people) | optional inventory seed; UI may create additional people | - (`groups` is deliberately absent) | yes - name, email, credentials, avatar and UI-owned memberships; infrastructure login keys require coordinated renaming |
 | `authentik_core.user` (service account) | repository | `roles` | no |
 | `authentik_core.token` (machine) | repository | `user`; fields `managed`, `expiring` | no - topology, and the key comes from SOPS |
 | `authentik_rbac.role` | repository | `permissions` | no |
@@ -321,7 +416,7 @@ interface?" in one sentence.
 | `authentik_policies.policybinding` | repository | `target`, `order`, policy/group/user | no |
 
 The membership column is the line. A service declares which groups it accepts through its `memberOf` filter;
-a human decides who is in those groups. There are no per-user application bindings, because a second mechanism
+each group's declaration decides whether membership belongs to Nix or the UI. There are no per-user application bindings, because a second mechanism
 next to the group filter would be a second truth. The interface-only things from §11.1 - credentials and
 devices, invitations, profile attributes, notifications - are not blueprinted at all and therefore appear in
 no row of this table.
@@ -345,8 +440,8 @@ The owned `00-system/retired-applications.yaml` blueprint enforces the absence o
 application, OAuth2 provider, human-access policy and email scope mapping. Application deletion
 also removes its policy bindings; these tombstones prevent stale access objects surviving a deploy.
 
-- **Direct SQL writes stay invisible.** No event, no blueprint. The rule "the database is not a change path"
-  plus the event arm of the drift report are the only countermeasures.
+- **Direct SQL writes produce no interface event.** Declared membership differences are nevertheless
+  detected by the exact-set verifier; UI-owned fields remain outside declarative drift detection.
 - **Objects created in the interface that nobody declares are not reclaimed.** They are reported as foreign,
   which is the intended behaviour, not a gap. Measured 2026-09-22: `esphome` carries an application and no
   binding while no publication in the repository declares it - a stale object that survives because a blueprint
@@ -361,7 +456,10 @@ also removes its policy bindings; these tombstones prevent stale access objects 
   reaches only accounts that are created afterwards.
 - **A new consumer's SOPS secret is added by hand.** The identity contract derives the path; if the key is
   missing, `sops-install-secrets` fails the deploy loudly rather than starting with an empty credential.
-- **The derived relation inventory covers the relations that are their own rows** - policy bindings and
+- **The derived relation inventory covers exact declared group memberships**, including missing users,
+  missing and extra members, empty sets and duplicate membership owners. Apply and drift consume the
+  same verifier. Groups without a `users` field are deliberately excluded. It also covers relations
+  that are their own rows - policy bindings and
   stage bindings - because those are not overwritten by an object's `present` update. Relations that are
   fields of the object (outpost `providers`, user `roles`, role `permissions`) are already enforced by that
   update. What is not derived are the **additive guardian permissions** applied through an entry's

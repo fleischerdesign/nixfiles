@@ -3,6 +3,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 {
@@ -40,6 +41,27 @@
     # A host may override it, but the default is the session, not a per-host copy.
     niri.enable = lib.mkDefault true;
     noctalia.enable = lib.mkDefault true;
+  };
+
+  # Only a primary identity in ai-users receives a node; group membership, not this role,
+  # provisions a gateway and its access. The node follows the person's graphical session.
+  my.features.services.openclaw = {
+    enable = lib.mkDefault true;
+    node = {
+      enable = lib.mkDefault true;
+      packages = [
+        pkgs.chromium
+        pkgs.wtype
+      ];
+      settings = {
+        browser.executablePath = "${pkgs.chromium}/bin/chromium";
+        nodeHost = {
+          browserProxy.enabled = true;
+          skills.enabled = true;
+          workerRuns.enabled = true;
+        };
+      };
+    };
   };
 
   # The shell's Phone Operate plugin talks to KDE Connect, so the daemon and its ports are a

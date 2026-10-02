@@ -60,6 +60,8 @@
     };
 
     opencode.url = "github:anomalyco/opencode/v2";
+
+    openclaw.url = "github:openclaw/nix-openclaw";
   };
 
   outputs =
@@ -417,6 +419,10 @@
           # for a typo. This reads the exact compiled directory the server ships, so the check and the
           # apply consume identical bytes. The rules are documented in docs/identity.md §11 and enforced
           # by features/services/authentik/lib/blueprints-check.py.
+          directory = import ./checks/directory.nix checkArgs;
+          directory-runtime = import ./checks/directory-runtime.nix checkArgs;
+          openclaw-feature = import ./checks/openclaw-feature.nix checkArgs;
+
           authentik-blueprints =
             let
               blueprintLib = import ./features/services/authentik/lib/blueprint.nix {
@@ -452,6 +458,7 @@
               units = [
                 "authentik-blueprints-apply"
                 "authentik-drift-report"
+                "authentik-directory-report"
               ];
               scriptOf =
                 name: unit:

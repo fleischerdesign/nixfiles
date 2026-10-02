@@ -35,10 +35,9 @@ in
     enable = lib.mkEnableOption "SSH server, bound to the LAN and the mesh overlay only";
 
     # The administrative path is `infra` and `corp`, and it deliberately excludes the mesh: a
-    # compromised public relay should not reach into a host. One host needs an exception, and an
-    # exception written down is worth more than a rule widened for everyone: `cld-ops-01` runs the
-    # OpenClaw nodes, and the gateway instances on its sibling reach them through an SSH tunnel. So
-    # that sibling - a member of the `mesh` zone - has to be admitted *there* and nowhere else.
+    # compromised public relay should not reach into a host. An explicit exception is narrower
+    # than widening the trust level fleet-wide: administrative consumers project their source
+    # host through admitsHosts and their public credential through extraDeployKeys.
     admits = lib.mkOption {
       type = lib.types.listOf (lib.types.enum config.my.topology.trustLevels);
       default = [ ];
@@ -62,6 +61,18 @@ in
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGuk66em/pg6jVlG2U6dTLFeQCOWjEzlyGGEWGvSM0hI nixfiles-deploy@vyrx-2.0"
       ];
       description = "Authorized SSH public keys for root deploy-rs access.";
+    };
+
+    admitsHosts = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Additional inventory source hosts admitted on the mesh SSH endpoint.";
+    };
+
+    extraDeployKeys = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Additional root administrative trust anchors.";
     };
   };
 
@@ -91,6 +102,7 @@ in
             "corp"
           ]
           ++ cfg.admits;
+          fromHosts = cfg.admitsHosts;
         };
         # SSH is not HTTP; a TCP connect is the probe that actually answers.
         applicationProtocol = "ssh";
@@ -132,7 +144,7 @@ in
       inherit listenAddresses;
     };
 
-    users.users.root.openssh.authorizedKeys.keys = cfg.deployKeys;
+    users.users.root.openssh.authorizedKeys.keys = cfg.deployKeys ++ cfg.extraDeployKeys;
 
     warnings = lib.optionals (cfg.enable && ownHost == null) [
       "SSH feature: host '${config.networking.hostName}' not found in topology — SSH will bind to all interfaces."
