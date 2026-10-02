@@ -60,6 +60,9 @@
           skills.enabled = true;
           workerRuns.enabled = true;
         };
+        # Node-host surfaces: desktop notifications, camera capture and location. This plugin is
+        # only meaningful on a node host, so it is enabled here and not in the gateway profile.
+        plugins.entries."linux-node".enabled = true;
       };
     };
   };

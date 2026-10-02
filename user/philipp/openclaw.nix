@@ -37,9 +37,12 @@ let
     "memory-core"
     "active-memory"
     "canvas"
+    "document-extract"
     "file-transfer"
     "llm-task"
     "session-share"
+    "talk-voice"
+    "workboard"
     "device-pair"
   ];
 in
@@ -107,6 +110,17 @@ in
           openai.apiKey = envSecret "OPENAI_API_KEY";
           deepseek.apiKey = envSecret "DEEPSEEK_API_KEY";
           openrouter.apiKey = envSecret "OPENROUTER_API_KEY";
+        };
+        # Talk: speech and realtime voice both run through OpenAI. Provider, model and speaker
+        # voice stay on the provider default until one is chosen deliberately; the schema's
+        # defaults are the documented starting point, not a missing decision.
+        talk = {
+          provider = "openai";
+          providers.openai.apiKey = envSecret "OPENAI_API_KEY";
+          realtime = {
+            provider = "openai";
+            providers.openai.apiKey = envSecret "OPENAI_API_KEY";
+          };
         };
         agents = {
           ownership = "explicit";
