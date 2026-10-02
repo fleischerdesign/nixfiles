@@ -258,6 +258,9 @@ let
               auth = "authentik";
               ingressOnly = true;
               accessUsers = [ instance.owner ];
+              # The gateway reads this header as a connection scope cap; it belongs to this
+              # publication, not to the shared ingress, so the declaration carries it.
+              stripRequestHeaders = [ "X-OpenClaw-Scopes" ];
               inherit (instance) subdomain;
               proxyOptions = "flush_interval -1";
             };
@@ -269,6 +272,7 @@ let
               auth = "authentik";
               ingressOnly = true;
               accessUsers = [ instance.owner ];
+              stripRequestHeaders = [ "X-OpenClaw-Scopes" ];
               subdomain = instance.apps.subdomain;
             };
           };

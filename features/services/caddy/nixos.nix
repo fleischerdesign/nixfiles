@@ -186,6 +186,7 @@ in
                               auth
                               unauthenticatedPaths
                               machineClientsBypassAuth
+                              stripRequestHeaders
                               customExtraConfig
                               proxyOptions
                               ;
@@ -205,9 +206,8 @@ in
                   target = conf.target or "127.0.0.1:${toString conf.port}";
 
                   # Always overwrite (never append) the forwarded client chain. Untrusted clients
-                  # must not be able to spoof X-Forwarded-* towards downstream trusted-proxy
-                  # consumers such as the OpenClaw gateway, which attributes clients from these
-                  # headers (openclaw trusted-proxy security checklist).
+                  # must not be able to spoof X-Forwarded-* towards a downstream trusted-proxy
+                  # consumer, which attributes clients from these headers.
                   proxy =
                     "reverse_proxy ${target} {\n"
                     + "  header_up X-Forwarded-For {http.request.remote.host}\n"
@@ -216,13 +216,27 @@ in
                     + lib.optionalString (conf.proxyOptions != "") "${conf.proxyOptions}\n"
                     + "}";
 
+                  # A downstream consumer of forward-auth trusts the identity headers, so a client
+                  # must never be able to supply one. `X-Authentik-*` belongs to the auth
+                  # integration; a publication names any further headers it owns. The strip has to
+                  # run before `forward_auth` copies the trusted values - Caddy otherwise orders
+                  # `forward_auth` before `request_header` and would delete exactly what it copied,
+                  # which is why the blocks below are `route` (literal order) and not bare
+                  # sequences.
+                  strippedRequestHeaders =
+                    lib.optional (conf.auth == "authentik") "X-Authentik-*" ++ conf.stripRequestHeaders;
+                  stripRequestHeaderLines = lib.concatMapStrings (
+                    name: "request_header -${name}\n"
+                  ) strippedRequestHeaders;
+
                   exemptHandlers =
                     lib.optionalString (conf.unauthenticatedPaths != [ ]) ''
                       @unauthenticatedRoute path ${lib.concatStringsSep " " conf.unauthenticatedPaths}
                       handle @unauthenticatedRoute {
-                        request_header -X-Authentik-*
-                        request_header -X-OpenClaw-Scopes
-                        ${proxy}
+                        route {
+                          ${stripRequestHeaderLines}
+                          ${proxy}
+                        }
                       }
                     ''
                     + lib.optionalString conf.machineClientsBypassAuth ''
@@ -232,9 +246,10 @@ in
                         not header Origin *
                       }
                       handle @nonBrowserWebsocket {
-                        request_header -X-Authentik-*
-                        request_header -X-OpenClaw-Scopes
-                        ${proxy}
+                        route {
+                          ${stripRequestHeaderLines}
+                          ${proxy}
+                        }
                       }
                     '';
                 in
@@ -245,19 +260,20 @@ in
                     import authentik
                     ${exemptHandlers}
                     handle {
-                      request_header -X-Authentik-*
-                      request_header -X-OpenClaw-Scopes
-                      forward_auth ${cfg.authentikOutpostAddress} {
-                        uri /outpost.goauthentik.io/auth/caddy
-                        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
-                        trusted_proxies private_ranges
+                      route {
+                        ${stripRequestHeaderLines}
+                        forward_auth ${cfg.authentikOutpostAddress} {
+                          uri /outpost.goauthentik.io/auth/caddy
+                          copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt X-Authentik-Meta-Jwks X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version authorization
+                          trusted_proxies private_ranges
+                        }
+                        ${proxy}
                       }
-                      ${proxy}
                     }
                   ''
                 else
                   ''
-                    ${proxy}
+                    ${stripRequestHeaderLines}${proxy}
                   '';
             };
           };

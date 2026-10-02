@@ -48,5 +48,16 @@
       description = "Bypass forward-auth for non-browser WebSocket upgrades (e.g. device/node tokens)";
     };
 
+    stripRequestHeaders = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = ''
+        Request header names or globs the ingress removes from client requests before
+        authentication, so a downstream trusted-proxy consumer can never read a value the client
+        chose. The authentication integration's own identity headers are stripped by the ingress
+        itself; this option is for headers a particular publication owns.
+      '';
+    };
+
   };
 }
