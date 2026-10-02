@@ -14,6 +14,16 @@ let
     let
       id = "openclaw-${name}";
       user = id;
+      # One identity file per gateway, whichever way it arrives: a SOPS secret this feature owns
+      # (preferred, and what a person's gateway uses) or a path the operator provides. Everything
+      # below - the fleet SSH config, Git over SSH and node-pairing verification - reads this one
+      # path, so the credential cannot be named differently in two places.
+      identityFile =
+        if instance.fleet.privateKeySecret != null then
+          config.sops.secrets.${instance.fleet.privateKeySecret}.path
+        else
+          instance.fleet.privateKeyFile;
+      hasFleetCredential = identityFile != null;
       contract = config.my.contracts.provides.${id};
       credentials = lib.mapAttrs (
         variable: _: config.sops.templates."${id}-${variable}".path
@@ -71,7 +81,7 @@ let
               GOG_CONFIG_DIR = "${instance.stateDir}/google";
               GOG_KEYRING_BACKEND = "file";
             }
-            // lib.optionalAttrs (instance.fleet.privateKeyFile != null) {
+            // lib.optionalAttrs hasFleetCredential {
               GIT_SSH_COMMAND = "${pkgs.openssh}/bin/ssh -F /etc/openclaw/${id}.ssh";
             }
             // lib.optionalAttrs instance.publishing.enable {
@@ -91,7 +101,14 @@ let
               trustedProxies = [ ingress.wireguardIpv4 ];
               auth = {
                 mode = "trusted-proxy";
-                identityScopes.${instance.owner} = [ "operator.admin" ];
+                identityScopes.${instance.owner} = [
+                  "operator.admin"
+                  # Approving a node's declared capability surface is an `operator.pairing`
+                  # operation; non-exec commands on that surface additionally need `operator.write`.
+                  # Without these the Control UI identity cannot approve its own devices.
+                  "operator.pairing"
+                  "operator.write"
+                ];
                 trustedProxy = {
                   userHeader = "x-authentik-username";
                   requiredHeaders = [
@@ -126,11 +143,11 @@ let
                 ];
               }
               // (
-                if instance.fleet.privateKeyFile != null then
+                if hasFleetCredential then
                   {
                     sshVerify = {
                       user = "root";
-                      identity = instance.fleet.privateKeyFile;
+                      identity = identityFile;
                       cidrs = [
                         config.my.topology.subnets.mesh.cidr
                         config.my.topology.subnets."mesh-ipv6".cidr
@@ -186,18 +203,27 @@ let
       environment.etc = {
         "openclaw/${id}.json".source = built.source;
       }
-      // lib.optionalAttrs (instance.fleet.privateKeyFile != null) {
+      // lib.optionalAttrs hasFleetCredential {
         "openclaw/${id}.ssh".text = lib.concatMapStringsSep "\n" (target: ''
           Host ${target} ${config.my.topology.hosts.${target}.wireguardIpv4}
             HostName ${config.my.topology.hosts.${target}.wireguardIpv4}
             User root
-            IdentityFile ${instance.fleet.privateKeyFile}
+            IdentityFile ${identityFile}
             IdentitiesOnly yes
             StrictHostKeyChecking yes
             UserKnownHostsFile /etc/ssh/ssh_known_hosts
         '') instance.fleet.hosts;
       };
-      sops.secrets = lib.genAttrs (lib.attrValues instance.secrets) (_: { });
+      sops.secrets =
+        lib.genAttrs (lib.attrValues instance.secrets) (_: { })
+        // lib.optionalAttrs (instance.fleet.privateKeySecret != null) {
+          # The fleet credential belongs to this gateway's account alone, so each person's gateway
+          # reads only its own identity.
+          ${instance.fleet.privateKeySecret} = {
+            owner = user;
+            mode = "0400";
+          };
+        };
       sops.templates = lib.mapAttrs' (
         variable: secret:
         lib.nameValuePair "${id}-${variable}" {

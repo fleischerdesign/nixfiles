@@ -84,6 +84,11 @@ let
             default = null;
             description = "Private fleet credential readable by this gateway; never a node tunnel key.";
           };
+          privateKeySecret = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "SOPS secret name holding the private fleet credential. The feature declares the secret and uses its decrypted path as the SSH identity, so the credential is owned by this gateway's account and every person's gateway carries its own.";
+          };
           publicKey = lib.mkOption {
             type = lib.types.nullOr lib.types.str;
             default = null;
@@ -343,9 +348,12 @@ in
       }
       {
         assertion = lib.all (
-          instance: (instance.fleet.privateKeyFile == null) == (instance.fleet.publicKey == null)
+          instance:
+          (instance.fleet.privateKeySecret != null || instance.fleet.privateKeyFile != null)
+          == (instance.fleet.publicKey != null)
+          && !(instance.fleet.privateKeySecret != null && instance.fleet.privateKeyFile != null)
         ) (lib.attrValues cfg.instances);
-        message = "OpenClaw fleet credentials require both privateKeyFile and publicKey.";
+        message = "OpenClaw fleet credentials require exactly one private credential (privateKeySecret or privateKeyFile) and a publicKey.";
       }
     ];
   };

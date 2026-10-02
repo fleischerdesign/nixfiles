@@ -63,6 +63,11 @@ in
       fleet = {
         enable = true;
         hosts = lib.attrNames (fleetConfigs.systems config);
+        # One credential pair per gateway. The private half lives in SOPS under this person's own
+        # path; the public half is authorized only on the declared targets. Adding a person means
+        # adding their pair, not sharing this one.
+        privateKeySecret = "users/philipp/openclaw/fleet_private_key";
+        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP8ER6xTwR8a735K+pwIFTOLLl1IElKy7FytXFJYFey1 openclaw-philipp-gateway";
       };
       packages = with pkgs; [
         bashInteractive
