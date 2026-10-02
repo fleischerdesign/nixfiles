@@ -104,6 +104,42 @@ let
                   deviceAutoApprove.enabled = true;
                 };
               };
+              # Device pairing, capability approval and their auto-approval paths (docs/gateway/pairing).
+              #
+              # A node presents a signed device identity on connect; there is no Nix-only way to mint one.
+              # `autoApproveCidrs` admits the first pairing declaratively from the mesh, and nothing else -
+              # role, scope, metadata and public-key upgrades always prompt, and browsers/UI never auto-
+              # approve. The declared *capability surface* is a separate decision: `sshVerify` approves it
+              # automatically only by proving machine ownership over SSH, matching the remote
+              # `openclaw node identity` device key exactly. Reachability alone never approves, so LAN
+              # co-tenants fall through to the normal prompt.
+              #
+              # Without an SSH identity there is no automatic surface approval; the probe is disabled
+              # explicitly rather than left to fail and put a node into cooldown. The first surface then
+              # needs one `nodes approve` (or a minted setup code) per device - after which reconnects are
+              # automatic. The node wrapper is exported as `openclaw` on node hosts so the probe's
+              # `openclaw node identity --json` resolves.
+              nodes.pairing = {
+                autoApproveCidrs = [
+                  config.my.topology.subnets.mesh.cidr
+                  config.my.topology.subnets."mesh-ipv6".cidr
+                ];
+              }
+              // (
+                if instance.fleet.privateKeyFile != null then
+                  {
+                    sshVerify = {
+                      user = "root";
+                      identity = instance.fleet.privateKeyFile;
+                      cidrs = [
+                        config.my.topology.subnets.mesh.cidr
+                        config.my.topology.subnets."mesh-ipv6".cidr
+                      ];
+                    };
+                  }
+                else
+                  { sshVerify = false; }
+              );
               controlUi = {
                 enabled = true;
                 allowedOrigins = [ contract.publications.web.publicUrl ];

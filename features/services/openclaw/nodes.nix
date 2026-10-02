@@ -53,7 +53,17 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
-    environment.systemPackages = map (node: node.built.launcher) nodes;
+    environment.systemPackages = lib.concatMap (node: [
+      node.built.launcher
+      node.built.execute
+      # Exported under the name `openclaw` so a remote, non-interactive probe can run
+      # `openclaw node identity --json`: the gateway's SSH-verified pairing does exactly that
+      # before approving a node's first capability surface. The wrapper supplies the node's state
+      # directory, so the probed identity is the node's own.
+      (pkgs.writeShellScriptBin "openclaw" ''
+        exec ${node.built.execute}/bin/${node.id}-exec openclaw "$@"
+      '')
+    ]) nodes;
     environment.etc = lib.listToAttrs (
       map (node: lib.nameValuePair "openclaw/${node.id}.json" { source = node.built.source; }) nodes
     );
