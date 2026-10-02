@@ -151,6 +151,11 @@ let
         default = true;
         description = "Run in the primary user's graphical session instead of a system service.";
       };
+      passwordSecret = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "SOPS secret holding the gateway credential this node authenticates with. An internal client that does not travel through the reverse proxy must authenticate this way; a device identity alone is not a login.";
+      };
     };
   };
   systems = fleetConfigs.systems config;
@@ -221,6 +226,11 @@ in
             type = lib.types.bool;
             default = true;
             description = "Bind the automatic personal node to the graphical session.";
+          };
+          passwordSecret = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            description = "SOPS secret holding the gateway credential this node authenticates with. An internal client that does not travel through the reverse proxy must authenticate this way; a device identity alone is not a login.";
           };
         };
       };

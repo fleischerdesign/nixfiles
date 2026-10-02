@@ -28,11 +28,28 @@ let
       built = runtime.build {
         inherit id stateDir;
         package = cfg.package;
-        runtime = node;
+        runtime = node // {
+          # The gateway rejects an internal client that authenticates with nothing; the device
+          # identity is for pairing, not for login. A node therefore authenticates with the same
+          # local-direct credential the gateway itself uses, named by the node and delivered as a
+          # private file rather than a value in the config.
+          credentialFiles =
+            node.credentialFiles
+            // lib.optionalAttrs (node.passwordSecret != null) {
+              OPENCLAW_GATEWAY_PASSWORD = config.sops.secrets.${node.passwordSecret}.path;
+            };
+        };
         settings = lib.recursiveUpdate node.settings {
           gateway = {
             mode = "remote";
             remote.url = "ws://${host}:${toString port}";
+          }
+          // lib.optionalAttrs (node.passwordSecret != null) {
+            remote.password = {
+              source = "env";
+              provider = "default";
+              id = "OPENCLAW_GATEWAY_PASSWORD";
+            };
           };
         };
       };
@@ -54,6 +71,7 @@ let
         built
         serviceConfig
         ;
+      inherit (node) passwordSecret;
     };
   nodes = lib.mapAttrsToList make cfg.nodes;
 in
@@ -80,6 +98,18 @@ in
         "d ${builtins.dirOf node.stateDir} 0750 ${user} ${account.group} - -"
         "d ${node.stateDir} 0700 ${user} ${account.group} - -"
       ]) nodes
+    );
+    sops.secrets = lib.listToAttrs (
+      lib.concatMap (
+        node:
+        lib.optional (node.passwordSecret != null) {
+          name = node.passwordSecret;
+          value = {
+            owner = user;
+            mode = "0400";
+          };
+        }
+      ) nodes
     );
     systemd.services = lib.listToAttrs (
       map (

@@ -49,6 +49,10 @@
     enable = lib.mkDefault true;
     node = {
       enable = lib.mkDefault true;
+      # The gateway rejects an internal client that authenticates with nothing. The node signs in
+      # with the same local-direct credential the gateway uses; the private half stays in SOPS and
+      # is delivered as a file, never as a value in the config.
+      passwordSecret = "ai/openclaw/gateway_password";
       packages = [
         pkgs.chromium
         pkgs.wtype
