@@ -422,6 +422,7 @@
           directory = import ./checks/directory.nix checkArgs;
           directory-runtime = import ./checks/directory-runtime.nix checkArgs;
           openclaw-feature = import ./checks/openclaw-feature.nix checkArgs;
+          caddy-auth-order = import ./checks/caddy-auth-order.nix checkArgs;
 
           authentik-blueprints =
             let
