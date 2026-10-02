@@ -118,6 +118,11 @@ in
             utilityModel = "deepseek/deepseek-chat";
             userTimezone = config.time.timeZone;
             workspace = "${instance.stateDir}/workspace";
+            # `ownership = "explicit"` makes the four agents distinct, but ambient operations
+            # (Ask OpenClaw, models.list, skills.status, unscoped session reads) still need one named
+            # owner. Without it they fail with AgentSelectionRequiredError; `main` is the personal
+            # assistant and the correct default for work that names no agent.
+            systemAgent.agentId = "main";
             compaction = {
               mode = "safeguard";
               memoryFlush.enabled = true;
