@@ -271,9 +271,9 @@ in
               User = inst.user;
               Group = inst.group;
               WorkingDirectory = stateDir;
-              StateDirectory = "obsidian-livesync-bridge-${name}";
+              StateDirectory = "obsidian-livesync-bridge/${name}";
               StateDirectoryMode = "0750";
-              CacheDirectory = "obsidian-livesync-bridge-${name}";
+              CacheDirectory = "obsidian-livesync-bridge/${name}";
               CacheDirectoryMode = "0750";
               ExecStart = "${inst.package}/bin/livesync-bridge";
               Restart = "always";

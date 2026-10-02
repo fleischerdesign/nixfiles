@@ -38,6 +38,11 @@ let
           mv -n -- "$temporary" ${lib.escapeShellArg "${directory}/keyring-password"}
         fi
         export GOG_CONFIG_DIR=${lib.escapeShellArg directory}
+        # The file-backed keyring needs its password non-interactively; without it the CLI fails with
+        # "no TTY available for keyring file backend password prompt". Read the file created above
+        # rather than prompting.
+        export GOG_KEYRING_BACKEND=file
+        export GOG_KEYRING_PASSWORD="$(cat ${lib.escapeShellArg "${directory}/keyring-password"})"
         ${gog}/bin/gog auth credentials ${config.sops.templates."${id}-google-client".path}
       '';
     };
