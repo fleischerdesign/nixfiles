@@ -68,6 +68,47 @@ let
       ) terminatedPublications
     )
   );
+  localEndpoints = lib.concatLists (
+    lib.mapAttrsToList (
+      _svcName: contract:
+      lib.filter (
+        pub:
+        pub.ingress
+        && (!pub.ingressOnly || isIngress)
+        && builtins.elem pub.scope [
+          "public"
+          "internal"
+          "mesh"
+        ]
+        && pub.canonicalDomain != null
+      ) (lib.attrValues contract.publications)
+    ) config.my.contracts.provides
+  );
+  remoteEndpoints = lib.optionals isIngress (
+    lib.concatLists (
+      lib.mapAttrsToList (
+        hostName: hostConfig:
+        let
+          address = serviceAddress (config.my.topology.hosts.${hostName} or null);
+        in
+        lib.optionals (hostName != config.networking.hostName && address != null) (
+          lib.concatLists (
+            lib.mapAttrsToList (
+              _svcName: contract:
+              lib.concatMap (
+                pub:
+                lib.optional (pub.ingress && pub.scope == "public" && pub.canonicalDomain != null) (
+                  pub // { target = "${address}:${toString pub.port}"; }
+                )
+              ) (lib.attrValues contract.publications)
+            ) (fleetConfigs.providesOf hostConfig)
+          )
+        )
+      ) flakeConfigurations
+    )
+  );
+  vHostEndpoints = localEndpoints ++ remoteEndpoints;
+  usesForwardAuth = conf: conf.customExtraConfig == null && conf.auth == "authentik";
   certificateNames = lib.filter (name: !isIngress || lib.hasPrefix "*." name) publicNames;
   certificateId = name: lib.replaceStrings [ "*." ] [ "wildcard." ] name;
 in
@@ -110,6 +151,13 @@ in
   options.my.features.services.caddy = {
     enable = lib.mkEnableOption "Caddy Web Server";
 
+    forwardAuthRequired = lib.mkOption {
+      type = lib.types.bool;
+      readOnly = true;
+      default = cfg.enable && lib.any usesForwardAuth vHostEndpoints;
+      description = "Whether generated publication routes require the configured forward-auth outpost.";
+    };
+
     authentikOutpostAddress = lib.mkOption {
       type = lib.types.str;
       # Forward-auth terminates on the central embedded outpost of the authentik
@@ -145,60 +193,6 @@ in
       # Generate virtualHosts from service contracts (local host only)
       virtualHosts =
         let
-          localEndpoints = lib.concatLists (
-            lib.mapAttrsToList (
-              _svcName: contract:
-              lib.filter (
-                pub:
-                pub.ingress
-                && (!pub.ingressOnly || isIngress)
-                && builtins.elem pub.scope [
-                  "public"
-                  "internal"
-                  "mesh"
-                ]
-                && pub.canonicalDomain != null
-              ) (lib.attrValues contract.publications)
-            ) config.my.contracts.provides
-          );
-
-          remoteEndpoints =
-            if !isIngress then
-              [ ]
-            else
-              lib.concatLists (
-                lib.mapAttrsToList (
-                  hostName: hostConfig:
-                  let
-                    address = serviceAddress (config.my.topology.hosts.${hostName} or null);
-                  in
-                  lib.optionals (hostName != config.networking.hostName && address != null) (
-                    lib.concatLists (
-                      lib.mapAttrsToList (
-                        _svcName: contract:
-                        lib.concatMap (
-                          pub:
-                          lib.optional (pub.ingress && pub.scope == "public" && pub.canonicalDomain != null) {
-                            inherit (pub)
-                              canonicalDomain
-                              extraDomains
-                              port
-                              auth
-                              unauthenticatedPaths
-                              machineClientsBypassAuth
-                              stripRequestHeaders
-                              customExtraConfig
-                              proxyOptions
-                              ;
-                            target = "${address}:${toString pub.port}";
-                          }
-                        ) (lib.attrValues contract.publications)
-                      ) (fleetConfigs.providesOf hostConfig)
-                    )
-                  )
-                ) flakeConfigurations
-              );
-
           mkVHost = conf: {
             value = {
               extraConfig =
@@ -255,7 +249,7 @@ in
                 in
                 if conf.customExtraConfig != null then
                   conf.customExtraConfig
-                else if conf.auth == "authentik" then
+                else if usesForwardAuth conf then
                   ''
                     import authentik
                     ${exemptHandlers}
@@ -311,7 +305,7 @@ in
                 extraConfig = tlsFor domain + (mkVHost conf).value.extraConfig;
               };
             }) ([ conf.canonicalDomain ] ++ lib.filter (d: !lib.hasInfix "*" d) conf.extraDomains)
-          ) (localEndpoints ++ remoteEndpoints)
+          ) vHostEndpoints
         );
     };
 

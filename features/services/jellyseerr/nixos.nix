@@ -1,17 +1,75 @@
 {
   config,
   lib,
+  pkgs,
+  fleetConfigs,
   ...
 }:
 let
   cfg = config.my.features.services.jellyseerr;
+  contract = config.my.contracts.provides.jellyseerr;
+  containerUnit = "${config.virtualisation.oci-containers.backend}-jellyseerr.service";
+  integration = contract.identity.oidc.web;
+  coreLib = import ../authentik/lib/core.nix { inherit fleetConfigs; };
+  core = (fleetConfigs.systems config).${coreLib.hostName (fleetConfigs.systems config)}.config;
+  endpointIdentifiers = import ../../../contracts/endpoints/lib/identifiers.nix { };
+  applicationSlug = endpointIdentifiers.endpointName "jellyseerr" integration.publication;
+  oidcConfig = (pkgs.formats.json { }).generate "seerr-oidc.json" {
+    main = {
+      oidcLogin = true;
+      applicationUrl = contract.publications.web.publicUrl;
+    };
+    provider = {
+      slug = cfg.oidc.providerSlug;
+      name = "Authentik";
+      issuerUrl = "${core.my.contracts.provides.authentik.publications.web.publicUrl}/application/o/${applicationSlug}/";
+      inherit (integration) clientId;
+      scopes = lib.concatStringsSep " " integration.propertyMappings;
+    };
+  };
 in
 {
   options.my.features.services.jellyseerr = {
     enable = lib.mkEnableOption "Jellyseerr Media Request Manager";
+    oidc = {
+      clientId = lib.mkOption {
+        type = lib.types.str;
+        default = "seerr";
+        description = "Client identifier shared by Seerr and its declared OIDC integration.";
+      };
+      providerSlug = lib.mkOption {
+        type = lib.types.strMatching "[a-z0-9-]+";
+        default = "authentik";
+        description = "Native Seerr provider identity, preserved for existing linked accounts.";
+      };
+      secretPath = lib.mkOption {
+        type = lib.types.str;
+        default = "services/apps/seerr_oidc_secret";
+        description = "SOPS path holding the dedicated OIDC client credential.";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    sops.secrets.${cfg.oidc.secretPath}.restartUnits = [ "seerr-oidc-configure.service" ];
+    systemd.services.seerr-oidc-configure = {
+      description = "Configure Seerr's native OIDC integration";
+      wantedBy = [ "multi-user.target" ];
+      after = [ containerUnit ];
+      requires = [ containerUnit ];
+      restartTriggers = [
+        oidcConfig
+        ./configure-oidc.py
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        TimeoutStartSec = 120;
+        UMask = "0077";
+        LoadCredential = "oidc-secret:${config.sops.secrets.${cfg.oidc.secretPath}.path}";
+        ExecStart = "${pkgs.python3}/bin/python3 ${./configure-oidc.py} ${contract.endpoints.web.localUrl} /var/lib/jellyseerr/settings.json ${oidcConfig} %d/oidc-secret";
+      };
+    };
     # Run Jellyseerr as an OCI Container
     virtualisation.oci-containers.containers."jellyseerr" = {
       image = "ghcr.io/v3djg6gl/seerr:feat-oidc-jellyfin-quickconnect";
@@ -36,8 +94,8 @@ in
       publications."web" = {
         scope = "public";
         endpoint = "web";
-        auth = "none";
-        publicExempt = "Seerr enforces its own Jellyfin login; an external forward-auth proxy only adds a second login";
+        auth = "oidc";
+        accessGroups = [ "media-users" ];
         subdomain = "seerr";
         # Ingress reaches this over the WireGuard mesh (invariant I10).
       };
@@ -48,20 +106,22 @@ in
           en = "Request and approve media.";
         };
         show = true;
-        displayName = "Jellyseerr";
+        displayName = "Seerr";
         category = "Media";
         icon = "jellyseerr";
       };
       telemetry.probes."web-http".endpoint = "web";
       telemetry.probes."web-http".kind = "http";
+      identity.oidc.web = {
+        enable = true;
+        publication = "web";
+        inherit (cfg.oidc) clientId secretPath;
+        redirectPaths = [ "/login?provider=${cfg.oidc.providerSlug}&callback=true" ];
+      };
       endpoints.web = {
         port = 5055;
         protocol = "tcp";
-        # Public per docs/naming.md §9.4. Seerr authenticates with its own Jellyfin login — exactly
-        # like Home Assistant and Jellyfin — so no forward-auth layer and no double login.
-        # The image in use is an OIDC-capable fork, but its OIDC configuration contract is not
-        # environment based and is undocumented (settings-file based); wiring it declaratively
-        # is a separate follow-up, and declaring auth = "oidc" before that would be a lie.
+        # Native OIDC performs the login; Caddy must not add a second forward-auth layer.
         directAccess = {
           enable = true;
           protocol = "tcp";

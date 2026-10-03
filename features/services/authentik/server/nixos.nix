@@ -10,6 +10,34 @@ let
   serviceAddressLib = import ../../../../contracts/topology/lib/service-address.nix { };
   cfg = config.my.features.services.authentik.server;
   smtp = config.my.features.system.smtp;
+  systems = fleetConfigs.systems config;
+  # Admit actual HTTP consumers, not a trust level named after their transport. Caddy's predicate
+  # is shared with its route generation; independent outposts also consume this core API listener.
+  httpConsumerHosts = lib.attrNames (
+    lib.filterAttrs (
+      name: system:
+      let
+        consumer = system.config;
+        caddy = consumer.my.features.services.caddy;
+        outposts = consumer.my.features.services.authentik.outpost;
+        address = "${
+          serviceAddressLib.serviceAddress {
+            topology = config.my.topology;
+            consumer = config.my.topology.hosts.${name};
+            peer = config.my.topology.hosts.${config.networking.hostName};
+          }
+        }:${toString cfg.listenPort}";
+      in
+      name != config.networking.hostName
+      && (
+        (caddy.forwardAuthRequired && caddy.authentikOutpostAddress == address)
+        || lib.any (outpost: outpost.enable && outpost.coreAddress == "http://${address}") [
+          outposts.proxy
+          outposts.ldap
+        ]
+      )
+    ) systems
+  );
 
   # Constructors for blueprint entries. They belong to this feature, not to the framework: they encode
   # authentik's rules, and they exist so that a model name, a reference kind and the placement of a field
@@ -583,6 +611,12 @@ in
       default = 9055;
       description = "HTTP listen port of the core and its embedded outpost; read by outposts fleet-wide instead of a literal.";
     };
+    httpConsumerHosts = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      readOnly = true;
+      default = httpConsumerHosts;
+      description = "Inventory hosts consuming the core HTTP listener through generated forward-auth or native outposts.";
+    };
     embeddedOutpostAddress = lib.mkOption {
       type = lib.types.str;
       readOnly = true;
@@ -843,12 +877,8 @@ in
       telemetry.scrapes."metrics-metrics".jobName = "authentik";
       telemetry.probes."web-http".endpoint = "web";
       telemetry.probes."web-http".kind = "http";
-      # The server's own listeners. The ingress proxies to `web` on this host, so they are the local
-      # network's business and nobody else's - declared local, which is what the exposure inventory reads
-      # as "a decision", not as "forgotten".
-      # The server's own HTTP and HTTPS faces. The ingress reaches the service through `web` (9055) on this
-      # host, so nothing outside talks to these two; authentik listens on them regardless. Declared local,
-      # which is what the exposure inventory reads as a decision.
+      # Auxiliary HTTP/HTTPS faces are not remote integration endpoints. The configurable `web`
+      # listener below carries the published core, embedded forward-auth and native outpost API traffic.
       endpoints.http = {
         port = 9000;
         protocol = "tcp";
@@ -884,6 +914,11 @@ in
       endpoints.web = {
         port = cfg.listenPort;
         protocol = "tcp";
+        directAccess = lib.optionalAttrs (httpConsumerHosts != [ ]) {
+          enable = true;
+          interface = "wireguard";
+          fromHosts = httpConsumerHosts;
+        };
       };
     };
 

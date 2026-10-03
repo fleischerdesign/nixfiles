@@ -186,6 +186,23 @@ object permissions bound to a **named** role - not to the managed role, which is
 An earlier version of this document described a separate proxy outpost with its own token. That is not
 the design: the embedded outpost is the design, and it removes a credential and a process.
 
+### Application authentication paths
+
+Native OIDC and reverse-proxy forward-auth are separate integration types. Seerr uses native OIDC;
+its publication and callback URIs supply the Authentik client contract, and a dedicated SOPS
+credential is shared by the provider and relying party. Seerr's native configuration API applies
+only owned provider fields, the publication's application URL and OIDC enablement at deployment.
+Other providers, signup policy, linked accounts and application settings remain UI-owned. Its browser callback is `/login` with
+the provider slug and `callback=true` query parameters, not the backend token-exchange route.
+
+The central Authentik HTTP listener serves both the embedded proxy outpost and the core API.
+Its WireGuard admission derives from actual consumers: Caddy hosts whose generated routes use
+the central forward-auth address, and native proxy or LDAP outposts configured to consume that
+core address. Caddy uses one publication projection and one authentication predicate for both
+route generation and dependency declaration. OIDC applications do not become forward-auth
+consumers. The endpoint admits only those inventory hosts plus the published ingress source;
+an empty consumer set does not imply access for all trust levels.
+
 ## 6. Token inversion
 
 The naive order is: create the outpost in the UI, let Authentik generate a token, copy it into SOPS.
