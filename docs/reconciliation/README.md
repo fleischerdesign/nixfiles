@@ -41,6 +41,7 @@ and the reconciler that continuously converges the derived state between them.
 | How is the layer tested? | [testing.md](testing.md) |
 | How does each domain cross the line, reversibly? | [migration.md](migration.md) |
 | What do the terms mean? | [glossary.md](glossary.md) |
+| Which document owns each invariant, decision, scenario and risk? | [traceability.md](traceability.md) |
 | Which decisions were made, and which alternatives were rejected? | [decisions/](decisions/README.md) |
 
 ## Domains
