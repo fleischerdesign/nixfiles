@@ -38,9 +38,15 @@ placements, not a second list of devices.
 
 ## Configuration and state
 
-`release.nix` declares the OpenClaw release this fleet runs; `build.nix` selects the unmodified
-packages from the pinned nix-openclaw input and asserts the source release matches. A profile names
-plugin identifiers (`runtimePlugins`), never store paths. Unsupported identifiers fail evaluation.
+`release.nix` declares the OpenClaw release this fleet runs; `build.nix` selects the official
+packages from the pinned nix-openclaw input and asserts the source release matches. A local packaging
+adaptation applies one immutable-store hardlink policy to native skill bundles, plugin UI assets,
+package icons and plugin artifact manifests, including their embedded-worker implementations.
+The worker embeds that policy from the same source because device bootstrap transports it as a
+standalone file; the check prewarms it without neighboring package modules. The adaptation preserves
+the official dependency graph and installation recipe, and no plugins are bundled locally. A profile
+names plugin identifiers (`runtimePlugins`), never store paths. Unsupported identifiers fail
+evaluation.
 
 Nix generates immutable JSON, packages plugins, adds declarative skill directories and supplies
 executables through runtime wrappers. Updates and persisted plugin-registry overrides are disabled.
@@ -57,11 +63,20 @@ Hand-numbered internal ports are what produced the original collision: MCP Apps 
 port.
 
 The feature check measures the consumer-visible fact, not just the build's own writes:
-`checks/openclaw-plugins-loaded.py` runs the unmodified gateway binary against the generated
+`checks/openclaw-plugins-loaded.py` runs the packaged gateway binary against the generated
 configuration and requires every selected additional plugin to load without missing-peer diagnostics.
 The payload check separately invokes upstream's cold validator for actual installation records,
 not fabricated npm records for declarative load paths. Runtime inspection must report no registration
 errors; discovery alone does not prove that tools or agent harnesses registered successfully.
+
+`checks/openclaw-resources.mjs` exercises the native skill-bundle and plugin UI readers against
+the installed package, including real hardlinked immutable inputs. Nix-mode resource reads permit
+hardlinks only when their root resolves into a canonical Nix-store output and both the output and
+resource directories are store-owned and read-only. Ownership is compared with the store authority
+because Nix sandboxes map input ownership to an unprivileged identity. Mutable roots retain hardlink rejection;
+containment, symlink rules and byte limits are unchanged. The packaging adaptation fails the build
+if any gateway or worker reader no longer matches its release-bound guard contract. This checks
+resource consumption separately from discovery and registration.
 
 ### Deliberate audit findings
 

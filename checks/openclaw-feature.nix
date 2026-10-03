@@ -36,6 +36,11 @@ let
     lib.unique (lib.concatMap (instance: instance.runtimePlugins) instances)
   );
   config = host.config.environment.etc."openclaw/openclaw-philipp.json".source;
+  resourceFixture = pkgs.runCommand "openclaw-linked-resource-fixture" { } ''
+    mkdir -p "$out"
+    printf '%s\n' '---' 'name: synthetic' 'description: synthetic qualification skill' '---' > "$out/SKILL.md"
+    ln "$out/SKILL.md" "$out/second-link.md"
+  '';
   nodeConfigs =
     map
       (
@@ -162,6 +167,10 @@ pkgs.runCommand "openclaw-feature-check"
     print("Expected literal runtime paths and file-backed credentials: verified")
     ' > runtime-environment.txt
     node ${./openclaw-device-auth.mjs} ${openclaw.gateway} > device-auth.txt
+    OPENCLAW_NIX_MODE=1 node ${./openclaw-resources.mjs} ${openclaw.gateway} ${resourceFixture} > resources.txt
+    python3 ${./openclaw-resource-patch.py} ${../features/services/openclaw/patch-resource-readers.py} \
+      ${inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway} \
+      ${../features/services/openclaw/nix-resource-policy.mjs} > resource-patch.txt
     node ${./openclaw-node-capabilities.mjs} ${openclaw.gateway} \
       ${lib.escapeShellArgs (map toString nodeConfigs)} \
       ${
@@ -180,5 +189,5 @@ pkgs.runCommand "openclaw-feature-check"
     python3 ${./openclaw-plugins-loaded.py} \
       ${openclaw.package}/bin/openclaw ${config} ${pluginIds} > plugins.txt
 
-    cat feature.txt plugins.txt device-auth.txt node-capabilities.txt runtime-environment.txt > "$out"
+    cat feature.txt plugins.txt device-auth.txt node-capabilities.txt runtime-environment.txt resources.txt resource-patch.txt > "$out"
   ''

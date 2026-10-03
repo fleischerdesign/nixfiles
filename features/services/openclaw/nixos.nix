@@ -190,7 +190,7 @@ in
     package = lib.mkOption {
       type = lib.types.package;
       default = openclaw.package;
-      defaultText = lib.literalExpression "inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw";
+      defaultText = lib.literalExpression "openclaw.package (official package with the local immutable-resource policy)";
       description = "Upstream-pinned OpenClaw runtime and tools for the release declared in release.nix.";
     };
     accessGroup = lib.mkOption {
