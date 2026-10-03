@@ -15,6 +15,20 @@ let
     inherit lib pkgs inputs;
   };
   ports = import ../features/services/openclaw/ports.nix;
+  runtimeFixture =
+    (import ../features/services/openclaw/runtime.nix { inherit lib pkgs inputs; }).build
+      {
+        id = "openclaw-runtime-fixture";
+        stateDir = "/build/runtime-fixture";
+        configPath = "/build/runtime-fixture/config.json";
+        package = openclaw.package;
+        runtime = {
+          environment = { };
+          credentialFiles.SYNTHETIC_CREDENTIAL = "/build/runtime-fixture/credential";
+          packages = [ ];
+        };
+        settings = { };
+      };
   feature = host.config.my.features.services.openclaw;
   # Every instance the host actually provisions, not every profile that exists.
   instances = lib.attrValues feature.instances;
@@ -115,6 +129,16 @@ pkgs.runCommand "openclaw-feature-check"
   }
   ''
     set -euo pipefail
+    mkdir -p /build/runtime-fixture
+    cp ${runtimeFixture.source} /build/runtime-fixture/config.json
+    printf '%s' 'synthetic credential' > /build/runtime-fixture/credential
+    ${runtimeFixture.execute}/bin/openclaw-runtime-fixture-exec python3 -c '
+    import os
+    assert os.environ["OPENCLAW_CONFIG_PATH"] == "/build/runtime-fixture/config.json"
+    assert os.environ["OPENCLAW_STATE_DIR"] == "/build/runtime-fixture"
+    assert os.environ["SYNTHETIC_CREDENTIAL"] == "synthetic credential"
+    print("Expected literal runtime paths and file-backed credentials: verified")
+    ' > runtime-environment.txt
     node ${./openclaw-device-auth.mjs} ${openclaw.gateway} > device-auth.txt
     node ${./openclaw-node-capabilities.mjs} ${openclaw.gateway} \
       ${lib.escapeShellArgs (map toString nodeConfigs)} \
@@ -134,5 +158,5 @@ pkgs.runCommand "openclaw-feature-check"
     python3 ${./openclaw-plugins-loaded.py} \
       ${openclaw.package}/bin/openclaw ${config} ${pluginIds} > plugins.txt
 
-    cat feature.txt plugins.txt device-auth.txt node-capabilities.txt > "$out"
+    cat feature.txt plugins.txt device-auth.txt node-capabilities.txt runtime-environment.txt > "$out"
   ''

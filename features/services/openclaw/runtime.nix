@@ -55,9 +55,9 @@ in
       runtime,
       settings,
       source ? null,
+      configPath ? "/etc/openclaw/${id}.json",
     }:
     let
-      configPath = "/etc/openclaw/${id}.json";
       resolved = lib.recursiveUpdate settings {
         update = {
           checkOnStart = false;
@@ -66,20 +66,24 @@ in
       };
       configSource =
         if source != null then source else (pkgs.formats.json { }).generate "${id}.json" resolved;
-      runtimeEnvironment =
-        runtime.environment
-        // runtime.credentialFiles
-        // {
-          OPENCLAW_STATE_DIR = stateDir;
-          OPENCLAW_CONFIG_PATH = configPath;
-          OPENCLAW_NIX_MODE = "1";
-          OPENCLAW_NO_AUTO_UPDATE = "1";
-          OPENCLAW_DISABLE_PERSISTED_PLUGIN_REGISTRY = "1";
-        };
+      managedEnvironment = {
+        OPENCLAW_STATE_DIR = stateDir;
+        OPENCLAW_CONFIG_PATH = configPath;
+        OPENCLAW_NIX_MODE = "1";
+        OPENCLAW_NO_AUTO_UPDATE = "1";
+        OPENCLAW_DISABLE_PERSISTED_PLUGIN_REGISTRY = "1";
+      };
+      runtimeEnvironment = runtime.environment // runtime.credentialFiles // managedEnvironment;
       execute = pkgs.writeShellScriptBin "${id}-exec" ''
         set -euo pipefail
         ${environment.renderExports (
-          lib.mapAttrsToList (key: value: { inherit key value; }) runtimeEnvironment
+          lib.mapAttrsToList (key: value: { inherit key value; }) (
+            runtime.environment // runtime.credentialFiles
+          )
+        )}
+        # These are literal runtime paths/flags, not upstream file-backed environment inputs.
+        ${lib.concatStringsSep "\n" (
+          lib.mapAttrsToList (key: value: "export ${key}=${lib.escapeShellArg value}") managedEnvironment
         )}
         export PATH=${
           lib.escapeShellArg (
