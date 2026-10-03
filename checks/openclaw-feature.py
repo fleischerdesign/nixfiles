@@ -49,16 +49,19 @@ assert config["gateway"]["auth"]["trustedProxy"]["allowUsers"] == ["philipp"]
 # The heartbeat has no messenger route in this deployment, so it must not claim one.
 assert config["agents"]["defaults"]["heartbeat"]["target"] == "none"
 
-# Research reads untrusted content; it must not be able to write or execute.
-research = config["agents"]["entries"]["research"]
-assert research["sandbox"]["workspaceAccess"] == "ro"
-for denied in ("exec", "write", "apply_patch", "browser"):
-    assert denied in research["tools"]["deny"], denied
+# One personal agent, with a stable id for existing conversations and memory.
+assert set(config["agents"]["entries"]) == {"main"}
+main = config["agents"]["entries"]["main"]
+assert main["name"] == "Moebius"
+assert main["identity"]["name"] == "Moebius"
+assert main["subagents"]["allowAgents"] == ["main"]
+assert config["agents"]["defaults"]["systemAgent"]["agentId"] == "main"
 
 # Session reach is a decision, not the Gateway-wide default.
 assert config["tools"]["sessions"]["visibility"] == "agent"
-assert config["tools"]["agentToAgent"]["enabled"] is True
-assert config["tools"]["agentToAgent"]["allow"] == ["coding", "research", "operations"]
+assert config["tools"]["agentToAgent"]["enabled"] is False
+assert config["tools"]["agentToAgent"]["allow"] == []
+assert config["tools"]["exec"]["host"] == "auto", "Explicit node execution must not be locked to gateway"
 
 # Memory: the native backend is the active slot, and the two recall paths are explicitly on.
 # `rememberAcrossConversations` is a per-agent product setting; it implies session indexing, so the
@@ -67,8 +70,6 @@ assert config["plugins"]["slots"]["memory"] == "memory-core"
 assert config["memory"]["search"]["provider"] == "openai"
 assert "sources" not in config["memory"]["search"], "sources must stay derived, not global"
 assert config["agents"]["entries"]["main"]["memory"]["search"]["rememberAcrossConversations"] is True
-for specialist in ("coding", "research", "operations"):
-    assert "memory" not in config["agents"]["entries"][specialist], specialist
 
 # Active Memory must be allowed as well as configured; a configured-but-not-allowed plugin is the
 # exact warning the validator raises.
@@ -84,10 +85,15 @@ assert config["plugins"]["entries"]["memory-core"]["config"]["dreaming"]["enable
 assert "device-pair" in config["plugins"]["allow"]
 assert config["plugins"]["entries"]["device-pair"]["enabled"] is True
 
+# Linux node policies also run on the gateway; local capture remains opt-in on the node.
+assert "linux-node" in config["plugins"]["allow"]
+assert config["plugins"]["entries"]["linux-node"]["enabled"] is True
+assert config["gateway"]["nodes"]["commands"]["allow"] == ["camera.snap", "camera.clip"]
+
 # Every catalogue plugin is named for activation. The Codex harness is part of that set because the
 # GPT-5.4 fallback routes through it.
 for plugin_id in ids:
     assert plugin_id in config["plugins"]["allow"], plugin_id
     assert config["plugins"]["entries"][plugin_id]["enabled"] is True, plugin_id
 
-print("Expected bundled plugin layout, distinct MCP/Browser ports, narrowed specialisation and native memory: verified")
+print("Expected bundled plugins, distinct MCP/Browser ports, one Moebius agent and native memory: verified")

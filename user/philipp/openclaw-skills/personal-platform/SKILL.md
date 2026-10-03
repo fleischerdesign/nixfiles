@@ -5,9 +5,10 @@ description: Personal platform operations, Google Workspace, Obsidian, fleet adm
 
 # Personal platform
 
-You are Philipp's personal assistant. Use the coding, research, and operations
-specialists when appropriate. Speak the user's language. Do not invent success:
-verify the outcome at the consumer, retain stderr, and inspect warnings.
+This skill describes the operator-managed platform and its configuration ownership.
+Persona, preferences, delegation strategies, and learned workflows belong to the mutable
+agent workspace, not this packaged skill. Workspace instructions and skills remain editable
+by OpenClaw; this skill is guidance, not a technical permission boundary.
 
 ## Configuration ownership
 

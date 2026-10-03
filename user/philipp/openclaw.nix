@@ -44,6 +44,7 @@ let
     "talk-voice"
     "workboard"
     "device-pair"
+    "linux-node"
   ];
 in
 {
@@ -111,6 +112,12 @@ in
       };
       settings = {
         wizard.accessMode = "full";
+        # Persistent operator consent, not device admission: each node must independently enable
+        # and advertise capture and have its expanded command surface approved.
+        gateway.nodes.commands.allow = [
+          "camera.snap"
+          "camera.clip"
+        ];
         models.providers = {
           openai.apiKey = envSecret "OPENAI_API_KEY";
           deepseek.apiKey = envSecret "DEEPSEEK_API_KEY";
@@ -155,8 +162,7 @@ in
             "/reset"
           ];
         };
-        # Anhängsel wachsen den Zustand direkt; sieben Tage reichen für Medien- und Dokumentenkontext,
-        # und ältere Dateien sind nicht die Quelle der Wahrheit - die Sitzungen sind es.
+        # Retain attachment context for seven days; durable sessions remain the source of truth.
         attachments.ttlHours = 168;
         # Managed worktrees belong to the runtime, not the workspace of one agent.
         worktreeRoot = "${instance.stateDir}/worktrees";
@@ -171,7 +177,7 @@ in
             utilityModel = "deepseek/deepseek-chat";
             userTimezone = config.time.timeZone;
             workspace = "${instance.stateDir}/workspace";
-            # `ownership = "explicit"` makes the four agents distinct, but ambient operations
+            # Ambient operations under `ownership = "explicit"`
             # (Ask OpenClaw, models.list, skills.status, unscoped session reads) still need one named
             # owner. Without it they fail with AgentSelectionRequiredError; `main` is the personal
             # assistant and the correct default for work that names no agent.
@@ -190,71 +196,29 @@ in
           };
           entries = {
             main = {
-              name = "Personal assistant";
-              subagents.allowAgents = [
-                "coding"
-                "research"
-                "operations"
-              ];
-              # A personal agent may recall relevant context from its own other private
-              # conversations. Only main gets this: the specialists are task personas, not people
-              # with a memory of their own, and narrowing it to main keeps their transcripts out of
-              # recall. Enabling this implies session transcript indexing for main.
+              # Keep the stable id: existing conversations, memory and plugin scopes belong to main.
+              name = "Moebius";
+              identity.name = "Moebius";
+              subagents.allowAgents = [ "main" ];
+              # Cross-conversation recall belongs to this personal agent. Enabling it implies
+              # session transcript indexing without a Gateway-wide sources override.
               memory.search.rememberAcrossConversations = true;
-            };
-            coding = {
-              name = "Coding specialist";
-              model = "openai/gpt-5.4";
-              workspace = "${instance.stateDir}/workspaces/coding";
-            };
-            research = {
-              name = "Research specialist";
-              workspace = "${instance.stateDir}/workspaces/research";
-              # Research reads the open web. It may fetch and read, but it does not need to write
-              # files or run shell commands, so its authority is narrowed to the read path.
-              sandbox = {
-                mode = "all";
-                scope = "agent";
-                workspaceAccess = "ro";
-              };
-              tools = {
-                allow = [
-                  "read"
-                  "web_search"
-                  "web_fetch"
-                ];
-                deny = [
-                  "write"
-                  "edit"
-                  "apply_patch"
-                  "exec"
-                  "process"
-                  "browser"
-                ];
-              };
-            };
-            operations = {
-              name = "Fleet operations specialist";
-              workspace = "${instance.stateDir}/workspaces/operations";
             };
           };
         };
         tools = {
           profile = "full";
-          # Session visibility and agent-to-agent messaging are set explicitly so the default
-          # Gateway-wide reach is a decision, not an oversight. `allow` lists the agent ids that may
-          # be targeted; main owns the specialists, so only those names appear.
+          # One configured agent: temporary child runs use its existing subagent return channel,
+          # not a separate cross-agent messaging topology.
           sessions.visibility = "agent";
           agentToAgent = {
-            enabled = true;
-            allow = [
-              "coding"
-              "research"
-              "operations"
-            ];
+            enabled = false;
+            allow = [ ];
           };
           exec = {
-            host = "gateway";
+            # Auto keeps unsandboxed calls on the gateway but permits an explicit paired-node
+            # target. A fixed gateway host rejects node overrides and hides node-hosted skills.
+            host = "auto";
             mode = "full";
             # Keep apply_patch inside the agent workspace even though exec runs unsandboxed; the
             # filesystem tools already reach the host deliberately, so a patch should not also escape

@@ -49,12 +49,10 @@
     enable = lib.mkDefault true;
     node = {
       enable = lib.mkDefault true;
-      # The gateway rejects an internal client that authenticates with nothing. The node signs in
-      # with the same local-direct credential the gateway uses; the private half stays in SOPS and
-      # is delivered as a file, never as a value in the config.
-      passwordSecret = "ai/openclaw/gateway_password";
       packages = [
         pkgs.chromium
+        pkgs.ffmpeg
+        pkgs.libnotify
         pkgs.wtype
       ];
       settings = {
@@ -64,9 +62,16 @@
           skills.enabled = true;
           workerRuns.enabled = true;
         };
-        # Node-host surfaces: desktop notifications, camera capture and location. This plugin is
-        # only meaningful on a node host, so it is enabled here and not in the gateway profile.
-        plugins.entries."linux-node".enabled = true;
+        # Local enablement and tools determine the advertised surface. Gateway policy and explicit
+        # capability approval remain independent gates; location is not enabled without a provider.
+        plugins.entries."linux-node" = {
+          enabled = true;
+          config = {
+            notify.enabled = true;
+            camera.enabled = true;
+            location.enabled = false;
+          };
+        };
       };
     };
   };

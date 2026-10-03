@@ -24,9 +24,67 @@ let
   instances = lib.attrValues feature.instances;
   pluginIds = lib.concatStringsSep "," (lib.attrNames openclaw.all);
   config = host.config.environment.etc."openclaw/openclaw-philipp.json".source;
+  nodeConfigs =
+    map
+      (
+        name:
+        let
+          nodeHost = self.nixosConfigurations.${name}.config;
+          node = lib.head (lib.attrValues nodeHost.my.features.services.openclaw.nodes);
+          id = "openclaw-node-${node.gateway}-${node.instance}-${nodeHost.my.user.primary}";
+        in
+        nodeHost.environment.etc."openclaw/${id}.json".source
+      )
+      [
+        "hom-wrk-01"
+        "mob-nb-01"
+      ];
 in
 assert feature.enable;
 assert instances != [ ];
+assert lib.all
+  (
+    name:
+    lib.all (
+      node:
+      !(node.credentialFiles ? OPENCLAW_GATEWAY_PASSWORD)
+      && !(node.credentialFiles ? OPENCLAW_GATEWAY_TOKEN)
+      && !(node.settings ? gateway.remote.password)
+      && !(node.settings ? gateway.remote.token)
+    ) (lib.attrValues self.nixosConfigurations.${name}.config.my.features.services.openclaw.nodes)
+  )
+  [
+    "hom-wrk-01"
+    "mob-nb-01"
+  ];
+assert lib.all
+  (
+    name:
+    lib.all (
+      node:
+      lib.all (package: lib.elem package node.packages) [
+        pkgs.ffmpeg
+        pkgs.libnotify
+      ]
+    ) (lib.attrValues self.nixosConfigurations.${name}.config.my.features.services.openclaw.nodes)
+  )
+  [
+    "hom-wrk-01"
+    "mob-nb-01"
+  ];
+assert lib.all (
+  instance:
+  let
+    publication = host.config.my.contracts.provides."openclaw-${instance.owner}".publications.web;
+  in
+  publication.auth == "authentik"
+  &&
+    publication.unauthenticatedPaths == [
+      "/j/*"
+      "/__openclaw__/worker"
+    ]
+  && publication.machineClientsBypassAuth
+) instances;
 # The declared MCP Apps port is the derived default, not a hand-numbered value.
 assert lib.all (instance: instance.apps.port == instance.port + ports.apps) instances;
 # The derived listeners are distinct and clear of OpenClaw's own CDP band, and the publishing router
@@ -59,10 +117,24 @@ assert lib.all
   ];
 pkgs.runCommand "openclaw-feature-check"
   {
-    nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ];
+    nativeBuildInputs = [
+      (pkgs.python3.withPackages (ps: [ ps.pyyaml ]))
+      pkgs.nodejs
+    ];
   }
   ''
     set -euo pipefail
+    node ${./openclaw-device-auth.mjs} ${openclaw.gateway} > device-auth.txt
+    node ${./openclaw-node-capabilities.mjs} ${openclaw.gateway} \
+      ${lib.escapeShellArgs (map toString nodeConfigs)} \
+      ${
+        lib.escapeShellArg (
+          lib.makeBinPath [
+            pkgs.ffmpeg
+            pkgs.libnotify
+          ]
+        )
+      } > node-capabilities.txt
     python3 ${./openclaw-feature.py} \
       ${openclaw.gateway} ${pluginIds} ${config} \
       ${toString ports.apps} ${toString ports.browserControl} > feature.txt
@@ -72,5 +144,5 @@ pkgs.runCommand "openclaw-feature-check"
     python3 ${./openclaw-plugins-loaded.py} \
       ${openclaw.package}/bin/openclaw ${config} ${pluginIds} > plugins.txt
 
-    cat feature.txt plugins.txt > "$out"
+    cat feature.txt plugins.txt device-auth.txt node-capabilities.txt > "$out"
   ''

@@ -320,6 +320,16 @@ let
               auth = "authentik";
               ingressOnly = true;
               accessUsers = [ instance.owner ];
+              # These routes authenticate their own short-lived credentials. Native clients must
+              # reach them without an interactive SSO redirect.
+              unauthenticatedPaths = [
+                "/j/*"
+                "/__openclaw__/worker"
+              ];
+              # Native WebSockets carry signed device identity plus bootstrap/device credentials
+              # in the OpenClaw handshake, not a browser session. Stripping identity headers on
+              # this bypass is essential: the Gateway must authenticate the device itself.
+              machineClientsBypassAuth = true;
               # The gateway reads this header as a connection scope cap; it belongs to this
               # publication, not to the shared ingress, so the declaration carries it.
               stripRequestHeaders = [ "X-OpenClaw-Scopes" ];
@@ -396,7 +406,12 @@ let
       nix.settings.trusted-users = lib.optional instance.fleet.enable user;
       warnings =
         lib.optional
-          (instance.fleet.enable && instance.fleet.hosts != [ ] && instance.fleet.privateKeyFile == null)
+          (
+            instance.fleet.enable
+            && instance.fleet.hosts != [ ]
+            && instance.fleet.privateKeyFile == null
+            && instance.fleet.privateKeySecret == null
+          )
           "OpenClaw ${name}: local root administration is enabled, but fleet SSH still requires a private/public credential pair.";
     };
   parts = lib.mapAttrsToList make cfg.instances;

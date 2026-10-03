@@ -105,10 +105,24 @@ headers before Authentik authentication. The gateway trusts only the inventory-d
 proxy address and accepts only its owner's username. Its browser audience is the owner's
 generated identity group, not the whole `ai-users` group.
 
+The publication exempts `/j/*` and `/__openclaw__/worker` from Authentik forward-auth:
+OpenClaw validates the single-use join codes and short-lived worker credentials itself.
+Caddy still strips client-supplied identity and scope headers on these routes. The
+Control UI has no authentication bypass. Native WebSocket upgrades without an `Origin`
+header bypass forward-auth as well, but receive no trusted identity headers. OpenClaw verifies
+their signed device identity and bootstrap or device token in its native handshake. Requests
+with a browser `Origin` still require Authentik. Worker credentials are distinct from node tokens.
+
 Native nodes connect directly to the gateway over WireGuard. Firewall admission names only
 their inventory hosts. Admission is not authentication: nodes require OpenClaw's own pairing
 and device credentials. There is no SSH tunnel or browser machine-auth bypass. The private
 WebSocket transport explicitly relies on WireGuard for encryption.
+
+Nodes must not receive a shared Gateway password: it suppresses selection of the stored device
+token in the upstream client. Each device retains its own private identity and role-scoped token
+in mutable state. Enrollment and capability approvals apply equally to declarative nodes and
+devices outside the inventory, including mobile apps. Public native connections use the TLS
+publication; direct WireGuard connections remain limited to the declared endpoint sources.
 
 The native gateway uses its all-interface listener so the same process is reachable on loopback
 for local administration and on WireGuard for ingress and nodes. Only the declared WireGuard
@@ -126,9 +140,46 @@ device credentials, not the bootstrap code. Use the wrappers rather than bare Op
 paths and configuration stay correct. These commands use the host's fish shell; do not use
 POSIX inline environment assignments there.
 
+For mobile apps and devices outside the inventory, mint the setup code with
+`qr --url wss://<personal-gateway-domain> --json` instead. Scan or paste that native setup
+code in the app; it is not a `/j/` join URL. The public TLS endpoint permits native
+WebSockets without an `Origin`, while the ordinary browser still authenticates through
+Authentik. Review requested roles, scopes and capabilities before approving the device.
+
 Graphical nodes run as the desktop user, not root. Chromium is available to the native browser
 proxy. This does not imply general Wayland computer-control compatibility: `wtype` provides
 an executable, not a verified OpenClaw Niri computer-control implementation.
+
+The PC role enables the bundled `linux-node` plugin's camera and notification surfaces and
+provides FFmpeg and `notify-send` in the node wrapper's PATH. The gateway loads the same plugin
+for its node-invoke policies and explicitly allows `camera.snap` and `camera.clip`. This consent
+applies to eligible paired nodes, not only one inventory host. Device admission, approved command
+surface, local capability enablement and OS access remain independent requirements. Camera access
+uses the desktop user's existing session permissions; no permanent `video` group grant is added.
+Location remains disabled without a qualified GeoClue provider. General desktop control is not
+enabled for Niri/Wayland. `checks/openclaw-feature.nix` exercises the pinned Linux plugin's actual
+advertisement gates for both PC host classes without capturing media.
+
+The personal agent's exec target is `auto`: without a sandbox, unspecified calls stay on the
+gateway, while an explicit paired-node target is permitted. Fixing the target to `gateway`
+would reject node overrides and exclude node-hosted skills. Node command approval and local
+exec policy still apply; `auto` does not grant device admission or additional OS permissions.
+
+Session hosting is enabled on PC nodes. A missing worker bundle is an observation, not proof of
+broken provisioning: the gateway transfers and verifies its sealed artifact when a session first
+needs that build. MCP and local-inference capability labels likewise do not prove that servers or
+models are configured; qualification must discover and invoke an actual published tool or model.
+
+Consumer-level qualification on `hom-wrk-01` (2026-10-03): `nodes camera list` identified the
+UGREEN V4L2 camera; `nodes invoke camera.snap` with a nonexistent exact device id reached the
+node and failed without capture. An authorized single-frame `camera.snap` returned a valid
+640 × 360 JPEG without audio; validation retained no additional image file. `nodes notify`
+returned success. `browser.proxy` start/status/stop
+proved Chromium and CDP readiness; `terminal.upload` produced byte-identical content on the PC.
+`sessions.create` with an empty managed worktree followed by `sessions.dispatch` reached active
+device placement; `sessions.reclaim` and archive released the test session. After a node-service
+restart, `nodes status` showed approved camera/notification commands and the installed worker
+bundle. These measurements do not qualify video/audio capture, a hosted model turn, or the notebook.
 
 ## Memory
 
@@ -142,7 +193,7 @@ Two recall paths are enabled, both scoped to `main`:
 - `memory.search.rememberAcrossConversations` lets the personal agent recall relevant context from its
   own other private conversations. It implies session transcript indexing, so the global
   `memory.search.sources` stays unset and OpenClaw derives it. That derivation is per-agent; setting
-  `sources` globally would index the specialists' transcripts too.
+   `sources` globally would override that agent-local derivation.
 - The `active-memory` plugin runs bounded deep recall in `escalate` mode: only for recall intent when
   the deterministic lane found no strong trusted hit, only for direct conversations, with a 15 s
   budget. It must be in `plugins.allow`; a configured-but-not-allowed plugin is only a validator
@@ -172,7 +223,7 @@ right context are only observable in a running gateway with `/trace on` and
 
 ## Personal integrations
 
-Philipp's profile declares provider plugins, specialist agents, writable Obsidian access,
+Philipp's profile declares provider plugins, the personal agent Moebius, writable Obsidian access,
 Google Workspace, GitHub tooling and explicit local administration. These are profile choices,
 not capabilities implicitly granted to every group member. The plugin identifiers are the
 repository's reviewed allowlist (`plugins.nix`); the previous feature's `deepseek` and
@@ -180,12 +231,19 @@ repository's reviewed allowlist (`plugins.nix`); the previous feature's `deepsee
 contribute tools, and `codex` is the runtime the GPT-5.4 fallback routes through. `device-pair`
 is bundled with OpenClaw and enabled so native nodes can be paired.
 
-The profile narrows authority where the work is narrower: the research specialist reads the open
-web and is sandboxed read-only, while the coding and operations specialists keep the owner's full
-access. Session visibility is `agent` and agent-to-agent messaging is restricted to the named
-specialists, so the Gateway-wide default is a decision rather than an oversight. Heartbeats use
+Moebius is the only configured agent. Its stable internal id is `main`, including the default
+system-agent selection and memory-plugin scope. Research, coding and operations are capabilities
+of this agent, not separate permanent personas. Temporary subagents may target `main`; they return
+results to their parent without cross-agent messaging. Session visibility is `agent` and
+agent-to-agent messaging is disabled. Heartbeats use
 `target = "none"`: there is no messenger channel, so a heartbeat surfaces in the session rather than
 claiming a delivered notification. Recurring checks belong in automation jobs with explicit targets.
+
+The packaged `personal-platform` skill describes platform access and configuration ownership,
+not persona or delegation strategy. Workspace instructions (`AGENTS.md`, `SOUL.md`, `USER.md`,
+`IDENTITY.md`) and workspace skills remain native mutable state. A packaged skill is guidance,
+not a permission boundary; workspace skills can take precedence over extra-directory skills
+with the same name.
 
 The Google integration imports a SOPS OAuth client into a private `gog` configuration directory
 and initializes a private file-keyring password. OAuth consent must be completed interactively
