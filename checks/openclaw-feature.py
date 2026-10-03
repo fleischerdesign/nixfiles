@@ -107,7 +107,29 @@ assert config["models"]["providers"]["openai"]["models"][0]["api"] == "openai-ch
 sol = config["models"]["providers"]["openai"]["models"][0]
 assert sol["contextWindow"] == 872000, "Expected OAuth capacity, not the Platform API window"
 assert sol["contextTokens"] == 272000, "Expected the OAuth catalogue's default runtime budget"
-assert "agentRuntime" not in defaults["models"].get("openai/gpt-6.1-sol", {})
+assert defaults["models"]["openai/*"]["agentRuntime"] == {"id": "openclaw"}
+# Exercise native runtime selection and placement projection, not only the authored configuration.
+runtime_modules = [p for p in (root / "dist").glob("thinking-runtime-*.mjs")
+                   if "resolveEffectiveAgentRuntime as o" in p.read_text()]
+placement_modules = [p for p in (root / "dist").glob("placement-session-runtime-*.mjs")
+                     if "projectWorkerPlacementAgentRuntime as t" in p.read_text()]
+assert len(runtime_modules) == 1, "Expected one native runtime resolver"
+assert len(placement_modules) == 1, "Expected one native placement projector"
+subprocess.run([
+    "node", "--input-type=module", "-e",
+    '''const {o: resolve} = await import(process.argv[1]);
+    const {t: project} = await import(process.argv[2]);
+    const cfg = JSON.parse(process.argv[3]);
+    for (const modelId of ["gpt-6.1-sol", "gpt-5.5"]) {
+      const id = resolve({cfg, provider: "openai", modelId, agentId: "main"});
+      const runtime = project({id, source: "model"});
+      if (id !== "openclaw" || !runtime.devicePlacementSupported ||
+          runtime.cloudPlacementExecutionMode !== "worker-turn" ||
+          !runtime.devicePlacement?.consumesWorkerSlot)
+        throw new Error(`Expected native OpenAI device placement: ${JSON.stringify(runtime)}`);
+    }''',
+    runtime_modules[0].as_uri(), placement_modules[0].as_uri(), json.dumps(config),
+], check=True)
 assert defaults["subagents"]["model"] == worker
 assert defaults["heartbeat"]["model"] == worker
 assert defaults["utilityModel"] == free
@@ -156,8 +178,7 @@ assert "linux-node" in config["plugins"]["allow"]
 assert config["plugins"]["entries"]["linux-node"]["enabled"] is True
 assert config["gateway"]["nodes"]["commands"]["allow"] == ["camera.snap", "camera.clip"]
 
-# Every catalogue plugin is named for activation. The Codex harness is part of that set because the
-# subscription-backed main model routes through it.
+# Every selected official runtime plugin is named for activation.
 for plugin_id in ids:
     assert plugin_id in config["plugins"]["allow"], plugin_id
     assert config["plugins"]["entries"][plugin_id]["enabled"] is True, plugin_id

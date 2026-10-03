@@ -267,7 +267,9 @@ in
             };
             utilityModel = models.free;
             models = {
-              "openai/*" = { };
+              # Subscription transport and agent execution are separate choices. Native execution
+              # retains paired-device placement instead of inheriting the implicit Codex harness.
+              "openai/*".agentRuntime.id = "openclaw";
               "opencode-go/*" = { };
               ${models.freeAlternative} = { };
             };
