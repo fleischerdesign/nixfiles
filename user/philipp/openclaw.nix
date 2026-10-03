@@ -10,21 +10,40 @@ let
   instance = config.my.features.services.openclaw.users.${name};
   gatewayConfig = (fleetConfigs.systems config).${instance.gatewayHost}.config;
   metadata = import ./metadata.nix;
+  # Purpose-based routing; subscription chat, Go inference and API embeddings are separate paths.
+  models = {
+    main = "openai/gpt-6.1-sol";
+    worker = "opencode-go/deepseek-v4.1-flash";
+    free = "opencode-go/space-bunny-free";
+    freeAlternative = "opencode-go/longcat-2.5-preview-free";
+    multimodal = "opencode-go/mimo-v2.6-flash";
+  };
+  # Minimal published Go metadata for reproducible isolated runs, which have no discovery cache.
+  # Source: models.opencode.ai/api.json. Keep transport-compatible text/image capabilities here;
+  # advertised audio/video inputs need separate qualification in OpenClaw's media adapters.
+  goModel =
+    ref: metadata:
+    {
+      id = lib.removePrefix "opencode-go/" ref;
+      name = lib.removePrefix "opencode-go/" ref;
+      reasoning = true;
+      input = [
+        "text"
+        "image"
+      ];
+    }
+    // metadata;
   envSecret = variable: {
     source = "env";
     provider = "default";
     id = variable;
   };
-  # Identifiers resolved through features/services/openclaw/plugins.nix. `tokenjuice` was active in the
-  # previous OpenClaw feature and stays in use; the rest carry over the same way. `codex` is the agent
-  # runtime the GPT-5.4 fallback routes through.
-  enabledPlugins = [
+  # Additional runtime plugins are installed by nix-openclaw, not repackaged as bundled plugins.
+  runtimePlugins = [
     "deepseek"
-    "diffs"
     "searxng"
     "lobster"
     "tokenjuice"
-    "codex"
   ];
   # Plugins that ship inside OpenClaw and only need enablement. `device-pair` provides node onboarding
   # join codes; without it the native nodes cannot be paired.
@@ -88,7 +107,7 @@ in
         socat
       ];
       skillDirectories = [ ./openclaw-skills ];
-      inherit enabledPlugins;
+      inherit runtimePlugins;
       secrets = {
         OPENAI_API_KEY = "ai/openai_api_key";
         DEEPSEEK_API_KEY = "ai/deepseek_api_key";
@@ -119,7 +138,72 @@ in
           "camera.clip"
         ];
         models.providers = {
-          openai.apiKey = envSecret "OPENAI_API_KEY";
+          # Chat inference must not fall through to the separately configured embedding/voice key.
+          openai = {
+            auth = "oauth";
+            # This release's catalogue predates Sol. Declare its native subscription transport,
+            # without selecting the unrelated Codex app-server agent harness.
+            models = [
+              {
+                id = lib.removePrefix "openai/" models.main;
+                name = "GPT-6.1 Sol";
+                api = "openai-chatgpt-responses";
+                reasoning = true;
+                input = [
+                  "text"
+                  "image"
+                ];
+              }
+            ];
+          };
+          opencode-go = {
+            apiKey = envSecret "OPENCODE_API_KEY";
+            baseUrl = "https://opencode.ai/zen/go/v1";
+            api = "openai-completions";
+            models = [
+              (goModel models.free {
+                contextWindow = 1048576;
+                contextTokens = 524288;
+                maxTokens = 524288;
+                cost = {
+                  input = 0;
+                  output = 0;
+                  cacheRead = 0;
+                  cacheWrite = 0;
+                };
+              })
+              (goModel models.freeAlternative {
+                contextWindow = 1000000;
+                maxTokens = 131072;
+                cost = {
+                  input = 0;
+                  output = 0;
+                  cacheRead = 0;
+                  cacheWrite = 0;
+                };
+              })
+              (goModel models.worker {
+                contextWindow = 1000000;
+                maxTokens = 384000;
+                cost = {
+                  input = 0.15;
+                  output = 0.6;
+                  cacheRead = 0.003;
+                  cacheWrite = 0;
+                };
+              })
+              (goModel models.multimodal {
+                contextWindow = 1048576;
+                maxTokens = 131072;
+                cost = {
+                  input = 0.14;
+                  output = 0.28;
+                  cacheRead = 0.0028;
+                  cacheWrite = 0;
+                };
+              })
+            ];
+          };
           deepseek.apiKey = envSecret "DEEPSEEK_API_KEY";
           openrouter.apiKey = envSecret "OPENROUTER_API_KEY";
         };
@@ -171,10 +255,19 @@ in
           ownership = "explicit";
           defaults = {
             model = {
-              primary = "deepseek/deepseek-chat";
-              fallbacks = [ "openai/gpt-5.4" ];
+              primary = models.main;
+              fallbacks = [
+                models.worker
+                models.multimodal
+              ];
             };
-            utilityModel = "deepseek/deepseek-chat";
+            utilityModel = models.free;
+            models = {
+              "openai/*" = { };
+              "opencode-go/*" = { };
+              ${models.freeAlternative} = { };
+            };
+            subagents.model = models.worker;
             userTimezone = config.time.timeZone;
             workspace = "${instance.stateDir}/workspace";
             # Ambient operations under `ownership = "explicit"`
@@ -184,7 +277,12 @@ in
             systemAgent.agentId = "main";
             compaction = {
               mode = "safeguard";
-              memoryFlush.enabled = true;
+              # Native Codex compaction remains runtime-owned; this selects embedded summaries.
+              model = models.free;
+              memoryFlush = {
+                enabled = true;
+                model = models.free;
+              };
             };
             # There is no messenger channel, so a heartbeat has no owner address to deliver to. Runs
             # still execute and surface in the Control UI transcript; they must not silently claim a
@@ -192,6 +290,7 @@ in
             heartbeat = {
               every = "30m";
               target = "none";
+              model = models.worker;
             };
           };
           entries = {
@@ -263,12 +362,12 @@ in
           # Built-in plugin ids plus the external identifiers the catalogue resolves. A profile names
           # identifiers once; `allow` and `entries` are derived, so a plugin cannot be packaged and
           # loaded while silently left out of the allowlist.
-          allow = builtinsPluginIds ++ enabledPlugins;
+          allow = builtinsPluginIds ++ runtimePlugins;
           entries =
             lib.genAttrs builtinsPluginIds (_: {
               enabled = true;
             })
-            // lib.genAttrs enabledPlugins (_: {
+            // lib.genAttrs runtimePlugins (_: {
               enabled = true;
             })
             // {
@@ -284,6 +383,7 @@ in
                 enabled = true;
                 config = {
                   enabled = true;
+                  model = models.free;
                   mode = "escalate";
                   agents = [ "main" ];
                   allowedChatTypes = [ "direct" ];
@@ -298,7 +398,24 @@ in
               # Dreaming is on by default; naming it here makes the consolidation pass a reviewed
               # decision. Whether its scheduled sweep actually fires depends on the default agent's
               # heartbeat, which runs with target = "none" in this deployment.
-              memory-core.config.dreaming.enabled = true;
+              memory-core = {
+                enabled = true;
+                subagent = {
+                  allowModelOverride = true;
+                  allowedModels = [ models.free ];
+                };
+                config.dreaming = {
+                  enabled = true;
+                  model = models.free;
+                };
+              };
+              llm-task = {
+                enabled = true;
+                config = {
+                  defaultProvider = "opencode-go";
+                  defaultModel = lib.removePrefix "opencode-go/" models.free;
+                };
+              };
             };
           slots.memory = "memory-core";
         };

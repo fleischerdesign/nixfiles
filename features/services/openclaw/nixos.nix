@@ -9,7 +9,7 @@
 }:
 let
   cfg = config.my.features.services.openclaw;
-  runtime = import ./runtime.nix { inherit lib pkgs; };
+  runtime = import ./runtime.nix { inherit lib pkgs inputs; };
   openclaw = import ./build.nix { inherit lib pkgs inputs; };
   ports = import ./ports.nix;
   accessGroup = config.my.directory.groups.${cfg.accessGroup} or null;
@@ -190,7 +190,7 @@ in
     package = lib.mkOption {
       type = lib.types.package;
       default = openclaw.package;
-      defaultText = lib.literalExpression "the release resolved by features/services/openclaw/build.nix";
+      defaultText = lib.literalExpression "inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw";
       description = "Upstream-pinned OpenClaw runtime and tools for the release declared in release.nix.";
     };
     accessGroup = lib.mkOption {
@@ -279,27 +279,9 @@ in
         # must fail here, not produce a gateway that silently starts without a plugin the profile
         # believes it enabled.
         assertion = lib.all (
-          instance: lib.all (name: lib.hasAttr name openclaw.all) instance.enabledPlugins
+          instance: lib.all (name: lib.hasAttr name openclaw.runtimePlugins) instance.runtimePlugins
         ) (lib.attrValues cfg.users);
-        message = "OpenClaw enabledPlugins must name identifiers declared in features/services/openclaw/plugins.nix.";
-      }
-      {
-        # `contribution` is load-bearing: at most one enabled plugin may claim to implement the web
-        # search provider, and a profile that names one must name the enabled plugin. This is what
-        # keeps the catalogue's classification and the native `tools.web.search.provider` from
-        # disagreeing.
-        assertion = lib.all (
-          instance:
-          let
-            webSearch = lib.filter (
-              name: (openclaw.all.${name}.contribution or null) == "webSearch"
-            ) instance.enabledPlugins;
-            declared = instance.settings.tools.web.search.provider or null;
-          in
-          lib.length webSearch <= 1
-          && (webSearch == [ ] || declared == null || declared == lib.head webSearch)
-        ) (lib.attrValues cfg.users);
-        message = "At most one enabled plugin may contribute web search, and tools.web.search.provider must name it.";
+        message = "OpenClaw runtimePlugins must name official plugin identifiers supported by the pinned flake.";
       }
       {
         # Every listener an instance occupies on its gateway host, including the ports OpenClaw

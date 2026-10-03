@@ -3,17 +3,19 @@
   lib,
   pkgs,
   inputs,
+  utils,
   ...
 }:
 let
   cfg = config.my.features.services.openclaw;
-  runtime = import ./runtime.nix { inherit lib pkgs; };
+  runtime = import ./runtime.nix { inherit lib pkgs inputs; };
   ingress = config.my.topology.hosts.${config.my.topology.ingressHost};
   make =
     name: instance:
     let
       id = "openclaw-${name}";
       user = id;
+      homeManagerUnit = "home-manager-${utils.escapeSystemdPath user}.service";
       # One identity file per gateway, whichever way it arrives: a SOPS secret this feature owns
       # (preferred, and what a person's gateway uses) or a path the operator provides. Everything
       # below - the fleet SSH config, Git over SSH and node-pairing verification - reads this one
@@ -59,6 +61,7 @@ let
         inherit id;
         inherit (instance) stateDir;
         package = cfg.package;
+        source = config.home-manager.users.${user}.home.file."nix-openclaw.json".source;
         runtime = instance // {
           packages =
             instance.packages
@@ -189,6 +192,42 @@ let
       '';
     in
     {
+      home-manager.users.${user} = {
+        imports = [ inputs.openclaw.homeManagerModules.openclaw ];
+        home = {
+          username = user;
+          homeDirectory = instance.stateDir;
+          stateVersion = config.system.stateVersion;
+        };
+        programs.openclaw = {
+          enable = true;
+          installApp = false;
+          workspace.pinAgentDefaults = false;
+          # Persona and workspace files remain native mutable state.
+          skills = lib.concatMap (
+            root:
+            map (name: {
+              inherit name;
+              source = toString (root + "/${name}");
+            }) (lib.attrNames (lib.filterAttrs (_: type: type == "directory") (builtins.readDir root)))
+          ) (instance.skillDirectories ++ lib.optional instance.publishing.enable ./skills);
+          instances.${name} = {
+            enable = true;
+            package = cfg.package;
+            # CLI tools are provided by the package and this person's runtime packages.
+            plugins = [ ];
+            inherit (instance) stateDir runtimePlugins;
+            runtimePackages = instance.packages;
+            workspaceDir = instance.settings.agents.defaults.workspace or "${instance.stateDir}/workspace";
+            configPath = "${instance.stateDir}/nix-openclaw.json";
+            gatewayPort = instance.port;
+            config = built.resolved;
+            systemd.enable = false;
+            launchd.enable = false;
+            appDefaults.enable = false;
+          };
+        };
+      };
       users.groups.${user} = { };
       users.users.${user} = {
         isSystemUser = true;
@@ -239,7 +278,9 @@ let
           after = [
             "network-online.target"
             "sops-nix.service"
+            homeManagerUnit
           ];
+          requires = [ homeManagerUnit ];
           wants = [ "network-online.target" ];
           wantedBy = [ "multi-user.target" ];
           restartTriggers = [
@@ -420,6 +461,7 @@ in
 {
   config = lib.mkIf cfg.enable {
     users = merge "users";
+    home-manager = merge "home-manager";
     environment = merge "environment";
     sops = merge "sops";
     systemd = merge "systemd";

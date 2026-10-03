@@ -110,6 +110,7 @@
           }
         )
         inputs.nix-vscode-extensions.overlays.default
+        inputs.openclaw.overlays.default
         (import ./packages/custom)
       ];
 

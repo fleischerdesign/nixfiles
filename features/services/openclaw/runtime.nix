@@ -1,4 +1,13 @@
-{ lib, pkgs }:
+{
+  lib,
+  pkgs,
+  inputs,
+}:
+let
+  environment = import "${inputs.openclaw}/nix/modules/home-manager/openclaw/environment.nix" {
+    inherit lib pkgs;
+  };
+in
 {
   options = {
     settings = lib.mkOption {
@@ -11,10 +20,10 @@
       default = [ ];
       description = "Executables available to this runtime and its tools.";
     };
-    enabledPlugins = lib.mkOption {
+    runtimePlugins = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
-      description = "Identifiers from the repository plugin catalogue (features/services/openclaw/plugins.nix). The gateway closure carries them as bundled extensions; the consumer resolves the identifier to an allow/entry pair.";
+      description = "Official nix-openclaw runtime plugin identifiers; installed by its Home Manager module.";
     };
     skillDirectories = lib.mkOption {
       type = lib.types.listOf lib.types.path;
@@ -45,6 +54,7 @@
       package,
       runtime,
       settings,
+      source ? null,
     }:
     let
       configPath = "/etc/openclaw/${id}.json";
@@ -53,26 +63,23 @@
           checkOnStart = false;
           auto.enabled = false;
         };
-        skills.load.extraDirs =
-          (settings.skills.load.extraDirs or [ ]) ++ map toString runtime.skillDirectories;
       };
-      source = (pkgs.formats.json { }).generate "${id}.json" resolved;
-      environment = runtime.environment // {
-        OPENCLAW_STATE_DIR = stateDir;
-        OPENCLAW_CONFIG_PATH = configPath;
-        OPENCLAW_NIX_MODE = "1";
-        OPENCLAW_NO_AUTO_UPDATE = "1";
-        OPENCLAW_DISABLE_PERSISTED_PLUGIN_REGISTRY = "1";
-      };
+      configSource =
+        if source != null then source else (pkgs.formats.json { }).generate "${id}.json" resolved;
+      runtimeEnvironment =
+        runtime.environment
+        // runtime.credentialFiles
+        // {
+          OPENCLAW_STATE_DIR = stateDir;
+          OPENCLAW_CONFIG_PATH = configPath;
+          OPENCLAW_NIX_MODE = "1";
+          OPENCLAW_NO_AUTO_UPDATE = "1";
+          OPENCLAW_DISABLE_PERSISTED_PLUGIN_REGISTRY = "1";
+        };
       execute = pkgs.writeShellScriptBin "${id}-exec" ''
         set -euo pipefail
-        ${lib.concatStringsSep "\n" (
-          lib.mapAttrsToList (key: value: "export ${key}=${lib.escapeShellArg value}") environment
-        )}
-        ${lib.concatStringsSep "\n" (
-          lib.mapAttrsToList (
-            key: path: ''export ${key}="$(< ${lib.escapeShellArg path})"''
-          ) runtime.credentialFiles
+        ${environment.renderExports (
+          lib.mapAttrsToList (key: value: { inherit key value; }) runtimeEnvironment
         )}
         export PATH=${
           lib.escapeShellArg (
@@ -95,11 +102,11 @@
     {
       inherit
         configPath
-        source
-        environment
         execute
         launcher
         resolved
         ;
+      source = configSource;
+      environment = runtimeEnvironment;
     };
 }

@@ -19,25 +19,18 @@ directory and listener. Ports are stable functions of usernames; a collision fai
 and requires a profile override. Gateway placement can be overridden per person. Hosts contain
 feature activation, not personal OpenClaw configuration.
 
-The plugin catalogue is `features/services/openclaw/plugins/`: one folder per plugin, discovered by its
-`plugin.nix` marker through the shared `lib/discovery.nix`. The folder name **is** the plugin
-identifier, so a plugin does not restate its name; nix-openclaw derives the package attribute and the
-generated lock file from that same name. `plugins.nix` is the feature-local loader that validates each
-record and rejects an unknown field, so a plugin that needs more than `npm` and `contribution` must
-extend the contract there. A profile names identifiers, never package paths. `deepseek` and
-`tokenjuice` are continued from the OpenClaw feature this repository ran before the current one;
-`searxng`, `diffs`, `lobster` and the `codex` agent runtime arrive with it.
+The pinned nix-openclaw input owns the package and runtime-plugin catalogue. Its overlay supplies
+the packages expected by its Home Manager module. Each gateway account imports that module and
+declares a named `programs.openclaw.instances` entry. A profile names additional plugins through
+`runtimePlugins`; the upstream module builds their dependencies and OpenClaw peer links and renders
+`plugins.load.paths`. Already bundled plugins are enabled through native configuration, not installed
+again. Plugins are not copied into or rewritten inside the gateway package.
 
-Plugins are **bundled into the gateway closure**, not named through `plugins.load.paths`. OpenClaw
-resolves trust-gated runtime surfaces (`openBlobStore`, `openKeyedStore`, channel ingress queues) only
-for a plugin whose origin is `bundled` or whose install record is `trusted-official`; a load-path
-root is neither and is recorded as `record-missing`. nix-openclaw's own supported `runtimePlugins`
-path renders the same load path, so this is a property of Nix-declared plugins. A plugin that touches
-such a surface fails at registration from a load path - `diffs` calls `openBlobStore` and did exactly
-that. `build.nix` therefore copies each catalogue plugin into the gateway's own `extensions/<id>` and
-`dist/extensions/<id>`, the same physical-containment mechanism nix-openclaw uses for its bundled
-ACPX runtime. The plugins are built without the OpenClaw peer link so the gateway does not depend on
-itself; the host SDK resolves from the containing gateway.
+The repository owns the system services, identity, placement, publication and backup contracts.
+The Home Manager module owns generated gateway configuration and declarative skill materialization;
+its user gateway service is disabled because the gateway runs as a dedicated system account.
+The system service requires that account's Home Manager activation. Workspace bootstrap files remain
+undeclared so native persona, instructions and memory are not replaced on activation.
 
 The PC role requests a graphical-session node for its primary user. A node is generated only
 when that person is in the provisioning group. Gateway node admission is derived from these
@@ -45,11 +38,9 @@ placements, not a second list of devices.
 
 ## Configuration and state
 
-`release.nix` declares the OpenClaw release this fleet runs; `build.nix` resolves it, and the plugin
-catalogue under `plugins/` against the pinned `nix-openclaw` input. The two must agree: a version
-change without a matching packaging input fails evaluation with both values named. A profile names
-plugin **identifiers** (`enabledPlugins`); the catalogue decides the package, so no profile carries a
-store path and an identifier the catalogue does not declare fails evaluation.
+`release.nix` declares the OpenClaw release this fleet runs; `build.nix` selects the unmodified
+packages from the pinned nix-openclaw input and asserts the source release matches. A profile names
+plugin identifiers (`runtimePlugins`), never store paths. Unsupported identifiers fail evaluation.
 
 Nix generates immutable JSON, packages plugins, adds declarative skill directories and supplies
 executables through runtime wrappers. Updates and persisted plugin-registry overrides are disabled.
@@ -66,9 +57,11 @@ Hand-numbered internal ports are what produced the original collision: MCP Apps 
 port.
 
 The feature check measures the consumer-visible fact, not just the build's own writes:
-`checks/openclaw-plugins-loaded.py` runs the built gateway binary and asserts that every catalogue
-plugin is discovered with `origin=bundled`, `status=loaded` and `trust=bundled`. Reading the extension
-files back would only prove that Nix copied them.
+`checks/openclaw-plugins-loaded.py` runs the unmodified gateway binary against the generated
+configuration and requires every selected additional plugin to load without missing-peer diagnostics.
+The payload check separately invokes upstream's cold validator for actual installation records,
+not fabricated npm records for declarative load paths. Runtime inspection must report no registration
+errors; discovery alone does not prove that tools or agent harnesses registered successfully.
 
 ### Deliberate audit findings
 
@@ -226,9 +219,10 @@ right context are only observable in a running gateway with `/trace on` and
 Philipp's profile declares provider plugins, the personal agent Moebius, writable Obsidian access,
 Google Workspace, GitHub tooling and explicit local administration. These are profile choices,
 not capabilities implicitly granted to every group member. The plugin identifiers are the
-repository's reviewed allowlist (`plugins.nix`); the previous feature's `deepseek` and
-`tokenjuice` are continued, `searxng` implements the web-search provider, `diffs` and `lobster`
-contribute tools, and `codex` is the runtime the GPT-5.4 fallback routes through. `device-pair`
+profile's explicit allowlist; the previous feature's `deepseek` and
+`tokenjuice` are continued, `searxng` implements the web-search provider and `lobster`
+contributes workflow tools. The bundled OpenAI provider owns ChatGPT OAuth and subscription transport; no
+separate Codex app-server harness is selected. `device-pair`
 is bundled with OpenClaw and enabled so native nodes can be paired.
 
 Moebius is the only configured agent. Its stable internal id is `main`, including the default
@@ -238,6 +232,36 @@ results to their parent without cross-agent messaging. Session visibility is `ag
 agent-to-agent messaging is disabled. Heartbeats use
 `target = "none"`: there is no messenger channel, so a heartbeat surfaces in the session rather than
 claiming a delivered notification. Recurring checks belong in automation jobs with explicit targets.
+
+### Model routing
+
+Model choices are defined once in Philipp's profile and projected into purpose-specific slots:
+
+| Purpose | Provider/model |
+|---|---|
+| Moebius main turns | `openai/gpt-6.1-sol`, native OpenClaw runtime, ChatGPT OAuth |
+| Main-model failover | `opencode-go/deepseek-v4.1-flash`, then `opencode-go/mimo-v2.6-flash` |
+| Temporary subagents and heartbeat | `opencode-go/deepseek-v4.1-flash` |
+| Utility titles, recaps and progress narration | `opencode-go/space-bunny-free` |
+| Embedded compaction and memory flush | `opencode-go/space-bunny-free` |
+| Active Memory recall and Dream Diary | `opencode-go/space-bunny-free` |
+| Structured `llm-task` defaults | `opencode-go/space-bunny-free` |
+| Memory embeddings | `openai/text-embedding-3-small`, explicit Platform API key |
+
+OpenAI chat auth is explicitly `oauth`; the separately configured embedding and voice API keys
+are not chat fallbacks. OAuth credentials remain in OpenClaw's native mutable agent store. Existing
+session and automation model pins remain authoritative and are not rewritten by deployment.
+
+`opencode-go/longcat-2.5-preview-free` is available as a selectable alternative. The purpose slots
+do not all support runtime fallback chains: memory flush does not inherit the main chain, Active
+Memory's `modelFallback` is only an unresolved-selection last resort, and Dream Diary can retry its
+session default. No fabricated universal Free → LongCat → DeepSeek failover policy is configured.
+Free preview availability and provider data policies can change. Memory and recap calls send their
+task context to OpenCode and the model provider, independently of the OpenAI embedding flow.
+
+Image/PDF tools retain upstream session-aware routing; no new generation, transcription or
+realtime model is selected by this policy. Talk retains its explicit Platform credentials. A Go
+model advertising audio/video input does not by itself establish support in OpenClaw's media adapter.
 
 The packaged `personal-platform` skill describes platform access and configuration ownership,
 not persona or delegation strategy. Workspace instructions (`AGENTS.md`, `SOUL.md`, `USER.md`,

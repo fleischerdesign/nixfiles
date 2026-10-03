@@ -2,12 +2,13 @@
   config,
   lib,
   pkgs,
+  inputs,
   fleetConfigs,
   ...
 }:
 let
   cfg = config.my.features.services.openclaw;
-  runtime = import ./runtime.nix { inherit lib pkgs; };
+  runtime = import ./runtime.nix { inherit lib pkgs inputs; };
   systems = fleetConfigs.systems config;
   user = config.my.user.primary;
   account = config.users.users.${user};
