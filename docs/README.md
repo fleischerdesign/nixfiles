@@ -50,3 +50,14 @@ agentic contributors).
 | File names | lowercase, `noun.md` - the name says what the file is, not what it was for |
 | Cross-references | relative links between siblings, `docs/<name>.md` from the root |
 | Status | a specification describes the present; history belongs in a commit message, not a section |
+
+## Design packages
+
+These describe a state the system is **not in yet**. They are exempt from the rule above only by being
+explicit about it: each states its status and its expiry, and is deleted when it graduates into the
+specification. This is the single exception the directory permits, and it exists so a plan has a home
+that is visibly a plan.
+
+| Question | Package |
+|---|---|
+| How will the fleet separate compile-time truth from run-time truth, and what reconciles the two? | [reconciliation/](reconciliation/README.md) |
