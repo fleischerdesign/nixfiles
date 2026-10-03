@@ -33,11 +33,6 @@
     ];
   };
 
-  # Central AI Assistant Platform (Open-WebUI) on ai.vyrx.de
-  my.features.services.open-webui = {
-    enable = true;
-  };
-
   my.features.services.authentik.outpost.proxy = {
     enable = true;
   };

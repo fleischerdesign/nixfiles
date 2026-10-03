@@ -6,6 +6,13 @@
   lib,
   ...
 }:
+let
+  fleetConfigs = osConfig._module.specialArgs.fleetConfigs;
+  openclawProfile = osConfig.my.features.services.openclaw.users.${config.home.username};
+  openclawGateway = (fleetConfigs.systems osConfig).${openclawProfile.gatewayHost}.config;
+  openclawPublication =
+    openclawGateway.my.contracts.provides."openclaw-${config.home.username}".publications.web;
+in
 {
   imports = [
     ./packages.nix
@@ -178,14 +185,14 @@
     defaultBrowser = "chrome";
     apps = {
       ai = {
-        displayName = "AI Assistant";
-        url = "https://ai.${osConfig.my.topology.domain}";
+        displayName = "OpenClaw";
+        url = openclawPublication.publicUrl;
         icon = ../../media/openclaw.png;
-        comment = "AI Assistant (Open-WebUI)";
+        comment = "Personal OpenClaw assistant";
         categories = [
           "Network"
         ];
-        wmClass = "open-webui";
+        wmClass = "openclaw";
       };
 
       gmail = {

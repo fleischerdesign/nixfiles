@@ -497,6 +497,17 @@ let
       name = "vyrx-apps-oidc";
       entries =
         providerFlowDependencies
+        # Removed applications need explicit absence: omission does not revoke an OIDC client.
+        ++ [
+          (blueprintLib.absent {
+            model = blueprintLib.models.application;
+            identifiers.slug = "open-webui";
+          })
+          (blueprintLib.absent {
+            model = blueprintLib.models.oauth2Provider;
+            identifiers.client_id = "open-webui";
+          })
+        ]
         ++ lib.concatMap (
           name:
           let

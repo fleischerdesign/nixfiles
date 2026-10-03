@@ -54,6 +54,28 @@ let
 in
 assert feature.enable;
 assert instances != [ ];
+assert lib.all
+  (
+    name:
+    let
+      app =
+        self.nixosConfigurations.${name}.config.home-manager.users.philipp.my.features.desktop.webapps.apps.ai;
+    in
+    app.displayName == "OpenClaw"
+    && app.url == host.config.my.contracts.provides.openclaw-philipp.publications.web.publicUrl
+    && app.wmClass == "openclaw"
+    && app.browser == "chrome"
+    && !app.isolated
+  )
+  [
+    "hom-wrk-01"
+    "mob-nb-01"
+  ];
+assert lib.all (
+  system:
+  !(system.config.my.contracts.provides ? open-webui)
+  && !(system.config.services.open-webui.enable or false)
+) (lib.attrValues self.nixosConfigurations);
 # Home Manager escapes account names in unit identifiers; a guessed unit can build but fail startup.
 assert lib.all (
   instance:

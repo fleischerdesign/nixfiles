@@ -92,6 +92,11 @@ Secret values are not written into generated JSON or the Nix store.
 
 ## Authentication boundaries
 
+Philipp's desktop and notebook expose the personal gateway through the existing Chrome application
+launcher, named OpenClaw. Its URL derives from the gateway's publication contract. The launcher
+shares the existing Chrome profile, preserving browser authentication and device state; native node
+services remain separate from this browser interface.
+
 Mobile pairing advertises the publication contract's canonical host over `wss://` through
 `plugins.entries.device-pair.config.publicUrl`. Native setup codes carry short-lived bootstrap
 tokens; TLS permits the full-access profile. Cleartext private-network URLs remain restricted by
