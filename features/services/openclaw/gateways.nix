@@ -94,6 +94,9 @@ let
         };
         settings = lib.recursiveUpdate instance.settings (
           {
+            plugins.entries.device-pair.config.publicUrl =
+              lib.replaceStrings [ "https://" ] [ "wss://" ]
+                contract.publications.web.publicUrl;
             gateway = {
               mode = "local";
               # Native local administration targets loopback, while nodes and ingress use

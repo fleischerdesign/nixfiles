@@ -92,6 +92,12 @@ Secret values are not written into generated JSON or the Nix store.
 
 ## Authentication boundaries
 
+Mobile pairing advertises the publication contract's canonical host over `wss://` through
+`plugins.entries.device-pair.config.publicUrl`. Native setup codes carry short-lived bootstrap
+tokens; TLS permits the full-access profile. Cleartext private-network URLs remain restricted by
+upstream policy. Codes generated before an endpoint change retain their original URL and must be
+regenerated.
+
 The browser publication is ingress-only. DNS on every plane points it at the central ingress;
 no second local Caddy route bypasses authentication. Caddy removes incoming identity and scope
 headers before Authentik authentication. The gateway trusts only the inventory-derived ingress

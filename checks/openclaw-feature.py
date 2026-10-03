@@ -13,6 +13,28 @@ browser_control_offset = int(browser_control_offset)
 
 root = gateway / "lib" / "node_modules" / "openclaw"
 config = json.loads(Path(config_path).read_text())
+pairing_url = config["plugins"]["entries"]["device-pair"]["config"]["publicUrl"]
+assert pairing_url == config["gateway"]["publicOrigin"].replace("https://", "wss://", 1)
+setup_modules = [p for p in (root / "dist").glob("setup-code-*.mjs")
+                 if "resolvePairingSetupFromConfig as a" in p.read_text()]
+assert len(setup_modules) == 1, "Expected one native pairing setup resolver"
+# Measure full-access setup generation without minting a real token or requiring network access.
+subprocess.run([
+    "node", "--input-type=module", "-e",
+    '''const {a: resolve, r: publicUrl} = await import(process.argv[1]);
+    const cfg = JSON.parse(process.argv[2]);
+    const options = {publicUrl: publicUrl(cfg),
+      env: {...process.env, OPENCLAW_GATEWAY_PASSWORD: "synthetic"},
+      issuedBootstrap: {token: "synthetic", setupId: "fixture", expiresAtMs: Date.now() + 60000}};
+    const secure = await resolve(cfg, options);
+    if (!secure.ok || secure.access !== "full" || secure.accessDowngraded ||
+        secure.payload.url !== cfg.plugins.entries["device-pair"].config.publicUrl)
+      throw new Error("Expected contract-derived TLS pairing with full access");
+    const insecure = await resolve(cfg, {...options, publicUrl: "ws://192.168.0.2:18789"});
+    if (!insecure.ok || insecure.access !== "limited" || !insecure.accessDowngraded)
+      throw new Error("Expected cleartext private-network pairing to retain its access restriction");''',
+    setup_modules[0].as_uri(), json.dumps(config),
+], check=True)
 load_paths = config["plugins"].get("load", {}).get("paths", [])
 plugin_roots = {json.loads((Path(p) / "openclaw.plugin.json").read_text())["id"]: Path(p)
                 for p in load_paths}
