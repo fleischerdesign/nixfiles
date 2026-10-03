@@ -12,6 +12,11 @@
 | [0004](0004-nix-as-compiler.md) | Nix is substrate and compiler, not system of record | accepted |
 | [0005](0005-identity-ownership.md) | Identity: policy is declared, entities are observed | accepted |
 | [0006](0006-scope-hybrid-by-pace.md) | Scope: hybrid by pace | accepted |
+| [0007](0007-ownership-labels-and-admission.md) | Ownership labels and admission | accepted |
+| [0008](0008-isolation-classes.md) | Isolation classes | accepted |
+| [0009](0009-observed-snapshot-bridge.md) | Observed-snapshot bridge | accepted |
+| [0010](0010-secrets-two-store-bridge.md) | Secrets: two stores, one bridge | accepted |
+| [0011](0011-internal-dns-reconciliation.md) | Internal DNS reconciliation | accepted |
 
 ## Format
 

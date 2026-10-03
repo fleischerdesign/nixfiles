@@ -32,8 +32,28 @@ and the reconciler that continuously converges the derived state between them.
 | Who owns which field of which domain, and what happens on deletion? | [ownership.md](ownership.md) |
 | Which edge cases, scenarios and risks are unclosed? | [edge-cases.md](edge-cases.md) |
 | How do we adopt this without a big bang, and when do we stop? | [roadmap.md](roadmap.md) |
+| What is the starting point, and what is measured before each phase? | [baseline.md](baseline.md) |
+| How are the invariants made falsifiable? | [checks.md](checks.md) |
+| How is the plane seeded, adopted and recovered? | [bootstrap.md](bootstrap.md) |
+| How do we operate, upgrade, roll back and decommission it? | [operations.md](operations.md) |
+| What is the threat model? | [security.md](security.md) |
+| What stays reproducible, and where is the one seam? | [reproducibility.md](reproducibility.md) |
+| How is the layer tested? | [testing.md](testing.md) |
+| How does each domain cross the line, reversibly? | [migration.md](migration.md) |
 | What do the terms mean? | [glossary.md](glossary.md) |
 | Which decisions were made, and which alternatives were rejected? | [decisions/](decisions/README.md) |
+
+## Domains
+
+| Domain | Document |
+|---|---|
+| Identity: declared policy, observed population, derived members | [domains/identity.md](domains/identity.md) |
+| Workloads: kinds, isolation classes, lifecycle | [domains/workloads.md](domains/workloads.md) |
+| Data: storage classes, tenant databases, control-plane state | [domains/data.md](domains/data.md) |
+| Exposure: ingress, split-horizon DNS, TLS | [domains/exposure.md](domains/exposure.md) |
+| Secrets: two stores, one bridge | [domains/secrets.md](domains/secrets.md) |
+| Observability: dynamic targets, drift, audit | [domains/observability.md](domains/observability.md) |
+| Network: the boundary that is never reconciled | [domains/network.md](domains/network.md) |
 
 ## Principles
 
