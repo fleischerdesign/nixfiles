@@ -82,6 +82,9 @@ assert defaults["model"] == {
 assert config["models"]["providers"]["openai"]["auth"] == "oauth"
 assert "apiKey" not in config["models"]["providers"]["openai"]
 assert config["models"]["providers"]["openai"]["models"][0]["api"] == "openai-chatgpt-responses"
+sol = config["models"]["providers"]["openai"]["models"][0]
+assert sol["contextWindow"] == 872000, "Expected OAuth capacity, not the Platform API window"
+assert sol["contextTokens"] == 272000, "Expected the OAuth catalogue's default runtime budget"
 assert "agentRuntime" not in defaults["models"].get("openai/gpt-6.1-sol", {})
 assert defaults["subagents"]["model"] == worker
 assert defaults["heartbeat"]["model"] == worker

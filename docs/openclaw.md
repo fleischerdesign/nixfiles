@@ -249,7 +249,10 @@ Model choices are defined once in Philipp's profile and projected into purpose-s
 | Memory embeddings | `openai/text-embedding-3-small`, explicit Platform API key |
 
 OpenAI chat auth is explicitly `oauth`; the separately configured embedding and voice API keys
-are not chat fallbacks. OAuth credentials remain in OpenClaw's native mutable agent store. Existing
+are not chat fallbacks. Sol's OAuth account catalogue reports an 872,000-token maximum context
+window and a 272,000-token default runtime budget; these map to `contextWindow` and `contextTokens`,
+respectively. The Platform API's 1,050,000-token window is not used for the subscription route.
+OAuth credentials remain in OpenClaw's native mutable agent store. Existing
 session and automation model pins remain authoritative and are not rewritten by deployment.
 
 `opencode-go/longcat-2.5-preview-free` is available as a selectable alternative. The purpose slots

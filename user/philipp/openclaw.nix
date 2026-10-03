@@ -148,6 +148,10 @@ in
                 id = lib.removePrefix "openai/" models.main;
                 name = "GPT-6.1 Sol";
                 api = "openai-chatgpt-responses";
+                # OAuth account catalogue (/codex/models, client_version=0.160.0):
+                # max_context_window is capacity; context_window is the default runtime budget.
+                contextWindow = 872000;
+                contextTokens = 272000;
                 reasoning = true;
                 input = [
                   "text"
