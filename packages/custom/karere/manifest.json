@@ -1,8 +1,8 @@
 {
   "name": "karere",
-  "version": "4.3.0",
-  "srcHash": "sha256-bInQ7dRqsBPVlDthN0hzipsQPlxi+LPXAaKwRxXgfV8=",
-  "cargoHash": "sha256-QwQ9FXPgV8dA7496wlUEZ6JooKWc6I2X6aMa/diHJ7g=",
+  "version": "4.3.4",
+  "srcHash": "sha256-yYmd9HMgNujoX0Lniw730wLsJQyyo7242T+uD2nYL48=",
+  "cargoHash": "sha256-soVQaOJWCkmwnwWOAfbI8sr02GgYGQfEoCJD2o+5L4A=",
   "upstream": {
     "type": "github-source",
     "owner": "tobagin",

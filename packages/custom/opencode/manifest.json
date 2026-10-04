@@ -9,12 +9,12 @@
   },
   "dependencyHashes": {
     "x86_64-linux": {
-      "node_modules": "sha256-q9F04B8xHQWDw+0HF0UeAJ7JX5xBHl3b2VdrUdwDl5I="
+      "node_modules": "sha256-2RlbJRTEKSliuUbAE2lAktX63JFR/RKAuLkcCou8wb4="
     }
   },
   "dependencyDerivations": {
     "x86_64-linux": {
-      "node_modules": "/nix/store/ah96makci5dh05pmfcfhd2jm61lgdbak-opencode-node_modules-2.0.18+39021df.drv"
+      "node_modules": "/nix/store/2v482c4v17gi47yjd7vxvj7v4gjy1m44-opencode-node_modules-2.0.22+9c66a0a.drv"
     }
   }
 }
