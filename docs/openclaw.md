@@ -268,10 +268,10 @@ Model choices are defined once in Philipp's profile and projected into purpose-s
 | Moebius main turns | `openai/gpt-6.1-sol`, native OpenClaw runtime, ChatGPT OAuth |
 | Main-model failover | `opencode-go/deepseek-v4.1-flash`, then `opencode-go/mimo-v2.6-flash` |
 | Temporary subagents and heartbeat | `opencode-go/deepseek-v4.1-flash` |
-| Utility titles, recaps and progress narration | `opencode-go/space-bunny-free` |
-| Embedded compaction and memory flush | `opencode-go/space-bunny-free` |
-| Active Memory recall and Dream Diary | `opencode-go/space-bunny-free` |
-| Structured `llm-task` defaults | `opencode-go/space-bunny-free` |
+| Utility titles, recaps and progress narration | `opencode-go/longcat-2.5-preview-free` |
+| Embedded compaction and memory flush | `opencode-go/longcat-2.5-preview-free` |
+| Active Memory recall and Dream Diary | `opencode-go/longcat-2.5-preview-free` |
+| Structured `llm-task` defaults | `opencode-go/longcat-2.5-preview-free` |
 | Memory embeddings | `openai/text-embedding-3-small`, explicit Platform API key |
 
 OpenAI chat auth is explicitly `oauth`; the separately configured embedding and voice API keys
@@ -284,12 +284,13 @@ respectively. The Platform API's 1,050,000-token window is not used for the subs
 OAuth credentials remain in OpenClaw's native mutable agent store. Existing
 session and automation model pins remain authoritative and are not rewritten by deployment.
 
-`opencode-go/longcat-2.5-preview-free` is available as a selectable alternative. The purpose slots
-do not all support runtime fallback chains: memory flush does not inherit the main chain, Active
+The free-purpose slots (utility, compaction, memory flush, Active Memory, Dream Diary and
+`llm-task`) all select `opencode-go/longcat-2.5-preview-free` through the single free binding. That
+route is a limited-time free preview: availability and provider data policies can change. The purpose
+slots do not all support runtime fallback chains: memory flush does not inherit the main chain, Active
 Memory's `modelFallback` is only an unresolved-selection last resort, and Dream Diary can retry its
-session default. No fabricated universal Free → LongCat → DeepSeek failover policy is configured.
-Free preview availability and provider data policies can change. Memory and recap calls send their
-task context to OpenCode and the model provider, independently of the OpenAI embedding flow.
+session default. Memory and recap calls send their task context to OpenCode and the model provider,
+independently of the OpenAI embedding flow.
 
 Image/PDF tools retain upstream session-aware routing; no new generation, transcription or
 realtime model is selected by this policy. Talk retains its explicit Platform credentials. A Go

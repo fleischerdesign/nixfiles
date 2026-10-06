@@ -14,8 +14,7 @@ let
   models = {
     main = "openai/gpt-6.1-sol";
     worker = "opencode-go/deepseek-v4.1-flash";
-    free = "opencode-go/space-bunny-free";
-    freeAlternative = "opencode-go/longcat-2.5-preview-free";
+    free = "opencode-go/longcat-2.5-preview-free";
     multimodal = "opencode-go/mimo-v2.6-flash";
   };
   # Minimal published Go metadata for reproducible isolated runs, which have no discovery cache.
@@ -166,17 +165,6 @@ in
             api = "openai-completions";
             models = [
               (goModel models.free {
-                contextWindow = 1048576;
-                contextTokens = 524288;
-                maxTokens = 524288;
-                cost = {
-                  input = 0;
-                  output = 0;
-                  cacheRead = 0;
-                  cacheWrite = 0;
-                };
-              })
-              (goModel models.freeAlternative {
                 contextWindow = 1000000;
                 maxTokens = 131072;
                 cost = {
@@ -271,7 +259,6 @@ in
               # retains paired-device placement instead of inheriting the implicit Codex harness.
               "openai/*".agentRuntime.id = "openclaw";
               "opencode-go/*" = { };
-              ${models.freeAlternative} = { };
             };
             subagents.model = models.worker;
             userTimezone = config.time.timeZone;

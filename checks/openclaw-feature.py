@@ -95,7 +95,7 @@ assert config["agents"]["defaults"]["systemAgent"]["agentId"] == "main"
 
 # Purpose routes must not inherit the main model accidentally or enable API-billed chat fallback.
 defaults = config["agents"]["defaults"]
-free = "opencode-go/space-bunny-free"
+free = "opencode-go/longcat-2.5-preview-free"
 worker = "opencode-go/deepseek-v4.1-flash"
 assert defaults["model"] == {
     "primary": "openai/gpt-6.1-sol",
@@ -135,6 +135,22 @@ assert defaults["heartbeat"]["model"] == worker
 assert defaults["utilityModel"] == free
 assert defaults["compaction"]["model"] == free
 assert defaults["compaction"]["memoryFlush"]["model"] == free
+
+# The Go provider exposes each published route exactly once: a second registration of one model id
+# with different metadata is how a purpose slot and its billing class drift apart.
+go_provider = config["models"]["providers"]["opencode-go"]
+assert go_provider["baseUrl"] == "https://opencode.ai/zen/go/v1"
+go_ids = [m["id"] for m in go_provider["models"]]
+assert len(go_ids) == len(set(go_ids)), f"duplicate opencode-go model ids: {go_ids}"
+assert set(go_ids) == {"longcat-2.5-preview-free", "deepseek-v4.1-flash", "mimo-v2.6-flash"}, go_ids
+free_model = next(m for m in go_provider["models"] if m["id"] == "longcat-2.5-preview-free")
+# Published LongCat limits: 1,000,000 context, 131,072 output. maxTokens is the output cap and must
+# not be turned into an artificial context budget, so no contextTokens is authored for this route.
+assert free_model["contextWindow"] == 1000000
+assert free_model["maxTokens"] == 131072
+assert "contextTokens" not in free_model, "maxTokens must not be re-cast as a context budget"
+assert free_model["cost"] == {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
+assert free_model["reasoning"] is True and free_model["input"] == ["text", "image"]
 assert config["memory"]["search"]["model"] == "text-embedding-3-small"
 assert config["memory"]["search"]["remote"]["apiKey"]["id"] == "OPENAI_API_KEY"
 
@@ -166,7 +182,7 @@ memory_core = config["plugins"]["entries"]["memory-core"]
 assert memory_core["config"]["dreaming"]["model"] == free
 assert memory_core["subagent"] == {"allowModelOverride": True, "allowedModels": [free]}
 assert config["plugins"]["entries"]["llm-task"]["config"] == {
-    "defaultProvider": "opencode-go", "defaultModel": "space-bunny-free",
+    "defaultProvider": "opencode-go", "defaultModel": "longcat-2.5-preview-free",
 }
 
 # Node onboarding needs the bundled device-pair plugin; without it the native nodes cannot pair.
