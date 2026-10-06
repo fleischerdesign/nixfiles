@@ -189,5 +189,9 @@ pkgs.runCommand "openclaw-feature-check"
     python3 ${./openclaw-plugins-loaded.py} \
       ${openclaw.package}/bin/openclaw ${config} ${pluginIds} > plugins.txt
 
-    cat feature.txt plugins.txt device-auth.txt node-capabilities.txt runtime-environment.txt resources.txt resource-patch.txt > "$out"
+    # A configured purpose slot resolves against the generated agent model catalog, not the live
+    # picker listing. Measuring the picker would have passed while every agent turn failed.
+    node ${./openclaw-model-resolution.mjs} ${openclaw.gateway} ${config} > model-resolution.txt
+
+    cat feature.txt plugins.txt model-resolution.txt device-auth.txt node-capabilities.txt runtime-environment.txt resources.txt resource-patch.txt > "$out"
   ''

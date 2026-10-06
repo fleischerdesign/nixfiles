@@ -22,6 +22,24 @@ let
     # main binding, which now lives on the Go route.
     chatgpt = "openai/gpt-6.1-sol";
   };
+  # Purpose-slot models on the Go route are declared, not discovery-only. The Gateway builds its
+  # agent-resolution catalog statically: it composes the plugin manifest rows and the hosted catalog
+  # overlay, and the Go plugin publishes only its seven curated rows in both. An account-specific
+  # model that a purpose slot names therefore has to be registered here, or every turn fails with
+  # `Unknown model`. Discovery still fills the picker's long tail; these rows are the routing
+  # contract. Values are OpenClaw's own discovery output (models.opencode.ai/api.json plus the Go
+  # model list), and checks/openclaw-model-resolution.mjs measures that each slot resolves.
+  goModel =
+    ref: metadata:
+    {
+      id = lib.removePrefix "opencode-go/" ref;
+      reasoning = true;
+      input = [
+        "text"
+        "image"
+      ];
+    }
+    // metadata;
   envSecret = variable: {
     source = "env";
     provider = "default";
@@ -152,11 +170,56 @@ in
           opencode-go = {
             apiKey = envSecret "OPENCODE_API_KEY";
             baseUrl = "https://opencode.ai/zen/go/v1";
-            # Nothing is authored here on purpose. OpenClaw discovers the Go models, their
-            # transport, context window and price live from https://models.opencode.ai/api.json
-            # (its npm field maps to the protocol) plus the Go model list, and each purpose slot
-            # names a discovered model. An authored model row would override that discovery - the
-            # precise way a blanket Completions transport once broke the Responses-only Muse Spark.
+            # Default transport for the Go route. Muse Spark speaks the Responses protocol and
+            # overrides this on its own row; the other slots are OpenAI-compatible Completions.
+            api = "openai-completions";
+            models = [
+              (goModel models.main {
+                name = "Muse Spark 1.3 Contributor";
+                api = "openai-responses";
+                contextWindow = 1048576;
+                maxTokens = 131072;
+                cost = {
+                  input = 0.1;
+                  output = 0.2;
+                  cacheRead = 0.002;
+                  cacheWrite = 0;
+                };
+              })
+              (goModel models.free {
+                name = "LongCat 2.5 Preview Free";
+                contextWindow = 1000000;
+                maxTokens = 131072;
+                cost = {
+                  input = 0;
+                  output = 0;
+                  cacheRead = 0;
+                  cacheWrite = 0;
+                };
+              })
+              (goModel models.worker {
+                name = "DeepSeek V4.1 Flash";
+                contextWindow = 1000000;
+                maxTokens = 384000;
+                cost = {
+                  input = 0.15;
+                  output = 0.6;
+                  cacheRead = 0.003;
+                  cacheWrite = 0;
+                };
+              })
+              (goModel models.multimodal {
+                name = "MiMo-V2.6-Flash";
+                contextWindow = 1048576;
+                maxTokens = 131072;
+                cost = {
+                  input = 0.14;
+                  output = 0.28;
+                  cacheRead = 0.0028;
+                  cacheWrite = 0;
+                };
+              })
+            ];
           };
           deepseek.apiKey = envSecret "DEEPSEEK_API_KEY";
           openrouter.apiKey = envSecret "OPENROUTER_API_KEY";

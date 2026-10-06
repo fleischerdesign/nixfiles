@@ -140,14 +140,44 @@ assert defaults["utilityModel"] == free
 assert defaults["compaction"]["model"] == free
 assert defaults["compaction"]["memoryFlush"]["model"] == free
 
-# The Go catalog is discovered live (models.opencode.ai/api.json plus the Go model list): transport,
-# context window and price all come from upstream, keyed by the model's npm package. Authoring any
-# model row would override that discovery - which is how a blanket Completions transport once broke
-# the Responses-only Muse Spark. Keep the provider entry to credential and base URL only.
+# Purpose-slot models on the Go route are declared, and their transport, limits and price are part
+# of the contract. The Gateway builds its agent-resolution catalog statically from the plugin
+# manifest plus the hosted catalog overlay, and the Go plugin publishes only its seven curated rows
+# in both, so an account-specific slot model must be registered here. checks/openclaw-model-resolution.mjs
+# measures the consumer-visible fact: that every configured slot actually resolves for an agent run.
 go_provider = config["models"]["providers"]["opencode-go"]
 assert go_provider["baseUrl"] == "https://opencode.ai/zen/go/v1"
-assert not go_provider.get("models"), f"opencode-go must not author model rows: {go_provider.get('models')}"
-assert "api" not in go_provider, "opencode-go must not pin a transport; discovery supplies it"
+assert go_provider["api"] == "openai-completions", "Go route default transport"
+go_models = {model["id"]: model for model in go_provider["models"]}
+assert set(go_models) == {
+    "muse-spark-1.3-contributor",
+    "deepseek-v4.1-flash",
+    "mimo-v2.6-flash",
+    "longcat-2.5-preview-free",
+}, sorted(go_models)
+# A row may inherit the provider transport or override it; assert the effective value either way.
+def transport(model):
+    return model.get("api", go_provider["api"])
+# Muse Spark speaks the Responses protocol; the provider-level Completions default must not override
+# it, or the Go endpoint rejects the turn with ModelProtocolUnsupported.
+muse = go_models["muse-spark-1.3-contributor"]
+assert transport(muse) == "openai-responses"
+assert muse["contextWindow"] == 1048576 and muse["maxTokens"] == 131072
+assert muse["cost"] == {"input": 0.1, "output": 0.2, "cacheRead": 0.002, "cacheWrite": 0}
+free_model = go_models["longcat-2.5-preview-free"]
+assert transport(free_model) == "openai-completions"
+assert free_model["contextWindow"] == 1000000 and free_model["maxTokens"] == 131072
+assert "contextTokens" not in free_model, "maxTokens must not be re-cast as a context budget"
+assert free_model["cost"] == {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
+worker_model = go_models["deepseek-v4.1-flash"]
+assert transport(worker_model) == "openai-completions"
+assert worker_model["contextWindow"] == 1000000 and worker_model["maxTokens"] == 384000
+assert worker_model["cost"] == {"input": 0.15, "output": 0.6, "cacheRead": 0.003, "cacheWrite": 0}
+mimo = go_models["mimo-v2.6-flash"]
+assert transport(mimo) == "openai-completions"
+assert mimo["contextWindow"] == 1048576 and mimo["maxTokens"] == 131072
+assert mimo["cost"] == {"input": 0.14, "output": 0.28, "cacheRead": 0.0028, "cacheWrite": 0}
+assert all(model["reasoning"] is True and model["input"] == ["text", "image"] for model in go_models.values())
 assert main.startswith("opencode-go/")
 assert config["memory"]["search"]["model"] == "text-embedding-3-small"
 assert config["memory"]["search"]["remote"]["apiKey"]["id"] == "OPENAI_API_KEY"
