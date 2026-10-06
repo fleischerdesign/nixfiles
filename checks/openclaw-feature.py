@@ -97,13 +97,17 @@ assert config["agents"]["defaults"]["systemAgent"]["agentId"] == "main"
 defaults = config["agents"]["defaults"]
 free = "opencode-go/longcat-2.5-preview-free"
 worker = "opencode-go/deepseek-v4.1-flash"
+main = "opencode-go/muse-spark-1.3-contributor"
 assert defaults["model"] == {
-    "primary": "openai/gpt-6.1-sol",
+    "primary": main,
     "fallbacks": [worker, "opencode-go/mimo-v2.6-flash"],
 }
 assert config["models"]["providers"]["openai"]["auth"] == "oauth"
 assert "apiKey" not in config["models"]["providers"]["openai"]
 assert config["models"]["providers"]["openai"]["models"][0]["api"] == "openai-chatgpt-responses"
+# The OpenAI ChatGPT route is declared and selectable but is no longer any purpose slot's primary;
+# the main binding now lives on the Go provider, so this declaration must not track it.
+assert config["models"]["providers"]["openai"]["models"][0]["id"] == "gpt-6.1-sol"
 sol = config["models"]["providers"]["openai"]["models"][0]
 assert sol["contextWindow"] == 872000, "Expected OAuth capacity, not the Platform API window"
 assert sol["contextTokens"] == 272000, "Expected the OAuth catalogue's default runtime budget"
@@ -142,7 +146,13 @@ go_provider = config["models"]["providers"]["opencode-go"]
 assert go_provider["baseUrl"] == "https://opencode.ai/zen/go/v1"
 go_ids = [m["id"] for m in go_provider["models"]]
 assert len(go_ids) == len(set(go_ids)), f"duplicate opencode-go model ids: {go_ids}"
-assert set(go_ids) == {"longcat-2.5-preview-free", "deepseek-v4.1-flash", "mimo-v2.6-flash"}, go_ids
+assert set(go_ids) == {main.removeprefix("opencode-go/"), "longcat-2.5-preview-free", "deepseek-v4.1-flash", "mimo-v2.6-flash"}, go_ids
+main_model = next(m for m in go_provider["models"] if m["id"] == "muse-spark-1.3-contributor")
+# Published Muse Spark 1.3 Contributor limits and Go pricing: 1,048,576 context / 131,072 output.
+assert main_model["contextWindow"] == 1048576
+assert main_model["maxTokens"] == 131072
+assert main_model["cost"] == {"input": 0.1, "output": 0.2, "cacheRead": 0.002, "cacheWrite": 0}
+assert main_model["reasoning"] is True and main_model["input"] == ["text", "image"]
 free_model = next(m for m in go_provider["models"] if m["id"] == "longcat-2.5-preview-free")
 # Published LongCat limits: 1,000,000 context, 131,072 output. maxTokens is the output cap and must
 # not be turned into an artificial context budget, so no contextTokens is authored for this route.

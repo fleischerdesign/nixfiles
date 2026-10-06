@@ -12,10 +12,15 @@ let
   metadata = import ./metadata.nix;
   # Purpose-based routing; subscription chat, Go inference and API embeddings are separate paths.
   models = {
-    main = "openai/gpt-6.1-sol";
+    main = "opencode-go/muse-spark-1.3-contributor";
     worker = "opencode-go/deepseek-v4.1-flash";
     free = "opencode-go/longcat-2.5-preview-free";
     multimodal = "opencode-go/mimo-v2.6-flash";
+    # The ChatGPT OAuth chat route stays declared and is selectable by hand, but no purpose slot
+    # routes to it any more; OpenAI remains the embedding and voice provider through its explicit
+    # Platform API keys. Keeping the id here stops the OpenAI declaration from silently tracking the
+    # main binding, which now lives on the Go route.
+    chatgpt = "openai/gpt-6.1-sol";
   };
   # Minimal published Go metadata for reproducible isolated runs, which have no discovery cache.
   # Source: models.opencode.ai/api.json. Keep transport-compatible text/image capabilities here;
@@ -144,7 +149,7 @@ in
             # without selecting the unrelated Codex app-server agent harness.
             models = [
               {
-                id = lib.removePrefix "openai/" models.main;
+                id = lib.removePrefix "openai/" models.chatgpt;
                 name = "GPT-6.1 Sol";
                 api = "openai-chatgpt-responses";
                 # OAuth account catalogue (/codex/models, client_version=0.160.0):
@@ -164,6 +169,16 @@ in
             baseUrl = "https://opencode.ai/zen/go/v1";
             api = "openai-completions";
             models = [
+              (goModel models.main {
+                contextWindow = 1048576;
+                maxTokens = 131072;
+                cost = {
+                  input = 0.1;
+                  output = 0.2;
+                  cacheRead = 0.002;
+                  cacheWrite = 0;
+                };
+              })
               (goModel models.free {
                 contextWindow = 1000000;
                 maxTokens = 131072;

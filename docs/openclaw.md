@@ -265,7 +265,7 @@ Model choices are defined once in Philipp's profile and projected into purpose-s
 
 | Purpose | Provider/model |
 |---|---|
-| Moebius main turns | `openai/gpt-6.1-sol`, native OpenClaw runtime, ChatGPT OAuth |
+| Moebius main turns | `opencode-go/muse-spark-1.3-contributor`, native OpenClaw runtime, OpenCode Go |
 | Main-model failover | `opencode-go/deepseek-v4.1-flash`, then `opencode-go/mimo-v2.6-flash` |
 | Temporary subagents and heartbeat | `opencode-go/deepseek-v4.1-flash` |
 | Utility titles, recaps and progress narration | `opencode-go/longcat-2.5-preview-free` |
@@ -274,9 +274,14 @@ Model choices are defined once in Philipp's profile and projected into purpose-s
 | Structured `llm-task` defaults | `opencode-go/longcat-2.5-preview-free` |
 | Memory embeddings | `openai/text-embedding-3-small`, explicit Platform API key |
 
-OpenAI chat auth is explicitly `oauth`; the separately configured embedding and voice API keys
-are not chat fallbacks. `agents.defaults.models."openai/*".agentRuntime.id = "openclaw"` explicitly
-selects native execution independently of OAuth transport. New sessions therefore advertise
+The main turn runs on `opencode-go/muse-spark-1.3-contributor` over the Go transport; the Go
+catalogue reports 1,048,576 tokens of context and a 131,072-token output cap, mapped to
+`contextWindow` and `maxTokens` (`maxTokens` stays an output cap and is not re-cast as a context
+budget). OpenAI chat auth remains explicitly `oauth` and the Sol route stays declared and
+hand-selectable, but no purpose slot routes to it any more; the separately configured embedding and
+voice API keys are not chat fallbacks. `agents.defaults.models."openai/*".agentRuntime.id =
+"openclaw"` explicitly selects native execution for that declared route independently of OAuth
+transport, so a hand-selected Sol session still advertises
 paired-device placement instead of inheriting the implicit Codex harness. Existing session runtime
 pins remain runtime-owned. Sol's OAuth account catalogue reports an 872,000-token maximum context
 window and a 272,000-token default runtime budget; these map to `contextWindow` and `contextTokens`,
