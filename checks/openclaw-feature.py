@@ -140,31 +140,15 @@ assert defaults["utilityModel"] == free
 assert defaults["compaction"]["model"] == free
 assert defaults["compaction"]["memoryFlush"]["model"] == free
 
-# The Go provider exposes each published route exactly once: a second registration of one model id
-# with different metadata is how a purpose slot and its billing class drift apart.
+# The Go catalog is discovered live (models.opencode.ai/api.json plus the Go model list): transport,
+# context window and price all come from upstream, keyed by the model's npm package. Authoring any
+# model row would override that discovery - which is how a blanket Completions transport once broke
+# the Responses-only Muse Spark. Keep the provider entry to credential and base URL only.
 go_provider = config["models"]["providers"]["opencode-go"]
 assert go_provider["baseUrl"] == "https://opencode.ai/zen/go/v1"
-go_ids = [m["id"] for m in go_provider["models"]]
-assert len(go_ids) == len(set(go_ids)), f"duplicate opencode-go model ids: {go_ids}"
-assert set(go_ids) == {main.removeprefix("opencode-go/"), "longcat-2.5-preview-free", "deepseek-v4.1-flash", "mimo-v2.6-flash"}, go_ids
-main_model = next(m for m in go_provider["models"] if m["id"] == "muse-spark-1.3-contributor")
-# Published Muse Spark 1.3 Contributor limits and Go pricing: 1,048,576 context / 131,072 output.
-assert main_model["contextWindow"] == 1048576
-assert main_model["maxTokens"] == 131072
-# Muse speaks the Responses protocol; the provider-level Completions default must not override it,
-# or the Go endpoint rejects the turn with ModelProtocolUnsupported.
-assert main_model["api"] == "openai-responses"
-assert go_provider["api"] == "openai-completions"
-assert main_model["cost"] == {"input": 0.1, "output": 0.2, "cacheRead": 0.002, "cacheWrite": 0}
-assert main_model["reasoning"] is True and main_model["input"] == ["text", "image"]
-free_model = next(m for m in go_provider["models"] if m["id"] == "longcat-2.5-preview-free")
-# Published LongCat limits: 1,000,000 context, 131,072 output. maxTokens is the output cap and must
-# not be turned into an artificial context budget, so no contextTokens is authored for this route.
-assert free_model["contextWindow"] == 1000000
-assert free_model["maxTokens"] == 131072
-assert "contextTokens" not in free_model, "maxTokens must not be re-cast as a context budget"
-assert free_model["cost"] == {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
-assert free_model["reasoning"] is True and free_model["input"] == ["text", "image"]
+assert not go_provider.get("models"), f"opencode-go must not author model rows: {go_provider.get('models')}"
+assert "api" not in go_provider, "opencode-go must not pin a transport; discovery supplies it"
+assert main.startswith("opencode-go/")
 assert config["memory"]["search"]["model"] == "text-embedding-3-small"
 assert config["memory"]["search"]["remote"]["apiKey"]["id"] == "OPENAI_API_KEY"
 

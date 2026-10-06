@@ -22,21 +22,6 @@ let
     # main binding, which now lives on the Go route.
     chatgpt = "openai/gpt-6.1-sol";
   };
-  # Minimal published Go metadata for reproducible isolated runs, which have no discovery cache.
-  # Source: models.opencode.ai/api.json. Keep transport-compatible text/image capabilities here;
-  # advertised audio/video inputs need separate qualification in OpenClaw's media adapters.
-  goModel =
-    ref: metadata:
-    {
-      id = lib.removePrefix "opencode-go/" ref;
-      name = lib.removePrefix "opencode-go/" ref;
-      reasoning = true;
-      input = [
-        "text"
-        "image"
-      ];
-    }
-    // metadata;
   envSecret = variable: {
     source = "env";
     provider = "default";
@@ -167,53 +152,11 @@ in
           opencode-go = {
             apiKey = envSecret "OPENCODE_API_KEY";
             baseUrl = "https://opencode.ai/zen/go/v1";
-            api = "openai-completions";
-            models = [
-              (goModel models.main {
-                # Muse Spark speaks the Responses protocol, not the provider-default Completions one;
-                # OpenClaw's own discovery derives this from the upstream npm package, but an
-                # authored row must state it or the blanket provider transport wins.
-                api = "openai-responses";
-                contextWindow = 1048576;
-                maxTokens = 131072;
-                cost = {
-                  input = 0.1;
-                  output = 0.2;
-                  cacheRead = 0.002;
-                  cacheWrite = 0;
-                };
-              })
-              (goModel models.free {
-                contextWindow = 1000000;
-                maxTokens = 131072;
-                cost = {
-                  input = 0;
-                  output = 0;
-                  cacheRead = 0;
-                  cacheWrite = 0;
-                };
-              })
-              (goModel models.worker {
-                contextWindow = 1000000;
-                maxTokens = 384000;
-                cost = {
-                  input = 0.15;
-                  output = 0.6;
-                  cacheRead = 0.003;
-                  cacheWrite = 0;
-                };
-              })
-              (goModel models.multimodal {
-                contextWindow = 1048576;
-                maxTokens = 131072;
-                cost = {
-                  input = 0.14;
-                  output = 0.28;
-                  cacheRead = 0.0028;
-                  cacheWrite = 0;
-                };
-              })
-            ];
+            # Nothing is authored here on purpose. OpenClaw discovers the Go models, their
+            # transport, context window and price live from https://models.opencode.ai/api.json
+            # (its npm field maps to the protocol) plus the Go model list, and each purpose slot
+            # names a discovered model. An authored model row would override that discovery - the
+            # precise way a blanket Completions transport once broke the Responses-only Muse Spark.
           };
           deepseek.apiKey = envSecret "DEEPSEEK_API_KEY";
           openrouter.apiKey = envSecret "OPENROUTER_API_KEY";

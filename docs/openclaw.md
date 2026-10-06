@@ -274,10 +274,17 @@ Model choices are defined once in Philipp's profile and projected into purpose-s
 | Structured `llm-task` defaults | `opencode-go/longcat-2.5-preview-free` |
 | Memory embeddings | `openai/text-embedding-3-small`, explicit Platform API key |
 
-The main turn runs on `opencode-go/muse-spark-1.3-contributor` over the Go transport; the Go
-catalogue reports 1,048,576 tokens of context and a 131,072-token output cap, mapped to
-`contextWindow` and `maxTokens` (`maxTokens` stays an output cap and is not re-cast as a context
-budget). OpenAI chat auth remains explicitly `oauth` and the Sol route stays declared and
+The main turn runs on `opencode-go/muse-spark-1.3-contributor` over the Go transport. The Go
+provider entry authors only its credential and base URL; OpenClaw discovers every Go model - id,
+transport, context window and price - live from `https://models.opencode.ai/api.json` plus the Go
+model list, mapping each model's upstream npm package to its protocol (`@ai-sdk/openai` →
+Responses, `@ai-sdk/anthropic` → Anthropic messages, `@ai-sdk/openai-compatible` → Completions).
+Muse Spark therefore arrives as `openai-responses` without being authored. An authored model row
+would override that discovery, which is how a blanket provider-level `openai-completions` once
+broke Muse Spark with `ModelProtocolUnsupported`; the feature check now asserts the Go provider
+carries no model rows and no pinned transport.
+
+OpenAI chat auth remains explicitly `oauth` and the Sol route stays declared and
 hand-selectable, but no purpose slot routes to it any more; the separately configured embedding and
 voice API keys are not chat fallbacks. `agents.defaults.models."openai/*".agentRuntime.id =
 "openclaw"` explicitly selects native execution for that declared route independently of OAuth
