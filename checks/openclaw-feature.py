@@ -151,6 +151,10 @@ main_model = next(m for m in go_provider["models"] if m["id"] == "muse-spark-1.3
 # Published Muse Spark 1.3 Contributor limits and Go pricing: 1,048,576 context / 131,072 output.
 assert main_model["contextWindow"] == 1048576
 assert main_model["maxTokens"] == 131072
+# Muse speaks the Responses protocol; the provider-level Completions default must not override it,
+# or the Go endpoint rejects the turn with ModelProtocolUnsupported.
+assert main_model["api"] == "openai-responses"
+assert go_provider["api"] == "openai-completions"
 assert main_model["cost"] == {"input": 0.1, "output": 0.2, "cacheRead": 0.002, "cacheWrite": 0}
 assert main_model["reasoning"] is True and main_model["input"] == ["text", "image"]
 free_model = next(m for m in go_provider["models"] if m["id"] == "longcat-2.5-preview-free")

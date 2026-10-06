@@ -170,6 +170,10 @@ in
             api = "openai-completions";
             models = [
               (goModel models.main {
+                # Muse Spark speaks the Responses protocol, not the provider-default Completions one;
+                # OpenClaw's own discovery derives this from the upstream npm package, but an
+                # authored row must state it or the blanket provider transport wins.
+                api = "openai-responses";
                 contextWindow = 1048576;
                 maxTokens = 131072;
                 cost = {
