@@ -16,6 +16,17 @@ Release, revision, PyPI, npm and Obsidian manifests select their upstream using 
 Source-package updates measure fixed-output hashes from the package's own derivations and verify
 them with a second build. A failed source-package refresh restores its previous manifest.
 
+`github-release` normally selects an AppImage. An `upstream.assetTemplate` instead selects exactly
+one named release asset, substituting `{version}` with the release version. OpenCodex uses this for
+its compiled Linux tarball, keeping the executable, dashboard and keyring module from one release.
+
+`openai-desktop` reads the release list from OpenAI's official Arch installer without executing it.
+It rejects missing, ambiguous or malformed release lists, selects the first published version, and
+hashes the immutable archive for `upstream.architecture`. ChatGPT Linux consumes that version and
+hash. The mutable `latest` download is not a package source. Failed metadata or artifact retrieval
+leaves the existing manifest intact; the workflow's host builds verify the new package before
+publication.
+
 ## Flake-managed packages
 
 `upstream.type = "flake-package"` leaves source selection to `flake.lock`. Its manifest declares

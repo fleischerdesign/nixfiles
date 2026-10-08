@@ -1,0 +1,12 @@
+{
+  "name": "opencodex",
+  "version": "2.80.0",
+  "hash": "sha256-TBMfCTMNPRaSRYM7RfQYYXijiOgK4Pt05v4yf8HBP+M=",
+  "upstream": {
+    "type": "github-release",
+    "owner": "lidge-jun",
+    "repo": "opencodex",
+    "assetTemplate": "ocx-{version}-bun-linux-x64.tar.gz",
+    "assetName": "ocx-2.80.0-bun-linux-x64.tar.gz"
+  }
+}

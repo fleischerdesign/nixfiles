@@ -110,6 +110,7 @@
           }
         )
         inputs.nix-vscode-extensions.overlays.default
+        (import ./packages/overlays/fix/codex-editor)
         inputs.openclaw.overlays.default
         (import ./packages/custom)
       ];
@@ -260,6 +261,7 @@
           backup-contract = import ./checks/backup-contract.nix checkArgs;
           cloudflare = import ./checks/cloudflare.nix checkArgs;
           webapps = import ./checks/webapps.nix checkArgs;
+          codex-proxy = import ./checks/codex-proxy.nix checkArgs;
 
           custom-package-updater =
             pkgs.runCommandLocal "custom-package-updater-check"
@@ -273,6 +275,7 @@
               }
               ''
                 python3 ${./apps/update-custom-packages/tests/test_github_source.py} ${./apps/update-custom-packages/update-custom-packages.sh}
+                python3 ${./apps/update-custom-packages/tests/test_openai_desktop.py} ${./apps/update-custom-packages/openai-desktop-metadata.py}
                 touch $out
               '';
 

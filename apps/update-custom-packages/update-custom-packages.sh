@@ -4,7 +4,8 @@
 # them when upstream releases change.
 #
 # Supported upstream types:
-#   github-release   — GitHub Release with AppImage asset
+#   github-release   — GitHub Release asset (AppImage or explicit asset template)
+#   openai-desktop   — Official Linux artifact selected by OpenAI's installer
 #   github-source    — GitHub Release, rebuild from source tarball
 #   github-rev       — Pinned to a git commit, tracks default branch HEAD
 #   pypi             — PyPI package, single or multi-package manifests
@@ -285,6 +286,29 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
   if [ "$upstream_type" = "flake-package" ]; then
     refresh_flake_package "$manifest_path"
 
+  elif [ "$upstream_type" = "openai-desktop" ]; then
+    mk_tmp_dir openai_work
+    if ! curl -fsSL https://persistent.oaistatic.com/codex-app-prod/linux/install-arch.sh -o "$openai_work/installer.sh" ||
+       ! python3 "$SCRIPT_DIR/openai-desktop-metadata.py" "$openai_work/installer.sh" \
+         "$(jq -er '.upstream.architecture' "$manifest_path")" > "$openai_work/release.json"; then
+      echo "Could not resolve the published OpenAI Linux release" >&2
+      failures=$((failures + 1))
+      continue
+    fi
+    latest_version="$(jq -er '.version' "$openai_work/release.json")"
+    if [ "$latest_version" = "$(jq -er '.version' "$manifest_path")" ]; then
+      echo "  OpenAI desktop is already up to date ($latest_version)."
+      continue
+    fi
+    if ! nix store prefetch-file "$(jq -er '.url' "$openai_work/release.json")" --json > "$openai_work/hash.json"; then
+      echo "Could not hash the published OpenAI Linux artifact" >&2
+      failures=$((failures + 1))
+      continue
+    fi
+    jq --arg version "$latest_version" --arg hash "$(jq -er '.hash' "$openai_work/hash.json")" \
+      '.version = $version | .hash = $hash' "$manifest_path" > "$openai_work/manifest.json"
+    cp "$openai_work/manifest.json" "$manifest_path"
+
   # =========================================================================
   # github-release — AppImage asset from GitHub Release
   # =========================================================================
@@ -318,13 +342,23 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
 
     echo "  🎉 New version available: v$latest_tag (current: v$current_version)"
 
-    asset_name="$(echo "$RELEASE_JSON" | jq -r --arg ver "$latest_tag" '.assets[].name | select(test($ver) and endswith(".AppImage"))' | head -n 1)"
-    if [ -z "$asset_name" ]; then
-      asset_name="$(echo "$RELEASE_JSON" | jq -r '.assets[].name | select(endswith(".AppImage"))' | head -n 1)"
+    asset_template="$(jq -r '.upstream.assetTemplate // empty' "$manifest_path")"
+    if [ -n "$asset_template" ]; then
+      expected_asset="${asset_template//\{version\}/$latest_tag}"
+      if ! asset_name="$(echo "$RELEASE_JSON" | jq -er --arg name "$expected_asset" \
+        '[.assets[] | select(.name == $name)] | if length == 1 then .[0].name else error("Expected exactly one matching release asset") end')"; then
+        failures=$((failures + 1))
+        continue
+      fi
+    else
+      asset_name="$(echo "$RELEASE_JSON" | jq -r --arg ver "$latest_tag" '.assets[].name | select(test($ver) and endswith(".AppImage"))' | head -n 1)"
+      if [ -z "$asset_name" ]; then
+        asset_name="$(echo "$RELEASE_JSON" | jq -r '.assets[].name | select(endswith(".AppImage"))' | head -n 1)"
+      fi
     fi
 
     if [ -z "$asset_name" ]; then
-      echo "  ⚠️ Could not find matching AppImage asset in release v$latest_tag"
+      echo "  ⚠️ Could not find matching asset in release v$latest_tag"
       failures=$((failures + 1))
       continue
     fi

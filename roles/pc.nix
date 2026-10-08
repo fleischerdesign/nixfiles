@@ -6,6 +6,13 @@
   pkgs,
   ...
 }:
+let
+  aiCredentialFiles = {
+    DEEPSEEK_API_KEY = config.sops.secrets."ai/deepseek_api_key".path;
+    OPENROUTER_API_KEY = config.sops.secrets."ai/openrouter_api_key".path;
+    OPENCODE_API_KEY = config.sops.secrets."ai/opencode_api_key".path;
+  };
+in
 {
   imports = [
     ./base.nix
@@ -36,6 +43,7 @@
   };
 
   my.features.desktop = {
+    chatgpt.enable = lib.mkDefault true;
     webapps.enable = lib.mkDefault true;
     # Every personal computer runs the same graphical session: Niri with the Noctalia shell.
     # A host may override it, but the default is the session, not a per-host copy.
@@ -81,6 +89,11 @@
   programs.kdeconnect.enable = lib.mkDefault true;
 
   my.features.dev = {
+    codex.enable = lib.mkDefault true;
+    opencodex = {
+      enable = lib.mkDefault true;
+      credentialFiles = aiCredentialFiles;
+    };
     containers.enable = lib.mkDefault true;
     codium.enable = lib.mkDefault true;
     nixvim.enable = lib.mkDefault true;
@@ -88,11 +101,7 @@
     opencode = {
       enable = lib.mkDefault true;
       model = lib.mkDefault "opencode-go/deepseek-v4-flash";
-      credentialFiles = {
-        DEEPSEEK_API_KEY = config.sops.secrets."ai/deepseek_api_key".path;
-        OPENROUTER_API_KEY = config.sops.secrets."ai/openrouter_api_key".path;
-        OPENCODE_API_KEY = config.sops.secrets."ai/opencode_api_key".path;
-      };
+      credentialFiles = aiCredentialFiles;
     };
     openchamber = {
       enable = lib.mkDefault true;
