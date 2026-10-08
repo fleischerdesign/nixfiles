@@ -8,6 +8,8 @@ carries it to the build and commit jobs as one patch artifact. The workflow ther
 of manifest paths of its own.
 
 `nix run .#update-custom-packages` discovers manifests under `packages/custom` and `features`.
+It writes into the checkout it is invoked from, resolves that checkout from the working tree, and
+refuses to run outside one rather than retargeting another repository.
 Pass a directory name to update only that package, for example:
 
 ```fish

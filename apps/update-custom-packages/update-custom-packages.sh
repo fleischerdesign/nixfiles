@@ -50,12 +50,13 @@ cleanup_tmp_dirs() {
 
 trap cleanup_tmp_dirs EXIT
 
-if [ -d "$PWD/packages/custom" ]; then
-  REPO_ROOT="$PWD"
-elif [ -d "/etc/nixos/packages/custom" ]; then
-  REPO_ROOT="/etc/nixos"
-else
-  REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# The checkout is discovered from the working tree, never from a literal path:
+# the updater must write into the checkout it was invoked in. A run from
+# somewhere else fails loudly instead of retargeting another repository.
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+if [ ! -d "$REPO_ROOT/packages/custom" ]; then
+  echo "Run the updater inside the nixfiles checkout: $REPO_ROOT has no packages/custom." >&2
+  exit 1
 fi
 CUSTOM_PKGS_DIR="$REPO_ROOT/packages/custom"
 TARGET_PKG="${1:-all}"

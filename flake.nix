@@ -174,6 +174,7 @@
                 gzip
                 (python3.withPackages (ps: [ ps.pyyaml ]))
                 findutils
+                git
               ];
               text = "exec ${./apps/update-custom-packages}/update-custom-packages.sh \"$@\"";
             }
