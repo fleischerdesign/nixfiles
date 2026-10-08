@@ -32,4 +32,9 @@ echo "==> deadnix"
 deadnix --fail "${changed[@]}"
 
 echo "==> statix"
-statix check "${changed[@]}"
+# statix accepts a single target, so a commit that stages several Nix files
+# needs one invocation per file; passing them all aborts the hook before it
+# lints anything.
+for file in "${changed[@]}"; do
+  statix check "$file"
+done
