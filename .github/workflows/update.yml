@@ -30,12 +30,15 @@ jobs:
         run: |
           nix flake update
           nix run .#update-custom-packages
-          # Include newly vendored lockfiles in the Git flake source.
-          git add flake.lock packages/custom
+          # The updater writes its results into the working tree. Stage whatever
+          # it changed instead of listing manifest paths here a second time: the
+          # inventory belongs to the updater's discovery, not to this workflow.
+          git add -A
           if git diff --cached --quiet; then
             echo "has-updates=false" >> "$GITHUB_OUTPUT"
           else
             echo "has-updates=true" >> "$GITHUB_OUTPUT"
+            git diff --cached --binary > "$RUNNER_TEMP/update.patch"
           fi
 
       # The host matrix is the flake's own host list; a literal here is a second inventory that
@@ -46,15 +49,12 @@ jobs:
           hosts=$(nix eval --json '.#nixosConfigurations' --apply 'builtins.attrNames')
           echo "matrix={\"host\":$hosts}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload updated flake.lock and manifests
+      - name: Upload the update patch
         if: steps.detect.outputs.has-updates == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: updated-flake-lock
-          path: |
-            flake.lock
-            packages/custom/**/manifest.json
-            packages/custom/**/package-lock.json
+          name: update-patch
+          path: ${{ runner.temp }}/update.patch
           retention-days: 1
 
       - name: Check updated flake
@@ -72,13 +72,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download updated flake.lock
+      - name: Download the update patch
         uses: actions/download-artifact@v7
         with:
-          name: updated-flake-lock
+          name: update-patch
 
-      - name: Include updated files in the flake source
-        run: git add flake.lock packages/custom
+      - name: Apply the update patch to the flake source
+        run: git apply --index update.patch
 
       - uses: ./.github/actions/build-nixos-host
         with:
@@ -116,16 +116,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Download updated flake.lock
+      - name: Download the update patch
         uses: actions/download-artifact@v7
         with:
-          name: updated-flake-lock
+          name: update-patch
 
       - name: Commit and push
         run: |
           git switch -C flake-update "${{ github.sha }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add flake.lock packages/custom
+          git apply --index update.patch
           git commit -m "chore(deps): update flake inputs and custom packages"
           git push origin HEAD:main

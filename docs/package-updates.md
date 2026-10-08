@@ -2,8 +2,10 @@
 
 `.github/workflows/update.yml` updates `flake.lock`, runs the manifest updater, checks the flake
 and builds every inventory host before committing the updated lock and package metadata. A failed
-preparation or host build prevents publication. Manifests and vendored npm lockfiles under
-`packages/custom` travel with the flake lock through the workflow artifacts.
+preparation or host build prevents publication. The preparation stages the updater's whole
+working-tree change, whatever its discovery found under `packages/custom` or `features`, and
+carries it to the build and commit jobs as one patch artifact. The workflow therefore keeps no list
+of manifest paths of its own.
 
 `nix run .#update-custom-packages` discovers manifests under `packages/custom` and `features`.
 Pass a directory name to update only that package, for example:
