@@ -139,6 +139,7 @@ let
   pluginCacheRoot = "${codexHome}/plugins/cache/openai-bundled";
   pluginCacheScript = lib.concatMapStrings (cached: ''
     target=${pluginCacheRoot}/${cached.name}/${app.version}
+    run mkdir -p ${pluginCacheRoot}/${cached.name}
     if [ ! -d "$target" ]; then
       run cp -a ${cached.source} "$target"
       run chmod -R u+w "$target"
