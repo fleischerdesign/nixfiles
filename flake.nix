@@ -263,6 +263,7 @@
           cloudflare = import ./checks/cloudflare.nix checkArgs;
           webapps = import ./checks/webapps.nix checkArgs;
           codex-proxy = import ./checks/codex-proxy.nix checkArgs;
+          chatgpt-chrome-native-host = import ./checks/chatgpt-chrome-native-host.nix checkArgs;
 
           custom-package-updater =
             pkgs.runCommandLocal "custom-package-updater-check"
