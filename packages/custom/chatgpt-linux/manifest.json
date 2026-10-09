@@ -1,7 +1,7 @@
 {
   "name": "chatgpt-linux",
-  "version": "26.1002.52244",
-  "hash": "sha256-j1YBpa96Ml3Iw5WNUWK7cOX20cGt+mqrRqPMDLVpvZA=",
+  "version": "26.1007.21434",
+  "hash": "sha256-haFiZRdCDmH3mnlIMb3ftyfvPsgWmFtEKjozWAsGdRo=",
   "upstream": {
     "type": "openai-desktop",
     "architecture": "x86_64"
