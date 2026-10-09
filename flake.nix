@@ -60,8 +60,6 @@
     };
 
     opencode.url = "github:anomalyco/opencode/v2";
-
-    openclaw.url = "github:openclaw/nix-openclaw";
   };
 
   outputs =
@@ -111,7 +109,6 @@
         )
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/overlays/fix/codex-editor)
-        inputs.openclaw.overlays.default
         (import ./packages/custom)
       ];
 
@@ -427,7 +424,6 @@
           # by features/services/authentik/lib/blueprints-check.py.
           directory = import ./checks/directory.nix checkArgs;
           directory-runtime = import ./checks/directory-runtime.nix checkArgs;
-          openclaw-feature = import ./checks/openclaw-feature.nix checkArgs;
           caddy-auth-order = import ./checks/caddy-auth-order.nix checkArgs;
           authentication-paths = import ./checks/authentication-paths.nix checkArgs;
 

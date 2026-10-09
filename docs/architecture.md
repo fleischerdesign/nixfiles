@@ -28,7 +28,7 @@
 | Host | Role | Zone | Address | Mesh | Runs |
 |---|---|---|---|---|---|
 | `cld-edge-01` | server | `mesh` + public | `173.249.22.211` | `10.10.100.1` | Ingress (Caddy), Authentik core, CrowdSec master, observability stack, primary database, ntfy |
-| `cld-ops-01` | server | `mesh` + public | `37.114.55.91` | `10.10.100.2` | Observability collector, Attic binary cache, OpenClaw gateways, CrowdSec agent |
+| `cld-ops-01` | server | `mesh` + public | `37.114.55.91` | `10.10.100.2` | Observability collector, Attic binary cache, CrowdSec agent |
 | `hom-srv-01` | server | `infra` | `10.10.10.10` | `10.10.100.10` | LAN gateway (DHCP, DNS, NTP, NAT), media stack, Home Assistant, Klipper, local ingress, ESPHome flashing |
 | `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` | GNOME desktop, development environment |
 | `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` | GNOME notebook; reaches the LAN over the mesh |
@@ -198,7 +198,6 @@ network part.
 | public | `<service>.vyrx.de` | Cloudflare | the ingress |
 | internal | `<service>.lan.vyrx.de`, `<service>.mesh.vyrx.de` | Knot Resolver only, never Cloudflare | the LAN host, over the mesh for remote clients |
 | node | `<host>.node.vyrx.de` | Cloudflare | the host's overlay address |
-| user public | `*.pub.<user>.ai.vyrx.de`, `<user>.ai.vyrx.de` | Cloudflare | the user's OpenClaw gateway |
 
 Public names are **flat at the apex**: the host that serves a name is never part of it. The normative,
 machine-generated list is `my.contracts.projections.fqdns`; the derivation rules are

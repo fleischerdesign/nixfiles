@@ -264,6 +264,13 @@ let
       }
     ) (lib.filter audience.isAudienceGroup ep.accessGroups);
 
+  # A personal audience group a removed endpoint derived. It is retired only while no live declaration
+  # still names it, so a future consumer of the same audience re-adopts the group instead of fighting a
+  # stale tombstone. The role groups handle their own absence through the directory declaration.
+  retiredAudienceGroups = lib.filter (
+    groupName: lib.all (item: !(builtins.elem groupName item.ep.accessGroups)) allClusterEndpointsList
+  ) [ "svc-philipp" ];
+
   rbacRoleGroupNames = lib.attrNames (
     lib.filterAttrs (_: group: group.state == "present") config.my.directory.groups
   );
@@ -411,6 +418,29 @@ let
     identifiers.target = blueprintLib.refs.policyTargetBySlug "flow" "default-provider-authorization-implicit-consent";
   };
 
+  # The OpenClaw gateways were removed as a feature. An apply adds and updates but never deletes an
+  # object that merely vanishes from a file, so every Proxy Application and the Provider behind it is
+  # retired by an explicit tombstone (practices.md §6.8). `absent` is a no-op once the object is gone,
+  # so these may stay in place.
+  retiredOpenClawApplications = [
+    (blueprintLib.absent {
+      model = blueprintLib.models.application;
+      identifiers.slug = "openclaw-philipp";
+    })
+    (blueprintLib.absent {
+      model = blueprintLib.models.proxyProvider;
+      identifiers.name = "Provider for OpenClaw (philipp)";
+    })
+    (blueprintLib.absent {
+      model = blueprintLib.models.application;
+      identifiers.slug = "openclaw-philipp-apps";
+    })
+    (blueprintLib.absent {
+      model = blueprintLib.models.proxyProvider;
+      identifiers.name = "Provider for openclaw-philipp-apps";
+    })
+  ];
+
   # The LDAP outpost blueprint depends on the default provider flows, on the RBAC groups, and on the consumer
   # blueprint: it carries an object permission for each consumer's role, and those roles are created by
   # `vyrx-ldap-consumers`. Declared as a dependency rather than hoped for, because authentik guarantees no
@@ -433,6 +463,7 @@ let
       entries =
         providerFlowDependencies
         ++ (lib.replicate 2 orphanedAuthorizationFlowBinding)
+        ++ retiredOpenClawApplications
         ++ (lib.concatMap (
           name:
           let
@@ -878,7 +909,14 @@ let
           }
         ) config.my.directory.groups
         # Personal audiences share this one owner across proxy, OIDC and LDAP consumers.
-        ++ lib.unique (lib.concatMap (item: audienceGroupEntries item.ep) allClusterEndpointsList);
+        ++ lib.unique (lib.concatMap (item: audienceGroupEntries item.ep) allClusterEndpointsList)
+        ++ map (
+          groupName:
+          blueprintLib.absent {
+            model = blueprintLib.models.group;
+            identifiers.name = groupName;
+          }
+        ) retiredAudienceGroups;
     };
   generatedDirectoryBlueprint = toBlueprintYaml "users-and-groups" directoryBlueprint;
 

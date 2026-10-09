@@ -48,7 +48,7 @@ This document is the **execution + safety guide**. It is deliberately explicit a
 | Host | Role | Zone | Primary IP | WireGuard | Public IP | Domain |
 |---|---|---|---|---|---|---|
 | `cld-edge-01` | server (identity/ingress) | mesh | 10.10.100.1 (WG) | relay hub | `173.249.22.211` | `edge.vyrx.de`, `auth.vyrx.de` |
-| `cld-ops-01` | server (observability/AI) | mesh | 10.10.100.2 (WG) | relay hub | `37.114.55.91` | `ops.vyrx.de` |
+| `cld-ops-01` | server (observability) | mesh | 10.10.100.2 (WG) | relay hub | `37.114.55.91` | `ops.vyrx.de` |
 | `hom-srv-01` | server (LAN core, media) | infra | `10.10.10.10` | 10.10.100.10 | – | `srv.lan.vyrx.de` |
 | `hom-wrk-01` | desktop (Niri + Noctalia) | corp | `10.10.20.10` | 10.10.100.20 | – | `wrk.lan.vyrx.de` |
 | `mob-nb-01` | notebook | corp (roaming) | DHCP | 10.10.100.30 | – | – |
@@ -179,7 +179,7 @@ function builds the NixOS spokes' peers. Revocation is the inverse, plus the key
 ```
 Phase 0  Repository + secrets verified, Tailscale up, backups taken
 Phase 1  cld-edge-01        (DONE)  – identity/ingress
-Phase 2  cld-ops-01                 – observability/AI, second relay hub
+Phase 2  cld-ops-01                 – observability, second relay hub
 Phase 3  hom-srv-01                 – LAN core; ***network cutover, §8***
 Phase 4  hom-wrk-01                 – desktop
 Phase 5  mob-nb-01                  – notebook
@@ -255,74 +255,6 @@ records and confirm their public answers before requesting sender-domain verific
 These DNS records do not configure SMTP credentials or change any application's outbound transport;
 existing MX, SPF and DMARC records are not replaced by this declaration.
 
-### 7.1 OpenClaw node command surfaces (runtime, not Nix)
-
-A node advertises its command surface; the gateway's `gateway.nodes.commands.allow`, projected from
-`nodePolicy.capabilities` (`features/services/openclaw/lib/command-surface.nix`), decides which of
-those commands are invocable. Two facts live in the gateway's SQLite and not in the repository, so a
-deploy cannot set them:
-
-* a **widened command surface** — when a node upgrade adds commands (the File Transfer plugin's
-  `dir.list`, `file.fetch`, …), the node declares them on reconnect and the gateway holds them in
-  `device_pairing_paired.pending_node_surface_json` until an operator approves them; and
-* the pairing record's **display name**, which is frozen at pairing: the configuration derives the
-  name from `networking.hostName`, but an existing pairing keeps the name it was approved with.
-
-Both are `operator.pairing` operations. The `cli` device token this repository creates carries
-`operator.admin` and `operator.read` only, so `openclaw nodes approve`/`rename` fail (`Unknown node
-pairing requestId` / `node rename denied`). Approve from the **Control UI → Devices**, whose
-authenticated identity carries `operator.pairing` via `auth.identityScopes`.
-
-Verified 2026-09-23: after the capability catalogue deployed, hom-wrk-01's pending surface
-(`dir.fetch`, `dir.list`, `file.fetch`, `file.write`) was present in
-`device_pairing_paired.pending_node_surface_json` while `openclaw nodes pending` returned an empty
-list — read the request straight from the DB when the CLI cannot show it:
-
-```bash
-# on the gateway host (cld-ops-01); <instance> is philipp, katja, …
-DB=/var/lib/openclaw/instances/<instance>/state/openclaw.sqlite
-nix shell nixpkgs#sqlite -c sqlite3 "$DB" \
-  "select display_name, json_extract(pending_node_surface_json,'$.requestId') from device_pairing_paired where pending_node_surface_json is not null;"
-```
-
-The workstation's historic `jello` is the same kind of runtime state; correct it in the Control UI
-(Devices → rename) or with a pairing-scoped token.
-
-### 7.2 Instance identities, powers and the tunnel account
-
-Every gateway and node instance runs as its own system user `openclaw-<instance>` with a private
-group. State directories, rendered env files and single-consumer secrets (for example
-`users/philipp/github_pat`) belong to that user; secrets more than one instance needs (the fleet-wide
-provider keys) stay in the `openclaw` **group**. One person's agent therefore cannot read another's
-state, and this is enforced by the file system, not by configuration.
-
-A node instance declares `powers`, empty unless declared:
-
-| Power | Grant |
-|---|---|
-| `repo.write` | an access and default ACL for the instance user on `my.features.services.openclaw.node.repoPath` |
-| `fleet.deploy` | the fleet deploy key rendered `0400` into the instance home |
-| `flow.push` | the GitHub token in the service env, wired as the git credential helper |
-| `system.rebuild` | the Nix trusted user plus passwordless `nod` / `nixos-rebuild` rules |
-
-Only the owner's workstation instance carries all four; the family instances carry none. Giving an
-instance `fleet.deploy` gives it root over the whole fleet - that is the point, and the reason it is
-scoped to one identity.
-
-A powered instance also gets the `nod` binary on its PATH and a `safe.directory` entry in its own
-`.gitconfig`. Nix's libgit2 does not read the `GIT_CONFIG_*` environment and refuses a repository the
-instance does not own (`repository path '/etc/nixos' is not owned by current user`), so the git-CLI
-grant alone is not enough for `nod` (measured 2026-09-24).
-
-The node loopback tunnels authenticate as the unprivileged `openclaw-tunnel` account, never as
-`root`. Its authorized key carries `command=false,no-pty,no-agent-forwarding,no-X11-forwarding,no-user-rc`
-and one `permitopen` per gateway port, so a stolen node key can forward one loopback port and nothing
-else. Do **not** add `restrict` to that key: it implies `no-port-forwarding`, and `permitopen` only
-narrows an allowed forward - it does not re-enable one (measured 2026-09-24: the forward failed with
-`administratively prohibited` until `restrict` was removed).
-
----
-
 ## 8. Emergency Recovery — Regaining Access
 
 Order of attempts (stop as soon as one works):
@@ -338,7 +270,7 @@ Order of attempts (stop as soon as one works):
 | Host | root trusts | Note |
 |---|---|---|
 | `hom-srv-01` | operator key (`WXfSlOz…`) + fleet key (`EduFlyo…`) | both verified by logging in as root |
-| `cld-ops-01` | operator key + fleet key | the openclaw tunnel additionally logs in as root here, by design |
+| `cld-ops-01` | operator key + fleet key | both verified by logging in as root |
 | `cld-edge-01` | operator key + fleet key | restored through the provider's rescue system; the old fleet key (`3zq1hFFw…`) is gone for good |
 | `hom-wrk-01` | operator key + fleet key | local switch |
 
@@ -455,7 +387,6 @@ here: they belong in the commit that resolved them.
 | The `tplink-ap` reconciler has never been run in apply mode | its desired state is verified as a **diff**, not as an applied state — the access point's SSID and band settings are still whatever the device already had. The `fritzbox` reconciler **has** been applied (2026-09-21): its diff is empty except the DHCP-announced DNS, which this box exposes no TR-064 action for |
 | Authentik's `akadmin` is the only usable break-glass account | family accounts carry no password and are created through the enrollment flow |
 | The remote forward-auth outpost is reached at an overlay address (`10.10.100.1:9055`) | Caddy logins on the LAN hosts break if the mesh is down |
-| OpenClaw gateways require the ingress in `gateway.trustedProxies` | without it every proxy-shaped request is rejected |
 | The resolver's blocklist refresh must not claim the resolver's directories | declaring `RuntimeDirectory`/`StateDirectory` = `knot-resolver` in `knot-blocklist.service` makes systemd re-own `/run/knot-resolver` and `/var/lib/knot-resolver` **as root**, which killed both resolvers twice on 2026-09-21 (`FileNotFoundError` on the manager's working directory, then `PermissionError` on its API socket). The refresh writes one file and reloads through systemd (`systemctl reload knot-resolver`, which runs as the user the resolver runs as). Any second caller of that directory breaks DNS for the whole house - and a `watchdog: true` on the RPZ is not an alternative, because the refresh replaces the file and the watchdog follows the inode |
 | The box's IPv6 settings are **set by hand**, and no TR-064 action exists for them | a firmware update or a reset brings back router advertisements and DHCPv6, and with them a second resolver that answers our names with the public address - silently, because a device learns it over the segment, not through us. Check with a router solicitation (`rdisc6 -1 <iface>` on a LAN host: nobody must answer, measured 2026-09-21) |
 | Nothing **forces** a device to use our resolver | DHCP offers only ours, the fleet hosts are configured for it, and the box no longer announces itself (no router advertisements, no DHCPv6). What remains is a device that is configured by hand to use `10.10.10.1`, or a hard-coded public resolver in a printer or TV - the segment is flat, so no rule of ours can stop it (see [architecture.md](architecture.md) §3.1). Outbound 53/853 to non-fleet destinations is not blocked, and DoH over 443 cannot be closed without breaking TLS; the real remedy is a second segment, not a firewall rule |

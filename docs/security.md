@@ -136,8 +136,8 @@ directories, and the correct fix is to declare those directories rather than to 
 
 ## 5. Network
 
-- **Every host-to-host path is the mesh.** Logs, metrics, backups, Caddy upstreams and the AI gateways
-  all run over `wg0` (`10.10.100.0/24`). There is no unencrypted cluster traffic.
+- **Every host-to-host path is the mesh.** Logs, metrics, backups and Caddy upstreams all run over
+  `wg0` (`10.10.100.0/24`). There is no unencrypted cluster traffic.
 - **Cryptographic addressing.** WireGuard binds each overlay address to a public key via `allowedIPs`,
   so IP spoofing inside the mesh is not a possibility to defend against but a configuration error.
 - **The ingress is the only public surface.** Caddy terminates TLS, CrowdSec reads its access logs and

@@ -26,10 +26,10 @@ _: {
       infra-admins.description = "Cluster Administrators (Root & Global Access)";
       media-users.description = "Access to Media Streaming & Requests";
       family.description = "Family members with home automation & smart home access";
-      ai-users = {
-        description = "Personal AI gateway owners";
-        members = [ "philipp" ];
-      };
+      # The OpenClaw gateways were removed; the group is retired explicitly rather than dropped. A
+      # directory group that merely vanishes from this inventory is not deleted on the next apply
+      # (contracts/directory: "Removal requires an explicit absent declaration").
+      ai-users.state = "absent";
     };
   };
   # Provider-specific privilege mapping, not a universal property of a directory group.

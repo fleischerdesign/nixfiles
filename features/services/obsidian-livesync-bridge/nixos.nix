@@ -3,7 +3,7 @@
 # Synchronizes CouchDB LiveSync remote vaults with local filesystem paths in real-time.
 #
 # Designed to be completely agnostic: supports arbitrary instances, customizable targets,
-# and integrates cleanly with OpenClaw or standalone vault setups.
+# and standalone vault setups.
 {
   lib,
   pkgs,
@@ -13,11 +13,14 @@ let
   osConfig = topArgs.config;
   cfg = osConfig.my.features.services.obsidian-livesync-bridge;
 
-  # The path an instance writes into, whether it named one or took the OpenClaw default. Defined once so
-  # the bridge's target, the tmpfiles rule and the storage declaration cannot drift apart.
+  # The path an instance writes into, whether it named one or took the default. Defined once so the
+  # bridge's target, the tmpfiles rule and the storage declaration cannot drift apart.
   effectiveVaultPath =
     name: inst:
-    if inst.vaultPath != null then inst.vaultPath else "/var/lib/openclaw/instances/${name}/obsidian";
+    if inst.vaultPath != null then
+      inst.vaultPath
+    else
+      "/var/lib/obsidian-livesync-bridge/vaults/${name}";
 
   instanceSubmodule =
     { name, config, ... }:
@@ -101,7 +104,7 @@ let
           default = null;
           description = ''
             Filesystem path to synchronize notes into.
-            Defaults to /var/lib/openclaw/instances/<name>/obsidian.
+            Defaults to /var/lib/obsidian-livesync-bridge/vaults/<name>.
           '';
         };
 
@@ -113,13 +116,13 @@ let
 
         user = lib.mkOption {
           type = lib.types.str;
-          default = "openclaw";
+          default = "obsidian-bridge";
           description = "User account under which the bridge daemon runs.";
         };
 
         group = lib.mkOption {
           type = lib.types.str;
-          default = "openclaw";
+          default = "obsidian-bridge";
           description = "Group under which the bridge daemon runs.";
         };
 

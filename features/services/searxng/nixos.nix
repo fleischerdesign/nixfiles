@@ -1,6 +1,6 @@
 # features/services/searxng/nixos.nix
 # SearXNG privacy-respecting, self-hosted metasearch engine.
-# Designed for autonomous AI agents (OpenClaw) and private user search.
+# Designed for autonomous AI agents and private user search.
 #
 # Security:
 #   - Listens on 127.0.0.1 (Loopback) by default.
@@ -62,7 +62,7 @@ in
     enableJsonApi = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Enable JSON output format for API clients like OpenClaw.";
+      description = "Enable JSON output format for API clients such as autonomous agents.";
     };
 
     extraSettings = lib.mkOption {

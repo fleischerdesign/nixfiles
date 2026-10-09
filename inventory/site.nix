@@ -3,7 +3,6 @@
 # These values describe this deployment, not the topology schema or an individual host. This
 # module is composed explicitly with the host, subnet and device inventories.
 _: {
-  my.features.services.openclaw.gatewayHost = "cld-ops-01";
   my.topology = {
     domain = "vyrx.de";
     ingressHost = "cld-edge-01";

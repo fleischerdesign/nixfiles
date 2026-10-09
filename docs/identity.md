@@ -380,11 +380,10 @@ accounts a service belongs to. The contract turns each username into its own gro
 value; the compiler creates that group *with* the membership, so no deploy leaves an audience empty and nobody
 has to click before a new personal service works. It is still one mechanism — both halves are memberships — and
 the test that separates them is §11.2's: "this gateway belongs to kai" is a sentence a reviewer comments on,
-"katja is in the film group" is not. The role groups stay untouched and interface-owned, because nothing
-declares their members. Groups with an explicit member list, such as `ai-users`, are different:
-`inventory/identity.nix` declares its members, the directory compiler writes that exact membership, and
-OpenClaw provisions one isolated gateway per member. Editing this membership only in the interface
-neither provisions a NixOS service nor survives the next blueprint apply.
+"katja is in the film group" is not. The role groups stay untouched and interface-owned, because no
+declaration owns their members. A group may instead declare an explicit member list: `inventory/identity.nix`
+then owns it, the directory compiler writes exactly that membership, and a change made only in the interface
+does not survive the next blueprint apply.
 
 **And it is enforced at the ingress, not only described.** A group-restricted publication that authenticates through authentik
 declares `accessGroups` on the publication; the compiler projects them into a `PolicyBinding` per group on the

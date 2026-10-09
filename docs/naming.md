@@ -132,7 +132,6 @@ path**: `scope` *is* the plane, so the name never depends on placement.
 | Home Assistant | `scope = "public"; subdomain = "hass"` | `hass.vyrx.de` (split horizon, §5) |
 | Mealie | `scope = "internal"; subdomain = "mealie"` | `mealie.lan.vyrx.de` (as specified in §3 l. 89) |
 | Sonarr | `scope = "internal"; subdomain = "sonarr"` | `sonarr.lan.vyrx.de` (as specified in §1.1) |
-| OpenClaw (philipp) | `scope = "public"; subdomain = "philipp.ai"` | `philipp.ai.vyrx.de` |
 | Prometheus scrape target | `subdomain = null` | — (direct overlay address) |
 
 ### 3.1 `scope = "public"` does **not** mean "host has a public address"
@@ -170,7 +169,7 @@ part of the design is a wildcard that encodes a **host** into a **service** name
 |---|---|---|
 | `*.${domain}` → ingress | **kept** (exactly one) | catch-all for the public plane; never shadows a projected name |
 | `*.mesh.${domain}` | **kept** (documented) | overlay namespace |
-| `*.${service}.${domain}` | **kept**, service-declared via `extraDomains` | runtime-minted names (OpenClaw self-publishing `<app>.pub.<inst>.ai.vyrx.de`) |
+| `*.${service}.${domain}` | **kept**, service-declared via `extraDomains` | names minted at runtime rather than projected |
 | `*.edge.${domain}`, `*.ops.${domain}` | **abolished** | these only existed because service names encoded hosts |
 
 A wildcard **certificate** for the public plane is **not obtainable here**, and that is a
@@ -194,7 +193,6 @@ which is why no vhost needs Caddy's own CA.
 | public | one per name, issued on the terminating host via DNS-01 (never a wildcard) |
 | internal (`.lan`, `.mesh`) | one per name as well, from a public CA. Not reachable from outside — measured: every `.lan` name is NXDOMAIN publicly while the internal resolver answers it — but a **publicly trusted** certificate, so no client has to trust a private CA |
 | outside the managed zone | Caddy's own CA; no credential here can publish a challenge in a zone we do not manage |
-| multi-label public (`<app>.pub.<inst>.ai.${domain}`) | one per name as well; OpenClaw's dynamically minted hosts keep Caddy `on_demand_tls` (code §8.1) |
 
 **The deliberate trade-off:** a certificate says nothing about reachability, but Certificate
 Transparency logs publish every name a public CA issues for. Internal names therefore become

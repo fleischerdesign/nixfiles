@@ -22,7 +22,6 @@
   };
 
   my.features.services.attic.server.enable = true;
-  my.features.services.openclaw.enable = true;
 
   my.features.services.crowdsec = {
     enable = true;
@@ -39,10 +38,9 @@
 
   my.features.services.obsidian-livesync-bridge = {
     enable = true;
-    # The instance name is the owner, which is also the OpenClaw gateway instance name. The vault path,
-    # the run-as account and the CouchDB connection therefore all follow from the defaults: the vault
-    # lives in the gateway's own state directory (only OpenClaw writes it), the integration assigns
-    # the gateway account, and the CouchDB URL derives from the topology domain.
+    # The instance name is the owner. The vault path, the run-as account and the CouchDB connection
+    # therefore all follow from the defaults: the bridge owns an `obsidian-bridge` service account and
+    # writes into its own vault directory, and the CouchDB URL derives from the topology domain.
     instances.philipp.enable = true;
   };
 

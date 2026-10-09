@@ -233,7 +233,7 @@ the next step is instrumentation, not another guess:
    reverted rather than left as a claim.
 
 **B1 — root access to `cld-edge-01`.** The edge trusts only the old fleet deploy key, whose private
-half was destroyed when the openclaw tunnel rendered its secret over `~/.ssh/deploy-key`. Recovery
+half was destroyed when a feature's node tunnel rendered its secret over `~/.ssh/deploy-key`. Recovery
 paths, in order of effort: (a) the old private key still exists somewhere (notebook, backup,
 password manager); (b) the old SOPS hash is retrievable from git and candidate passwords can be
 verified against it **without touching the VPS**; (c) the provider console — GRUB is unrestricted, so
@@ -446,5 +446,4 @@ means *initialized*, every other state means *declared*; the drift report compar
 `state: present`; and `features/services/authentik/lib/blueprints-check.py` fails the build when a person is
 declared or a topology object is seeded. A rule a comment states and the code does not read is not a rule -
 and each of these two failures was exactly that.
-
 

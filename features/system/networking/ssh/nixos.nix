@@ -47,8 +47,8 @@ in
     deployKeys = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
-        # Operator key. It replaces the fleet deploy key whose private half was destroyed when the
-        # openclaw tunnel rendered its secret over ~/.ssh/deploy-key. That key is not kept here: a
+        # Operator key. It replaces the fleet deploy key whose private half was destroyed when a
+        # feature's node tunnel rendered its secret over ~/.ssh/deploy-key. That key is not kept here: a
         # trust anchor nobody can use, but which still grants root if it ever resurfaces, is a
         # liability rather than a safety net. A fresh fleet key is generated in the rotation.
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+bSErYniJev/+/UxsilaoxHGYW8oVpd3pYMQuuGStw fleis@Yorke"

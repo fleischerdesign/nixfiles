@@ -24,7 +24,6 @@ agentic contributors).
 | How are Google Drive and server files mounted on PCs? | [rclone.md](rclone.md) |
 | What are the microcontrollers, the access point, the router - and how are they configured? | [embedded.md](embedded.md) |
 | Which coding-agent interfaces are installed, and how do they receive credentials? | [coding-agents.md](coding-agents.md) |
-| How are personal AI gateways, native nodes and published applications configured? | [openclaw.md](openclaw.md) |
 | What do the interfaces look like, which tokens and typography? | [design.md](design.md) |
 
 ## How to read these
