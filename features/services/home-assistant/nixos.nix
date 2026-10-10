@@ -69,6 +69,24 @@ in
 
     services.home-assistant = {
       enable = true;
+
+      # PKCE S256 backport for the MCP server's OAuth flow. Home Assistant advertises and implements
+      # PKCE (RFC 7636) only from 2026.10.0 on (home-assistant/core#181957), and ChatGPT refuses to
+      # create a connector against an instance whose /.well-known/oauth-authorization-server omits
+      # `"code_challenge_methods_supported": ["S256"]`. The patches carry that upstream commit plus
+      # its hardening follow-up on the release nixpkgs pins today; they drop out of their own accord
+      # once nixpkgs ships 2026.10.x, with a warning that names the files to delete.
+      package =
+        if lib.versionOlder pkgs.home-assistant.version "2026.10" then
+          pkgs.home-assistant.overrideAttrs (old: {
+            patches = (old.patches or [ ]) ++ [
+              ./patches/pkce-s256.patch
+              ./patches/pkce-hardening.patch
+            ];
+          })
+        else
+          lib.warn "home-assistant ${pkgs.home-assistant.version} ships PKCE S256: delete features/services/home-assistant/patches/pkce-*.patch and this override" pkgs.home-assistant;
+
       customComponents = [
         pkgs.home-assistant-custom-components.moonraker
       ];

@@ -1,0 +1,373 @@
+Backport of Home Assistant's PKCE S256 support (RFC 7636), taken from home-assistant/core.
+
+Home Assistant's OAuth server advertises and implements PKCE S256 only from 2026.10.0 on. ChatGPT
+refuses to create the connector against an instance whose /.well-known/oauth-authorization-server
+omits "code_challenge_methods_supported": ["S256"], so the release nixpkgs pins today (2026.9.4)
+cannot be connected at all. This patch carries the upstream fix on that release.
+
+Upstream commit, re-anchored onto this release (same changes, context lines from the installed
+sources; tests omitted):
+  7398141b4c  Support PKCE S256 in OAuth server (#181957)
+
+Adaptation: the upstream hunk was cut after the voluptuous alias had been renamed to "probatio"; this
+tree still imports "voluptuous as vol", so the references read "vol."
+
+Delete this file and the "patches" override in nixos.nix as soon as nixpkgs ships Home Assistant
+2026.10.x, and verify the result with:
+  curl -s https://hass.vyrx.de/.well-known/oauth-authorization-server | grep code_challenge
+
+diff --git a/homeassistant/auth/models.py b/homeassistant/auth/models.py
+--- a/homeassistant/auth/models.py
++++ b/homeassistant/auth/models.py
+@@ -28,6 +28,8 @@
+ 
+     ip_address: IPv4Address | IPv6Address
+     redirect_uri: str
++    code_challenge: str
++    code_challenge_method: str
+ 
+ 
+ class AuthFlowResult(FlowResult[AuthFlowContext, tuple[str, str]], total=False):
+diff --git a/homeassistant/components/auth/__init__.py b/homeassistant/components/auth/__init__.py
+--- a/homeassistant/components/auth/__init__.py
++++ b/homeassistant/components/auth/__init__.py
+@@ -14,7 +14,8 @@
+ {
+     "client_id": "https://hassbian.local:8123/",
+     "grant_type": "authorization_code",
+-    "code": "411ee2f916e648d691e937ae9344681e"
++    "code": "411ee2f916e648d691e937ae9344681e",
++    "code_verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+ }
+ 
+ Return value will be the access and refresh tokens. The access token will have
+@@ -124,11 +125,16 @@
+ """
+ 
+ import asyncio
++import base64
+ from collections.abc import Callable
++from dataclasses import dataclass
+ from datetime import datetime, timedelta
++import hashlib
++import hmac
+ from http import HTTPStatus
+ from logging import getLogger
+-from typing import Any, cast
++import re
++from typing import Any, Protocol, cast
+ import uuid
+ 
+ from aiohttp import web
+@@ -162,8 +168,31 @@
+ 
+ DOMAIN = "auth"
+ 
+-type StoreResultType = Callable[[str, Credentials], str]
+-type RetrieveResultType = Callable[[str, str], Credentials | None]
++
++@dataclass(slots=True)
++class AuthCodeEntry:
++    """Entry stored in the auth code store."""
++
++    created: datetime
++    credentials: Credentials
++    code_challenge: str | None = None
++    code_challenge_method: str | None = None
++
++
++class StoreResultType(Protocol):
++    """Protocol for storing auth flow results."""
++
++    def __call__(
++        self,
++        client_id: str,
++        result: Credentials,
++        code_challenge: str | None = None,
++        code_challenge_method: str | None = None,
++    ) -> str:
++        """Store flow result and return a code to retrieve it."""
++
++
++type RetrieveResultType = Callable[[str, str], AuthCodeEntry | None]
+ DATA_STORE: HassKey[StoreResultType] = HassKey(DOMAIN)
+ CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
+ 
+@@ -229,6 +258,19 @@
+ 
+         hass.auth.async_remove_refresh_token(refresh_token)
+         return web.Response(status=HTTPStatus.OK)
++
++
++# RFC 7636 4.1: code_verifier is 43-128 unreserved characters.
++_CODE_VERIFIER_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}\Z")
++
++
++def _verify_code_verifier(code_verifier: str, code_challenge: str) -> bool:
++    """Verify code_verifier against code_challenge per RFC 7636 (S256)."""
++    if not _CODE_VERIFIER_RE.match(code_verifier):
++        return False
++    hashed = hashlib.sha256(code_verifier.encode("ascii")).digest()
++    computed_challenge = base64.urlsafe_b64encode(hashed).decode("ascii").rstrip("=")
++    return hmac.compare_digest(computed_challenge, code_challenge)
+ 
+ 
+ class TokenView(HomeAssistantView):
+@@ -290,14 +332,43 @@
+                 status_code=HTTPStatus.BAD_REQUEST,
+             )
+ 
+-        credential = self._retrieve_auth(client_id, code)
+-
+-        if credential is None or not isinstance(credential, Credentials):
++        entry = self._retrieve_auth(client_id, code)
++
++        if entry is None:
+             return self.json(
+                 {"error": "invalid_request", "error_description": "Invalid code"},
+                 status_code=HTTPStatus.BAD_REQUEST,
+             )
+ 
++        if entry.code_challenge is not None:
++            if not (code_verifier := data.get("code_verifier")):
++                return self.json(
++                    {
++                        "error": "invalid_request",
++                        "error_description": "Code verifier required",
++                    },
++                    status_code=HTTPStatus.BAD_REQUEST,
++                )
++            if not _verify_code_verifier(code_verifier, entry.code_challenge):
++                return self.json(
++                    {
++                        "error": "invalid_grant",
++                        "error_description": "Invalid code verifier",
++                    },
++                    status_code=HTTPStatus.BAD_REQUEST,
++                )
++        elif "code_verifier" in data:
++            return self.json(
++                {
++                    "error": "invalid_request",
++                    "error_description": (
++                        "Code verifier provided but no code challenge was present"
++                    ),
++                },
++                status_code=HTTPStatus.BAD_REQUEST,
++            )
++
++        credential = entry.credentials
+         user = await hass.auth.async_get_or_create_user(credential)
+ 
+         if user_access_error := async_user_not_allowed_do_auth(hass, user):
+@@ -421,12 +492,12 @@
+         hass = request.app[KEY_HASS]
+         user: User = request["hass_user"]
+ 
+-        credentials = self._retrieve_credentials(data["client_id"], data["code"])
+-
+-        if credentials is None:
++        entry = self._retrieve_credentials(data["client_id"], data["code"])
++
++        if entry is None:
+             return self.json_message("Invalid code", status_code=HTTPStatus.BAD_REQUEST)
+ 
+-        linked_user = await hass.auth.async_get_user_by_credentials(credentials)
++        linked_user = await hass.auth.async_get_user_by_credentials(entry.credentials)
+         if linked_user != user and linked_user is not None:
+             return self.json_message(
+                 "Credential already linked", status_code=HTTPStatus.BAD_REQUEST
+@@ -434,44 +505,51 @@
+ 
+         # No-op if credential is already linked to the user it will be linked to
+         if linked_user != user:
+-            await hass.auth.async_link_user(user, credentials)
++            await hass.auth.async_link_user(user, entry.credentials)
+         return self.json_message("User linked")
+ 
+ 
+ @callback
+ def _create_auth_code_store() -> tuple[StoreResultType, RetrieveResultType]:
+     """Create an in memory store."""
+-    temp_results: dict[tuple[str, str], tuple[datetime, Credentials]] = {}
++    temp_results: dict[tuple[str, str], AuthCodeEntry] = {}
+ 
+     @callback
+-    def store_result(client_id: str, result: Credentials) -> str:
++    def store_result(
++        client_id: str,
++        result: Credentials,
++        code_challenge: str | None = None,
++        code_challenge_method: str | None = None,
++    ) -> str:
+         """Store flow result and return a code to retrieve it."""
+         if not isinstance(result, Credentials):
+             raise TypeError("result has to be a Credentials instance")
+ 
+         code = uuid.uuid4().hex
+-        temp_results[(client_id, code)] = (
+-            dt_util.utcnow(),
+-            result,
++        temp_results[(client_id, code)] = AuthCodeEntry(
++            created=dt_util.utcnow(),
++            credentials=result,
++            code_challenge=code_challenge,
++            code_challenge_method=code_challenge_method,
+         )
+         return code
+ 
+     @callback
+-    def retrieve_result(client_id: str, code: str) -> Credentials | None:
++    def retrieve_result(client_id: str, code: str) -> AuthCodeEntry | None:
+         """Retrieve flow result."""
+         key = (client_id, code)
+ 
+         if key not in temp_results:
+             return None
+ 
+-        created, result = temp_results.pop(key)
++        entry = temp_results.pop(key)
+ 
+         # OAuth 4.2.1
+         # The authorization code MUST expire shortly after it is issued to
+         # mitigate the risk of leaks.  A maximum authorization code lifetime of
+         # 10 minutes is RECOMMENDED.
+-        if dt_util.utcnow() - created < timedelta(minutes=10):
+-            return result
++        if dt_util.utcnow() - entry.created < timedelta(minutes=10):
++            return entry
+ 
+         return None
+ 
+diff --git a/homeassistant/components/auth/login_flow.py b/homeassistant/components/auth/login_flow.py
+--- a/homeassistant/components/auth/login_flow.py
++++ b/homeassistant/components/auth/login_flow.py
+@@ -22,13 +22,18 @@
+ Pass in parameter 'handler' to specify the auth provider to use. Auth providers
+ are identified by type and id.
+ 
++Pass in optional parameters 'code_challenge' and 'code_challenge_method' for
++PKCE (RFC 7636). The only supported method is 'S256'.
++
+ The default 'type' is 'authorize'.
+ 
+ {
+     "client_id": "https://hassbian.local:8123/",
+     "handler": ["local_provider", null],
+     "redirect_url": "https://hassbian.local:8123/",
+-    "type': "authorize"
++    "type': "authorize",
++    "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
++    "code_challenge_method": "S256"
+ }
+ 
+ Return value will be a step in a data entry flow. See the docs for data entry
+@@ -64,7 +69,6 @@
+ }
+ """
+ 
+-from collections.abc import Callable
+ from http import HTTPStatus
+ from ipaddress import ip_address
+ from typing import TYPE_CHECKING, Any, cast
+@@ -75,7 +79,7 @@
+ 
+ from homeassistant import data_entry_flow
+ from homeassistant.auth import AuthManagerFlowManager, InvalidAuthError
+-from homeassistant.auth.models import AuthFlowContext, AuthFlowResult, Credentials
++from homeassistant.auth.models import AuthFlowContext, AuthFlowResult
+ from homeassistant.components import onboarding
+ from homeassistant.components.http import KEY_HASS
+ from homeassistant.components.http.auth import async_user_not_allowed_do_auth
+@@ -105,9 +109,7 @@
+ 
+ 
+ @callback
+-def async_setup(
+-    hass: HomeAssistant, store_result: Callable[[str, Credentials], str]
+-) -> None:
++def async_setup(hass: HomeAssistant, store_result: StoreResultType) -> None:
+     """Component to allow users to login."""
+     hass.http.register_view(WellKnownOAuthInfoView)
+     hass.http.register_view(WellKnownProtectedResourceView)
+@@ -143,6 +145,7 @@
+             # This flag advertises that support
+             # (draft-ietf-oauth-client-id-metadata-document).
+             "client_id_metadata_document_supported": True,
++            "code_challenge_methods_supported": ["S256"],
+             "response_types_supported": ["code"],
+             "service_documentation": (
+                 "https://developers.home-assistant.io/docs/auth_api"
+@@ -307,7 +310,7 @@
+             return self.json_message("Invalid redirect URI", HTTPStatus.FORBIDDEN)
+ 
+         result.pop("data")
+-        result.pop("context")
++        context = result.pop("context")
+ 
+         result_obj = result.pop("result")
+ 
+@@ -323,7 +326,12 @@
+ 
+         process_success_login(request)
+         # We overwrite the Credentials object with the string code to retrieve it.
+-        result["result"] = self._store_result(client_id, result_obj)  # type: ignore[typeddict-item]
++        result["result"] = self._store_result(
++            client_id,
++            result_obj,
++            code_challenge=context.get("code_challenge"),
++            code_challenge_method=context.get("code_challenge_method"),
++        )  # type: ignore[typeddict-item]
+ 
+         return self.json(result)
+ 
+@@ -346,6 +354,11 @@
+                     [vol.Any(str, None)], vol.Length(2, 2), vol.Coerce(tuple)
+                 ),
+                 vol.Required("redirect_uri"): str,
++                # S256 challenges are always 43 unpadded base64url characters.
++                vol.Optional("code_challenge"): vol.Match(
++                    r"^[A-Za-z0-9_-]{43}\Z"
++                ),
++                vol.Optional("code_challenge_method"): str,
+                 vol.Optional(
+                     "type", default="authorize"
+                 ): str,  # not used, kept for backwards compatibility
+@@ -361,15 +374,33 @@
+         if not indieauth.verify_client_id(client_id):
+             return self.json_message("Invalid client id", HTTPStatus.BAD_REQUEST)
+ 
++        code_challenge = data.get("code_challenge")
++        code_challenge_method = data.get("code_challenge_method")
++        if code_challenge_method is not None and not code_challenge:
++            return self.json_message(
++                "code_challenge required when code_challenge_method is provided",
++                HTTPStatus.BAD_REQUEST,
++            )
++        # RFC 7636 4.3: the method defaults to "plain", which is not supported.
++        if code_challenge is not None and code_challenge_method != "S256":
++            return self.json_message(
++                "Transform algorithm not supported", HTTPStatus.BAD_REQUEST
++            )
++
+         handler: tuple[str, str] = tuple(data["handler"])
++
++        flow_context = AuthFlowContext(
++            ip_address=ip_address(request.remote),  # type: ignore[arg-type]
++            redirect_uri=redirect_uri,
++        )
++        if code_challenge and code_challenge_method:
++            flow_context["code_challenge"] = code_challenge
++            flow_context["code_challenge_method"] = code_challenge_method
+ 
+         try:
+             result = await self._flow_mgr.async_init(
+                 handler,
+-                context=AuthFlowContext(
+-                    ip_address=ip_address(request.remote),  # type: ignore[arg-type]
+-                    redirect_uri=redirect_uri,
+-                ),
++                context=flow_context,
+             )
+         except data_entry_flow.UnknownHandler:
+             return self.json_message("Invalid handler specified", HTTPStatus.NOT_FOUND)

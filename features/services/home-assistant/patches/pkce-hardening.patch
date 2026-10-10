@@ -1,0 +1,21 @@
+Reject PKCE authorization codes in the link-user flow, taken from home-assistant/core.
+
+Follow-up to the PKCE backport in this directory: an authorization code created with a PKCE challenge
+must not be redeemable through the link-user flow. Upstream commit re-anchored onto this release,
+tests omitted:
+  52fdc84634  Reject PKCE authorization codes in LinkUserView (#183213)
+
+Delete together with pkce-s256.patch once nixpkgs ships Home Assistant 2026.10.x.
+
+diff --git a/homeassistant/components/auth/__init__.py b/homeassistant/components/auth/__init__.py
+--- a/homeassistant/components/auth/__init__.py
++++ b/homeassistant/components/auth/__init__.py
+@@ -494,7 +494,7 @@
+ 
+         entry = self._retrieve_credentials(data["client_id"], data["code"])
+ 
+-        if entry is None:
++        if entry is None or entry.code_challenge is not None:
+             return self.json_message("Invalid code", status_code=HTTPStatus.BAD_REQUEST)
+ 
+         linked_user = await hass.auth.async_get_user_by_credentials(entry.credentials)
