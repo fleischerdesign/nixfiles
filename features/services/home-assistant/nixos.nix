@@ -70,27 +70,8 @@ in
     services.home-assistant = {
       enable = true;
 
-      # OAuth backports for the MCP server, so that ChatGPT can create the connector at all. Two
-      # upstream gaps sit in the 2026.9.4 that nixpkgs pins today and are closed in 2026.10.0:
-      # ChatGPT refuses an instance whose /.well-known/oauth-authorization-server omits
-      # `"code_challenge_methods_supported": ["S256"]` (home-assistant/core#181957), and without
-      # `"token_endpoint_auth_methods_supported": ["none"]` it sends its token request as a
-      # confidential client, which the token endpoint answers with 400 "Invalid client id"
-      # (#184254). The patches carry those commits and the PKCE hardening follow-up on the pinned
-      # release; they drop out of their own accord once nixpkgs ships 2026.10.x, with a warning that
-      # names the files to delete.
-      package =
-        if lib.versionOlder pkgs.home-assistant.version "2026.10" then
-          pkgs.home-assistant.overrideAttrs (old: {
-            patches = (old.patches or [ ]) ++ [
-              ./patches/pkce-s256.patch
-              ./patches/pkce-hardening.patch
-              ./patches/oauth-discovery-metadata.patch
-            ];
-          })
-        else
-          lib.warn "home-assistant ${pkgs.home-assistant.version} ships the OAuth metadata: delete features/services/home-assistant/patches/*.patch and this override" pkgs.home-assistant;
-
+      # The OAuth backports the ChatGPT connector needs are a package fix and live in
+      # `packages/overlays/fix/home-assistant` until nixpkgs ships Home Assistant 2026.10.x.
       customComponents = [
         pkgs.home-assistant-custom-components.moonraker
       ];

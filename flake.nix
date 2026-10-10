@@ -79,6 +79,7 @@
         (import ./packages/overlays/fix/authentik)
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
+        (import ./packages/overlays/fix/home-assistant)
         (
           final: _prev:
           let
