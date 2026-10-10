@@ -33,6 +33,11 @@ in
     sops.secrets."services/monitoring/grafana_oidc_client_id" = {
       owner = "grafana";
     };
+    # Break-glass account: Grafana's own login form stays reachable next to the SSO, so this must
+    # never be the shipped default again.
+    sops.secrets."services/monitoring/grafana_admin_password" = {
+      owner = "grafana";
+    };
     sops.secrets."services/monitoring/grafana_ntfy_token" = { }; # Definition from ntfy/nixos.nix
     sops.secrets."services/monitoring/grafana_secret_key" = {
       owner = "grafana";
@@ -48,6 +53,7 @@ in
       }
       GF_SECURITY_SECRET_KEY=${config.sops.placeholder."services/monitoring/grafana_secret_key"}
       NTFY_TOKEN=${config.sops.placeholder."services/monitoring/grafana_ntfy_token"}
+      GF_SECURITY_ADMIN_PASSWORD=${config.sops.placeholder."services/monitoring/grafana_admin_password"}
     '';
 
     services.grafana = {
@@ -79,7 +85,20 @@ in
           auth_url = "${cfg.ssoAuthority}/authorize/";
           token_url = "${cfg.ssoAuthority}/token/";
           api_url = "${cfg.ssoAuthority}/userinfo/";
-          role_attribute_path = "contains(groups, 'Grafana Admins') && 'Admin' || 'Viewer'";
+          # Grafana evaluates the role itself from the claims, so the group names have to come from
+          # the same declaration the rest of the fleet uses - \`Grafana Admins\` never existed in
+          # Authentik, which is why every OIDC login fell back to Viewer. The claim is a list, hence
+          # the \`[*]\` form; with no group declared the expression stays a plain Viewer fallback.
+          role_attribute_path =
+            let
+              adminGroups = config.my.contracts.provides.grafana.publications.web.adminGroups;
+              adminCondition =
+                if adminGroups == [ ] then
+                  "false"
+                else
+                  lib.concatMapStringsSep " || " (group: "contains(groups[*], '${group}')") adminGroups;
+            in
+            "${adminCondition} && 'Admin' || 'Viewer'";
         };
       };
 
@@ -316,6 +335,8 @@ in
         endpoint = "web";
         auth = "oidc";
         accessGroups = [ "infra-admins" ];
+        # Whoever may administer the instance: the role above maps exactly these groups to Admin.
+        adminGroups = [ "infra-admins" ];
         subdomain = "grafana";
         extraDomains = [ ];
         # The legacy aliases `grafana.ops.…` and `mon.lan.…` were removed: they encoded a
