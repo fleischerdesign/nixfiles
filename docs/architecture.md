@@ -397,7 +397,7 @@ service:
 | CrowdSec | the trusted-subnet whitelist, from `my.topology.trustedSubnets` | nothing |
 | ntfy | accounts and tokens from SOPS, `deny-all` by default | nothing |
 | Klipper | the machine definition and macros from the store | calibration state - the `runtime_variables.cfg` include is prepared but commented out |
-| Home Assistant | integrations, MQTT, the reverse-proxy configuration | **automations**: the module includes them in UI mode, so they are not in Git, not reviewed, and do not survive a reinstall |
+| Home Assistant | integrations, MQTT, the reverse-proxy configuration | **automations**: the module includes them in UI mode, so they are not in Git, not reviewed, and do not survive a reinstall; the MCP server is a config entry and the entities exposed to Assist are UI state |
 | arr stack, Sabnzbd | quality profiles and custom formats (Recyclarr) | root folders, download clients, categories, paths - only the secrets are templated |
 
 The two gaps in the last rows are real and worth being explicit about: they are the difference between

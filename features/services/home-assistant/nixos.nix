@@ -76,10 +76,21 @@ in
         "androidtv_remote" # Fix for ModuleNotFoundError: No module named 'androidtvremote2'
         "mqtt"
         "google_translate" # gTTS
+        # Model Context Protocol server. The integration itself is a config entry (no YAML
+        # setup); this only bundles its Python dependencies so it can be added in the UI.
+        "mcp_server"
       ];
       config = {
         # This generates the configuration.yaml
         default_config = { };
+
+        # MCP clients discover the authorization server over the public name; without an
+        # instance URL the discovery documents answer relative URLs. The name is projected,
+        # not written: the publication already owns https://hass.<domain>.
+        homeassistant = {
+          external_url = config.my.contracts.provides.home-assistant.publications.web.publicUrl;
+          internal_url = config.my.contracts.provides.home-assistant.publications.web.publicUrl;
+        };
 
         # Enable UI editing
         "automation ui" = "!include automations.yaml";
