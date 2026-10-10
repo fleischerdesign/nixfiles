@@ -83,6 +83,18 @@ over the air by `esphome-sync-<device>`.
 - **Only devices that are both declared and known to the template are managed**: the engine filters on
   `device.mac != null && specs ? <name>`, so an entry in the topology without a matching declaration is
   ignored rather than guessed at.
+- **A relay declares what it switches.** `relayKind` in the device declaration says whether the GPIO
+  drives a lamp circuit - declared as a `light`, so Home Assistant shows a lamp - or mains power, like
+  the 3D printer, which stays the `switch` it is. The same value picks the action the physical button
+  calls (`light.turn_on` or `switch.turn_on`), because ESPHome names an action after its entity's
+  domain; a lamp that stays a `switch` in the firmware can never be shown as one in Home Assistant.
+- **A relay names two things, and both are needed.** `friendlyName` names the load ("Deckenlampe",
+  "Sofa", "3D-Drucker") and the entity names the function ("Licht", "Strom"). The entity name is not
+  optional: ESPHome marks an entity that carries only an `id` as internal and it then never reaches
+  Home Assistant (measured 2026-10-10 - the flashed relay reported nothing but its status LED).
+  Neither name carries a room: the room is the area, which the entity ID already starts with, and a
+  device label repeating it would carry the room twice
+  (`switch.arbeitszimmer_arbeitszimmer_deckenlampe_relais` before the change).
 - **The address comes from the reservation.** A device that is not there yet is flashed at whatever
   address it currently answers on (`--device`), which is how the six relays were moved into their IoT
   addresses.
