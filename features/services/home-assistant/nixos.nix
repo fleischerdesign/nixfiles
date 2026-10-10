@@ -6,6 +6,16 @@
 }:
 let
   cfg = config.my.features.services.home-assistant;
+
+  # The ingress terminates the public names on another host and reaches Home Assistant over the mesh
+  # (`contracts/topology/lib/service-address.nix`): that overlay address is the peer Home Assistant
+  # must trust to read X-Forwarded-For at all (see `http` below).
+  serviceAddressLib = import ../../../contracts/topology/lib/service-address.nix { };
+  ingressAddress = serviceAddressLib.serviceAddress {
+    topology = config.my.topology;
+    consumer = config.my.topology.hosts.${config.networking.hostName} or null;
+    peer = config.my.topology.hosts.${config.my.topology.ingressHost};
+  };
 in
 {
   options.my.features.services.home-assistant = {
@@ -101,9 +111,14 @@ in
         http = {
           server_port = 8123;
           use_x_forwarded_for = true;
+          # Loopback for the local ingress, plus the ingress host's overlay address: a request that
+          # arrives with X-Forwarded-For from an untrusted peer is refused with 400 before Home
+          # Assistant answers anything (measured 2026-10-10 - the whole public plane answered 400,
+          # which is what made the MCP endpoint undiscoverable from the internet).
           trusted_proxies = [
-            "127.0.0.1"
-            "::1"
+            "127.0.0.1/32"
+            "::1/128"
+            "${ingressAddress}/32"
           ];
         };
       };
