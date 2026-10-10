@@ -1,0 +1,44 @@
+Advertise the OAuth discovery metadata ChatGPT needs to pick a public-client grant, taken from
+home-assistant/core.
+
+Without "token_endpoint_auth_methods_supported", a client has to assume the RFC 8414 default
+("client_secret_basic") and sends its token request as a confidential client - which Home Assistant
+answers with 400 "Invalid client id", so the connector fails after a successful login. ChatGPT's own
+client metadata declares "token_endpoint_auth_method": "private_key_jwt" with ["none",
+"private_key_jwt"]; the announcement below is what makes it choose the public-client path. The same
+commit allows CORS on both discovery documents.
+
+Upstream commit, re-anchored onto this release (same changes, tests omitted):
+  ef31c2d9ca  Correct OAuth discovery metadata for public clients (#184254)
+
+Delete together with the PKCE backport in this directory once nixpkgs ships Home Assistant 2026.10.x.
+
+diff --git a/homeassistant/components/auth/login_flow.py b/homeassistant/components/auth/login_flow.py
+--- a/homeassistant/components/auth/login_flow.py
++++ b/homeassistant/components/auth/login_flow.py
+@@ -122,6 +122,7 @@
+     """View to host the OAuth2 information."""
+ 
+     requires_auth = False
++    cors_allowed = True
+     url = "/.well-known/oauth-authorization-server"
+     name = "well-known/oauth-authorization-server"
+ 
+@@ -139,6 +140,9 @@
+             "authorization_endpoint": f"{url_prefix}/auth/authorize",
+             "token_endpoint": f"{url_prefix}/auth/token",
+             "revocation_endpoint": f"{url_prefix}/auth/revoke",
++            "grant_types_supported": ["authorization_code", "refresh_token"],
++            "token_endpoint_auth_methods_supported": ["none"],
++            "revocation_endpoint_auth_methods_supported": ["none"],
+             # Home Assistant accepts URL-based client_ids via IndieAuth without
+             # prior registration, and discovers allowed redirect URIs from link
+             # tags or a Client ID Metadata Document served at the client_id URL.
+@@ -163,6 +167,7 @@
+     """View to host the OAuth2 Protected Resource Metadata per RFC9728."""
+ 
+     requires_auth = False
++    cors_allowed = True
+     url = "/.well-known/oauth-protected-resource"
+     name = "well-known/oauth-protected-resource"
+ 
