@@ -59,6 +59,15 @@ _: {
       description = "Ender 3D-Drucker Relais";
     };
 
+    hom-rly-04 = {
+      zone = "iot";
+      ipv4 = "10.10.30.14";
+      mac = "8c:ce:4e:0c:e2:50";
+      platform = "esp8266";
+      board = "esp01_1m";
+      description = "Fernseher Deckenlampe";
+    };
+
     hom-rly-06 = {
       zone = "iot";
       ipv4 = "10.10.30.16";

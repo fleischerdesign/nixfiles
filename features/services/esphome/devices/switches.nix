@@ -35,6 +35,14 @@
     relayKind = "switch";
   };
 
+  hom-rly-04 = {
+    name = "hom-rly-04";
+    friendlyName = "Fernseher";
+    buttonPin = 1;
+    buttonTrigger = "on_state";
+    relayKind = "light";
+  };
+
   hom-rly-06 = {
     name = "hom-rly-06";
     friendlyName = "Deckenlampe";
