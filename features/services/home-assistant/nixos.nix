@@ -7,15 +7,13 @@
 let
   cfg = config.my.features.services.home-assistant;
 
-  # The ingress terminates the public names on another host and reaches Home Assistant over the mesh
-  # (`contracts/topology/lib/service-address.nix`): that overlay address is the peer Home Assistant
-  # must trust to read X-Forwarded-For at all (see `http` below).
-  serviceAddressLib = import ../../../contracts/topology/lib/service-address.nix { };
-  ingressAddress = serviceAddressLib.serviceAddress {
-    topology = config.my.topology;
-    consumer = config.my.topology.hosts.${config.networking.hostName} or null;
-    peer = config.my.topology.hosts.${config.my.topology.ingressHost};
-  };
+  # The ingress terminates the public names on another host and reaches Home Assistant over the mesh,
+  # so Home Assistant has to accept X-Forwarded-For from that host - and answers 400 to everything
+  # else. The trust is not declarable from here: Home Assistant 2026.8 migrated the `http` integration
+  # out of YAML, ignores an `http:` block ever after and drops YAML support in 2027.2. The value lives
+  # in Home Assistant's own store (`/var/lib/hass/.storage/http`, `stable` slot) and is set under
+  # Settings - System - Network, with the ingress host's overlay address in `trusted_proxies`; see
+  # `docs/architecture.md` 6.1.
 in
 {
   options.my.features.services.home-assistant = {
@@ -107,20 +105,6 @@ in
         "script ui" = "!include scripts.yaml";
         "scene ui" = "!include scenes.yaml";
         rest_command = "!include ${config.sops.templates."hass-rest-commands.yaml".path}";
-
-        http = {
-          server_port = 8123;
-          use_x_forwarded_for = true;
-          # Loopback for the local ingress, plus the ingress host's overlay address: a request that
-          # arrives with X-Forwarded-For from an untrusted peer is refused with 400 before Home
-          # Assistant answers anything (measured 2026-10-10 - the whole public plane answered 400,
-          # which is what made the MCP endpoint undiscoverable from the internet).
-          trusted_proxies = [
-            "127.0.0.1/32"
-            "::1/128"
-            "${ingressAddress}/32"
-          ];
-        };
       };
     };
 
@@ -174,7 +158,8 @@ in
         # (integrations/http, Reverse proxies) defines the trusted-proxy settings but NO set of
         # paths an external SSO proxy may bypass, and a forward-auth layer in front of HA breaks
         # the companion app and the WebSocket API. Direct exposure with HA's own auth is the
-        # documented path; the trusted_proxies/use_x_forwarded_for settings are set above.
+        # documented path; the trusted-proxy settings are Home Assistant settings, not a module
+        # option (see the module's `let` block and docs/architecture.md 6.1).
         directAccess = {
           enable = true;
           protocol = "tcp";

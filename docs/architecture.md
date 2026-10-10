@@ -387,7 +387,7 @@ serve it, or a subnet a reservation falls outside - each fails the build rather 
 ### 6.1 What is compiled, and what is still a setting
 
 A projection earns its complexity only where it replaces a manual step. Measured 2026-09-20, service by
-service:
+service; the Home Assistant row re-measured 2026-10-10 against Home Assistant 2026.9.4:
 
 | Surface | Compiled from the repository | Still configured in a UI |
 |---|---|---|
@@ -397,12 +397,16 @@ service:
 | CrowdSec | the trusted-subnet whitelist, from `my.topology.trustedSubnets` | nothing |
 | ntfy | accounts and tokens from SOPS, `deny-all` by default | nothing |
 | Klipper | the machine definition and macros from the store | calibration state - the `runtime_variables.cfg` include is prepared but commented out |
-| Home Assistant | integrations, MQTT, the reverse-proxy configuration | **automations**: the module includes them in UI mode, so they are not in Git, not reviewed, and do not survive a reinstall; the MCP server is a config entry and the entities exposed to Assist are UI state |
+| Home Assistant | integrations, MQTT | **automations**: the module includes them in UI mode, so they are not in Git, not reviewed, and do not survive a reinstall; the MCP server is a config entry and the entities exposed to Assist are UI state; the **reverse-proxy trust** - since 2026.8 the `http:` block is migrated into Home Assistant's own store once and ignored afterwards, so `use_x_forwarded_for` and the ingress host's overlay address in `trusted_proxies` are a setting, not a declaration |
 | arr stack, Sabnzbd | quality profiles and custom formats (Recyclarr) | root folders, download clients, categories, paths - only the secrets are templated |
 
-The two gaps in the last rows are real and worth being explicit about: they are the difference between
-"the instance can be rebuilt" and "the instance behaves the same afterwards". Neither is blocked by
-anything except the work.
+The gaps in the last rows are real and worth being explicit about: they are the difference between
+"the instance can be rebuilt" and "the instance behaves the same afterwards". The reverse-proxy trust
+is the sharpest of them: without the ingress host's overlay address in `trusted_proxies`, Home
+Assistant answers 400 to every request that arrives through the ingress before it handles anything -
+on 2026-10-10 that was the whole public plane, `/api/mcp` included. Re-entered under
+*Settings - System - Network*, next to `127.0.0.1/32` and `::1/128`, once per lost store; the
+address is the one the topology contract gives the ingress host (`10.10.100.1` today), not a literal.
 
 ## 8. Observability
 
