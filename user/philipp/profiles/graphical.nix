@@ -60,6 +60,20 @@
     };
   };
 
+  # figma-linux ships a desktop entry that never advertises the figma:// scheme, so
+  # the browser reports "no application available" and the login handshake cannot
+  # return to the app. Shadow it with an entry that registers the handler.
+  xdg.desktopEntries.figma-linux = {
+    name = "Figma Linux";
+    comment = "Unofficial Figma desktop application for Linux";
+    exec = "figma-linux %U";
+    icon = "figma-linux";
+    terminal = false;
+    mimeType = [ "x-scheme-handler/figma" ];
+  };
+
+  xdg.mimeApps.defaultApplications."x-scheme-handler/figma" = "figma-linux.desktop";
+
   # figma-agent is socket-activated: the socket starts at login and pulls in the
   # service when Figma connects. Port and unit wiring mirror upstream's
   # files/figma-agent.socket and files/figma-agent.service.
