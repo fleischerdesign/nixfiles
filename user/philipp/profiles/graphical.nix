@@ -33,6 +33,8 @@
     custom.karere
     cameractrls-gtk4
     dbeaver-bin
+    figma-linux
+    figma-agent
   ];
 
   programs.ghostty = {
@@ -56,5 +58,26 @@
     // lib.optionalAttrs (config.my.desktop.surfaceOpacity < 1.0) {
       background-opacity = config.my.desktop.surfaceOpacity;
     };
+  };
+
+  # figma-agent is socket-activated: the socket starts at login and pulls in the
+  # service when Figma connects. Port and unit wiring mirror upstream's
+  # files/figma-agent.socket and files/figma-agent.service.
+  systemd.user.sockets.figma-agent = {
+    Unit.Description = "Figma Agent for Linux Socket";
+    Socket.ListenStream = "127.0.0.1:44950";
+    Install.WantedBy = [ "sockets.target" ];
+  };
+
+  systemd.user.services.figma-agent = {
+    Unit = {
+      Description = "Figma Agent for Linux Service";
+      Requires = [ "figma-agent.socket" ];
+    };
+    Service = {
+      Type = "exec";
+      ExecStart = "${pkgs.figma-agent}/bin/figma-agent";
+    };
+    Install.WantedBy = [ "default.target" ];
   };
 }
