@@ -64,15 +64,22 @@ in
     codium.enable = lib.mkDefault true;
     nixvim.enable = lib.mkDefault true;
     obsidian.enable = lib.mkDefault true;
+    # OpenCode and OpenChamber stay in the tree but are installed nowhere: the modules are complete,
+    # the two master switches are off. Turning a machine on is one flag, and the sub-options below
+    # still state the intended shape, so nothing has to be remembered a second time.
     opencode = {
-      enable = lib.mkDefault true;
+      enable = lib.mkDefault false;
       model = lib.mkDefault "opencode-go/deepseek-v4-flash";
       credentialFiles = aiCredentialFiles;
     };
     openchamber = {
-      enable = lib.mkDefault true;
+      enable = lib.mkDefault false;
       web.enable = lib.mkDefault true;
       desktop.enable = lib.mkDefault true;
+      # Every personal computer serves OpenChamber over the mesh, so the other one is reachable
+      # from it: each declares its own port through the endpoint contract, and the instance
+      # switcher connects to the peer. A host may turn this off; nothing else has to change.
+      server.enable = lib.mkDefault true;
     };
   };
 
