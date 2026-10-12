@@ -8,7 +8,7 @@ exact directory the server ships, so it proves the same bytes the apply will con
 
 Two rule sets are enforced, and neither is trusted to whoever writes the next file.
 
-authentik's blueprint semantics (docs/practices.md §6.7-§6.9):
+authentik's blueprint semantics (docs/identity.md §5):
 
   - a model name is an ``app.model`` string; without the dot the importer raises;
   - ``!KeyOf`` resolves only within one file, ``!Find`` looks the object up in the database, and a

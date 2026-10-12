@@ -2,7 +2,7 @@
 
 > **Aesthetic:** modern industrial minimalist - the register of high-end developer tooling
 > **Scope:** the Authentik portal, Caddy's error pages, internal dashboards
-> **Naming:** see [naming.md](naming.md) - normative, derived, never maintained by hand.
+> **Naming:** see [architecture.md](architecture.md) §5 - normative, derived, never maintained by hand.
 
 ## 1. Principles
 

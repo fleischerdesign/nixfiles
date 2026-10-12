@@ -421,7 +421,7 @@
           # `!KeyOf` that points nowhere, a dependency on a blueprint that is not there, or a person who
           # is declared instead of seeded. The apply there proves the same files, but a deploy is too late
           # for a typo. This reads the exact compiled directory the server ships, so the check and the
-          # apply consume identical bytes. The rules are documented in docs/identity.md §11 and enforced
+          # apply consume identical bytes. The rules are documented in docs/identity.md §5 and enforced
           # by features/services/authentik/lib/blueprints-check.py.
           directory = import ./checks/directory.nix checkArgs;
           directory-runtime = import ./checks/directory-runtime.nix checkArgs;

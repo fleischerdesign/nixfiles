@@ -1,282 +1,150 @@
-# Identity and access
+# Identity, access and secrets
 
-> **System:** Authentik · **Portal:** `auth.vyrx.de` · **Source of truth:**
-> `inventory/identity.nix`, service contracts, and the owned Authentik blueprints
+> **System:** Authentik · **Portal:** `auth.vyrx.de` · **Secrets:** SOPS with age · **Model:** zero trust
 >
-> This document records how identity works here **and** the constraints that were expensive to learn.
+> Source of truth: `inventory/identity.nix`, the service contracts and the owned Authentik blueprints.
 > The code is normative; where it and this text disagree, the code is right.
 
-## 1. The GitOps axiom
+## 1. Model
 
-Directory identities and role groups are declared in `inventory/identity.nix` through the
-provider-neutral `my.directory` contract. Authentik compiles them into native blueprints. Providers,
-outposts, service accounts, bindings and applications are projected from service contracts or owned
-blueprints. Configuration is applied idempotently, but **the database is durable personal state**:
-credentials, passkeys, sessions, UI-created users and UI-owned memberships require database backup.
-Reapplying configuration is not a substitute for restoring that state.
+No segment is trusted, including the house LAN - security is a property of every component, not a wall
+at the edge. Zero trust (NIST SP 800-207), applied: **verify explicitly** (every access to an internal
+resource carries a WireGuard key, a passkey assertion or an SSH key); **least privilege** (a service
+account, a process and a person each hold what their task needs); **assume breach** (lateral movement is
+limited by the trust lattice and by cryptographically addressed hosts).
 
-The reason is not elegance: an identity system configured through a web UI is the one component whose
-configuration cannot be reconstructed from the repository, and it is the component that gates
-everything else.
-
-## 2. Layout
+The zones are partially ordered and the firewall implements the order rather than each rule separately.
+They are addressing and policy on one Layer-2 segment ([architecture.md](architecture.md) §3):
 
 ```
-features/services/authentik/
-├── server/blueprints/            hand-written adapter configuration; dependencies are explicit
-│   ├── 00-system/brand.yaml      title, design tokens, favicon
-│   └── 02-flows/                 enrollment, recovery, remember-me, passkey autofill
-├── server/nixos.nix              runtime, apply verification and drift reporting
-├── server/blueprints.nix         directory and service-contract compiler
-├── outpost/proxy/                per-host forward-auth where the embedded outpost cannot reach
-└── outpost/ldap/                 per-host LDAP outposts
+Trust(guest) < Trust(iot) < Trust(mesh) <= Trust(corp) < Trust(infra)
 ```
 
-`01-rbac/users-and-groups.yaml` is generated from the directory inventory, including derived personal
-audience groups. `03-apps/*.yaml` (`proxy-apps-generated.yaml`, `oidc-apps-generated.yaml`,
-`ldap-outposts-generated.yaml`) does not exist in the tree: the compiler in `server/blueprints.nix` emits
-it **from the service contracts** - every service that declares an OIDC integration or a forward-auth publication gets a
-provider and an application without writing any blueprint. That is the whole point of the contract
-layer - see [architecture.md](architecture.md) §6.1.
+The layers, from the outside in: identity and authentication (Authentik, passkeys); ingress (Caddy TLS,
+CrowdSec, forward-auth); transport (WireGuard, ChaCha20-Poly1305, cryptokey routing); operating system
+(NixOS hardening); storage and state (impermanence, restic); cryptographic material (SOPS with age).
 
-## 3. Constraints that cost real time
+## 2. Secrets
 
-Recorded because they are properties of Authentik, not of this repository, and each one was found the
-hard way.
+SOPS with age, one file (`secrets/secrets.yaml`), keys derived from identities that already exist.
+
+| Key | Derived from | Used by |
+|---|---|---|
+| host key | the `/etc/ssh/ssh_host_ed25519_key` of the host, converted with `ssh-to-age` | every host decrypts its own secrets |
+| operator key | `~/.config/sops/age/keys.txt` | break-glass, adding keys, user-level secrets in Home Manager |
+| deploy keys | generated per purpose, authorised through `deployKeys` in the ssh feature | root access during deployment |
+
+The system module decrypts as root with the host key; the Home Manager module decrypts as the user with
+that key, because a user process cannot read a host key. Nothing is decrypted until a module declares a
+secret. The operator key is a file, not a hardware token. No secret is passed on a command line, embedded
+in the Nix store, or written into a generated configuration - the ESPHome engine assembles its
+`secrets.yaml` in a private temporary directory and deletes it after the flash.
+
+**Losing a device** is deterministic, because both places that matter are declared: remove the age key of
+the lost host from `.sops.yaml`, run `sops updatekeys`, remove its WireGuard public key from
+`my.topology`, and deploy the remaining hosts. The device keeps no mesh peer and no future secret. A
+roaming client whose private key is escrowed under `infra/wireguard/<name>_private_key` must have that
+key rotated or deleted in the same change, or the stale private half stays usable if it resurfaces.
+
+**Missing secrets fail the build**: a module that references a path absent from `secrets/secrets.yaml`
+fails evaluation, not deployment - the build is where a missing declaration is discovered.
+
+## 3. Humans and machines are different kinds of thing
+
+**Service accounts are fully declarative.** The account and its token are declared, and the token value
+lives in SOPS: the blueprint creates the token object with a key read from the environment, and the
+consuming service reads the same secret, so both sides meet on first boot with no interaction. The
+direction is inverted on purpose - SOPS is the source of truth, so nothing is generated at runtime that
+would have to be recovered later.
+
+**People are seeded, not enforced.** An entry with `initialProfile` carries `state: created`, so display
+name and e-mail are written when the account is first created and never again; everything afterwards -
+credential, avatar, memberships the interface owns - belongs to the person. Infrastructure references use
+the username as the stable key, so renaming that login means updating its declarations and consumers, not
+treating it as a display-name change.
+
+The inventory is not an exhaustive user list. People can be created in the interface or through
+enrollment, and an entry with `initialProfile = null` references an existing UI-created person without
+creating or modifying the account. The passkey cannot be declared: FIDO2 binds to a secure element and is
+registered interactively. There are no enforced password policies, because the primary factor is a
+passkey.
+
+Groups use `my.directory.groups.<name>`: `members = null` leaves membership interface-owned, an explicit
+list (including an explicitly empty one) is owned by the repository, and `state = "absent"` retires a
+group - deleting an inventory entry alone is not a deletion request. Service audiences keep the reserved
+`svc-` prefix and are derived, never declared by hand.
+
+## 4. Who owns what
+
+> **This repository owns the shape of the system. The interface owns the people in it.**
+
+A fact has exactly one owner and never changes hands between the two. An entry is either **declared**
+(`state: present` or `absent`: the repository enforces the field and the drift report names a
+divergence) or **initialized** (`state: created`: a default for a new object, never enforced, never
+drift). The two never mix on one entry, and
+`features/services/authentik/lib/blueprints-check.py` enforces exactly that.
+
+| Kind | Owner | Behaviour |
+|---|---|---|
+| declared, with a value | repository | a change in the interface is overwritten at the next apply, and the drift report says so before that happens |
+| initialized, with a seeded value | repository writes it once | a default for a new object; the interface owns the field afterwards |
+| not declared | interface | never touched, reported as foreign, which is normal |
+| declared, but the database value came from elsewhere | defect | the declaration is incomplete; a fresh install or a restore produces a different world and nothing notices |
+
+**The interface may change:** the own data of a person (name, address, password, avatar), which roles a
+person has, their credentials and devices, invitations, own profile attributes, notifications.
+**The interface may not change:** providers, applications, outposts, flows, stages, bindings, policies,
+roles, group *definitions*, certificates, branding, sources, machine tokens and service accounts - each
+is topology, policy or integration, and all three must be readable, reviewable and reproducible here. The
+test for a new case is one question: would I comment on this in a review?
+
+**Group names are part of the shape.** Access hangs on them - every consumer filter names the groups it
+accepts - so renaming a group in the interface removes access for everyone without anything turning red.
+A rename here means a new entry *and* `state: absent` for the old one. There are no per-user application
+bindings, because a second mechanism next to the group filter would be a second truth.
+
+**An audience a resource declares about itself is topology, and it is declared.** `accessUsers` names the
+accounts a service belongs to; the contract turns each username into its own group and feeds it into
+`accessGroups`, so the ingress, the directory filter and the portal read one value. `accessAuthenticated =
+true` is the explicitly universal audience and excludes service accounts. A group-restricted publication
+is projected into a `PolicyBinding` per group on the generated application, and the compiler refuses to
+build a gated service that names no audience - an application with no binding is open to every
+authenticated user.
+
+## 5. Authentik constraints that cost real time
+
+Properties of Authentik, not of this repository.
 
 | Constraint | Consequence |
 |---|---|
-| Authentik's blueprint YAML knows `!KeyOf`, `!Find`, `!Env`, `!File`, `!Context` - **not `!Key`** | an unknown tag breaks the `authentik_blueprints.0001_initial` migration, which parses every blueprint; the failure appears as the whole server failing to start |
-| Only `*.yaml` is discovered; JSON cannot carry YAML tags | structured reference nodes are rendered as native tagged YAML with a safe dumper, not string replacement |
-| Blueprint application is **unordered** | dependencies must be declared explicitly with `authentik_blueprints.metaapplyblueprint` - the default provider flows and the RBAC group are declared that way |
-| `authorization_flow` **and** `invalidation_flow` are both required on a provider | a provider without them fails at apply time, not at parse time |
+| Blueprint YAML knows `!KeyOf`, `!Find`, `!Env`, `!File`, `!Context` - not `!Key` | an unknown tag breaks the migration that parses every blueprint; the whole server fails to start |
+| Only `*.yaml` is discovered | structured references are rendered as native tagged YAML, not string replacement |
+| Blueprint application is unordered | dependencies must be declared explicitly with `metaapplyblueprint` |
+| `authorization_flow` and `invalidation_flow` are both required on a provider | a provider without them fails at apply time, not at parse time |
 | `redirect_uris` are objects (`{matching_mode, url}`), not strings | a plain string list is silently ignored |
-| The worker deadlocks on `authentik_flows_stage` during a fresh bootstrap when it runs multi-threaded | `AUTHENTIK_WORKER__THREADS=1`, unconditionally |
+| The worker deadlocks on `authentik_flows_stage` during a fresh bootstrap if it runs multi-threaded | `AUTHENTIK_WORKER__THREADS=1`, unconditionally |
 | There is no out-of-band setup wizard | `AUTHENTIK_BOOTSTRAP_PASSWORD` triggers `system/bootstrap.yaml`, which creates `akadmin` and sets `setup = true` |
-| Two hosts may not declare the same OIDC publication name | the module asserts it at evaluation time and names the collision |
-| Two OIDC integrations may not share a client ID | the module asserts it at evaluation time and names the collision |
+| No two hosts may declare the same OIDC publication name, and no two integrations may share a client ID | both are asserted at evaluation time, naming the collision |
 
-## 4. Humans and machines are different kinds of thing
+## 6. Bootstrap, enrollment, self-service
 
-### 4.1 Service accounts - fully declarative
+`akadmin` is the only account that can always get in, and it belongs to `authentik Admins`; its password is
+`AUTHENTIK_BOOTSTRAP_PASSWORD`, consumed only while `akadmin` does not exist, so it never resets a changed
+password. It is break-glass and not a member: superusers do not bypass application policy bindings, so it
+reaches no service unless a group grants it. Enrollment creates people through invitations and assigns
+the interface-owned `media-users` group; e-mail recovery, invitation enrollment, passkey autofill
+(conditional UI) and remember-me are wired through the brand.
 
-For daemons, outposts, pipelines and APIs. The account and its token are both declared, and the token's
-*value* comes from SOPS: the blueprint creates the token object with a key read from the environment,
-and the consuming service reads the same secret. Neither side needs a human.
+## 7. The directory
 
-`ServiceAccount = (username, role, token_from_SOPS)`
+Authentik is the directory, served by an LDAP outpost on `hom-srv-01` and `cld-edge-01` (389 plain, 636
+TLS); applications authenticate their users against it instead of keeping their own accounts.
+`contracts/directory` holds the structure for the whole fleet - base DN, user and group subtrees, the
+prefix of consumer service accounts - as a contract module, so it is loaded everywhere and is not behind
+an enable flag. A consumer never composes a DN: `contracts/identity` projects the resolved values into
+`my.contracts.consumes.<service>.ldap`, and the provider creates its accounts from the same contract.
 
-### 4.2 People - the shell is declarative, the credential is not
-
-For entries with `my.directory.users.<username>.initialProfile`, display name and e-mail are
-**initialized, not enforced**: the generated entry carries `state: created`, so
-the value is written when the account is first created and never again. The account therefore exists after
-the first apply, and everything about it afterwards - name, address, credential, avatar - belongs to the
-person and to whoever administers identities in the interface. Infrastructure references use the
-username as their stable key: renaming that login requires updating its declarations and consumers,
-not treating it as a display-name change. This is an initialization, not a hand-off
-of a fact: the repository makes a statement about the default for a new object, never about the object's
-current value (§11.4). A `state: created` entry is the only initialization this repository uses;
-`features/services/authentik/lib/blueprints-check.py` fails a build that seeds a topology object or
-declares a person.
-
-The inventory is **not an exhaustive user list**. Users can be created in the UI or through enrollment.
-An inventory entry with `initialProfile = null` references an existing UI-created human without
-creating or modifying the account. Register such a username before using it in a declarative group or
-personal service audience; actual existence is verified when resolving the generated membership.
-
-Group definitions use `my.directory.groups.<name>`. `members = null` leaves membership UI-owned;
-`members = [ ... ]` owns the exact set, including an explicitly empty list. The compiler writes the
-group's `users` field, never the human's complete `groups` field. Other memberships, profile fields
-and credentials remain untouched. `state = "absent"` explicitly retires a group; deleting an inventory
-entry alone is not a deletion request. Service audiences retain the reserved `svc-` prefix and are
-derived, not manually declared. The **passkey cannot be declared**: FIDO2
-is bound to a secure element and created through an interactive challenge-response ceremony in the
-browser. Initial account existence does not imply role membership or enrollment; passkeys are registered
-interactively through the WebAuthn flow.
-
-There are no enforced password policies: the primary factor is a passkey, and a policy that only
-constrains the fallback path would be friction without security.
-
-### 4.3 Registering UI-created identities for infrastructure
-
-Create the person through the UI or enrollment. To reference that person in Nix, add
-`my.directory.users.<username> = { };` to the identity inventory: the default `initialProfile = null`
-does not create a replacement account or reset their email. Add the stable username to the intended
-group's explicit `members` list only when that membership is meant to be Nix-owned. Ordinary UI-created
-users need no inventory entry until infrastructure references them. Group membership alone never
-creates a Linux account or grants a provider credential.
-
-### 4.4 Lifecycle and ownership
-
-| Operation | Authority and required action | What it does not imply |
-|---|---|---|
-| Change email, display name, avatar or credentials | Person or identity administrator through Authentik | No change to the infrastructure login key or resource ownership |
-| Create a human | UI/enrollment, or an optional `initialProfile` seed | No Linux account, gateway, role grant or provider credential without the corresponding declaration |
-| Rename a login used by infrastructure | Coordinated change of the existing account and all inventory/service references; keep the same database account | No automatic rename inferred from a removed and added Nix key; an old seed left in place can recreate the old login |
-| Suspend a human | UI-owned `is_active = false`; seeds never reactivate existing accounts | No removal of their declared infrastructure, data or credentials; no claim that every previously issued application token or session has been revoked |
-| Revoke a UI-owned role | Remove its membership in Authentik | No change to Nix-owned memberships or resource placement |
-| Revoke a Nix-owned role | Remove the username from that group's explicit list and apply the identity host | No deletion of the person or memberships in other groups |
-| Stop personal provisioning | Remove provisioning membership and deploy every affected resource host, including node hosts | Updating Authentik alone does not stop gateways/nodes or invalidate independently authenticated native devices |
-| Retire a group | Stop all consumers first, retain `state = "absent"` until removal is verified | Deleting an inventory entry is not a tombstone; a retired group cannot carry a managed membership list |
-| Retire a human | Suspend access, revoke memberships and consumers, preserve required backups, remove the seed/reference declaration, then explicitly delete in the UI only if intended | Removing a declaration does not delete the account; deleting an account while keeping its seed causes recreation without the original credentials |
-
-Account deletion, login renaming, credential erasure and personal-data retention are not inferred from
-inventory diffs. Nix owns infrastructure configuration, not a garbage collector for personal state.
-Stopping a service and revoking an identity are distinct operations. Existing sessions, OIDC tokens,
-provider credentials and native node approvals need their own explicit revocation and consumer-level
-verification; a correct directory membership is not evidence of universal logout.
-
-### 4.5 Read-only preflight and diagnosis
-
-The provider-neutral preflight in `contracts/directory/lib/preflight.py` classifies observed state as:
-
-- `failures`: missing UI-reference accounts, service-account collisions, ambiguous logins or group names;
-- `pending`: missing seeds and present group definitions that an apply can create;
-- `inactive`: UI-suspended humans, which an apply must preserve rather than reactivate.
-
-The Authentik adapter reads exact login matches and maps provider-specific account types into human
-observations. The same preflight runs before the explicit apply queues any blueprint tasks and contributes
-invalid-reference findings to drift reporting. Missing seeds are valid on a fresh database. Suspension
-is an operational observation, not configuration drift or a reason to undo an administrator's decision.
-
-For on-demand diagnosis on the identity host:
-
-```bash
-systemctl start authentik-directory-report.service
-journalctl -u authentik-directory-report.service --no-pager
-```
-
-The worker must already be active: the report has `Requisite`, not a dependency that starts it. The report
-does not depend on the apply unit, does not enqueue blueprint tasks, and only queries database objects.
-It emits a JSON result with the three categories, without profile values or credentials. Exit status is
-zero only when all categories are empty; pending creation, suspension and invalid references produce a
-nonzero verdict. Backend/query errors fail loudly rather than becoming an empty successful report.
-
-This preflight is not a fleet transaction or a global interlock: Authentik's native worker can independently
-discover/apply blueprints, and concurrent UI changes can occur after the observation. Post-apply verification
-therefore remains mandatory. The directory report establishes identity-reference readiness only, not
-gateway availability, browser authentication, OAuth enrollment or end-to-end integration health.
-
-`checks.directory` tests the schema and membership verifier's negative cases.
-`checks.directory-runtime` compiles each Authentik host with isolated test identities added, then applies
-that directory blueprint with the packaged Authentik importer against disposable PostgreSQL. It uses
-the native user serializer to create additional people and
-measures repeated-apply preservation of changed names, emails, passwords, attributes, stored WebAuthn
-records, UI suspension and UI-owned membership. It tests missing-reference and service-account-collision
-preflight failures before applying, and distinguishes expected seed creation from an invalid reference.
-It also measures managed-set correction, empty sets, existing UI-user
-references, missing groups and explicit retirement. This is a backend-state test, not a browser login
-or a cryptographic WebAuthn ceremony. A logical dump restored into a separate fresh database must
-preserve those identities, credential records and memberships before and after another apply; this
-does not prove retrieval of the production backup repository or whole-host disaster recovery.
-
-## 5. Two outpost models, deliberately
-
-| | Forward-auth | LDAP |
-|---|---|---|
-| What it is | the **embedded** outpost inside the Authentik server | one outpost **per host** that needs it |
-| Why | forward-auth is a per-request decision the server can make itself; a separate process adds latency and a token for nothing | LDAP is a long-lived TCP service; it belongs where the consumer is |
-| Address | `my.features.services.authentik.server.embeddedOutpostAddress` - `127.0.0.1:9055` on the server, `10.10.100.1:9055` from the LAN hosts over the mesh | per host, listening on 389/636 |
-| Credential | none | a service account plus a token with `intent = "api"`, read via `!File` from `services/authentik/outposts/<host>-ldap-token` |
-
-The LDAP outpost's role carries global read permissions (`view_user`, `view_group`, `add_event`) and
-object permissions bound to a **named** role - not to the managed role, which is recreated by upgrades.
-
-An earlier version of this document described a separate proxy outpost with its own token. That is not
-the design: the embedded outpost is the design, and it removes a credential and a process.
-
-### Application authentication paths
-
-Native OIDC and reverse-proxy forward-auth are separate integration types. Seerr uses native OIDC;
-its publication and callback URIs supply the Authentik client contract, and a dedicated SOPS
-credential is shared by the provider and relying party. Seerr's native configuration API applies
-only owned provider fields, the publication's application URL and OIDC enablement at deployment.
-Other providers, signup policy, linked accounts and application settings remain UI-owned. Its browser callback is `/login` with
-the provider slug and `callback=true` query parameters, not the backend token-exchange route.
-
-The central Authentik HTTP listener serves both the embedded proxy outpost and the core API.
-Its WireGuard admission derives from actual consumers: Caddy hosts whose generated routes use
-the central forward-auth address, and native proxy or LDAP outposts configured to consume that
-core address. Caddy uses one publication projection and one authentication predicate for both
-route generation and dependency declaration. OIDC applications do not become forward-auth
-consumers. The endpoint admits only those inventory hosts plus the published ingress source;
-an empty consumer set does not imply access for all trust levels.
-
-## 6. Token inversion
-
-The naive order is: create the outpost in the UI, let Authentik generate a token, copy it into SOPS.
-That makes SOPS a copy of a value that already exists elsewhere, and it cannot be rebuilt from the
-repository.
-
-The direction is inverted - **SOPS is the single source of truth**:
-
-1. the token exists in `secrets/secrets.yaml`;
-2. the server's environment is populated from it;
-3. the blueprint creates the token object whose key is that value (`key: "!Env …"`);
-4. the outpost starts with the same value from the same file;
-5. both sides meet on first boot, with no interaction.
-
-Nothing is generated at runtime that would have to be recovered later.
-
-## 7. Bootstrap and self-service
-
-- **No OOBE.** The bootstrap password in `services/authentik/core_env` drives `system/bootstrap.yaml`,
-  which creates `akadmin` and marks setup complete.
-- **Break-glass.** `akadmin` is the only account that can always get in, and it belongs to
-  `authentik Admins`. Its password is `AUTHENTIK_BOOTSTRAP_PASSWORD` in the `services/authentik/core_env`
-  secret; authentik consumes it only while `akadmin` does not exist, so it never resets a password that has
-  already been changed. `infra-admins` is a separately named group whose current adapter mapping in
-  `my.features.services.authentik.server.superuserGroups` also grants **Authentik superuser** rights.
-  This mapping is provider-specific, not a generic directory-group property, and does not itself
-  grant Linux sudo or fleet SSH access. Its membership is UI-owned.
-- **Enrollment** creates users through invitations and assigns the UI-owned `media-users` group.
-  It does not automatically assign `family`, administration or `ai-users`. The five inventory seeds
-  are independent of enrollment; creating them does not replay its group assignment.
-- **Self-service:** e-mail recovery wired to the brand, invitation enrollment, passkey autofill
-  (conditional UI) and remember-me (`session_duration = 7 days`, `remember_me_offset = 30 days`).
-
-## 8. Applying changes
-
-Blueprints are part of the **host closure**: `nixos-rebuild switch --flake .#cld-edge-01` (or
-`nod switch cld-edge-01`). There is no separate reconciler target for Authentik - the server applies
-what its closure contains. See [operations.md](operations.md).
-
-## 9. What this buys, honestly
-
-| Situation | Before | Now |
-|---|---|---|
-| database lost | configuration and personal state mixed together | restore the database for personal state; reapply the declarative configuration |
-| new service | provider, redirect URI and secret by hand | the service declares a publication and an OIDC integration; the provider is generated |
-| new outpost | token generated in the UI, copied into SOPS | the token already exists; the outpost reads it |
-| "who may access what" | visible only in database rows | a Git commit, reviewable |
-
-Recovery time after a database loss is **not measured**. What is known is that the blueprints are
-applied on start and that their dependencies are declared; how long that takes on the actual hardware
-has not been timed, so no number is claimed here.
-
-## 10. The directory
-
-Authentik is the directory. It is served by the LDAP outpost on each of `hom-srv-01` and `cld-edge-01`
-(389 plain, 636 TLS), and applications authenticate their users against it instead of keeping their own
-accounts. Jellyfin is the first consumer; the mechanism is generic.
-
-### 10.1 One declaration, no restatements
-
-`contracts/directory` holds the structure of the directory for the whole fleet: the base DN, the user and
-group subtrees, and the prefix of consumer service accounts. It is a contract module rather than a feature,
-so it is loaded on every host and is not behind an enable flag. `usersDn` and `groupsDn` are derived from it.
-
-A consumer never composes a DN. `contracts/identity` projects the resolved values into
-`my.contracts.consumes.<service>.ldap` - the audience the service stated on its own publication, the SOPS path of
-its app password (derived when the integration leaves it empty), and the bind DN. The provider creates its
-accounts from the same contract, so both sides agree without reading each other's configuration. That matters
-because provider and consumer normally run on different hosts: an earlier attempt published the bind DN from
-the provider's feature and evaluated to an empty value on `hom-srv-01`, where Jellyfin runs.
-
-### 10.2 What a consumer declares, and what it does not
-
-A consumer states its **audience** once, on its publication:
+A consumer states its audience once, on its own publication:
 
 ```nix
 publications.web = {
@@ -291,197 +159,66 @@ identity.ldap.directory = {
 };
 ```
 
-That is policy, and it belongs to the service. The provider exposes identities and encodes no consumer's
-policy - it does not know who may sign in anywhere. The compiler refuses a consumer that enables directory
-authentication without naming `accessGroups`, because a service that authenticates against a directory
-without stating its audience has no access policy.
+The provider exposes identities and encodes no consumer policy - it does not know who may sign in
+anywhere. The compiler refuses a consumer that enables directory authentication without naming
+`accessGroups`, because a service that authenticates against a directory without stating its audience has
+no access policy. The application itself carries no policy binding, so it is open to every user; the
+actual decision is the `memberOf` filter of the consumer. A service account whose role holds
+`search_full_directory` may read the whole directory.
 
-### 10.3 How a bind is decided
+**Two outpost models, deliberately.** Forward-auth uses the **embedded** outpost inside the Authentik
+server - a per-request decision the server makes itself, reached at `127.0.0.1:9055` on the server and
+`10.10.100.1:9055` from LAN hosts; a separate process would add latency and a credential for nothing.
+LDAP is a long-lived TCP service and runs one outpost **per host** that needs it, with a service account
+token read from SOPS; its role carries global read permissions bound to a **named** role, not the managed
+one, which upgrades recreate. The central listener admits only the hosts that consume it, derived from
+the Caddy routes and the outposts; an empty consumer set does not mean all trust levels.
 
-The outpost runs the provider's bind flow, which authenticates with an app password, and then asks the core
-whether that user may use the application. The application carries **no** policy binding, so it is open to
-every user; the actual decision is the consumer's `memberOf` filter, which is why each service keeps deciding
-its own audience. A service account whose role holds `search_full_directory` (an object permission on the
-provider) may read the whole directory - Jellyfin needs that to find users at all - while an ordinary user
-can only see their own entry. Jellyfin's login is verified end to end: `philipp` authenticates with his
-Authentik password and is an administrator in Jellyfin because `infra-admins` is his group.
+A consumer that needs the directory reads one XML file from its state directory, rendered from SOPS onto
+tmpfs and symlinked into place, so the bind password never reaches the store; `restartTriggers` ties the
+service to the rendered file, because the plugin loads its configuration once at start.
 
-### 10.4 The client configuration is not state
+## 8. Operating system hardening
 
-Jellyfin's plugin reads one XML file from its state directory, and that file carries the bind password. It is
-rendered from SOPS onto tmpfs and symlinked into place, so the password never reaches the store and the file
-is read-only by construction. `restartTriggers` ties the service to the rendered file, because the plugin
-loads its configuration once at start and nothing else would notice a change.
+`features/system/security` is part of the base role on every host: `slab_nomerge`,
+`page_alloc.shuffle=1`, `kernel.kptr_restrict = 2`, `kernel.dmesg_restrict = 1`,
+`kernel.unprivileged_bpf_disabled = 1`, `tcp_syncookies = 1`, strict `rp_filter`, no ICMP redirects.
+All are chosen for zero runtime cost.
 
-## 11. Who owns what: this repository, or the admin interface
+systemd sandboxing (`ProtectSystem = "strict"`, `ProtectHome`, `PrivateTmp`, `PrivateDevices`,
+`NoNewPrivileges`, `ProtectKernel*`, `RestrictNamespaces`, empty `CapabilityBoundingSet`) is a declared
+contract that the service modules do not yet carry: measured 2026-09-20, none of the 35 service modules
+sets any of these, so the hardening in place is the kernel baseline above. Enforcing the sandbox is a
+per-service change with a real cost, because `ProtectSystem = "strict"` breaks any service that writes
+outside its declared state and cache directories - the fix is to declare those directories, not to relax
+the sandbox.
 
-Two authorities write into the same object store. The rule that keeps them apart is one sentence:
+## 9. Access
 
-> **This repository owns the shape of the system. The interface owns the people in it.**
+- **SSH.** The cloud hosts accept SSH on their **public** address - the lifeline that survives a broken
+  mesh, a bad route or a lockout - and every other host listens on its LAN and overlay address only.
+  Keys only (`PasswordAuthentication = false`, no password root login, Ed25519 throughout), two keys
+  fleet-wide: the operator key and the fleet deploy key. `~/.ssh/deploy-key` is the node tunnel secret
+  and never addresses a fleet host. sshd binds explicitly and waits for the units that create the
+  addresses, because it reads its `ListenAddress` list once at startup.
+- **Deployment** is not coupled to health probes: a rebuild must be fast and atomic, and health is
+  observed asynchronously by the monitoring stack, which alerts independently of who deployed what. What
+  is verified before a switch is that the replacement path exists (see [operations.md](operations.md)).
+- **The ingress is the only public surface.** A service that declares `scope = "public"` is proxied; one
+  that does not is not reachable from outside. Certificates are per name, issued on the host that
+  terminates them ([architecture.md](architecture.md) §5.3).
 
-A fact has exactly one owner. It is never shared, and it never changes hands between the two: "first the
-repository, then the interface" is how a declaration turns into a statement that is no longer true.
+## 10. Audit
 
-**Initialization is not a hand-off.** A seed (`state: created`) writes an initial value once, when the
-object is created, and the interface owns the field from that moment - so the repository never makes a
-claim about the object's current value and no declaration goes stale. That is the distinction the rest of
-this section rests on: an entry is either **declared** (`state: present` or `absent`: the repository owns
-the field, the apply enforces it, the drift report names a divergence) or **initialized** (`state:
-created`: a default for a new object, never enforced, never drift). The two never mix on one entry, and
-`features/services/authentik/lib/blueprints-check.py` enforces exactly that.
+Journal, Caddy access logs and CrowdSec decisions are shipped to Loki on `cld-edge-01`, so a compromised
+host cannot erase what has already left it. A failed unit is part of the health check - a backup that
+fails silently is a backup that does not exist.
 
-### 11.1 The interface may change
+## 11. Outbound application mail
 
-- **Users** — name, address, password, avatar, and everything the person sets afterwards. People are not
-  configuration. Existence is deliberately not in this list: the repository seeds the account, so it exists
-  again after the next apply even if the interface deletes it (§11.5).
-- **Which roles a person has** — who is in which role group. That membership is the assignment of people to
-  policy, and it is the access decision: a service accepts a group, a human decides who is in it. An audience
-  the repository declares *about a resource* (`accessUsers`) is the other half and is not this — it says who a
-  resource belongs to, which is §11.2's test answered with yes, and it is declared (§11.3). Explicit
-  groups with an explicit `my.directory.groups.<name>.members` list are repository-owned, including
-  provisioning groups whose membership determines infrastructure existence.
-- **Own credentials and devices** — app passwords, TOTP, WebAuthn, sessions. Nobody else can hold these; the
-  bootstrap admin password exists here only as a hash.
-- **Invitations** — an invitation link is a document, not system state.
-- **Own profile attributes** — phone number for MFA, preferences.
-- **Notifications** — "mail me when X happens" is an operational preference, not topology.
-
-### 11.2 The interface may not change
-
-Providers, applications, outposts, flows, stages, stage bindings, policies, roles, group *definitions*,
-certificates, branding, sources, machine tokens and service accounts. Each of these is topology, policy or
-integration, and all three have to be readable, reviewable and reproducible in the repository. A provider
-added in the interface would be a second truth about the shape of the system.
-
-The test for a new case is one question: **would I comment on this in a review?** If yes, it belongs in the
-repository; if it only concerns a person, it belongs in the interface.
-
-### 11.3 Two consequences that are easy to get wrong
-
-**Group names are part of the shape.** Access hangs on them: every consumer's `memberOf` filter names the
-groups it accepts. Renaming a group in the interface removes access for everyone without anything turning
-red. Renaming a group in this repository means a new entry **and** `state: absent` for the old one — otherwise
-the old name stays behind and can still grant access.
-
-**Group-restricted access runs through membership.** There are no per-user application bindings, because that would be a
-second mechanism next to the group filter — and two mechanisms are two truths. A service declares which groups
-it accepts; a human is put into one of them.
-
-An explicitly universal audience is different from a missing audience: `accessAuthenticated = true`
-admits active authenticated humans through a generated expression-policy binding and excludes service
-accounts. It is mutually exclusive with `accessGroups` and `accessUsers`; ordinary group-restricted
-applications retain their membership-based policy. Application-specific OIDC scope mappings and access-token
-lifetimes are declared in the identity contract and compiled alongside their provider.
-
-**An audience a resource declares about itself is topology, and it is declared.** `accessUsers` names the
-accounts a service belongs to. The contract turns each username into its own group
-(`contracts/identity/lib/audience.nix` `audienceGroup`) and feeds it into `accessGroups`, so the ingress, the directory filter and the portal read one
-value; the compiler creates that group *with* the membership, so no deploy leaves an audience empty and nobody
-has to click before a new personal service works. It is still one mechanism — both halves are memberships — and
-the test that separates them is §11.2's: "this gateway belongs to kai" is a sentence a reviewer comments on,
-"katja is in the film group" is not. The role groups stay untouched and interface-owned, because no
-declaration owns their members. A group may instead declare an explicit member list: `inventory/identity.nix`
-then owns it, the directory compiler writes exactly that membership, and a change made only in the interface
-does not survive the next blueprint apply.
-
-**And it is enforced at the ingress, not only described.** A group-restricted publication that authenticates through authentik
-declares `accessGroups` on the publication; the compiler projects them into a `PolicyBinding` per group on the
-generated application. An explicitly universal human audience uses the expression-policy binding described
-above. The compiler refuses to build a gated service that names neither audience (`blueprints.nix`,
-`ingressPolicyCheck`). Until 2026-09-22 the generated applications carried no binding at all, so authentik's
-`AppAccessWithoutBindings` opened every service to any authenticated user - measured before: zero bindings on
-all 17 applications, and a user in no group passed every one. Measured after: `philipp` passes `grafana`,
-`katja` does not, and a freshly created user with no groups passes nothing.
-
-### 11.4 The kinds of fact, and what each one does
-
-| Kind | Owner | Behaviour |
-|---|---|---|
-| declared, with a declared value | repository | a change in the interface is overwritten at the next apply — and the drift report says so **before** that happens |
-| initialized, with a seeded value | repository writes it once | a default for a new object; never enforced, never drift, and the interface owns the field afterwards |
-| not declared | interface | it is never touched; it is reported as foreign, which is normal |
-| declared, but the database value came from elsewhere | **defect** | the declaration is incomplete; a fresh install or a restore produces a different world and nothing notices - §11.6 is the inventory that closes it |
-
-That last row is the only dangerous one, and it is not the interface's fault: it means we depend on a fact we
-do not name. `token.managed`, `token.expiring` and `LDAPProvider.mfa_support` were three of them and are
-closed - each is now declared with the value the serializer actually accepts (`practices.md` §6.11, §11.6
-below). What remains in
-§11.6 are dependencies on files and flags that are not model fields, each documented with its source.
-
-### 11.5 The table: every model, its owner, and whether a human may change it
-
-"Owner" is who writes the object's definition. "Relationships we set" are the links that come from a
-blueprint; a relationship that is not listed is not ours. The last column answers "may I change X in the
-interface?" in one sentence.
-
-| Model | Object owner | Relationships we set | May a human change it? |
-|---|---|---|---|
-| `authentik_brands.brand` | repository | `flow_recovery` | no - topology and branding |
-| `authentik_core.group` | repository | `users` only for derived audiences or explicit member lists | definition: no. Membership: UI-owned when omitted, otherwise Nix-owned |
-| `authentik_core.user` (people) | optional inventory seed; UI may create additional people | - (`groups` is deliberately absent) | yes - name, email, credentials, avatar and UI-owned memberships; infrastructure login keys require coordinated renaming |
-| `authentik_core.user` (service account) | repository | `roles` | no |
-| `authentik_core.token` (machine) | repository | `user`; fields `managed`, `expiring` | no - topology, and the key comes from SOPS |
-| `authentik_rbac.role` | repository | `permissions` | no |
-| `authentik_flows.flow` | repository | - | no |
-| `authentik_flows.flowstagebinding` | repository | `target`, `stage`, `order` | no |
-| `authentik_stages_*` (password, identification, user login, prompt, invitation, user write, email) | repository | - | no |
-| `authentik_providers_*` (LDAP, OAuth2, proxy) | repository | flow fields, object `permissions` | no |
-| `authentik_core.application` | repository | `provider`, `group`, launch URL | no |
-| `authentik_outposts.outpost` | repository | `providers`, `permissions` | no |
-| `authentik_policies.policybinding` | repository | `target`, `order`, policy/group/user | no |
-
-The membership column is the line. A service declares which groups it accepts through its `memberOf` filter;
-each group's declaration decides whether membership belongs to Nix or the UI. There are no per-user application bindings, because a second mechanism
-next to the group filter would be a second truth. The interface-only things from §11.1 - credentials and
-devices, invitations, profile attributes, notifications - are not blueprinted at all and therefore appear in
-no row of this table.
-
-### 11.6 Facts we rely on but do not set
-
-The rule from §11.4: a fact we depend on is either declared, or documented with the reason it cannot be.
-This is the inventory that closes that last row. Every row here has been measured, not guessed.
-
-| Fact | Where it comes from | Resolution |
-|---|---|---|
-| `LDAPProvider.mfa_support` | model default `true`; the database carried `true` | declared `false` in the provider builder - code-based MFA is meaningless for a bind account |
-| `LDAPProvider.bind_mode`, `search_mode` | model default `direct` | declared `direct`, so their origin is the repository rather than a model default |
-| `token.managed`, `token.expiring` | model defaults `NULL` and `true` | declared `null` and `false`; `managed` accepts only a non-empty string or NULL, and an expiring api token is rotated by authentik on its own schedule (see [`practices.md` §6.11](./practices.md)) |
-| `Brand.branding_logo`, `branding_favicon`, `branding_custom_css` | names of files that must exist under `/var/lib/authentik/media` | provided by `features/system/theme`, which symlinks `logo.svg` and `theme.css` there through `systemd.tmpfiles`; the brand references them by name |
-| `core_default_app_access` (`AppAccessWithoutBindings`) | tenant flag, default `true`, `authentik/core/apps.py`; read by `providers/ldap/api.py` | relied on: the LDAP application carries no binding, so it is open to every user and access is decided by the consumer's `memberOf` filter |
-
-### 11.7 What this does not close
-
-The owned `00-system/retired-applications.yaml` blueprint enforces the absence of Vaultwarden's
-application, OAuth2 provider, human-access policy and email scope mapping. Application deletion
-also removes its policy bindings; these tombstones prevent stale access objects surviving a deploy.
-
-- **Direct SQL writes produce no interface event.** Declared membership differences are nevertheless
-  detected by the exact-set verifier; UI-owned fields remain outside declarative drift detection.
-- **Objects created in the interface that nobody declares are not reclaimed.** They are reported as foreign,
-  which is the intended behaviour, not a gap. Measured 2026-09-22: `esphome` carries an application and no
-  binding while no publication in the repository declares it - a stale object that survives because a blueprint
-  deletes only what it tombstones.
-- **`akadmin` is break-glass, not a member.** Superusers do not bypass application policy bindings, so the
-  bootstrap admin reaches no service unless a group grants it - measured 2026-09-22: `akadmin` failed every
-  application, `philipp` passed through his groups. Access is granted by membership; the bootstrap credential
-  exists only to repair that from the interface.
-- **A seed is not a migration.** An account that already exists is never updated, and a value seeded with a
-  typo can never be corrected by the repository - the same property a SQL column `DEFAULT` has for rows that
-  already exist. Changing an existing person's fields is an interface action, by design; a new seeded value
-  reaches only accounts that are created afterwards.
-- **A new consumer's SOPS secret is added by hand.** The identity contract derives the path; if the key is
-  missing, `sops-install-secrets` fails the deploy loudly rather than starting with an empty credential.
-- **The derived relation inventory covers exact declared group memberships**, including missing users,
-  missing and extra members, empty sets and duplicate membership owners. Apply and drift consume the
-  same verifier. Groups without a `users` field are deliberately excluded. It also covers relations
-  that are their own rows - policy bindings and
-  stage bindings - because those are not overwritten by an object's `present` update. Relations that are
-  fields of the object (outpost `providers`, user `roles`, role `permissions`) are already enforced by that
-  update. What is not derived are the **additive guardian permissions** applied through an entry's
-  `permissions:`; their access-critical case, the consumer's `search_full_directory`, is checked
-  directionally instead.
-- **A fresh install must create authentik's two unmanaged bootstrap tables** (`authentik_install_id`,
-  `authentik_version_history`) before the first migration. authentik's own `server`/`worker` entrypoint (the
-  Go binaries) does this on startup; the fresh-database acceptance test drove `ak migrate` plus a shell
-  directly and therefore seeded them itself. No repository action follows from this.
+`inventory/smtp.nix` assigns the shared transport (`mail-eu.smtp2go.com`, port `2525`, STARTTLS, from
+`noreply@<domain>`); `features/system/smtp` declares the credentials, and each enabled consumer enables
+the shared declarations, so a host that consumes no mail materialises none. Delivery is verified by
+sending to a mailbox under your control and reading the SPF, DKIM and DMARC results in the received
+headers: SMTP acceptance alone does not prove inbox delivery. Authentik uses the global transport, and
+its sender must belong to the verified domain.

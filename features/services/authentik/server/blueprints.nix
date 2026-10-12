@@ -49,7 +49,7 @@ let
     # Tokens whose key comes from SOPS and is read once at outpost start. They must stay unmanaged
     # **and** non-expiring: `Token.expire_action` rotates an expiring api token's key on its own
     # schedule and expires an app_password, while the standalone outpost read the key once
-    # (docs/practices.md §6.11).
+    # (docs/identity.md §5).
     sopsBackedTokens =
       map (o: "outpost-${o.hostName}-ldap-token") ldapOutposts
       ++ map (name: "ldap-consumer-${name}-password") sortedLdapEndpointNames;

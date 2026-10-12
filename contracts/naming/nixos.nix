@@ -1,8 +1,8 @@
 # contracts/naming/nixos.nix
-# Normative naming invariants (docs/naming.md §7).
+# Normative naming invariants (docs/architecture.md §5).
 #
-# These assertions make the naming rules of docs/architecture.md §1/§3/§8.1 *enforceable*.
-# Without them the drift documented in docs/naming.md §0.2 could reappear silently: nothing
+# These assertions make the naming rules of docs/architecture.md §1/§5 *enforceable*.
+# Without them the drift the architecture forbids could reappear silently: nothing
 # failed when a service name encoded a host, when a public service sat on an unreachable
 # host, or when an unauthenticated endpoint was published.
 #
@@ -104,7 +104,7 @@ let
 
   # I3 - a `public` publication must be reachable from the ingress. That means the provider has
   #      an address the ingress can dial (LAN address or overlay address); it does *not* mean
-  #      the provider has a public address (docs/naming.md §3.1).
+  #      the provider has a public address (docs/architecture.md §5).
   unreachablePublic = builtins.filter (
     e:
     e.pub.scope == "public"

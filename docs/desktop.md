@@ -1,206 +1,161 @@
 # Desktop
 
-> **Scope:** the graphical sessions of `hom-wrk-01` and `mob-nb-01`
-> **Owner of the session:** [`features/desktop/`](../features/desktop/)
-> **Naming and planes:** see [architecture.md](architecture.md), [naming.md](naming.md).
+> **Scope:** the graphical sessions of `hom-wrk-01` and `mob-nb-01`; the session is owned by
+> [`features/desktop/`](../features/desktop/). Names are in [architecture.md](architecture.md) §5.
 
 ## 1. One graphical session per host
 
-A host runs **at most one** graphical session. A compositor or desktop environment registers that
-session; a shell running inside it does not. Two sessions would compete for the same seat. The
-invariant lives in the desktop contract, [`contracts/desktop/nixos.nix`](../contracts/desktop/nixos.nix): a desktop feature
-registers itself under `my.desktop.environments` when it is enabled, and the contract refuses a host
-where more than one has. The contract holds no list of the environments it knows, so adding a
-desktop is one feature and one host switch, never an edit to a central list.
+A host runs at most one graphical session. A compositor or desktop environment registers that session; a
+shell running inside it does not, because two sessions would compete for the same seat. The invariant lives
+in the desktop contract: a desktop feature registers itself under `my.desktop.environments` when it is
+enabled, and the contract refuses a host where more than one has. The contract holds no list of the
+environments it knows, so adding a desktop is one feature and one host switch, never an edit to a central
+list.
 
-`hom-wrk-01` and `mob-nb-01` run **Niri** with **Noctalia Shell**: every personal computer takes the
-same session from `roles/pc.nix`, and a host states only its output layout. greetd asks for the
-credentials through the **Noctalia Greeter** and then starts that session, so login and desktop look
-alike. The greeter is the reason the login keyring is unlocked when the session begins: a password at
-login gives `pam_gnome_keyring` the authtok it needs, which a direct start without credentials could
-never provide. The Niri and Noctalia feature switches default in the role; a host may override them.
+`hom-wrk-01` and `mob-nb-01` run **Niri** with **Noctalia Shell**: every personal computer takes the same
+session from `roles/pc.nix`, and a host states only its output layout. `greetd` asks for credentials through
+the Noctalia Greeter and then starts that session, so login and desktop look alike. The greeter is also why
+the login keyring is unlocked at session start: a password at login gives `pam_gnome_keyring` the authtok it
+needs, which a direct start without credentials could never provide.
 
 ## 2. What each layer owns
 
-| Layer | Owns | Where |
-|---|---|---|
-| Nixpkgs Niri module | the session's services: xdg portals, gvfs, keyring, power profiles, NetworkManager, Bluetooth | pinned `nixpkgs-unstable`, not repeated here |
-| `contracts/desktop/nixos.nix` | the one-session invariant, fed by the features' self-registration | contract |
-| `roles/pc.nix` | the session every personal computer runs, plus the service prerequisites of its shell | role |
-| `features/desktop/niri/nixos.nix` | Niri session, Niri services and portals | system |
-| `features/desktop/niri/home.nix` | Compositor layout, keyboard, navigation, window rules and the background-effect projection | per user |
-| `features/desktop/noctalia/nixos.nix` | the Noctalia feature switch; no second session | system |
-| `features/desktop/noctalia/home.nix` | Noctalia's Home Manager module and Niri-specific startup/IPC adapter | per user |
-| `user/<name>/home.nix` | the actual personal choices: wallpaper, favourites, bar layout | per user |
-| host configuration | output layout and hardware facts | host |
+| Layer | Owns |
+|---|---|
+| Nixpkgs Niri module | the session services: xdg portals, gvfs, keyring, power profiles, NetworkManager, Bluetooth |
+| `contracts/desktop` | the one-session invariant, fed by the self-registration of the features |
+| `roles/pc.nix` | the session every personal computer runs and the service prerequisites of its shell |
+| `features/desktop/niri`, `features/desktop/noctalia` | the session, the compositor layout and the shell, including the background-effect projection |
+| `user/<name>/home.nix` | personal choices: wallpaper, palette, bar layout, favourites |
+| host configuration | output layout and hardware facts |
 
-The system module sets only what the pinned Nixpkgs session modules do not. This is deliberate: a
-module that re-states `services.gvfs.enable` or `programs.dconf.enable` would look authoritative
-while saying nothing, and would drift the day upstream changes.
+The system module sets only what the pinned Nixpkgs session modules do not. Re-stating `services.gvfs.enable`
+would look authoritative while saying nothing, and would drift the day upstream changes.
 
 ## 3. Niri and Noctalia
 
-Niri is independent of a particular shell: the host declares output positions, Niri owns its
-Wayland session and navigation, and Noctalia owns its package, launcher/lock/media/screenshot keybindings,
-wallpaper, notifications and Polkit prompt. Its Home Manager module installs the pinned nixpkgs
-package; Niri starts it exactly once, rather than enabling a second systemd user service. The
-desktop shell does not open a network port. The workstation already enables NetworkManager,
-Bluetooth, UPower, and a power-profile service through its existing modules; Noctalia does not
-enable another copy of these services.
+Niri is independent of a particular shell: the compositor owns its Wayland session and navigation, and
+Noctalia owns its package, launcher and lock, media, screenshot keybindings, wallpaper, notifications and the
+Polkit prompt. Its Home Manager module installs the pinned package, and Niri starts it exactly once rather
+than enabling a second user service; the shell opens no network port.
 
-The Niri adapter floats Noctalia's settings window, honors its notification-driven window
-activation, and maps launcher, control center, settings, window switcher, screenshots, lock, audio and
-brightness shortcuts. The shell captures through the compositor's image-copy protocol, so no external
-screenshot tool is installed; a capture is copied by default, and the annotation editor is bound too.
-`Mod+Comma` stays Niri's consume-window action; Noctalia settings use
-`Mod+Shift+Comma`. The overview uses Noctalia's blurred wallpaper backdrop, with its own
-background layer placed inside Niri's backdrop. Background effects are declared, not written as
-compositor rules: `my.desktop.effects` states which surface or window wants one and what it samples,
-and the Niri feature projects every entry into exactly one layer or window rule, so no entry names a
-compositor. The shell registers its own surfaces and its settings window, a user registers personal
-windows, and every entry samples `behind` - what is really under the surface, which is upstream's
-recommendation for a realistic blur. One value, `my.desktop.surfaceOpacity`, decides how opaque every
-frosted surface paints its background; each owner maps it to its own knob, so bar, panels,
-notifications, OSD, dock and the terminal cannot drift apart, and a consumer whose model is discrete
-does its own translation. A window's
-transparency is its own: Ghostty paints its background translucent and the compositor only blurs what
-shows through, and only the background is transparent - no window content is dimmed. GTK applications
-get the same treatment from the shell's frost stylesheet, which a second `gtk.css` import pulls in
-alongside the palette; because no layout has to name them, the registration blurs behind every window
-and an application that stays opaque simply shows nothing. A window may also frost its pop-ups, where
-the compositor has to make the pop-up translucent itself, so a menu loses some opacity. Non-xray blur is
-experimental upstream and disappears during window open and close
-animations; the wallpaper-only mode exists for a surface that must not flicker, and nothing here uses
-it. `my.features.desktop.niri.blur` tunes the shared blur and writes nothing unless set, so Niri's own
-defaults stand. These compositor rules leave Niri usable without Noctalia.
+Background effects are declared, not written as compositor rules: `my.desktop.effects` states which surface
+or window wants one and what it samples, and the Niri feature projects every entry into exactly one layer or
+window rule, so no entry names a compositor. One value, `my.desktop.surfaceOpacity`, decides how opaque every
+frosted surface paints its background, so bar, panels, notifications, OSD, dock and terminal cannot drift
+apart. The rules leave Niri usable without Noctalia.
 
-Noctalia reads declarative `~/.config/noctalia/config.toml`, then overlays mutable settings in
-`~/.local/state/noctalia/settings.toml`. GUI changes therefore take precedence over the declared
-defaults. The personal wallpaper is set in `user/philipp/home.nix`, not the shared feature.
-The same user file selects a wallpaper-derived palette with pure-black dark surfaces, places the
-Control Center near its bar trigger, supplies the personal avatar from `media/avatar-philipp.jpg`
-and gives Noctalia an explicit geocoded address instead of IP-based location. The photograph is
-part of this repository and its Nix store closure; geocoding sends the declared address to the
-location service.
+Noctalia reads the declarative `~/.config/noctalia/config.toml` and then overlays mutable settings in
+`~/.local/state/noctalia/settings.toml`, so interface changes take precedence over the declared defaults.
+The personal wallpaper and palette live in `user/philipp/home.nix`.
 
-The shell feature owns every seam between itself and an application. `home.nix` holds the shell and
-its Niri adapter; `features/desktop/noctalia/integrations/<app>.nix` holds one application each - the
-template it selects together with the configuration that makes that application consume the palette -
-and is active only where the application is enabled. An application feature therefore never names the
-shell, which `checks/niri-noctalia.nix` enforces with a grep over `features/`. Built-in templates
-whose seam is the template itself (Btop, KColorScheme, Niri, whose seam is the include in the
-adapter) are listed in `home.nix`.
+The shell feature owns every seam between itself and an application:
+`features/desktop/noctalia/integrations/<app>.nix` holds one application each and is active only where that
+application is enabled, so an application feature never names the shell - `checks/niri-noctalia.nix`
+enforces that with a grep over `features/`. Where an application does not own its own configuration (a Home
+Manager file is a store symlink and not writable), the selection is declared rather than left to a runtime
+hook: the Ghostty theme, the Niri include, the qt6ct colour scheme and the Neovim loader are declarations,
+while GTK, Btop and the KColorScheme consumer write their own files. The VS Code theme extension keeps a
+mutable extensions directory, because VS Code accepts a theme only inside its extension directory; the two
+files that identify the extension stay Home Manager-owned.
 
-Where an application does not own its own configuration, the selection is declared here rather than
-left to a runtime hook: a Home Manager file is a symlink into the store and not writable, so
-Noctalia's hooks for Ghostty, Niri and Neovim cannot edit it. Ghostty's theme, the Niri include,
-qt6ct's colour scheme and Neovim's loader are therefore declarations; GTK, Btop and the KColorScheme
-consumer write their own files. Neovim's community template is vendored here as
-`templates/neovim-base16.lua` and rendered as a user template without a hook: that template's hook
-registers its loader by appending to `~/.config/nvim/init.lua`, which Home Manager owns and the hook
-can therefore never change, so selecting it as a community template would only produce a failing
-hook on every palette change.
+One plugin needs a secret, the Home Assistant access token. It cannot live in a store file, so the feature
+generates the configuration, sops-nix renders it with the age identity of the user, and the file is linked at
+the rendered path through a Home Manager out-of-store symlink. The token is the Klipper Moonraker token by
+decision: one credential with two consumers, recorded in [identity.md](identity.md) §2. A running shell does
+not notice that its configuration file was replaced, so a user service restarts on change, tells the shell to
+reload, and fails loudly if it never answers.
 
-The VS Code theme extension keeps a mutable extensions directory, because VS Code only accepts a
-theme file inside its extension directory; the two files that identify the extension stay Home
-Manager-owned, and the theme file is seeded once and owned by the shell after that. A Home Manager
-generation that managed the extensions directory immutably leaves a store symlink at that path, so
-an activation entry removes exactly that link before linking the new layout. Community template files
-are downloaded after the first render, so a oneshot waits for the selected catalog to be cached and
-then triggers one apply; it fails loudly when that does not happen within its bound.
+The bar is a personal choice in `user/philipp/home.nix`: workspaces first, then media and the anchored clock,
+then state, then attention and action. The launcher and wallpaper widgets are dropped, because the launcher
+is reached with a key binding and the wallpaper is declared here. Home Assistant entities are deliberately
+not declared: which entity a toggle means is a personal decision.
 
-The shell's plugin selection is declared the same way. Each plugin integration adds its own entry to
-`settings.plugins.enabled` together with the packages that plugin needs as a prerequisite -
-`scrcpy` for Phone Operate, `system-config-printer` for Printers - and
-`settings.plugins.auto_update = "none"` keeps the plugin code at the revision it was first fetched, so
-updates are an explicit act. The phone plugin needs more than its own package: it calls `scrcpy`,
-`adb`, `sshfs` and `gdbus` as external commands, and on NixOS none of those arrives with another
-package's PATH, so each is declared and the check verifies the built session profile actually exposes
-them. A prerequisite that is a system service rather than a package is
-declared where it belongs: `programs.kdeconnect` in the host's configuration owns KDE Connect's
-daemon and opens its ports, because that is a machine decision with a firewall consequence, not a
-user package. Per-plugin options live under `settings.plugin_settings.<author>/<plugin>`, keyed
-exactly as the plugin's manifest declares them.
-
-One plugin needs a secret: Home Assistant's access token. It cannot be written into a store file, so
-`features/desktop/noctalia/config.nix` generates the configuration, has sops-nix render it with the
-user's own age identity, and links `~/.config/noctalia/config.toml` at the rendered file through a
-Home Manager out-of-store symlink. `my.features.desktop.noctalia.settings` remains the single
-declaration, `programs.noctalia.settings` is deliberately unused, and `checks/niri-noctalia.nix`
-validates the rendered generation with a placeholder token instead of the secret. The token is
-Klipper's Moonraker token by explicit decision: one credential now has two consumers, which
-[security.md](security.md) §3.1 records rather than hides. A running shell does not notice that its
-configuration file was replaced, because the file is a symlink whose target moved, so a user service
-restarts when the generated configuration changes, tells the shell to reload, and fails loudly if it
-never answers.
-
-The bar is a personal choice and lives in `user/philipp/home.nix`: workspaces at the start, media and
-the anchored clock in the centre, then state - system indicators first, then the plugin states - and
-finally attention and action (the privacy indicator, notifications, clipboard, control center, session). The launcher and
-wallpaper widgets are dropped: the launcher is reached with `Mod+Space`, and the wallpaper is declared
-in this repository, so a button for it would only invite drift. The control center carries the useful
-toggles plus the microphone mute; power profiles are not worth a slot on a desktop. Home Assistant's
-entities are deliberately not declared - which entity a toggle means is a personal decision, so it is
-chosen in the shell, not in this repository.
-
-The login is a password login, and that is what the keyring needs. `pam_gnome_keyring` unlocks the
-`login` keyring from the authtok the authenticating stack obtained; `greetd` includes the `login`
-stack, so the greeter's password reaches it. A direct start, as the site ran before, passed no
-password and left the keyring locked until the first client raised its own dialog. Noctalia's
-encrypted clipboard storage opens with the keyring, so it works from the first login on.
-
-The greeter shares the desktop's appearance instead of copying it: `appearance.scheme = "Synced"`
-lets the shell write its palette, wallpaper, font and monitor layout into the mutable `sync.toml`
-next to the declarative `greeter.toml`, and `security.polkit` authorises the constrained apply helper
-for the primary user, so no admin prompt is needed for what that user's own session looks like.
-`greeter.toml` keeps the session, keyboard layout and cursor and always wins where it sets a value.
+The greeter shares the appearance of the desktop instead of copying it: scheme `Synced` lets the shell write
+palette, wallpaper, font and monitor layout into the mutable `sync.toml` next to the declarative
+`greeter.toml`, and polkit authorises the constrained apply helper for the primary user, so what that user
+own session looks like needs no admin prompt. `greeter.toml` always wins where it sets a value.
 
 ## 4. GNOME
 
-GNOME remains an available desktop feature with its own GDM session and per-user options, but no host
-enables it: both personal computers take the session from `roles/pc.nix`. Its Home Manager half is
-imported everywhere and inert wherever `my.features.desktop.gnome.enable` is false, so a future host
-could run it without touching the Niri side.
+GNOME remains an available desktop feature with its own GDM session and per-user options, but no host enables
+it - both personal computers take the session from `roles/pc.nix`. Its Home Manager half is imported
+everywhere and inert where the feature is disabled, so a future host could run it without touching the Niri
+side.
 
 ## 5. Browser and webapps
 
-`features/desktop/webapps/home.nix` owns desktop launchers; personal app declarations remain in
-`user/philipp/home.nix`. Each app inherits `defaultBrowser` unless it explicitly selects another
-engine. The personal default is Google Chrome. `user/philipp/chrome.nix` installs the browser and
-sets ordinary HTTP, HTTPS and HTML MIME defaults to `google-chrome.desktop`.
+`features/desktop/webapps` owns the desktop launchers; personal app declarations stay in
+`user/philipp/home.nix`. Each app inherits `defaultBrowser` unless it selects another engine; the personal
+default is Google Chrome. Chrome, Brave and Epiphany are launched in application mode with shell wrappers
+that preserve argument boundaries and propagate the exit status. Chrome webapps use the ordinary browser
+profile by default; explicit `isolated = true` gives a separate profile under `~/.config/webapps/<name>`,
+and unsupported isolation is rejected at evaluation time. No browser profile is replaced, migrated or
+deleted.
 
-Chrome and Brave launch with `--app=<url>`, `--class=<wmClass>` and `--name=<wmClass>`; Epiphany
-uses `--application-mode`. Shell wrappers preserve argument boundaries and propagate the browser's
-exit status. Chrome webapps use the ordinary browser profile by default, sharing its logins and
-extensions. Explicit `isolated = true` gives Chrome or Brave a separate profile under
-`~/.config/webapps/<name>`; unsupported isolation is rejected at evaluation time. No browser profile
-is replaced, migrated or deleted by this feature.
+`checks/webapps.nix` verifies the generated launchers for both graphical host classes, default inheritance,
+explicit overrides, unsupported isolation and MIME defaults, plus argument boundaries in a shell fixture; it
+does not start a browser. After deployment, launch an app and confirm it opens an app window using the normal
+browser session - without deleting existing profiles.
 
-`checks/webapps.nix` verifies both graphical host classes' generated launchers, default inheritance,
-explicit browser overrides, unsupported isolation and MIME defaults. A shell-only fixture verifies
-argument boundaries and propagation of the browser's exit status; it does not start a browser or
-require Python, Selenium or Geckodriver. After deployment, launch an app and verify that it opens
-a Chrome app window using the normal browser session.
-Existing user profiles must not be manually deleted as part of that verification.
+## 6. Remote mounts
 
-## 6. Verification
+`features/system/rclone` owns provider-independent FUSE mounts and one systemd user service per named remote;
+only `roles/pc.nix` enables the host feature. Mounts live at `~/mounts/<name>` and neither sync the full
+remote locally nor provide a backup. Drive and SFTP use the `writes` VFS cache with a soft 2 GiB limit per
+mount and 24-hour retention for unused files; open files and pending uploads may exceed it. Foreground
+`rclone mount` reports readiness with `Type=notify` and unmounts itself on SIGTERM; missing credentials skip
+startup through `ConditionPathExists`, and the service is started explicitly after setup. A busy or stale
+mount needs operator attention rather than forcibly discarding open handles, and session termination or power
+loss does not guarantee completed uploads: keep the cache and restart the same mount to resume.
 
-Google Drive and server file browsing use [user-scoped rclone mounts](rclone.md). Nautilus bookmarks
-are appended by the personal graphical profile; mount services and credentials are independent of
-Nautilus and owned by the system rclone feature's Home Manager half.
+**Google Drive** is an interactive OAuth setup per PC, outside Git and the store, at
+`~/.config/rclone/gdrive.conf` - created with a restrictive umask and `chmod 600` afterwards. Use an own
+OAuth desktop client (the shared upstream client is being retired), and never paste credentials into a chat
+or into Nix. **Server mounts** derive from `my.topology.hosts` with `hostType = "server"`, using their mesh
+addresses. `inventory/ssh.nix` pins the Ed25519 host keys and rclone validates them against
+`/etc/ssh/ssh_known_hosts`, failing closed on a mismatch and negotiating Ed25519 explicitly. The personal key
+is used through the GCR SSH agent of the session; the private key is never read, and the fleet deploy key is
+never used for browsing.
 
-[`checks/niri-noctalia.nix`](../checks/niri-noctalia.nix) states properties, not a copy of the
-configuration, and runs for **every** host whose contract registration says Niri - the list is
-derived, so switching a host's session covers it without editing the check. A claim is either a
-relation between two declarations - an integration that selects a template must also wire the
-application that reads it, and a bar widget that names a plugin must name an enabled one - or a
-requirement the design cannot work without. Personal values (which widget sits in which lane, which
-address is configured) are deliberately not asserted: changing them is not a defect, and asserting
-them would only mean editing the check every time a preference changes. A violated claim is named
-with its host; that is how a bar widget that addressed a misspelled plugin id was found. The check
-validates each host's generated Niri KDL and Noctalia TOML with their pinned executables, and treats
-every Noctalia warning as a failure except the one the sandbox must produce per declared plugin
-setting, because the validator exits successfully even for settings it ignored.
-The desktop is a graphical session, so nothing short of logging in proves it on hardware: login,
-lock/unlock, keyring unlock, suspend/resume, external monitors, screen sharing, Bluetooth and
-brightness are exercised by the operator, not by evaluation.
+```fish
+systemctl --user status 'rclone-*.service'
+journalctl --user -u rclone-gdrive.service
+systemctl --user restart rclone-hom-srv-01.service
+```
+
+Any future recursive home backup or indexer must exclude `~/mounts` - the mounts are not a backup and are not
+a POSIX administration interface. Nautilus bookmarks are a separate graphical integration that appends
+missing locations without replacing existing ones.
+
+## 7. Coding agents
+
+The personal-computer role enables the ChatGPT desktop, Codex and OpenCodex, each behind its own Home Manager
+switch; servers do not install these applications. `packages/custom/chatgpt-linux` packages the official
+OpenAI Linux archive and patches its Linux dependencies; the `codex://` handler belongs to ChatGPT, while
+ordinary HTTP and HTTPS defaults stay with the graphical profile. The Codex feature installs the pinned
+nixpkgs CLI and the official editor extension where the editor is enabled.
+
+Codex and OpenCodex share their homes with interactive clients (`~/.codex`, `~/.opencodex`); neither directory
+is managed as an immutable file. Home Manager owns `opencodex-proxy.service`, which binds `127.0.0.1:10100`,
+reads its declared credential files and requires readiness within 45 seconds; missing secrets and failed
+readiness fail the unit. `features/dev/opencode` installs OpenCode v2 from its flake package, using the fleet
+Bun only when it matches the upstream `packageManager` requirement. `features/dev/openchamber` exposes two
+optional interfaces, web and desktop, which both call the host OpenCode launcher so both use the same version
+and credentials. Provider credentials stay in SOPS and are read when the process starts; a user with the
+feature enabled must be allowed to read the referenced files. No listener or firewall rule is created by
+these features, and provider selection and logins remain runtime state that the user must verify.
+
+## 8. Verification
+
+[`checks/niri-noctalia.nix`](../checks/niri-noctalia.nix) states properties, not a copy of the configuration,
+and runs for every host whose contract registration says Niri - the list is derived, so switching a host
+session covers it without editing the check. A claim is either a relation between two declarations (an
+integration that selects a template must also wire the application that reads it; a bar widget that names a
+plugin must name an enabled one) or a requirement the design cannot work without. Personal values are
+deliberately not asserted, because asserting them would mean editing the check on every preference change.
+The check validates the generated Niri KDL and Noctalia TOML of each host with their pinned executables and
+treats every Noctalia warning as a failure except the one the sandbox must produce.
+
+A graphical session is proven only on hardware: login, lock and unlock, keyring unlock, suspend and resume,
+external monitors, screen sharing, Bluetooth and brightness are exercised by the operator.

@@ -1,89 +1,76 @@
 # Working in this repository
 
-Agent-facing instructions. Everything substantive lives in [`docs/`](docs/README.md); this file says
-what an agent must know before touching anything, and nothing twice.
-
-## What this is
-
-Declarative NixOS + Home Manager configuration for five hosts, a WireGuard mesh, SOPS secrets, modular
-service contracts and agentless reconcilers for devices that cannot run NixOS. The
-[architecture](docs/architecture.md) defines the vocabulary - zone, plane, contract, scope, mesh - that
-this file uses without redefining.
+Agent-facing instructions for this NixOS + Home Manager configuration. What the system *is* is in the
+[README](README.md) and [`docs/`](docs/README.md); this file only says how to work in it.
 
 ## Commands
 
 ```bash
-nix fmt                            # nixfmt over the tree, in place
-deadnix --fail                     # no unused code
-statix check                       # lint (only repeated_keys disabled, see statix.toml)
-nix flake check                    # every host evaluates + statix + deadnix
-git config core.hooksPath .githooks # pre-commit runs the three above
-nod switch <host>              # the fleet deploy: discovers hosts, builds, transfers, activates
-nixos-rebuild switch --flake .#<host>            # local, single host
-nixos-rebuild switch --flake .#<host> --target-host root@<addr>   # remote, single host
+nix fmt        # nixfmt over the tree, in place
+deadnix --fail # no unused code
+statix check   # lint; statix.toml disables repeated_keys, manual_inherit, manual_inherit_from,
+               # useless_parens
+nix flake check                         # all five hosts evaluate, plus format, statix and deadnix
+nix build .#checks.x86_64-linux.<name>  # a single check from checks/, in isolation
+
+nod switch <host>                                                # fleet deploy: build, transfer, activate
+nixos-rebuild switch --flake .#<host>                            # one host, locally
+nixos-rebuild switch --flake .#<host> --target-host root@<addr>  # one host, remote
 ```
 
-A shell here is **fish** locally and on the hosts. `VAR=value cmd`, `$?`, `${PIPESTATUS[0]}` and
+`nix flake check` is the gate - it is what CI runs and what must pass before a change is done. Read
+its whole output, warnings included.
+
+The shell is **fish**, locally and on the hosts: `VAR=value cmd`, `$?`, `${PIPESTATUS[0]}` and
 `for … do … done` all fail. Wrap anything non-trivial in `bash -c '…'` or `bash -s` with a heredoc,
-and prefer a script file over nested quoting - nested quotes have broken more runs in this repository
-than any real defect.
+and prefer a script file over nested quoting.
 
-## Non-negotiables
+## Conventions
 
-1. **Prove the replacement before deleting the original.** Not "it looks right" - a measurement at the
-   level the consumer sees. Two outages came from skipping this, one of them taking a host's DNS with
-   the service that owned `/etc/resolv.conf`.
-2. **A check must be able to fail loudly.** Keep `stderr`, derive the exit code from the checks rather
-   than from the last statement, and never end a script on a bare `echo`. A missing tool, a guessed
-   file name and a real negative look identical at the point of measurement.
-3. **Write the expectation next to the measurement.** It is the only way a number can disagree.
-4. **Verify per host class before applying fleet-wide**, and read the tool's *whole* verdict - warnings
-   included. A deprecation warning that nobody read cost three rounds of wrong diagnosis.
-5. **Documents are specifications of the present.** No migration diaries, no phase plans, no status
-   sections - those belong in commit messages. Where a document and the code disagree, the code is
-   right and the document is a bug.
-6. **English** for code, comments, commits and documentation.
-7. **The inventory decides, not the order of a list.** Zones, addresses, names and firewall rules are
-   derived from `my.topology` and the contract projections. If you find yourself writing an address or
-   a name twice, the derivation is missing.
+- **English** for code, comments, commits and documentation.
+- **Conventional Commits**, scoped by area: `fix(home-assistant): …`, `chore(deps): …`.
+- **Nix style**: `nixfmt` decides formatting; do not hand-format. A feature is a directory with a
+  `nixos.nix` and an `enable` option, loaded on every host and active only where enabled.
+- **The inventory decides.** Zones, addresses, names and firewall rules derive from `my.topology`
+  and the contract projections; writing one twice means the derivation is missing.
+- **Declare, never hand-write.** Caddy vHosts, Authentik blueprints and provider resources
+  (databases, users, buckets) are projected from `my.contracts.provides.<name>`.
+- **Documents describe the present.** No diaries, no phase plans, no status sections - history
+  belongs in commit messages. Where a document and the code disagree, the code is right and the
+  document is a bug.
+
+## Do not edit by hand
+
+- `hosts/*/hardware-configuration.nix` - generated by `nixos-generate-config`.
+- `secrets/**` - SOPS-encrypted; edit with `sops`, never in plaintext.
+
+## Verification
+
+1. **Prove the replacement before deleting the original** - measure at the level the consumer sees,
+   not "it looks right". Two outages came from skipping this.
+2. **A check must be able to fail loudly** - keep `stderr`, derive the exit code from the checks,
+   never end a script on a bare `echo`; write the expected value next to the measurement.
+3. **Verify per host class before fleet-wide** - one host, then the class, then the fleet.
 
 ## Layout
 
 ```
-flake.nix                 15 inputs, overlays, one mkSystem call per host
-hosts/<name>/             entry point: role + hardware + host-specific features
-roles/                    base → server | pc → desktop | notebook
-features/                 NixOS modules, discovered by the `nixos.nix` marker, each behind `enable`
+flake.nix           13 inputs, overlays, one mkSystem call per host
+hosts/<name>/       entry point: role + hardware + host-specific features
+roles/              base → server | pc → desktop | notebook
+features/           NixOS modules, discovered by the `nixos.nix` marker, each behind `enable`
   system/  services/  dev/  media/  desktop/
-contracts/                domain schemas, projections and owned libraries
-inventory/                 site facts (subnets, hosts, devices), composed explicitly, never discovered
-checks/                     evaluation fixtures and generated-artifact assertions
-apps/                       operational programs (network/exposure audits, package updater)
-lib/                        system composition, discovery and generic pure helpers
-user/<name>/              Home Manager: home.nix, packages, fish, editors
-secrets/                  SOPS-encrypted, one file
-docs/                     the specification, see docs/README.md
+contracts/          domain schemas, projections and owned libraries
+inventory/          site facts (subnets, hosts, devices), composed explicitly, never discovered
+checks/             evaluation fixtures and generated-artifact assertions
+apps/               operational programs: network and exposure audits, package updater
+lib/                system composition, module discovery and generic pure helpers
+packages/           custom packages and their overlays
+user/<name>/        Home Manager: home.nix, packages, shell, editors
+media/              wallpapers, avatars and webapp icons
+secrets/            SOPS-encrypted, one file
+docs/               the specification, see docs/README.md
 ```
 
-## Adding a service
-
-1. `features/services/<name>/nixos.nix` with an `enable` option.
-2. Declare what it offers and needs: `my.contracts.provides.<name>` (endpoints, publications,
-   identity, portal, telemetry, storage, backup) and `my.contracts.consumes.<name>`. Caddy vHosts, Authentik blueprints and provider
-   resources (databases, users, buckets) are projected from those declarations - never written by hand.
-3. Enable it on the host that should run it. Nothing else: names, certificates, firewall rules and
-   backup jobs follow from the contracts.
-
-## Hosts
-
-| Host | Role | Zone | Address | Mesh |
-|---|---|---|---|---|
-| `cld-edge-01` | server | `mesh` / public | `173.249.22.211` | `10.10.100.1` |
-| `cld-ops-01` | server | `mesh` / public | `37.114.55.91` | `10.10.100.2` |
-| `hom-srv-01` | server | `infra` | `10.10.10.10` | `10.10.100.10` |
-| `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` |
-| `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` |
-
-Reach a host over the mesh (`root@10.10.100.x`, key `~/.ssh/nixfiles-deploy-key`) or - for the cloud
-hosts, always available - over their public address. `~/.ssh/deploy-key` is the node tunnel secret and
-must never address the fleet. Details in [`docs/operations.md`](docs/operations.md).
+Adding a service: create `features/services/<name>/nixos.nix` with an `enable` option, declare its
+contracts, and enable it on the host that runs it.

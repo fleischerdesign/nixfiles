@@ -1,27 +1,27 @@
 # Architecture
 
-> **Domain:** `vyrx.de` · **Overlay:** WireGuard `10.10.100.0/24` · **LAN supernet:** `10.10.0.0/16`
->
-> This document defines the vocabulary the others use - host, zone, plane, contract, scope. It states
-> how the system is, not how it was meant to be; where a statement is measured, the measurement is
-> named, and where it is enforced, the invariant is named.
+> **Domain:** `vyrx.de` · **Overlay:** WireGuard `10.10.100.0/24`, `fd10:1000:100::/64` ·
+> **LAN supernet:** `10.10.0.0/16`
+
+This is the specification of the system as it is. It defines the vocabulary the other documents use -
+host, zone, plane, contract - and the rules that connect them. Where a statement is enforced, the
+invariant that enforces it is named; where it is measured, the command that measures it is.
 
 ## 1. Principles
 
-1. **Services, not machines.** A service owns a DNS name. Which host runs it is a deployment decision
-   that may change without any consumer noticing - `jellyfin.vyrx.de` survived three host migrations.
-   See §6 for the one rule that makes this work: names are derived from contracts, never written.
+1. **Services, not machines.** A service owns a DNS name; which host runs it is a deployment decision
+   that may change without a consumer noticing. Names are derived from contracts (§6), never written.
 2. **Deterministic host names (RFC 1178).** `<location>-<role>-<index>`: `hom-srv-01`, `cld-edge-01`.
 3. **One name, one answer per plane.** A public name resolves to the ingress from outside and to the
-   LAN host from inside - split horizon, not two different names.
-4. **Collision-free addressing.** `10.10.0.0/16` behind `10.10.100.0/24`, chosen so a roaming client
-   can never collide with the network it happens to be attached to.
-5. **The inventory decides.** Addresses, zones, names, firewall rules and DNS records are functions of
-   `my.topology` and the contract projections. Writing an address twice means a derivation is missing.
+   LAN host from inside - split horizon, not two names.
+4. **Collision-free addressing.** `10.10.0.0/16` behind `10.10.100.0/24`, so a roaming client can
+   never collide with the network it happens to be attached to.
+5. **The inventory decides.** Addresses, zones, names, firewall rules and DNS records are functions
+   of `my.topology` and the contract projections. Writing one twice means a derivation is missing.
 6. **Self-hosted identity, no external control plane.** Authentik, ntfy and the WireGuard mesh replace
-   SaaS identity, push and connectivity. There is no vendor in the data path.
-7. **Evidence over intention.** Every claim in this documentation is either measured (the command is
-   named) or asserted (the invariant is named). See [practices.md](practices.md).
+   SaaS identity, push and connectivity; no vendor sits in the data path.
+7. **Evidence over intention.** Every claim here is either asserted by a check in this repository or
+   measured by a named command.
 
 ## 2. Hosts
 
@@ -33,412 +33,243 @@
 | `hom-wrk-01` | desktop | `corp` | `10.10.20.10` | `10.10.100.20` | GNOME desktop, development environment |
 | `mob-nb-01` | notebook | `corp` (roaming) | DHCP | `10.10.100.30` | GNOME notebook; reaches the LAN over the mesh |
 
-Devices that cannot run NixOS but belong to the LAN (printers, relays, access points) are declared in
-`my.topology.devices` and reconciled agentlessly; their own document is [embedded.md](embedded.md). A
-device that cannot run NixOS but needs the **mesh** (a phone, a tablet) is not a LAN device: it has no
-`ipv4`, only an overlay identity, and is declared in `my.topology.hosts` with `hostType = "client"`.
-It is a node like the others; its WireGuard configuration is rendered as a wg-quick file
-(`my.features.system.networking.wireguard.clientConfigs`) instead of a NixOS interface.
+The table is illustrative; the declaration is [`inventory/hosts.nix`](../inventory/hosts.nix), and the
+per-host service list follows from the contracts each host enables. Devices that cannot run NixOS but
+belong to the LAN (printers, relays, access points) are declared in `my.topology.devices` and
+reconciled agentlessly - see [embedded.md](embedded.md). A device that cannot run NixOS but needs the
+**mesh** (a phone, a tablet) is not a LAN device: it has no `ipv4`, only an overlay identity, and is a
+`my.topology.hosts` entry with `hostType = "client"`, its WireGuard configuration rendered as a
+wg-quick file (`my.features.system.networking.wireguard.clientConfigs`).
 
 ## 3. Network model
 
-### 3.1 One Layer-2 segment, three zones
+### 3.1 One Layer-2 segment, five zones
 
-The house is **one flat Layer-2 segment**. Zones are *addressing and policy*, not separate broadcast
-domains: a zone is a named subnet with a trust level, plus the firewall rules that treat it.
-There are no VLANs - the
-hardware for a second segment does not exist yet, and the zone model is honest about that
-([naming.md](naming.md) states this explicitly, because a naming document that implies isolation
-nobody implemented is worse than no document).
-
-Because the segment is flat, **everything on it can be asked, not just reached through us.** The box
-is the clearest case: it is the IPv4 gateway, and while its IPv6 stack was on it was also a second
-resolver on the segment - it announced itself over RDNSS and DHCPv6 and answered on `10.10.10.1` with
-the **public** address of our own names. No firewall rule of ours could have stopped that, because a
-device asking a neighbour never passes our router. Since 2026-09-21 the box's IPv6 is off (see
-[embedded.md](embedded.md) §4): the segment carries IPv4 only, the router advertisements are gone, and
-what remains is a rule the segment does not need - a device configured by hand to use the box as its
-resolver still can. **The remedy for that is a second segment, not a rule** - VLANs per zone, the box
-on an uplink port - which the hardware does not support yet.
+The house is one flat Layer-2 segment. Zones are addressing and policy, not separate broadcast
+domains: a zone is a subnet with a trust level, plus the firewall rules that treat it. There are no
+VLANs - a second segment needs hardware that does not exist yet, and the model is honest about that
+instead of implying isolation that nobody implemented.
 
 | Zone | CIDR | Gateway | Trust | Contains |
 |---|---|---|---|---|
-| `infra` | `10.10.10.0/24` | `10.10.10.1` (uplink) | highest | `hom-srv-01`, the access point, the router |
+| `infra` | `10.10.10.0/24` | `10.10.10.1` | highest | `hom-srv-01`, access point, router |
 | `corp` | `10.10.20.0/24` | `10.10.20.1` | trusted | workstations, phones, roaming clients |
 | `iot` | `10.10.30.0/24` | `10.10.30.1` | isolated | printer, relays, 3D printer |
 | `guest` | `10.10.99.0/24` | `10.10.99.1` | untrusted | guests, internet only |
 | `mesh` | `10.10.100.0/24` | `10.10.100.1` | trusted transport | the overlay itself |
 
+The authoritative declaration is [`inventory/subnets.nix`](../inventory/subnets.nix); an unknown zone
+fails the build. Because the segment is flat, everything on it can be asked directly, not only reached
+through the gateway - which is why isolation is a firewall property (§3.4), not a segment property.
+
 ### 3.2 DHCP: the inventory decides the zone
 
-`hom-srv-01` runs Kea. All served subnets live in **one shared network**, because Kea's default subnet
-selection for a directly connected client uses the *receiving interface's address* and ignores client
-classification entirely (ARM 8.6) - with an interface that carries an address in every zone, one zone
-would win for everybody. Inside the shared network the class decides:
+`hom-srv-01` runs Kea. All served subnets sit in one shared network, because Kea selects a subnet for a
+directly connected client by the receiving interface address and ignores classification:
 
-- one class per served zone, matched on the MAC addresses its inventory entries declare
-  (`pkt4.mac == 0x…`);
-- the default zone carries the **complement** class (`not member('infra') and not member('iot')`),
-  because a subnet that names no class accepts every client and naming a class does not make a subnet
-  preferred (ARM 8.4.2);
-- `guest` is deliberately **not** served by this gateway: no host carries that zone.
+- one class per served zone, matched on the MAC addresses its inventory entries declare;
+- the default zone (`corp`) carries the complement class, because a subnet that names no class accepts
+  every client;
+- `guest` is deliberately not served by this gateway.
 
-Measured 2026-09-20: all seven inventarised devices hold the address their entry declares; a device
-that is not in the inventory gets a default-zone lease - which is the rule, not a fallback.
+A device that is not in the inventory gets a default-zone lease. That is the rule, not a fallback.
 
 ### 3.3 The gateway
 
-`hom-srv-01` is a single-NIC router-on-a-stick (RFC 1812): it is the default router for every zone, the
-DHCP server, the resolver, the NTP server and the NAT for the trusted zones. The uplink is the router at
-`10.10.10.1`, which is a transparent modem - no DHCP, no DNS handed to clients, no port forwardings.
-Its DHCP toggle is off (verified over TR-064: `DHCP server current=False`), and the DNS it would
-announce is not settable over TR-064 and reaches nobody while its DHCP is off.
+`hom-srv-01` is a single-NIC router-on-a-stick (RFC 1812): default router, DHCP server, resolver, NTP
+server and NAT for the trusted zones. The uplink is `hom-rt-01` at `10.10.10.1`, a transparent modem -
+no DHCP, no DNS handed to clients, no port forwardings. The zone gateways are addresses on the one
+interface; which zones a host serves follows from its role, because a zone gateway must live inside the
+zone to be installable as a default route.
 
-IPv6 is deliberately absent from the LAN: this gateway is IPv4-only (Kea DHCPv4, no DHCPv6 and no
-router advertisements) and the zones declare no IPv6 prefix, so the only IPv6 in the fleet is the
-mesh's ULA (§4). Whatever the uplink announces over IPv6 reaches nothing and is not part of the model.
-
-The zone gateways (`10.10.20.1`, `10.10.30.1`, …) are addresses *on that one interface*. Which zones a
-host serves follows from its role, not from a list: a zone's gateway must live inside the zone, or it
-cannot be installed as a default route at all.
+IPv6 is deliberately absent from the LAN: Kea DHCPv4, no DHCPv6, no router advertisements, no IPv6
+prefix in any zone. The only IPv6 in the fleet is the ULA of the mesh (§4).
 
 ### 3.4 Isolation
 
-Isolation is enforced by the firewall and the trust model, not by segments:
+Isolation is the firewall and the trust model, not segments:
 
-- forwarding is enabled per zone and only for zones whose trust level permits it - `iot` and `guest`
-  never transit;
-- NAT for the uplink carries the trusted zones only;
-- the IoT zone may answer requests from `hom-srv-01` (Home Assistant, Klipper) and reach the internet
-  where it needs to, and nothing else.
+- forwarding is enabled per zone and only where the trust level permits; `iot` and `guest` never
+  transit;
+- NAT carries the trusted zones only;
+- the IoT zone may answer requests from `hom-srv-01` (Home Assistant, Klipper) and reach the internet,
+  and nothing else.
 
 ## 4. The mesh
 
-Kernel WireGuard, declaratively derived from `my.topology`. No control plane, no database, no vendor.
+Kernel WireGuard, derived from `my.topology`. No control plane, no database, no vendor.
 
 ```
-        cld-edge-01 10.10.100.1  ◄──────►  cld-ops-01 10.10.100.2      both public, both relays
-              ▲                                    ▲
-              │  dual-homed spokes, keepalive 25   │
-      ┌───────┴────────┬───────────────┬───────────┘
+        cld-edge-01 10.10.100.1  <------>  cld-ops-01 10.10.100.2      both public, both relays
+              ^                                    ^
+              |  dual-homed spokes, keepalive 25   |
+      +-------+--------+---------------+-----------+
   hom-srv-01      hom-wrk-01       mob-nb-01                     the LAN is behind hom-srv-01
   10.10.100.10    10.10.100.20     10.10.100.30
 ```
 
-- **Dual hub.** Every host peers with both cloud hosts. The *primary* hub carries the overlay CIDR for
-  transit; the secondary is reached by its own `/32`. A hub can be taken out without reconfiguring a
+- **Dual hub.** Every host peers with both cloud hosts; the primary carries the overlay CIDR for
+  transit, the secondary is reached by its own `/32`, so a hub can be taken out without touching a
   spoke.
-- **Longest-prefix cryptokey routing.** A peer's `allowedIPs` is its overlay address plus whatever it
-  carries (§ below). Traffic to a host's own `/32` goes direct; traffic to a prefix goes to whoever
-  carries it.
-- **The mesh carries the zones that need it - and the inventory says which.** Not declared but
-  derived: a zone is carried when it holds a device that has no overlay identity of its own. A
-  printer, a relay or a microcontroller has one address and no second one, so a node outside the LAN
-  reaches it only when its zone is routed. A host zone is never carried: its hosts answer at their
-  overlay address, and carrying the zone would put every device behind them within reach of every
-  mesh node. `my.topology.lanRouter` names the host that carries them, the way `ingressHost` names
-  the ingress; `my.topology.announcedZones` is what it carries. Measured 2026-09-21: from a cloud
-  node the printer resolves to its LAN address and `ping` and IPP reach it over `wg0`, while
-  `hom-srv-01.node` answers its overlay address.
-- **A host with its own address in a home zone installs no route for a carried zone**: its zone
-  gateway reaches every other home zone directly, so a tunnel route would shadow that path.
-- **A host that is at home uses the home LAN, even where the tunnel carries the same prefix.**
-  Measured: systemd-resolved keeps answering through the door that answered last, and a carried `/24`
-  beats a host's own default route by longest prefix - a route metric only orders equal prefixes. A
-  roaming node therefore resolved LAN names to overlay addresses and reached the printer through the
-  relays (65 ms). `features/system/networking/lan-preference` gives the link that holds an address in
-  a home zone the home door as its own resolver with a default routing domain, and puts every carried
-  zone the host is not itself inside on a route of the same prefix through that zone's gateway at
-  metric 600. The link carries the *internal domain*, not everything: a second `~.` does not win
-  against the global one (measured), while a more specific rule does. The dispatcher also resets
-  systemd-resolved's server preference, because it otherwise keeps the door that answered last - which
-  is what left the notebook attached to the home door while still receiving overlay addresses. Both are
-  withdrawn when the address is gone. Measured 2026-09-21 after: printer 13 ms, `jellyfin.vyrx.de` ->
-  `10.10.10.10`, `hom-wrk-01.node.vyrx.de` -> `10.10.20.10`, and `nix run .#network-audit` reports 20
-  checks, 0 failed, with every host judged on the path it actually uses.
-- **The mesh admits what a host declares.** Arriving over `wg0` is a transport fact, not a
-  permission: the endpoints contract projects onto that interface the ports an ingress proxies (a
-  named endpoint) and the ports declared for the mesh explicitly, and an endpoint may name the trust
-  levels that may reach it (`directAccess.from`). The administrative path declares itself the same
-  way and names two, `infra` and `corp`. Measured 2026-09-21: a cloud node can no longer open SSH on
-  a home host while the operator's path and every declared service stay reachable.
-- **What the mesh carries, it carries as an allow-list.** The zones the mesh routes into the home LAN
-  (`announcedZones`) hold devices that cannot speak for themselves, so their policy is declared where
-  they live: `my.topology.devices.<name>.endpoints` names a port and the trust levels that may use it,
-  and the host that routes the zone forwards exactly that. A blanket `ip saddr <mesh> accept` in front of
-  it made the routing decision and the permission decision one decision, so every member reached every
-  device on every port - measured: the printer answered on 80, 443 and 631, the relays on 6053. Measured
-  after: the printer's IPP answers, its web interface and the relays' API do not.
-- **One firewall, and it is rendered - not written.** Every permission in this fleet is data: what the
-  mesh carries, what an endpoint exposes and to whom, which zones may reach the uplink. Those
-  declarations are projected into the firewall's own rule options (`extraInputRules`,
-  `extraForwardRules`) under the **nftables implementation**, which renders one ruleset and applies it
-  atomically. Nothing writes a shell command into the firewall any more, and that is a rule rather than a
-  preference: measured twice, a command-shaped policy cost us the network - a syntax error stopped the
-  firewall mid-reload and took the NAT of a whole zone with it, and a rule whose declaration was
-  withdrawn stayed in the chain forever (28535 dropped packets against a rule that no longer existed).
-  Both chain policies are `drop` (`networking.firewall.filterForward`), so what nobody declared is closed
-  by construction and no projection has to write a deny rule.
-- **The mesh is the last resort.** The interface carries route metric 1000 against NetworkManager's
-  600: a prefix the host can reach directly always wins, and the tunnel is used only when the LAN is
-  elsewhere. Without it, a client at home would send LAN traffic out through the cloud and back.
+- **Longest-prefix cryptokey routing.** A peer carries its overlay address plus whatever it announces;
+  at most one host may deliver a zone, and every delivered zone is a `/24`.
+- **A zone is carried when it holds a device that cannot speak for itself.** A printer, relay or
+  microcontroller has one address and no overlay identity, so a node outside the LAN reaches it only
+  when its zone is routed. A host zone is never carried: its hosts answer at their overlay address.
+  `my.topology.lanRouter` names the carrier, `my.topology.announcedZones` what it carries.
+- **What the mesh carries, it carries as an allow-list.** `my.topology.devices.<name>.endpoints` names
+  a port and the trust levels that may use it; the carrier forwards exactly that. A blanket accept for
+  the mesh would make the routing decision and the permission decision one decision.
+- **One firewall, and it is rendered, not written.** What the mesh carries, what an endpoint exposes
+  and which zones may reach the uplink are data, projected into the firewall rule options under the
+  nftables implementation, which renders one ruleset atomically. Both chain policies are `drop`, so
+  what nobody declared is closed by construction.
+- **The mesh is the last resort.** Route metric 1000 against NetworkManager at 600, so a directly
+  reachable prefix always wins and a client at home does not send LAN traffic through the cloud.
 - **IPv6 by design.** Alongside `10.10.100.0/24` the mesh spans `fd10:1000:100::/64` (RFC 4193 ULA).
-- **MSS clamping** on both directions of the interface, so TCP handshakes survive mobile uplinks.
+- **MSS clamping** in both directions, so TCP handshakes survive mobile uplinks.
 
-Two invariants hold the assumptions: at most one host may deliver a zone (cryptokey routing has exactly
-one owner per prefix), and every delivered zone must be a `/24`, because membership is decided on the
-network part.
+These promises are held by `checks.network-invariants` (part of `nix flake check`) against the evaluated
+fleet, and measured against the running fleet by `nix run .#network-audit`.
 
-## 5. DNS and certificates
+## 5. Names, DNS and certificates
 
-### 5.1 Planes
+### 5.1 Planes, and how a name is derived
 
-| Plane | Names | Published where | Answers |
-|---|---|---|---|
-| public | `<service>.vyrx.de` | Cloudflare | the ingress |
-| internal | `<service>.lan.vyrx.de`, `<service>.mesh.vyrx.de` | Knot Resolver only, never Cloudflare | the LAN host, over the mesh for remote clients |
-| node | `<host>.node.vyrx.de` | Cloudflare | the host's overlay address |
+Names are derived, not maintained. An FQDN is a function of the topology and the contract projections,
+which is what makes a host rename a derivation change rather than a migration with a checklist. The
+rules are enforced at evaluation time in [`contracts/naming`](../contracts/naming/nixos.nix).
 
-Public names are **flat at the apex**: the host that serves a name is never part of it. The normative,
-machine-generated list is `my.contracts.projections.fqdns`; the derivation rules are
-[naming.md](naming.md). Any enumeration in this document is illustrative.
+| Plane | `scope` | Suffix | Published | Reached via |
+|---|---|---|---|---|
+| public | `"public"` | `vyrx.de` (apex) | Cloudflare | ingress host (reverse proxy) |
+| lan | `"internal"` | `lan.vyrx.de` | no | home LAN |
+| mesh | `"mesh"` | `mesh.vyrx.de` | no | WireGuard mesh |
+| node | `"isolated"` has no name; host and device plane | `node.vyrx.de` | Cloudflare | overlay address, admin only |
+| isolated | `"isolated"` | - | no | direct address and port only |
+
+```
+fqdn(endpoint)     = "${subdomain}.${planeSuffix(scope)}"   # null when scope = "isolated" or no subdomain
+hostFqdn(host)     = "${hostname}.node.${domain}"           # cld-edge-01.node.vyrx.de
+deviceFqdn(device) = "${name}.node.${domain}"               # hom-prn-01.node.vyrx.de
+```
+
+The suffix is the only thing that encodes visibility and it never encodes a host. `scope` is the
+contract enum (`public | internal | mesh | isolated`, default `internal`); it maps to the suffix, so
+the name never depends on placement. `iot` is not an endpoint scope - IoT names come from the device
+inventory and use the `node` plane. A device in a carried zone is answered on the `node` plane with its
+one address; a device whose zone is not carried is answered only on the LAN.
+
+An alias is a CNAME to the derived FQDN in the same plane, projected identically by every engine, so a
+rename is additive and reversible. Invariants I1-I9 (unique derived hostnames, no host label in a
+service name, no internal plane in the public zone, an unauthenticated public endpoint must declare
+`publicExempt`, and so on) fail the build. Read-only projections for inspection:
+`my.contracts.projections.{fqdns,hostFqdns,dnsRecords,ingressVhosts}`.
 
 ### 5.2 Split horizon
 
-The resolvers (`features/services/dns`, Knot Resolver 6) answer **three planes** and
-picks between them by the *source address* of the query, so one name has one address per plane:
+The resolvers (`features/services/dns`, Knot Resolver 6) answer three planes and choose by the source
+address and the door the query arrived at, so one name has one address per plane:
 
-| Plane | Source | What a name resolves to |
+| Plane | Source | Resolves to |
 |---|---|---|
-| `lan` | a home zone (`infra`, `corp`, `iot`) | the LAN address, so the packet stays local |
-| `overlay` | the mesh (`10.10.100.0/24`, `fd10:1000:100::/64`) | the overlay address, reachable over `wg0` |
-| `public` | anything else | the ingress for a `public` service, the overlay for a node |
+| `lan` | a home zone | the LAN address, so the packet stays local |
+| `overlay` | the mesh | the overlay address, reachable over `wg0` |
+| `public` | anything else | the ingress for a public service, the overlay for a node |
 
-A device has no overlay identity, so the `lan` plane answers its only address. A node outside the LAN
-reaches it exactly when its zone is carried into the mesh (`announcedZones`), so the `overlay` plane
-answers the same address then and stays silent otherwise: a name that resolves to an address nothing
-routes would be worse than no answer. A cloud host's `ipv4` is its public
-address and is never handed to a LAN client: the `lan` plane answers its overlay, which a home client
-reaches through its LAN gateway. Blocklists are carried as an RPZ zone, converted from hosts format
-and refreshed on a timer.
+A device has no overlay identity, so the `lan` plane answers its only address; the `overlay` plane
+answers it only when its zone is carried, because a name that resolves to an address nothing routes
+would be worse than no answer. The same resolver serves both doors: a client at home asks over the LAN,
+a client away from home asks over DNS-over-TLS at the public door, where the ingress terminates the
+resolver name and certificate. A client therefore configures one name and is answered by the door its
+network can reach.
 
-Cloudflare answers the public names with the ingress for everyone who does not ask us, so the family
-path is unchanged.
-
-The same name has two doors. A client at home reaches the resolver over the LAN - the `lan` plane,
-so the answer is a LAN address and the packet stays local - and a client away from home reaches the
-same resolver over DNS-over-TLS at the public door, where the ingress terminates the resolver's own
-name and certificate (`features/services/dns`, the `dot` option). A client therefore configures one
-name (a phone's private DNS setting is `dns.<domain>`) and is answered by the door its network can
-reach. The views also carry `dst-subnet`, so the home plane is the door a query *arrived at*, not
-merely where it came from: a foreign network that happens to use a home prefix is not treated as
-being at home.
-
-Measured 2026-09-21: `jellyfin.vyrx.de` -> `10.10.10.10` / `10.10.100.10` / `173.249.22.211`,
-`hom-wrk-01.node.vyrx.de` -> `10.10.20.10` / `10.10.100.20`, and `hom-prn-01.node.vyrx.de` ->
-`10.10.30.19` in the `lan` and the `overlay` plane alike, because that device's zone is carried into
-the mesh - a device in a zone that is not carried is NXDOMAIN off the LAN rather than an address
-nothing routes. Over DoT the public door answers the ingress for a service and NXDOMAIN
-for a device, the home door the LAN addresses of both; both doors present a Let's Encrypt
-certificate for the resolver's name.
-
-The resolver is not a single point of failure. `my.topology.resolverHosts` declares who serves DNS -
-`hom-srv-01` inside the home LAN and `cld-edge-01` in the cloud - and every one of them generates the
-same zones from the same inventory, so nothing is replicated at runtime. Each announces its overlay
-address as a door; a node that is not fixed at home lists the home door first, so a node inside the LAN
-uses the LAN, and then those mesh doors, so a home outage leaves name resolution working for everything
-that is not in the house. A fixed home host keeps the home door alone: a second door would only tempt it
-onto the overlay plane. Measured 2026-09-21: the cloud door answers the same zones over the mesh - the
-overlay plane, blocklist included - and the home resolver serves the LAN. The cloud door also showed
-that a door has to be opened to be a door: it listened on `10.10.100.1:53` while its firewall allowed
-only the DoT port, so every query to it was dropped.
-
-Every host resolves through the doors derived by `features/system/networking/resolver` from the
-topology. `services.resolved` owns resolution and receives `networking.nameservers`; NetworkManager
-feeds per-link DNS to systemd-resolved rather than writing `/etc/resolv.conf`. The resolver module
-sets `FallbackDNS` empty and the global routing domain to `~.`, so DHCP-provided resolvers and public
-fallbacks are not used. A fixed home host uses the home door alone; a roaming home-zone client tries
-the home door first, then the mesh doors. The static-addressing module retains a resolvconf projection
-as a fallback only when the resolver feature is disabled; it is not the active fleet resolver path.
+Resolution is not a single point of failure: `my.topology.resolverHosts` declares who serves DNS, and
+each generates the same zones from the same inventory. A host resolves through doors derived by
+`features/system/networking/resolver`: a host with its own address in a home zone has the home door
+alone, a roaming home-zone client tries the home door first and then the mesh doors. `FallbackDNS` is
+empty and the global routing domain is `~.`, so DHCP-provided resolvers never enter the path.
 
 ### 5.3 Certificates: one per name, issued where it terminates
 
-There is no wildcard certificate here: Cloudflare's own Universal SSL owns the apex and the wildcard,
-and DNS-01 for `_acme-challenge.vyrx.de` is therefore not ours to write (measured: the values are
-published but absent from the zone API). The model is the per-consumer one, not a shared secret:
+There is no fleet wildcard: Cloudflare Universal SSL owns the apex wildcard and `_acme-challenge` is
+not ours to write. Each name is issued on the host that terminates it, so no key material is copied.
+The ingress validates with HTTP-01 (the names resolve to it); hosts behind split horizon use DNS-01 via
+the Cloudflare API with the credential as a systemd credential; names outside the public zone fall back
+to `tls internal`. Internal `.lan` names get public certificates too, so they appear in certificate
+transparency logs - a deliberate trade-off.
 
-- each name's certificate is issued **on the host that terminates it**, so no key material is copied;
-- the ingress validates with **HTTP-01** (the names resolve to it);
-- hosts behind split horizon use **DNS-01** via the Cloudflare API, with the credential passed as a
-  systemd credential, and the resolver pinned to `1.1.1.1:53` because lego determines the zone from the
-  SOA and the system resolver would answer through the mesh;
-- names outside the public zone fall back to `tls internal`;
-- internal `.lan` names get public certificates too - they are subdomains of the public zone, and the
-  trade-off (they appear in certificate transparency logs) is deliberate.
+### 5.4 Which address a service uses
 
-Measured 2026-09-20: `hom-srv-01` holds 14 certificates, `cld-ops-01` 12, and the ingress none of its
-own beyond what Caddy obtains automatically.
-
-### 5.4 How a host resolves, and which address a service uses
-
-Two rules keep resolution and service addressing from being decided twice:
-
-- **A host resolves through the resolver's doors, never through what a network hands it.** The doors
-  are derived (`features/system/networking/resolver`): a host with its own fixed address in a home
-  zone has the home door alone, a host in a home zone *without* one has the home door first and the
-  mesh doors after it, and a host in the mesh zone has the mesh doors. `FallbackDNS` is empty on
-  purpose - a fallback that knows none of our names would resolve the public internet and fail
-  silently on everything internal - and `Domains=~.` keeps a link's DHCP-provided resolver out of the
-  path. The DHCP answer hands out `my.topology.resolvers` and nothing else: ours, or none.
-- **A service uses an address the far side can actually reach** (`contracts/topology/lib/service-address.nix`): the LAN address
-  while both sides are in a home zone, the overlay address otherwise, because a cloud host cannot
-  reach a home zone at all. That one rule replaced five modules that each decided for themselves.
-- **A rendered client is told a door instead of handed one.** Its wg-quick file carries the resolvers
-  of the mesh as `DNS =` - the overlay addresses of the hosts the inventory declares as resolvers - and
-  that is not the same as being handed a door: it is what makes the client's VPN network able to resolve
-  the name at all. Measured without it: `DnsAddresses: [ ]` on the VPN network, `PrivateDnsBroken`, and a
-  network without `INTERNET` or validation while the underlying one was fine. The resolver a device
-  actually *uses* is still a setting of its own - the name of the public DoT door, as private DNS - which
-  is a precondition rather than a derivation, and the one place our resolution model depends on a setting
-  inside somebody else's device ([operations.md](operations.md) §4.3).
-
-Measured 2026-09-21: `jellyfin.vyrx.de` answers `10.10.10.10` from the LAN and `10.10.100.10` over the
-mesh, and `nix run .#network-audit` checks every host's answer against the door it actually asked.
+A service uses an address the far side can actually reach
+(`contracts/topology/lib/service-address.nix`): the LAN address while both sides are in a home zone,
+the overlay address otherwise. That one rule replaced five modules that each decided for themselves. A
+rendered wg-quick client is told the mesh resolvers as `DNS =`, which is what makes its VPN network
+able to resolve our names at all.
 
 ## 6. Service contracts
 
-A service declares what it offers and what it needs; the platform derives the rest. Nothing is written
-twice, and no service module knows its host, its name or its neighbours.
+A service declares what it offers and what it needs; the platform derives the rest. No service module
+knows its host, its name or its neighbours.
 
 | Declaration | Meaning | Projected to |
 |---|---|---|
-| `my.contracts.provides.<svc>.endpoints` | listeners: port, transport and application protocol, direct network access. A listener is not a publication | firewall rules, telemetry targets, ingress upstreams |
-| `…publications.<name>` | a name on a listener: DNS identity, exposure plane, HTTP ingress policy and audience (`endpoint` references the listener) | DNS records, Caddy vHosts, firewall mesh reachability, access policies |
-| `…identity.oidc.<name>` / `…identity.ldap.<name>` | application integrations referencing a publication | Authentik blueprints, directory consumers |
-| `…presentation.tiles.<name>`, `…presentation.readouts`, `…presentation.actions` | portal entries referencing an endpoint, plus service-level capabilities | portal inventory and adapter data |
-| `…telemetry.probes.<name>`, `…telemetry.scrapes.<name>` | named HTTP/TCP probes and metrics scrapes referencing an endpoint (no repeated port, no inferred HTTP probe) | Prometheus scrape jobs and portal monitoring state |
-| `…storage` | persistence needs and their tier | storage contracts, backup sets |
-| `…backup` | what must be restorable and which consistency hooks are required | backend-neutral path/hook projection; the selected backup adapter renders its own jobs |
-| `…dependsOn` | fleet-wide service references, validated against every host's declared services | portal dependencies |
-| `my.contracts.consumes.<svc>.postgresql.<db>` / `…ldap` | a database and user, or a directory identity with audience | provider resources, declared by the provider engine |
-| `my.desktop.environments.<env>` | a desktop feature registering itself as the host's session | the one-session invariant, asserted by the desktop contract |
-| `my.desktop.effects.<name>` | a shell layer surface or a user window asking for a background effect, and what it samples | the compositor's layer and window rules, projected by its feature (account scope) |
-| `my.desktop.surfaceOpacity` | the background opacity every frosted surface paints; 1.0 writes nothing | bar, panel, notification, OSD, dock and terminal background opacity, mapped by each owner (account scope) |
+| `my.contracts.provides.<svc>.endpoints` | listeners: port, transport and application protocol, direct access | firewall rules, telemetry targets, ingress upstreams |
+| `...publications.<name>` | a name on a listener: DNS identity, exposure plane, ingress policy, audience | DNS records, Caddy vHosts, mesh reachability, access policies |
+| `...identity.oidc.<name>` / `...identity.ldap.<name>` | application integrations referencing a publication | Authentik blueprints, directory consumers |
+| `...presentation.tiles` / `.readouts` / `.actions` | portal entries referencing an endpoint | portal inventory and adapter data |
+| `...telemetry.probes` / `.scrapes` | named probes and scrapes referencing an endpoint | Prometheus jobs, portal monitoring state |
+| `...storage`, `...backup` | persistence needs and what must be restorable | storage contracts, backup sets, adapter jobs |
+| `...dependsOn` | fleet-wide service references, validated per host | portal dependencies |
+| `my.contracts.consumes.<svc>.postgresql.<db>` / `.ldap` | a database and user, or a directory identity | provider resources, declared by the provider engine |
+| `my.desktop.environments`, `.effects`, `.surfaceOpacity` | session, layer surfaces and window effects | compositor layer and window rules (account scope) |
 
-Each domain owns its schema: listener facts live in `contracts/endpoints/`, named
-publications in `contracts/publications/`, ingress policy in `contracts/ingress/`, audience
-naming and directory consumers in `contracts/identity/`, presentation in `contracts/portal/`,
-observations in `contracts/telemetry/`, service dependency references in
-`contracts/dependencies/`, and the desktop session invariant in `contracts/desktop/`. Backend-specific option extensions such as Caddy proxy directives
-and CrowdSec exemptions live with those features. References between domains are validated at
-evaluation: unknown endpoints, publications or services, nameless publications, an ingress on
-a non-HTTP listener, authentication without an ingress, ambiguous directory identities and
-duplicate Prometheus job names or OIDC client IDs all fail the build with a named offender.
+Each domain owns its schema; references between domains are validated at evaluation, so an unknown
+endpoint, a nameless publication, an ingress on a non-HTTP listener, authentication without an ingress
+or a duplicate Prometheus job name fails the build with a named offender. An account-scope domain
+carries a `home.nix` half beside its `nixos.nix`; the system builder attaches those through
+`home-manager.sharedModules` and leaves them out where that module is absent.
 
-A domain whose schema is account-scope carries a `home.nix` half beside its `nixos.nix`. The system
-builder attaches those halves through `home-manager.sharedModules` and leaves them out where that
-module is absent, because a contract is also evaluated in fixtures; discovery therefore reads a
-second marker without that marker ever implying a NixOS module. The desktop domain's
-`my.desktop.effects` is the first such schema: the host half keeps the one-session invariant, the
-account half states the background effects the shell and the user request.
+Consequences worth knowing: a `public` publication gets its name, certificate and proxy rather than
+asking for them; services never reference a host, so moving one is a one-line change in `hosts/`; and a
+path exempted from authentication is proxied without `forward_auth`, so it carries no identity headers -
+a page that reads identity must never be exempted, and `checks/vyrx-portal.nix` holds the exempted set
+equal to the set the application declares public.
 
-Consequences worth knowing:
+## 7. What is compiled, and what is still a setting
 
-- a publication with `scope = "public"` gets a public name, a certificate and a proxy - it does
-  not ask for them;
-- services never reference a host, so moving one is a one-line change in `hosts/`;
-- the FQDNs, the Caddy configuration, the Authentik blueprints and backup requirements are all *functions*
-  of these declarations; a backend adapter turns backup requirements into its own jobs;
-- a path exempted from authentication (`unauthenticatedPaths`) is proxied **without** `forward_auth`,
-  so it carries **no** identity headers. A page that reads identity must therefore never be exempted,
-  and the set of exempted paths must equal the set the application declares public -
-  `checks/vyrx-portal.nix` holds the two equal, because the two live in different repositories.
-
-## 7. Configuration layout
-
-```
-flake.nix        inputs, overlays, one mkSystem call per host
-hosts/<name>/    entry point: role + hardware + host-specific features
-roles/           base → server | pc → desktop | notebook
-features/        NixOS modules, discovered by the `nixos.nix` marker, each behind an `enable` option
-contracts/       provides (endpoints, publications, identity, portal, telemetry) / consumes / naming / storage / dependencies
-inventory/       site facts (subnets, hosts, devices), composed explicitly by mk-system, never auto-discovered
-checks/          the promises, measured: network invariants, contract fixtures, the portal artifact
-lib/             mkSystem, module discovery, shared pure helpers (endpoints, addresses, cidr, users, fleet)
-user/<name>/     Home Manager: user packages, shell, editors
-docs/            this specification
-```
-
-Every feature and contract is *loaded* on every host and *active* only where `enable` is set. That is
-what makes `nix flake check` meaningful: a module that does not evaluate is caught for all five hosts at
-once, whether or not any of them enables it.
-
-Shared code follows ownership. Generic composition helpers (`lib/cidr`, `lib/users`,
-`lib/fleet-configs`) are injected through `specialArgs` from `lib/mk-system.nix`. Domain-owned
-helpers such as endpoint identifiers and service address selection are imported from their owning
-contract (`contracts/endpoints/lib`, `contracts/topology/lib`). Capability modules are discovered;
-site facts are composed explicitly; generic infrastructure is injected. Each category has one
-loading mechanism.
-
-The invariants (`contracts/*`) are evaluation-time assertions, not conventions: a service from the
-public plane without authentication, a name that cannot be derived, an endpoint on a host that does not
-serve it, or a subnet a reservation falls outside - each fails the build rather than the deployment.
-
-### 6.1 What is compiled, and what is still a setting
-
-A projection earns its complexity only where it replaces a manual step. Measured 2026-09-20, service by
-service; the Home Assistant row re-measured 2026-10-10 against Home Assistant 2026.9.4:
+A projection earns its complexity only where it replaces a manual step.
 
 | Surface | Compiled from the repository | Still configured in a UI |
 |---|---|---|
-| cluster dashboard (Homarr) | tiles, categories, icons and URLs from `presentation.tiles` | nothing |
-| portal (vyrx.de) | services, categories, dependencies and actions projected from the endpoint contracts; read at runtime and carrying no addresses and no people | nothing |
-| Grafana | three dashboards as files, plus datasources and alerts from the module | nothing |
-| CrowdSec | the trusted-subnet whitelist, from `my.topology.trustedSubnets` | nothing |
-| ntfy | accounts and tokens from SOPS, `deny-all` by default | nothing |
-| Klipper | the machine definition and macros from the store | calibration state - the `runtime_variables.cfg` include is prepared but commented out |
-| Home Assistant | integrations, MQTT | **automations**: the module includes them in UI mode, so they are not in Git, not reviewed, and do not survive a reinstall; the MCP server is a config entry and the entities exposed to Assist are UI state; the **reverse-proxy trust** - since 2026.8 the `http:` block is migrated into Home Assistant's own store once and ignored afterwards, so `use_x_forwarded_for` and the ingress host's overlay address in `trusted_proxies` are a setting, not a declaration |
-| arr stack, Sabnzbd | quality profiles and custom formats (Recyclarr) | root folders, download clients, categories, paths - only the secrets are templated |
+| cluster dashboard, portal, Grafana, CrowdSec, ntfy | tiles, categories, URLs, dashboards, alerts, trusted subnets, accounts and tokens | nothing |
+| Klipper | the machine definition and macros | calibration state |
+| Home Assistant | integrations, MQTT | automations, the MCP server and Assist exposure; the reverse-proxy trust (`use_x_forwarded_for`, the ingress overlay address in `trusted_proxies`) - since 2026.8 the `http:` block migrates into the Home Assistant store once and is ignored afterwards |
+| arr stack, Sabnzbd | quality profiles and custom formats (Recyclarr) | root folders, download clients, categories, paths |
 
-The gaps in the last rows are real and worth being explicit about: they are the difference between
-"the instance can be rebuilt" and "the instance behaves the same afterwards". The reverse-proxy trust
-is the sharpest of them: without the ingress host's overlay address in `trusted_proxies`, Home
-Assistant answers 400 to every request that arrives through the ingress before it handles anything -
-on 2026-10-10 that was the whole public plane, `/api/mcp` included. Re-entered under
-*Settings - System - Network*, next to `127.0.0.1/32` and `::1/128`, once per lost store; the
-address is the one the topology contract gives the ingress host (`10.10.100.1` today), not a literal.
+The last rows are the difference between "the instance can be rebuilt" and "the instance behaves the
+same afterwards". The reverse-proxy trust is the sharpest: without the ingress overlay address in
+`trusted_proxies`, Home Assistant answers 400 to everything arriving through the ingress before it
+handles anything. Re-enter it under *Settings - System - Network* after a lost store; the address is
+the one the topology gives the ingress host (`10.10.100.1`), not a literal.
 
 ## 8. Observability
 
-`cld-edge-01` runs the full pipeline (Prometheus, Grafana, Loki, Alertmanager); `cld-ops-01` and
-`hom-srv-01` run collectors (Alloy, node and blackbox exporters). The desktops run none - the ground
-truth for "is the fleet healthy" is the server side, and a laptop that is switched off is not an
-incident.
+`cld-edge-01` runs the pipeline (Prometheus, Grafana, Loki, Alertmanager); `cld-ops-01` and
+`hom-srv-01` run collectors (Alloy, node and blackbox exporters); the desktops run none - the ground
+truth for fleet health is the server side. Alerting goes to the self-hosted ntfy instance, which also
+carries Home Assistant, CrowdSec and arr-stack notifications. CrowdSec runs on both cloud hosts with
+one bouncer per host and global decisions.
 
-Alerting goes to the self-hosted ntfy instance (`push.vyrx.de`), which also carries Home Assistant,
-CrowdSec and arr-stack notifications. CrowdSec runs on both cloud hosts and shares a bouncer per host;
-its decisions are global.
+Three instruments state the promises and can disagree with the system:
 
-### 8.1 What can fail loudly
-
-Three instruments state the network's promises and are able to disagree with it:
-
-- **`checks.network-invariants`** (part of `nix flake check`) holds the promises against the *evaluated*
-  fleet: the LAN router forwards mesh traffic exactly when it carries a zone, a host inside the home LAN
-  installs no route for a carried zone, the resolver doors follow the host class, every handed-out
-  resolver belongs to a host of this fleet, a rendered client routes the mesh and the ingress and no
-  home zone, and a device is answered off the LAN exactly when its zone is carried. It was verified by
-  breaking it on purpose, not by passing.
-- **`nix run .#network-audit`** measures the *running* fleet: it asks each host which path it uses to the
-  home door, and requires the answer to come from that plane. It holds wherever a node happens to be.
-- **`nix run .#exposure-audit -- --strict`** lists every listening socket outside loopback and says
-  whether it is a decision - open, declared local, a link-local protocol - or a question. It found the
-  port that closing the mesh had cut (CrowdSec's local API) and the health bridge an agent skill had
-  left behind.
+- `checks.network-invariants` holds them against the evaluated fleet, and was verified by breaking it
+  on purpose;
+- `nix run .#network-audit` measures the running fleet and asks each host which path it uses;
+- `nix run .#exposure-audit -- --strict` lists every listening socket outside loopback and says whether
+  it is a decision or a question.
 
 ## 9. Data, backup, restore
-
-Three copies, and the tiers are storage contracts rather than directory conventions:
 
 | Copy | Where | How |
 |---|---|---|
@@ -447,17 +278,10 @@ Three copies, and the tiers are storage contracts rather than directory conventi
 | offsite | Backblaze B2 | `restic`, nightly, encrypted client-side, object lock |
 
 Restore is `restic restore` from the same repository; the passphrase lives in SOPS. A failed job is a
-failed backup - `systemctl --failed` is part of the health check, not an optional extra (one run was
-silently lost to a DNS outage and only showed up in that list).
+failed backup, so `systemctl --failed` is part of the health check.
 
-## 10. Where the other documents take over
+## 10. Where things live
 
-| Topic | Document |
-|---|---|
-| What a name may look like and who owns it | [naming.md](naming.md) |
-| Users, service accounts, authentication flows | [identity.md](identity.md) |
-| The security model, layer by layer | [security.md](security.md) |
-| Microcontrollers, access point, router | [embedded.md](embedded.md) |
-| Interfaces, tokens, typography | [design.md](design.md) |
-| Deploy, verify, recover | [operations.md](operations.md) |
-| The engineering bar and the known failure patterns | [practices.md](practices.md) |
+The repository layout is in [`../AGENTS.md`](../AGENTS.md); deploy, verify and recovery in
+[operations.md](operations.md); users, access and the security model in [identity.md](identity.md); the
+desktop hosts in [desktop.md](desktop.md); devices that cannot run NixOS in [embedded.md](embedded.md).

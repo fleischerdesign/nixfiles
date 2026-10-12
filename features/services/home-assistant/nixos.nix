@@ -156,7 +156,7 @@ in
       endpoints.web = {
         port = 8123;
         protocol = "tcp";
-        # Public per docs/naming.md §9.4 (decision recorded). Scope and auth must move together.
+        # Public per docs/architecture.md §5. Scope and auth must move together.
         # Home Assistant enforces its own authentication. Its official documentation
         # (integrations/http, Reverse proxies) defines the trusted-proxy settings but NO set of
         # paths an external SSO proxy may bypass, and a forward-auth layer in front of HA breaks

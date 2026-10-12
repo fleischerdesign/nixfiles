@@ -2,43 +2,32 @@
 
 This directory is the specification of the system as it **is**. It is not a plan, not a migration
 diary, and not a to-do list: those have an expiry, and a specification that carries them describes two
-states at once.
+states at once. History belongs in a commit message.
 
 Two files stay in the repository root because tools and conventions expect them there:
 [`../README.md`](../README.md) (entry point) and [`../AGENTS.md`](../AGENTS.md) (instructions for
-agentic contributors).
+agentic contributors). The repository layout is documented in `AGENTS.md`, once.
 
 ## The map
 
 | Question | Document |
 |---|---|
-| What is this system, which machines does it run on, how do they talk to each other? | [architecture.md](architecture.md) |
-| What may a name look like, which plane does it live in, who owns it? | [naming.md](naming.md) |
+| What is this system - hosts, zones, planes, the mesh, DNS, contracts? | [architecture.md](architecture.md) |
+| Who is a user, what is a service account, how do access, secrets and the security model work? | [identity.md](identity.md) |
 | How do I deploy, reach a host, verify a change, recover a host I locked myself out of? | [operations.md](operations.md) |
-| How do we work here - what counts as verified, what are the failure patterns? | [practices.md](practices.md) |
-| How are flake inputs and custom package dependency hashes updated? | [package-updates.md](package-updates.md) |
-| Who is a user, what is a service account, how does authentication and authorisation work? | [identity.md](identity.md) |
-| What is the security model, layer by layer? | [security.md](security.md) |
-| How do applications send mail and share SMTP credentials? | [smtp.md](smtp.md) |
-| Which desktop runs, who owns the session, where do user settings live? | [desktop.md](desktop.md) |
-| How are Google Drive and server files mounted on PCs? | [rclone.md](rclone.md) |
-| What are the microcontrollers, the access point, the router - and how are they configured? | [embedded.md](embedded.md) |
-| Which coding-agent interfaces are installed, and how do they receive credentials? | [coding-agents.md](coding-agents.md) |
+| Which desktop runs, who owns the session, where do user settings and remote mounts live? | [desktop.md](desktop.md) |
+| What are the microcontrollers, the access point, the router? | [embedded.md](embedded.md) |
 | What do the interfaces look like, which tokens and typography? | [design.md](design.md) |
 
 ## How to read these
 
-- **Architecture first.** It defines the vocabulary - zone, plane, contract, scope - that the other
-  documents use without redefining it.
-- **Names are derived, never maintained.** [`naming.md`](naming.md) is normative: an FQDN is a function
-  of the topology and the contracts. Where this documentation and the code disagree, the code is right
+- **Architecture first.** It defines the vocabulary - host, zone, plane, contract, scope - that the
+  others use without redefining it.
+- **Names are derived, never maintained.** An FQDN is a function of the topology and the contracts
+  ([architecture.md](architecture.md) §5). Where a document and the code disagree, the code is right
   and the document is a bug.
-- **Claims carry their evidence.** Where a statement says "measured", it names the command and the date.
-  Where it says "asserted", it names the invariant that enforces it at evaluation time. Statements
-  without either are opinions and should be read as such.
-- **Everything in English.** Code, comments, commits and documentation - verified, not intended:
-  no document in this directory contains German prose any more. A specification that changes language
-  mid-draft is one that will be half-updated, and the half that lags is the half nobody notices.
+- **Claims carry their evidence.** A statement is measured (the command is named) or asserted (the
+  invariant is named). Statements without either are opinions.
 
 ## Conventions
 
@@ -46,6 +35,6 @@ agentic contributors).
 |---|---|
 | Language | English, throughout |
 | Diagrams | ASCII, in the document that owns the concept |
-| File names | lowercase, `noun.md` - the name says what the file is, not what it was for |
-| Cross-references | relative links between siblings, `docs/<name>.md` from the root |
-| Status | a specification describes the present; history belongs in a commit message, not a section |
+| File names | lowercase, `noun.md` |
+| Scope | one document per question; a fact that appears twice is a bug waiting to disagree |
+| Status | a specification describes the present; history belongs in a commit message |
