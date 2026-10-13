@@ -1,9 +1,9 @@
 {
   "name": "obsidian-linter",
   "pname": "obsidian-linter",
-  "version": "1.34.0",
-  "mainHash": "00a5805b3b99pgghqga6bhy2bdd3hm9scqwh8407q0c2f4zb43xz",
-  "manifestHash": "1r2fi52wjvczxx13lvh0qhxlq6r5klg743vwa61pa8s0z2jd233z",
+  "version": "1.34.1",
+  "mainHash": "06dfmksizsfvgflcw7b2aj0dn9qykq0wx55a2ir3kaixjcb4f4xk",
+  "manifestHash": "14afxwgx78n1rjhmzzaprpkn6iv7wm2xl1767k2mc70dsm3hqvbr",
   "stylesHash": "0d4637qqjd96hpfanpxanfvy066hdfli65hdcm41xpkhh1k3mnmf",
   "upstream": {
     "type": "obsidian-plugin",
