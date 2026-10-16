@@ -73,13 +73,14 @@
       enable = lib.mkDefault true;
       web.enable = lib.mkDefault true;
       desktop.enable = lib.mkDefault true;
-      # A personal computer runs its instance when you work on it (the web and desktop surfaces
-      # above), and you pair your devices with that running instance - a pairing link is exactly
-      # what the settings dialog mints. A second, always-on API-only unit next to it would target the
-      # same data directory and the same default port, so it is an explicit choice, not a default;
-      # the always-on instance belongs on the machine that never sleeps. A reachable bind needs a UI
-      # password (openchamber/ui_password) either way.
-      server.enable = lib.mkDefault false;
+      # A personal computer is reachable from a phone: the headless unit serves the API on the
+      # host's mesh address and a device pairs with that instance, while the interface you actually
+      # work in keeps its own runtime - OpenChamber addresses runtimes per port and lists several
+      # of them side by side (`openchamber status`), so the two do not displace each other. The unit
+      # is a user service and lives while the session does, which is when the machine is usable
+      # anyway; the machine that never sleeps is the one to pair with for access from anywhere. A
+      # reachable bind needs a UI password (openchamber/ui_password) either way.
+      server.enable = lib.mkDefault true;
     };
   };
 
