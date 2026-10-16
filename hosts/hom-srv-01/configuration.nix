@@ -91,7 +91,21 @@
           ];
         };
       };
-      dev.containers.enable = true;
+      dev = {
+        containers.enable = true;
+        # This server hosts the coding workspace the personal computers switch to: the switches for
+        # them live in roles/pc.nix, this one is a fact of this host. No desktop interface here.
+        opencode.enable = true;
+        openchamber = {
+          enable = true;
+          server = {
+            # This is the instance reachable from a network that is not the mesh, so it is the one
+            # that serves the browser interface and the one the ingress puts a name on.
+            apiOnly = false;
+            publish.enable = true;
+          };
+        };
+      };
     };
   };
 

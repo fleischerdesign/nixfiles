@@ -139,12 +139,29 @@ nixpkgs CLI and the official editor extension where the editor is enabled.
 Codex and OpenCodex share their homes with interactive clients (`~/.codex`, `~/.opencodex`); neither directory
 is managed as an immutable file. Home Manager owns `opencodex-proxy.service`, which binds `127.0.0.1:10100`,
 reads its declared credential files and requires readiness within 45 seconds; missing secrets and failed
-readiness fail the unit. `features/dev/opencode` installs OpenCode v2 from its flake package, using the fleet
-Bun only when it matches the upstream `packageManager` requirement. `features/dev/openchamber` exposes two
-optional interfaces, web and desktop, which both call the host OpenCode launcher so both use the same version
-and credentials. Provider credentials stay in SOPS and are read when the process starts; a user with the
-feature enabled must be allowed to read the referenced files. No listener or firewall rule is created by
-these features, and provider selection and logins remain runtime state that the user must verify.
+readiness fail the unit.
+
+`features/dev/opencode` installs OpenCode v2 from its flake package, writes the global configuration, and puts
+a launcher on `PATH` that reads the declared credential files into the environment at start, so no provider
+key reaches the Nix store or a unit file and a user with the feature enabled never has to read them by hand.
+The default model is the role's declaration and has to exist in the gateway the fleet subscribes to
+(`opencode-go`, `https://opencode.ai/zen/go/v1`; `opencode models` lists the catalogue) - an id the gateway
+does not offer is a broken default, not a preference.
+
+`features/dev/openchamber` builds on that launcher: the web and desktop interfaces are launchers of the same
+OpenCode binary, so an interface and the host share one version and one credential set. `server.enable` adds
+a headless instance as a user service on the host's overlay address, which is the port the endpoint contract
+opens for the mesh; where the role is a server the feature also sets the operator's `linger`, because nobody
+logs in there to start it. The instance reads two secrets from the store at start - `openchamber/ui_password`, without which it
+refuses to bind a reachable address, and `openchamber/jwt_secret`, which signs the tokens issued to paired
+devices, where a key minted fresh at every start would drop every pairing on every restart. Both are owned by
+the operator and exported into the process rather than the unit environment, so no status query prints them.
+`server.apiOnly` (default true) serves the API alone, which is what a native client needs, and
+`server.publish.enable` puts the interface on a public name the ingress terminates alone: there the ingress is
+the authentication boundary, and the central forward-auth outpost answers on the authentik host alone. The
+declared audience is `infra-admins`, and a paired application's non-browser WebSocket upgrade is handed
+through to the instance, which checks the device token itself. Provider selection and logins beyond the
+declared credentials remain runtime state that the user must verify.
 
 ## 8. Verification
 

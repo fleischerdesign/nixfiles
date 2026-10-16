@@ -38,7 +38,11 @@ in
     credentialFiles = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
-      description = "Environment variable names mapped to runtime-readable secret files.";
+      description = ''
+        Environment variable names mapped to runtime-readable secret files. The feature stays
+        generic: whoever enables it passes the set the fleet declares once, so the paths exist in
+        exactly one place.
+      '';
     };
 
     package = lib.mkOption {

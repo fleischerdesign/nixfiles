@@ -359,6 +359,16 @@ in
       );
     };
 
+    # A vhost names its certificate by path, so Caddy reads the file while it loads and refuses to
+    # start when the order that writes it has not finished. Ordering Caddy after the certificate
+    # units closes the window in which the first activation to introduce a public name starts
+    # Caddy before its own certificate exists and leaves the site down until something restarts
+    # it. `wants`, not `requires`: a failed order must not take the whole ingress with it.
+    systemd.services.caddy = {
+      wants = map (name: "acme-${name}.service") certificateNames;
+      after = map (name: "acme-${name}.service") certificateNames;
+    };
+
     my.contracts.provides.caddy = {
       endpoints = {
         http = {

@@ -5,13 +5,6 @@
   lib,
   ...
 }:
-let
-  aiCredentialFiles = {
-    DEEPSEEK_API_KEY = config.sops.secrets."ai/deepseek_api_key".path;
-    OPENROUTER_API_KEY = config.sops.secrets."ai/openrouter_api_key".path;
-    OPENCODE_API_KEY = config.sops.secrets."ai/opencode_api_key".path;
-  };
-in
 {
   imports = [
     ./base.nix
@@ -58,34 +51,37 @@ in
     codex.enable = lib.mkDefault true;
     opencodex = {
       enable = lib.mkDefault true;
-      credentialFiles = aiCredentialFiles;
+      credentialFiles = config.my.user.aiCredentialFiles;
     };
     containers.enable = lib.mkDefault true;
     codium.enable = lib.mkDefault true;
     nixvim.enable = lib.mkDefault true;
     obsidian.enable = lib.mkDefault true;
-    # OpenCode and OpenChamber stay in the tree but are installed nowhere: the modules are complete,
-    # the two master switches are off. Turning a machine on is one flag, and the sub-options below
-    # still state the intended shape, so nothing has to be remembered a second time.
+    # Every personal computer carries the coding workspace: OpenCode, with the OpenChamber web and
+    # desktop interfaces on top of it. The credentials come from the one fleet declaration, and each
+    # computer serves its own instance over the mesh so the other one is reachable from it. A host
+    # may turn a master switch off; nothing else has to be remembered.
     opencode = {
-      enable = lib.mkDefault false;
-      model = lib.mkDefault "opencode-go/deepseek-v4-flash";
-      credentialFiles = aiCredentialFiles;
+      enable = lib.mkDefault true;
+      # The gateway this fleet uses (OpenCode Go, https://opencode.ai/zen/go/v1) offers
+      # deepseek-v4-pro and deepseek-v4.1-flash; a model id it does not offer is a broken default,
+      # not a preference (measured: opencode models lists 482 ids and no deepseek-v4-flash).
+      model = lib.mkDefault "opencode-go/deepseek-v4.1-flash";
+      credentialFiles = config.my.user.aiCredentialFiles;
     };
     openchamber = {
-      enable = lib.mkDefault false;
+      enable = lib.mkDefault true;
       web.enable = lib.mkDefault true;
       desktop.enable = lib.mkDefault true;
-      # Every personal computer serves OpenChamber over the mesh, so the other one is reachable
-      # from it: each declares its own port through the endpoint contract, and the instance
-      # switcher connects to the peer. A host may turn this off; nothing else has to change.
-      server.enable = lib.mkDefault true;
+      # A personal computer runs its instance when you work on it (the web and desktop surfaces
+      # above), and you pair your devices with that running instance - a pairing link is exactly
+      # what the settings dialog mints. A second, always-on API-only unit next to it would target the
+      # same data directory and the same default port, so it is an explicit choice, not a default;
+      # the always-on instance belongs on the machine that never sleeps. A reachable bind needs a UI
+      # password (openchamber/ui_password) either way.
+      server.enable = lib.mkDefault false;
     };
   };
-
-  sops.secrets."ai/deepseek_api_key".owner = config.my.user.primary;
-  sops.secrets."ai/openrouter_api_key".owner = config.my.user.primary;
-  sops.secrets."ai/opencode_api_key".owner = config.my.user.primary;
 
   my.features.media = {
     gaming.enable = lib.mkDefault true;

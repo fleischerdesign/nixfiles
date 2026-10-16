@@ -23,6 +23,26 @@ in
         default = 3000;
         description = "TCP port the headless server listens on, on the mesh address of the host.";
       };
+
+      apiOnly = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Serve the API without the browser interface assets - the headless mode a native client
+          needs and nothing more. A browser reaches the interface through the publication below,
+          which is why an instance published for browsers turns this off.
+        '';
+      };
+
+      publish = {
+        enable = lib.mkEnableOption "a public name for this instance, terminated by the ingress";
+
+        subdomain = lib.mkOption {
+          type = lib.types.str;
+          default = "chamber";
+          description = "Subdomain under the site zone that the published instance answers on.";
+        };
+      };
     };
   };
 
@@ -42,6 +62,12 @@ in
             assertion = !cfg.desktop.enable || pkgs.stdenv.hostPlatform.system == "x86_64-linux";
             message = "The OpenChamber desktop package is available only on x86_64-linux.";
           }
+          {
+            # A name is put on a running instance, so publishing without serving would leave a
+            # virtual host in front of nothing.
+            assertion = !cfg.server.publish.enable || cfg.server.enable;
+            message = "OpenChamber cannot publish an instance it does not serve.";
+          }
         ]
         ++ lib.optionals (cfg.enable && cfg.server.enable) [
           {
@@ -59,6 +85,21 @@ in
     # the firewall renders it from the contract like every other permission in this fleet. With
     # the feature off nothing is declared, so no service entry is left behind to offer nothing.
     (lib.mkIf (cfg.enable && cfg.server.enable) {
+      # OpenChamber refuses to bind a reachable address without a UI password, and it is right to:
+      # the mesh is reachable from every node. The signing secret matters for the same reason in
+      # reverse: a key minted fresh at every start would invalidate every paired device on every
+      # restart. Both are declared here, with the host's own key, and owned by the operator so the
+      # user service can read them. A missing key fails the deploy loudly instead of leaving a unit
+      # that restarts forever.
+      sops.secrets."openchamber/ui_password" = {
+        owner = config.my.user.primary;
+        mode = "0400";
+      };
+      sops.secrets."openchamber/jwt_secret" = {
+        owner = config.my.user.primary;
+        mode = "0400";
+      };
+
       my.contracts.provides.openchamber.endpoints.ui = {
         port = cfg.server.port;
         protocol = "tcp";
@@ -67,6 +108,54 @@ in
           interface = "wireguard";
           protocol = "tcp";
         };
+      };
+
+      # The instance is a user service. On a server nobody is logged in at all, so it has to outlive
+      # any login; on a personal computer the session owns it like every other user service, and a
+      # logged-out computer does not serve the peer - the requirement is a fact of the host class,
+      # which is why it is derived from the role instead of assumed from the enable switch.
+      users.users.${config.my.user.primary}.linger = lib.mkIf (config.my.role == "server") (
+        lib.mkDefault true
+      );
+    })
+
+    # A name is what makes the instance reachable from a network that is not the mesh, which is the
+    # reason to publish it at all. The ingress terminates TLS and the fleet single sign-on in front
+    # of it; the instance keeps enforcing its own UI password and device tokens behind that.
+    (lib.mkIf (cfg.enable && cfg.server.enable && cfg.server.publish.enable) {
+      my.contracts.provides.openchamber.publications.web = {
+        scope = "public";
+        endpoint = "ui";
+        auth = "authentik";
+        subdomain = cfg.server.publish.subdomain;
+
+        # The audience edge is the whole authentication boundary, so the name terminates there and
+        # nowhere else: forward-auth asks the central outpost, which answers on the authentik host
+        # alone, and a second vhost next to the instance would carry the name without a working
+        # gate. The instance is reached from the mesh by its overlay address, which is what the
+        # endpoint already opens.
+        ingressOnly = true;
+
+        # The instance runs commands and reads files on a real machine, so its audience is the same
+        # one that administers the fleet - stated, never inferred.
+        accessGroups = [ "infra-admins" ];
+
+        # Live traffic in both directions: the message and terminal transports are WebSockets and
+        # the event feeds are server-sent events. A proxy that buffers either turns a live session
+        # into one that answers after the fact, so the response is flushed as it arrives and the
+        # read stays open far longer than a request.
+        proxyOptions = ''
+          flush_interval -1
+          transport http {
+            read_timeout 3600s
+            write_timeout 3600s
+          }
+        '';
+
+        # A paired application carries the token the instance issued it rather than a browser
+        # session, and it cannot complete a sign-on redirect. The ingress lets a WebSocket with no
+        # browser origin through to the instance, which is where the token is checked.
+        machineClientsBypassAuth = true;
       };
     })
   ];

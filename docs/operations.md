@@ -164,6 +164,7 @@ Standing conditions that will bite an operator who does not know them.
 | `nod switch` writes the boot entry but advances no profile generation | systemd-boot derives its default from the profile generation, so a reboot can bring a host back on an older configuration. Pin it by hand after a deploy: `nix-env -p /nix/var/nix/profiles/system --set <closure> && switch-to-configuration boot` |
 | Nothing may write shell commands into the firewall | the policy is data, projected into the firewall rule options under nftables, which renders and applies one ruleset atomically. A command-shaped policy once flushed a zone NAT mid-reload and left a withdrawn rule in the chain forever |
 | Home Assistant carries OAuth backports for the MCP server | `packages/overlays/fix/home-assistant/` backports upstream PKCE metadata and frontend behaviour until 2026.10; the overlay applies them only while the version is older and warns once it is not, so a nixpkgs bump makes the files dead rather than breaking the build |
+| A public name gets its certificate only once the name exists in DNS | the CA's resolvers cache the answer it saw before the name was created, so a challenge can keep failing until that cache expires - the zone's SOA minimum, 1800 s here. Order a deployment that introduces a public name the other way round - record first, vhost second - and read the ACME log instead of the site's silence |
 | The Bluetooth adapter on `hom-srv-01` can return on a different `hci` index | a replug can bring it back as `hci1` while Home Assistant still looks for `hci0`, leaving the integration in `setup_retry` until the service restarts |
 | An OIDC identity link can move under a service | a changed `auth_id` makes the service read the login as a new account and the sync fail. Repair the one row, never delete the user - and derive role names from the publication (`adminGroups`), because a hand-written name that does not exist silently makes everyone a Viewer |
 
@@ -192,3 +193,35 @@ for the package build platform, not copied between platforms; an empty hash boot
 a normal build then fails loudly with a mismatch. OpenCode uses this schema, with the fleet Bun package
 checked against the upstream `packageManager` requirement - an unsupported version fails loudly rather
 than accepting an unverified dependency tree.
+
+## 9. The agent workspace
+
+`hom-srv-01` runs the always-on OpenChamber instance the other devices pair with: a user service bound to the
+overlay address `10.10.100.10:3000`, serving the browser interface, and published as `chamber.vyrx.de` through
+the ingress and the fleet single sign-on. A personal computer runs its own instance only while its session is
+up, so the machine that never sleeps is the one to pair with.
+
+Pair from the instance's browser interface (*Settings - Remote Instances - Add a device*), or mint a link on
+the server as the operator:
+
+```bash
+openchamber connect-url --port 3000 --server http://10.10.100.10:3000 --qr
+```
+
+`--server` is the address the link carries, and it is the overlay address on purpose: `OPENCHAMBER_LAN_URL`
+names the same one, so the dialog and the command mint the same link, and a device on the mesh then reaches
+the instance directly. Scan the printed code in the mobile app, or open the printed
+`openchamber://connect?v=2&p=...` link on the machine that runs the desktop app. It is single use, expires on
+its own and never carries the UI password; the device then holds its own token, listed and revocable under
+*Settings - Remote Instances*.
+
+Off the mesh the browser uses `https://chamber.vyrx.de`, which the ingress serves only once the single sign-on
+has admitted a session; the audience is `infra-admins`. A paired application sends no `Origin` on its
+WebSocket upgrade, so the ingress hands that connection to the instance, which checks the device token
+itself. The instance is bound to the overlay address, so a device that cannot resolve that address needs a
+name it can reach - not the link above.
+
+Two properties of the command are worth knowing before it runs. It writes a relay identity into
+`~/.config/openchamber/relay-identity.json` when none exists: that file must never enter a backup or a
+dotfile repository, and a new identity invalidates every earlier pairing. And it starts a server when nothing
+answers on the port, so read the port before minting a link on a machine that should not be serving.

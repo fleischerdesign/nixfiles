@@ -13,14 +13,47 @@ let
   # derivations of the OpenCode binary, so deriving them again is not a second fact - it is the same
   # fact read where it is used.
   opencodeBinary = "${osConfig.my.features.dev.opencode.package}/bin/opencode";
-  withOpenCode =
+
+  # What every OpenChamber surface needs to find its tools, resolved here instead of inherited from
+  # whatever PATH the caller happens to have. Bun is deliberately absent: the packaged interface is
+  # the Node build, so a Bun path here would configure a runtime nothing uses.
+  environment = ''
+    export OPENCODE_BINARY=${lib.escapeShellArg opencodeBinary}
+    export OPENCHAMBER_GIT_BINARY=${lib.escapeShellArg "${pkgs.git}/bin/git"}
+  '';
+
+  launcher =
     name: target:
     pkgs.writeShellScriptBin name ''
-      export OPENCODE_BINARY=${lib.escapeShellArg opencodeBinary}
+      ${environment}
       exec ${target} "$@"
     '';
-  web = withOpenCode "openchamber" "${pkgs.custom.openchamber-web}/bin/openchamber";
-  desktop = withOpenCode "openchamber-desktop" "${pkgs.custom.openchamber-desktop}/bin/openchamber-desktop";
+  web = launcher "openchamber" "${pkgs.custom.openchamber-web}/bin/openchamber";
+  desktop = launcher "openchamber-desktop" "${pkgs.custom.openchamber-desktop}/bin/openchamber-desktop";
+
+  # The server refuses to bind a reachable address without a UI password, and it signs the tokens it
+  # hands a paired device with a key that has to outlive a restart - a key minted fresh at every
+  # start would drop every paired device. Neither value belongs in this file, so the wrapper reads
+  # both out of the secret store at start, exactly like the OpenCode launcher reads its provider
+  # credentials, and they never enter the unit environment where a status query would print them.
+  secretPath = name: (osConfig.sops.secrets or { }).${name}.path or "/run/secrets/${name}";
+  serverArguments = lib.concatStringsSep " " (
+    [
+      "--foreground"
+      "--port"
+      (toString system.server.port)
+      "--host"
+      meshAddress
+    ]
+    ++ lib.optional system.server.apiOnly "--api-only"
+  );
+  serverCommand = pkgs.writeShellScriptBin "openchamber-serve" ''
+    set -euo pipefail
+    ${environment}
+    export OPENCHAMBER_UI_PASSWORD="$(< ${secretPath "openchamber/ui_password"})"
+    export OPENCODE_JWT_SECRET="$(< ${secretPath "openchamber/jwt_secret"})"
+    exec ${web}/bin/openchamber serve ${serverArguments}
+  '';
 
   # The headless server binds the overlay address: the one address every other mesh node can
   # reach, and the address whose port the endpoint contract opens. It is derived from the
@@ -57,7 +90,7 @@ in
       };
 
       Service = {
-        ExecStart = "${web}/bin/openchamber serve --foreground --port ${toString system.server.port} --host ${meshAddress} --api-only";
+        ExecStart = "${serverCommand}/bin/openchamber-serve";
         Environment = [ "OPENCHAMBER_LAN_URL=http://${meshAddress}:${toString system.server.port}" ];
         Restart = "always";
         RestartSec = 5;

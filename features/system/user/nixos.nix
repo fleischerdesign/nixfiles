@@ -81,6 +81,17 @@ in
       default = [ "core" ];
       description = "Active Home-Manager atomic profiles for primary user (e.g. core, graphical).";
     };
+
+    aiCredentialFiles = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      readOnly = true;
+      description = ''
+        The AI provider credentials the operator's tools read at runtime, as environment variable
+        name to secret file. Declared once for the fleet, so a role and a host name the set instead
+        of restating the same paths; the operator owns the files because the launchers run as that
+        user.
+      '';
+    };
   };
 
   config = lib.mkMerge (
@@ -108,6 +119,19 @@ in
       (lib.mkIf (config ? sops) {
         sops.secrets."users/${cfg.primary}/password".neededForUsers = lib.mkDefault true;
         my.user.hashedPasswordFile = lib.mkDefault config.sops.secrets."users/${cfg.primary}/password".path;
+      })
+      (lib.mkIf (config ? sops) {
+        my.user.aiCredentialFiles = {
+          DEEPSEEK_API_KEY = config.sops.secrets."ai/deepseek_api_key".path;
+          OPENROUTER_API_KEY = config.sops.secrets."ai/openrouter_api_key".path;
+          OPENCODE_API_KEY = config.sops.secrets."ai/opencode_api_key".path;
+        };
+
+        sops.secrets = {
+          "ai/deepseek_api_key".owner = lib.mkDefault cfg.primary;
+          "ai/openrouter_api_key".owner = lib.mkDefault cfg.primary;
+          "ai/opencode_api_key".owner = lib.mkDefault cfg.primary;
+        };
       })
       {
         environment.sessionVariables = lib.mkIf (cfg.sopsAgeKeyFile != null) {
