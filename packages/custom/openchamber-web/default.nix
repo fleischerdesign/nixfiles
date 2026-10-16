@@ -2,13 +2,13 @@
   buildNpmPackage,
   lib,
   makeWrapper,
-  nodejs_22,
+  nodejs_24,
 }:
 buildNpmPackage {
   pname = "openchamber-web";
-  version = "2.0.1";
+  version = "2.3.3";
   src = ./.;
-  npmDepsHash = "sha256-h60yBZCH1BIqytikCUPhPbB+VA9reonp1siEglgSkMM=";
+  npmDepsHash = "sha256-LXn4P3MX4JR2SimtQ2U5jhPgHKyTMXNav7oioEgJyFY=";
   dontNpmBuild = true;
   nativeBuildInputs = [ makeWrapper ];
 
@@ -16,7 +16,7 @@ buildNpmPackage {
     runHook preInstall
     mkdir -p "$out/lib/openchamber" "$out/bin"
     cp -r node_modules "$out/lib/openchamber/"
-    makeWrapper "${nodejs_22}/bin/node" "$out/bin/openchamber" \
+    makeWrapper "${nodejs_24}/bin/node" "$out/bin/openchamber" \
       --add-flags "$out/lib/openchamber/node_modules/@openchamber/web/bin/cli.js"
     runHook postInstall
   '';

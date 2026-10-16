@@ -103,7 +103,7 @@ in
       name = "OpenChamber";
       genericName = "Coding workspace";
       exec = "${desktop}/bin/openchamber-desktop";
-      icon = "${pkgs.custom.openchamber-desktop}/share/icons/hicolor/scalable/apps/openchamber.svg";
+      icon = "${pkgs.custom.openchamber-desktop}/share/icons/hicolor/512x512/apps/openchamber.png";
       categories = [ "Development" ];
       terminal = false;
     };

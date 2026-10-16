@@ -59,7 +59,7 @@
       inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
     };
 
-    opencode.url = "github:anomalyco/opencode/v2";
+    opencode.url = "github:anomalyco/opencode/dev";
   };
 
   outputs =
@@ -89,6 +89,26 @@
             );
             upstream = inputs.opencode.packages.${system}.opencode;
             manifest = builtins.fromJSON (builtins.readFile ./packages/custom/opencode/manifest.json);
+
+            # The source tree upstream builds the CLI from leaves out the repository root
+            # `script/` directory, which packages/cli/script/build.ts imports since v2.0.28,
+            # so the from-source build stops with "Cannot find module '../../../script/native-arch'".
+            # Upstream's fix (adding `../script` to the fileset) is open as PR #55494; until it
+            # lands, the directory is added here. The dependency tree never reads it, so the
+            # measured node_modules hash is unchanged. Remove this once the fix is released.
+            nodeModules =
+              (upstream.node_modules.override {
+                bun = final.bun;
+                hash = manifest.dependencyHashes.${system}.node_modules or "";
+              }).overrideAttrs
+                (old: {
+                  src = final.runCommandLocal "opencode-cli-src" { } ''
+                    mkdir -p $out
+                    cp -r --no-preserve=mode ${old.src}/. $out/
+                    chmod -R u+w $out
+                    cp -r --no-preserve=mode ${inputs.opencode}/script $out/script
+                  '';
+                });
           in
           {
             opencode-v2 =
@@ -98,10 +118,7 @@
                 # Upstream v2's completion hook currently runs from a missing directory.
                 (upstream.override {
                   bun = final.bun;
-                  node_modules = upstream.node_modules.override {
-                    bun = final.bun;
-                    hash = manifest.dependencyHashes.${system}.node_modules or "";
-                  };
+                  node_modules = nodeModules;
                 }).overrideAttrs
                   (_: {
                     postInstall = "";
