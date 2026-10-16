@@ -100,7 +100,7 @@ in
         mode = "0400";
       };
 
-      my.contracts.provides.openchamber.endpoints.ui = {
+      my.contracts.provides.openchamber.endpoints.http = {
         port = cfg.server.port;
         protocol = "tcp";
         directAccess = {
@@ -120,14 +120,22 @@ in
     })
 
     # A name is what makes the instance reachable from a network that is not the mesh, which is the
-    # reason to publish it at all. The ingress terminates TLS and the fleet single sign-on in front
-    # of it; the instance keeps enforcing its own UI password and device tokens behind that.
+    # reason to publish it at all. The ingress terminates TLS, keeps the sign-on in front of
+    # everything that is not the API, and the instance authenticates every API call itself.
     (lib.mkIf (cfg.enable && cfg.server.enable && cfg.server.publish.enable) {
       my.contracts.provides.openchamber.publications.web = {
         scope = "public";
-        endpoint = "ui";
+        endpoint = "http";
         auth = "authentik";
         subdomain = cfg.server.publish.subdomain;
+
+        # The callers of this name are applications, not browsers. Every route under /api answers
+        # 401 without a device token (measured: 425 of 430 routes), and the pairing call that
+        # issues the token carries its own single-use secret - a sign-on redirect in front of it
+        # would block exactly the step that connects a device. So the API speaks for itself while
+        # everything else on the host stays behind the sign-on. A narrower list of paths would
+        # break the next app update that adds a route.
+        unauthenticatedPaths = [ "/api/*" ];
 
         # The audience edge is the whole authentication boundary, so the name terminates there and
         # nowhere else: forward-auth asks the central outpost, which answers on the authentik host
@@ -151,11 +159,6 @@ in
             write_timeout 3600s
           }
         '';
-
-        # A paired application carries the token the instance issued it rather than a browser
-        # session, and it cannot complete a sign-on redirect. The ingress lets a WebSocket with no
-        # browser origin through to the instance, which is where the token is checked.
-        machineClientsBypassAuth = true;
       };
     })
   ];

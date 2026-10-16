@@ -100,8 +100,8 @@
           enable = true;
           server = {
             # This is the instance reachable from a network that is not the mesh, so it is the one
-            # that serves the browser interface and the one the ingress puts a name on.
-            apiOnly = false;
+            # the ingress puts a name on. It serves the API alone: its callers are the apps on
+            # machines that cannot join the mesh, and every route authenticates them itself.
             publish.enable = true;
           };
         };
