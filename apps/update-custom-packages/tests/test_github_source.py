@@ -12,6 +12,7 @@ import unittest
 UPDATER = Path(sys.argv.pop(1)).resolve()
 SOURCE_HASH = "sha256-" + "B" * 43 + "="
 CARGO_HASH = "sha256-" + "C" * 43 + "="
+BUN_HASH = "sha256-" + "D" * 43 + "="
 
 MOCK_NIX = r'''#!/usr/bin/env python3
 import json
@@ -25,15 +26,15 @@ drv = "/nix/store/test-" + attribute + ".drv"
 if sys.argv[1] == "eval":
     print(drv, end="")
     sys.exit(0)
-if os.environ.get("FAIL_BUILD") == "network":
+if os.environ.get("FAIL_BUILD") == "network" or (os.environ.get("FAIL_BUILD") == "bun-network" and attribute == "bunDeps"):
     print("error: download failed: connection refused", file=sys.stderr)
     sys.exit(1)
-key = "srcHash" if attribute == "src" else "cargoHash"
+key = {"src": "srcHash", "bunDeps": "bunDepsHash"}.get(attribute, "cargoHash")
 if not manifest[key]:
     # A dependency's hash mismatch must not be used for the requested output.
-    if os.environ.get("FAIL_BUILD") == "dependency":
+    if os.environ.get("FAIL_BUILD") == "dependency" or (os.environ.get("FAIL_BUILD") == "bun-dependency" and attribute == "bunDeps"):
         drv = "/nix/store/unrelated.drv"
-    actual = "sha256-" + ("B" if key == "srcHash" else "C") * 43 + "="
+    actual = "sha256-" + {"srcHash": "B", "cargoHash": "C", "bunDepsHash": "D"}[key] * 43 + "="
     print("error: hash mismatch in fixed-output derivation '" + drv + "':", file=sys.stderr)
     print("           likely URL: (unknown)", file=sys.stderr)
     print("            specified: sha256-" + "A" * 43 + "=", file=sys.stderr)
@@ -84,6 +85,31 @@ class SourceUpdateTests(unittest.TestCase):
         self.assertEqual(actual["version"], "2.0.0")
         self.assertEqual(actual["srcHash"], SOURCE_HASH)
         self.assertEqual(actual["cargoHash"], CARGO_HASH)
+
+    def test_bun_source_update_verifies_dependency_hash(self):
+        manifest = json.loads(self.original)
+        del manifest["cargoHash"]
+        manifest["bunDepsHash"] = "original-bun"
+        self.original = json.dumps(manifest) + "\n"
+        self.manifest.write_text(self.original)
+        result = self.run_update()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        actual = json.loads(self.manifest.read_text())
+        self.assertEqual(actual["version"], "2.0.0")
+        self.assertEqual(actual["srcHash"], SOURCE_HASH)
+        self.assertEqual(actual["bunDepsHash"], BUN_HASH)
+
+    def test_bun_failures_restore_source_and_dependency_hashes(self):
+        manifest = json.loads(self.original)
+        manifest["bunDepsHash"] = "original-bun"
+        self.original = json.dumps(manifest) + "\n"
+        self.manifest.write_text(self.original)
+        for failure in ("bun-network", "bun-dependency"):
+            with self.subTest(failure=failure):
+                result = self.run_update(failure)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("error:", result.stderr)
+                self.assertEqual(self.manifest.read_text(), self.original)
 
     def test_failures_are_loud_and_restore_original_bytes(self):
         for failure in ("network", "dependency", "verification"):

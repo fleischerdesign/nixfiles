@@ -29,7 +29,22 @@ let
       exec ${target} "$@"
     '';
   web = launcher "openchamber" "${pkgs.custom.openchamber-web}/bin/openchamber";
-  desktop = launcher "openchamber-desktop" "${pkgs.custom.openchamber-desktop}/bin/openchamber-desktop";
+  manifest = pkgs.writeText "openchamber-mesh.json" (builtins.toJSON system.mesh.manifest);
+  manifestPath = "${config.xdg.configHome}/openchamber/managed-hosts.json";
+  statePath = "${config.xdg.stateHome}/openchamber-mesh/state.json";
+  desktop = pkgs.writeShellScriptBin "openchamber-desktop" ''
+    ${environment}
+    ${lib.optionalString system.server.enable ''
+      ${pkgs.systemd}/bin/systemctl --user start --no-block openchamber-mesh.service
+    ''}
+    export OPENCHAMBER_MANAGED_HOSTS_CONFIG=${lib.escapeShellArg manifestPath}
+    export OPENCHAMBER_MANAGED_HOSTS_STATE=${lib.escapeShellArg statePath}
+    exec ${pkgs.custom.openchamber-desktop}/bin/openchamber-desktop "$@"
+  '';
+  reconcile = pkgs.writeShellScriptBin "openchamber-mesh-sync" ''
+    exec ${pkgs.python3}/bin/python3 ${./lib/reconcile.py} \
+      ${manifest} ${lib.escapeShellArg statePath} ${lib.escapeShellArg (secretPath "openchamber/ui_password")} "$@"
+  '';
 
   # The server refuses to bind a reachable address without a UI password, and it signs the tokens it
   # hands a paired device with a key that has to outlive a restart - a key minted fresh at every
@@ -74,8 +89,35 @@ in
       }
     ];
 
+    xdg.configFile."openchamber/managed-hosts.json".source = manifest;
+
     home.packages =
-      lib.optionals system.web.enable [ web ] ++ lib.optionals system.desktop.enable [ desktop ];
+      lib.optionals system.web.enable [ web ]
+      ++ lib.optionals system.desktop.enable [ desktop ]
+      ++ lib.optionals system.server.enable [ reconcile ];
+
+    # Keep the reconciler when mesh management is disabled: the empty manifest
+    # revokes previously managed grants without touching manually paired devices.
+    systemd.user.services.openchamber-mesh = lib.mkIf system.server.enable {
+      Unit = {
+        Description = "Reconcile Nix-managed OpenChamber connections";
+        After = [ "openchamber.service" ];
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = "${reconcile}/bin/openchamber-mesh-sync";
+        UMask = "0077";
+      };
+    };
+    systemd.user.timers.openchamber-mesh = lib.mkIf system.server.enable {
+      Unit.Description = "Reconcile OpenChamber access after changes and when peers return";
+      Timer = {
+        OnStartupSec = "10s";
+        OnUnitInactiveSec = "60s";
+        Unit = "openchamber-mesh.service";
+      };
+      Install.WantedBy = [ "timers.target" ];
+    };
 
     # A headless server on the mesh, so the other personal computer reaches this one with the
     # instance switcher. It is a user service, like the OpenCodex proxy: the session owns it, and

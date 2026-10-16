@@ -233,12 +233,16 @@ refresh_source_package() (
     .version = $version | .srcHash = ""
     | (if has("cargoHash") then .cargoHash = "" else . end)
     | (if has("npmDepsHash") then .npmDepsHash = "" else . end)
+    | (if has("bunDepsHash") then .bunDepsHash = "" else . end)
   ' "$manifest" > "$work/manifest.json"
   cp "$work/manifest.json" "$manifest"
   refresh_fixed_hash "$manifest" "$package" srcHash src "$work"
   if jq -e 'has("cargoHash")' "$manifest" > /dev/null; then
     refresh_fixed_hash "$manifest" "$package" cargoHash cargoDeps.vendorStaging "$work"
     nix build --no-link --print-build-logs ".#${package}.cargoDeps"
+  fi
+  if jq -e 'has("bunDepsHash")' "$manifest" > /dev/null; then
+    refresh_fixed_hash "$manifest" "$package" bunDepsHash bunDeps "$work"
   fi
   if jq -e 'has("npmDepsHash")' "$manifest" > /dev/null; then
     refresh_fixed_hash "$manifest" "$package" npmDepsHash npmDeps "$work"

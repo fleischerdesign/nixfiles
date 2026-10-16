@@ -149,13 +149,41 @@ The default model is the role's declaration and has to exist in the gateway the 
 does not offer is a broken default, not a preference.
 
 `features/dev/openchamber` builds on that launcher: the web and desktop interfaces are launchers of the same
-OpenCode binary, so an interface and the host share one version and one credential set. `server.enable` adds
-a headless instance as a user service on the host's overlay address, which is the port the endpoint contract
-opens for the mesh; where the role is a server the feature also sets the operator's `linger`, because nobody
+OpenCode binary, so an interface and the host share one version and one credential set.
+`/etc/openchamber/policy.json` pins that executable through OpenChamber's machine policy, including its
+credential wrapper, so Settings cannot select or install an independent CLI. The desktop package
+builds the tagged OpenChamber source with its locked Bun dependencies and runs on Nixpkgs Electron, with
+`node-pty` compiled against that runtime's headers. It uses the host filesystem directly, including
+`/etc/nixos`; no AppImage FHS environment remaps system paths. Desktop updates are managed by Nix, and
+the package's install check exercises the server import, bundled UI, native speech addon and PTY execution.
+The flake's `openchamber-desktop` check starts the graphical app in Xvfb and verifies its project-browser
+API outside the home directory and its Nix-managed update behavior. `server.enable` adds a headless instance
+as a user service on the host's overlay address, which is the port the endpoint contract opens for the mesh; where the role is a server the feature also sets the operator's `linger`, because nobody
 logs in there to start it. The instance reads two secrets from the store at start - `openchamber/ui_password`, without which it
 refuses to bind a reachable address, and `openchamber/jwt_secret`, which signs the tokens issued to paired
 devices, where a key minted fresh at every start would drop every pairing on every restart. Both are owned by
 the operator and exported into the process rather than the unit environment, so no status query prints them.
+`mesh.enable` manages directed connections between fleet instances. Desktop hosts default to every other
+enabled mesh instance; headless hosts have no outgoing targets. `mesh.targets` can narrow a desktop's
+selection. Addresses and ports come from the target's topology and service declaration. The desktop reads
+public intent from a generated manifest and device tokens from the private
+`$XDG_STATE_HOME/openchamber-mesh/state.json`; it merges them with personal connections without writing
+managed tokens into `settings.json`. The active desktop runtime adopts renewed credentials in place.
+
+The primary user's `openchamber-mesh` timer reconciles every minute. It authenticates with the existing
+SOPS-managed fleet UI password, issues a distinct `desktop` grant for each client-target pair, and reuses
+valid tokens. It restores declared access after revocation and revokes removed connections. Offline
+targets remain pending without blocking other connections; their retired grants are revoked when they
+return. Each target also prunes obsolete incoming grants in the reserved `nix-openchamber:` label namespace,
+so removal does not depend on the original client retaining its state. Disabling mesh management leaves
+the cleanup timer running while the OpenChamber server remains enabled. Changes take effect as each
+host's configuration is activated; peers on older generations retain their previous declared intent.
+
+`openchamber-mesh-sync --status` prints status without tokens or passwords. Running it without `--status`
+performs an immediate reconciliation. The cache is private runtime state, not a declarative secret.
+Manually paired devices, including the phone, stay outside this management namespace. Pair the phone once
+with each of the server, desktop and notebook; all three are reachable through its declared WireGuard peer.
+
 `server.apiOnly` (default true) serves the API alone, which is what a native client needs, and
 `server.publish.enable` puts the interface on a public name the ingress terminates alone: there the ingress is
 the authentication boundary, and the central forward-auth outpost answers on the authentik host alone. The

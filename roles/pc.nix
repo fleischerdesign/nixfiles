@@ -70,6 +70,7 @@
       credentialFiles = config.my.user.aiCredentialFiles;
     };
     openchamber = {
+      mesh.enable = lib.mkDefault true;
       enable = lib.mkDefault true;
       web.enable = lib.mkDefault true;
       desktop.enable = lib.mkDefault true;

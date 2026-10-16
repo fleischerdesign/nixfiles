@@ -9,6 +9,8 @@ let
   ownHost = config.my.topology.hosts.${config.networking.hostName} or null;
 in
 {
+  imports = [ ./mesh.nix ];
+
   options.my.features.dev.openchamber = {
     enable = lib.mkEnableOption "OpenChamber workspace for Home Manager users";
 
@@ -29,8 +31,7 @@ in
         default = true;
         description = ''
           Serve the API without the browser interface assets - the headless mode a native client
-          needs and nothing more. A browser reaches the interface through the publication below,
-          which is why an instance published for browsers turns this off.
+          needs and nothing more. Serving the browser interface requires disabling this explicitly.
         '';
       };
 
@@ -47,6 +48,13 @@ in
   };
 
   config = lib.mkMerge [
+    (lib.mkIf cfg.enable {
+      # Use the upstream machine policy so every surface keeps Nix's CLI and
+      # credentials instead of offering an independent OpenCode installation.
+      environment.etc."openchamber/policy.json".text = builtins.toJSON {
+        opencodeBinary = "${config.my.features.dev.opencode.package}/bin/opencode";
+      };
+    })
     {
       assertions =
         lib.optionals cfg.enable [

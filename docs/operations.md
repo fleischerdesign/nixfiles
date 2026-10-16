@@ -197,12 +197,14 @@ than accepting an unverified dependency tree.
 ## 9. The agent workspace
 
 `hom-srv-01` runs the always-on OpenChamber instance the other devices pair with: a user service bound to the
-overlay address `10.10.100.10:3000`, serving the browser interface, and published as `chamber.vyrx.de` through
-the ingress and the fleet single sign-on. A personal computer runs its own instance only while its session is
+overlay address `10.10.100.10:3000`, serving the API, and published as `chamber.vyrx.de` through
+the ingress. Application API calls use device tokens; the publication keeps non-API routes behind fleet
+single sign-on. A personal computer runs its own instance only while its session is
 up, so the machine that never sleeps is the one to pair with.
 
-Pair from the instance's browser interface (*Settings - Remote Instances - Add a device*), or mint a link on
-the server as the operator:
+PC and notebook receive their outgoing connections and individual grants through the declarative mesh
+reconciler described in [Desktop](desktop.md). The server has no outgoing peers. Mobile connections are
+paired manually and remain untouched by that reconciler. Mint a link on the target as the operator:
 
 ```bash
 openchamber connect-url --port 3000 --server http://10.10.100.10:3000 --qr
@@ -215,8 +217,9 @@ the instance directly. Scan the printed code in the mobile app, or open the prin
 its own and never carries the UI password; the device then holds its own token, listed and revocable under
 *Settings - Remote Instances*.
 
-Off the mesh the browser uses `https://chamber.vyrx.de`, which the ingress serves only once the single sign-on
-has admitted a session; the audience is `infra-admins`. A paired application sends no `Origin` on its
+Off the mesh, paired applications can use `https://chamber.vyrx.de` for API access. The instance runs in
+API-only mode; this publication does not serve a browser workspace. Non-API routes require the
+`infra-admins` single sign-on audience. A paired application sends no `Origin` on its
 WebSocket upgrade, so the ingress hands that connection to the instance, which checks the device token
 itself. The instance is bound to the overlay address, so a device that cannot resolve that address needs a
 name it can reach - not the link above.

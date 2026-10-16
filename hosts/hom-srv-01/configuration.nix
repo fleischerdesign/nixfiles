@@ -97,6 +97,7 @@
         # them live in roles/pc.nix, this one is a fact of this host. No desktop interface here.
         opencode.enable = true;
         openchamber = {
+          mesh.enable = true;
           enable = true;
           server = {
             # This is the instance reachable from a network that is not the mesh, so it is the one
