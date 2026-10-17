@@ -23,7 +23,10 @@
 
   my.features.services.attic.server.enable = true;
 
-  my.features.services.openclaw.gateway.enable = true;
+  my.features.services.openclaw.gateway = {
+    enable = true;
+    opencodeApiKeySecret = "ai/opencode_api_key_2";
+  };
 
   my.features.services.crowdsec = {
     enable = true;

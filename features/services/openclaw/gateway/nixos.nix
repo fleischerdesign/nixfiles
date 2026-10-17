@@ -23,7 +23,7 @@ let
     export OPENCLAW_CONFIG_PATH=/etc/openclaw/openclaw.json
     unset OPENCLAW_GATEWAY_TOKEN
     export OPENCLAW_GATEWAY_PASSWORD="$(< ${config.sops.secrets."openclaw/gateway_password".path})"
-    export OPENCODE_API_KEY="$(< ${config.sops.secrets."ai/opencode_api_key".path})"
+    export OPENCODE_API_KEY="$(< ${config.sops.secrets.${cfg.opencodeApiKeySecret}.path})"
     export OPENROUTER_API_KEY="$(< ${config.sops.secrets."ai/openrouter_api_key".path})"
     export OPENAI_API_KEY="$(< ${config.sops.secrets."ai/openai_api_key".path})"
     exec ${pkgs.util-linux}/bin/runuser -u openclaw -- ${package}/bin/openclaw "$@"
@@ -49,6 +49,11 @@ in
       default = "opencode-go/deepseek-v4.1-flash";
       description = "Default provider/model reference for the native OpenClaw runtime.";
     };
+    opencodeApiKeySecret = lib.mkOption {
+      type = lib.types.str;
+      default = "ai/opencode_api_key";
+      description = "SOPS secret containing the active OpenCode subscription API key.";
+    };
     settings = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       default = { };
@@ -65,12 +70,12 @@ in
     ];
 
     sops.secrets."openclaw/gateway_password" = { };
-    sops.secrets."ai/opencode_api_key" = { };
+    sops.secrets.${cfg.opencodeApiKeySecret} = { };
     sops.secrets."ai/openrouter_api_key" = { };
     sops.secrets."ai/openai_api_key" = { };
     sops.templates.openclaw-gateway-env.content = ''
       OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder."openclaw/gateway_password"}
-      OPENCODE_API_KEY=${config.sops.placeholder."ai/opencode_api_key"}
+      OPENCODE_API_KEY=${config.sops.placeholder.${cfg.opencodeApiKeySecret}}
       OPENROUTER_API_KEY=${config.sops.placeholder."ai/openrouter_api_key"}
       OPENAI_API_KEY=${config.sops.placeholder."ai/openai_api_key"}
     '';

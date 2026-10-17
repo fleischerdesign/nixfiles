@@ -218,6 +218,10 @@ runtime and never enter the Nix store. Shared Gateway tokens are incompatible wi
 and are not configured.
 
 The default model is DeepSeek V4.1 Flash through OpenCode Go, using the native OpenClaw runtime.
+The gateway's `opencodeApiKeySecret` selects the active subscription for both the service and
+administrative CLI. `cld-ops-01` selects `ai/opencode_api_key_2`; the first subscription remains
+stored separately as `ai/opencode_api_key`. Switching this option requires a gateway deployment.
+Other OpenCode consumers retain their own configured credential selection.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
 cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;
