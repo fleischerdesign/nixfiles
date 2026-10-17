@@ -218,6 +218,8 @@ runtime and never enter the Nix store. Shared Gateway tokens are incompatible wi
 and are not configured.
 
 The default model is DeepSeek V4.1 Flash through OpenCode Go, using the native OpenClaw runtime.
+Model selection uses the dynamically discovered provider catalog with an unrestricted model policy;
+the default model does not impose a one-model restriction or an explicit per-model runtime binding.
 The gateway's ordered `opencodeSubscriptions` list provisions stable, named auth profiles through
 OpenClaw's supported secrets-plan CLI before startup. Profiles store environment SecretRefs; API keys
 remain in SOPS and the runtime environment. The importer uses a temporary config copy because the

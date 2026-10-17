@@ -220,7 +220,9 @@ in
         };
         agents.defaults = {
           model.primary = cfg.model;
-          models.${cfg.model}.agentRuntime.id = "openclaw";
+          # An explicit empty policy disables legacy restrictions inferred from
+          # model settings and keeps the provider's discovered catalog selectable.
+          modelPolicy = { };
           heartbeat = {
             every = "1h";
             lightContext = true;
