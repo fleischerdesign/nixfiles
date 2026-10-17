@@ -233,6 +233,12 @@ Provider-specific reset times are used only when OpenClaw recognizes them; no mo
 invented. An explicit per-agent auth-order override takes precedence over the declarative default.
 The service and administrative CLI receive both credentials. Other OpenCode consumers retain their
 own configured credential selection.
+The `web_search` tool runs against the fleet's SearXNG instance. The `searxng` runtime plugin is
+pinned through `nix-openclaw` and loaded by store path, so plugin installation stays outside the
+immutable config, and the provider is selected explicitly. A co-located gateway queries loopback,
+a remote gateway the provider's overlay address; the instance's machine-facing allowance already
+covers that path while browser traffic keeps the Authentik gate. The instance must keep the JSON
+API enabled.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
 cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;

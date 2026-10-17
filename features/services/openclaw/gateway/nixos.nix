@@ -12,6 +12,27 @@ let
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   meshAddress = config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4;
   ingressAddress = config.my.topology.hosts.${config.my.topology.ingressHost}.wireguardIpv4;
+  # Web search runs through the fleet's single SearXNG instance. A co-located
+  # gateway uses loopback; a remote gateway uses the provider's overlay address,
+  # which the machine-facing allowance already covers.
+  fleetConfigs = import ../../../../lib/fleet-configs.nix { inherit lib; };
+  systems = fleetConfigs.systems config;
+  searxngHost = fleetConfigs.uniqueHost {
+    inherit systems;
+    matches = host: host.my.features.services.searxng.enable or false;
+    role = "SearXNG";
+  };
+  searxng = systems.${searxngHost}.config.my.features.services.searxng;
+  searxngAddress = config.my.topology.hosts.${searxngHost}.wireguardIpv4;
+  searxngBaseUrl =
+    if searxngHost == config.networking.hostName then
+      "http://127.0.0.1:${toString searxng.port}"
+    else
+      "http://${searxngAddress}:${toString searxng.port}";
+  # Pinned runtime plugin from nix-openclaw; the load path keeps installation
+  # outside the immutable config.
+  searxngPlugin =
+    inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}."openclaw-runtime-plugin-searxng";
   subscriptions = lib.imap0 (
     index: subscription:
     subscription
@@ -141,6 +162,10 @@ in
             lib.length (lib.unique (map (subscription: subscription.name) subscriptions))
             == lib.length subscriptions;
         message = "OpenClaw requires at least one OpenCode subscription with unique names.";
+      }
+      {
+        assertion = searxngHost == config.networking.hostName || searxngAddress != null;
+        message = "OpenClaw web search requires the SearXNG host's overlay address.";
       }
     ];
 
@@ -273,6 +298,15 @@ in
         plugins.entries.acpx.enabled = false;
         plugins.entries.openrouter.enabled = true;
         plugins.entries.openai.enabled = true;
+        plugins.load.paths = [ "${searxngPlugin}" ];
+        plugins.entries.searxng = {
+          enabled = true;
+          config.webSearch.baseUrl = searxngBaseUrl;
+        };
+        tools.web.search = {
+          enabled = true;
+          provider = "searxng";
+        };
         plugins.entries.active-memory = {
           enabled = true;
           config = {
