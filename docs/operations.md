@@ -213,11 +213,34 @@ only to the verified owner's session. Client identity headers are stripped befor
 Single-use `/j/*` enrollment links, credentialed `/__openclaw__/worker` connections and non-browser
 WebSocket upgrades bypass browser SSO; OpenClaw verifies their own bootstrap, worker or paired-device
 credentials. The direct-local administrative CLI uses a separate password fallback, unavailable to
-proxied requests. This password and the OpenCode Go API key come from SOPS at runtime and never enter
-the Nix store. Shared Gateway tokens are incompatible with trusted-proxy mode and are not configured.
+proxied requests. This password and the OpenCode Go, OpenRouter and OpenAI API keys come from SOPS at
+runtime and never enter the Nix store. Shared Gateway tokens are incompatible with trusted-proxy mode
+and are not configured.
 
 The default model is DeepSeek V4.1 Flash through OpenCode Go, using the native OpenClaw runtime.
-Recurring heartbeats and cron are disabled. Gateway data participates in the host's Restic backup.
+The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
+cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
+Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;
+deeper model-based recall runs when recall intent lacks a strong deterministic memory match.
+Private transcript recall stays within the same agent. Indexing and nightly dreaming retain
+OpenClaw's maintained defaults. Workspace memory, personality and working instructions remain
+runtime-owned and are edited through OpenClaw.
+
+Automations are enabled. Heartbeats run hourly with lightweight context in isolated sessions;
+their delivery target is `none` because the installation has no external messaging channel.
+Heartbeat results remain internal; this does not establish browser push or mobile notifications.
+Recurring tasks and reminders are managed through OpenClaw's automations UI or CLI, not Nix.
+Dreaming and other built-in maintenance jobs use the same scheduler and the default agent model.
+
+Browser and native-app Talk use OpenAI `gpt-live-1` with voice `marin` through the Gateway-owned
+realtime relay. The relay supports Android and the browser without exposing the Platform key to
+clients. GPT-Live delegates agent work to the default DeepSeek model through `agent-consult`.
+The speech locale is German and speech interruption is enabled. Non-realtime speech playback retains
+OpenRouter `google/gemini-3.1-flash-tts-preview` with voice `Kore` as its configured provider.
+Client microphone permission, audio playback and billable voice sessions require an actual client
+session to verify.
+
+Gateway data participates in the host's Restic backup.
 Inspect the service with `journalctl -u openclaw-gateway`; administrative CLI operations run as the
 service account through `sudo openclaw-gateway-admin <command>` on the gateway host.
 

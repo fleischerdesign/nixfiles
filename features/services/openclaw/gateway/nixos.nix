@@ -24,6 +24,8 @@ let
     unset OPENCLAW_GATEWAY_TOKEN
     export OPENCLAW_GATEWAY_PASSWORD="$(< ${config.sops.secrets."openclaw/gateway_password".path})"
     export OPENCODE_API_KEY="$(< ${config.sops.secrets."ai/opencode_api_key".path})"
+    export OPENROUTER_API_KEY="$(< ${config.sops.secrets."ai/openrouter_api_key".path})"
+    export OPENAI_API_KEY="$(< ${config.sops.secrets."ai/openai_api_key".path})"
     exec ${pkgs.util-linux}/bin/runuser -u openclaw -- ${package}/bin/openclaw "$@"
   '';
 in
@@ -64,9 +66,13 @@ in
 
     sops.secrets."openclaw/gateway_password" = { };
     sops.secrets."ai/opencode_api_key" = { };
+    sops.secrets."ai/openrouter_api_key" = { };
+    sops.secrets."ai/openai_api_key" = { };
     sops.templates.openclaw-gateway-env.content = ''
       OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder."openclaw/gateway_password"}
       OPENCODE_API_KEY=${config.sops.placeholder."ai/opencode_api_key"}
+      OPENROUTER_API_KEY=${config.sops.placeholder."ai/openrouter_api_key"}
+      OPENAI_API_KEY=${config.sops.placeholder."ai/openai_api_key"}
     '';
     sops.templates.openclaw-gateway-env.restartUnits = [ "openclaw-gateway.service" ];
 
@@ -116,11 +122,71 @@ in
         agents.defaults = {
           model.primary = cfg.model;
           models.${cfg.model}.agentRuntime.id = "openclaw";
-          heartbeat.every = "0m";
+          heartbeat = {
+            every = "1h";
+            lightContext = true;
+            isolatedSession = true;
+            # Browser/app users have no external channel delivery route.
+            target = "none";
+          };
         };
-        cron.enabled = false;
+        cron.enabled = true;
+        memory.search = {
+          enabled = true;
+          rememberAcrossConversations = true;
+          sources = [
+            "memory"
+            "sessions"
+          ];
+          provider = "openai-compatible";
+          model = "openai/text-embedding-3-small";
+          remote = {
+            baseUrl = "https://openrouter.ai/api/v1";
+            apiKey = "\${OPENROUTER_API_KEY}";
+          };
+        };
+        talk = {
+          provider = "openrouter";
+          providers.openrouter = {
+            modelId = "google/gemini-3.1-flash-tts-preview";
+            speakerVoice = "Kore";
+            responseFormat = "mp3";
+            apiKey = "\${OPENROUTER_API_KEY}";
+          };
+          speechLocale = "de-DE";
+          interruptOnSpeech = true;
+          realtime = {
+            provider = "openai";
+            providers.openai = {
+              model = "gpt-live-1";
+              speakerVoice = "marin";
+              apiKey = "\${OPENAI_API_KEY}";
+            };
+            mode = "realtime";
+            # Android requires the relay; the browser supports it as well.
+            transport = "gateway-relay";
+            brain = "agent-consult";
+          };
+        };
         discovery.mdns.mode = "off";
         plugins.entries.acpx.enabled = false;
+        plugins.entries.openrouter.enabled = true;
+        plugins.entries.openai.enabled = true;
+        plugins.entries.active-memory = {
+          enabled = true;
+          config = {
+            enabled = true;
+            mode = "escalate";
+            allowedChatTypes = [
+              "direct"
+              "explicit"
+            ];
+          };
+        };
+        plugins.entries.memory-core = {
+          enabled = true;
+          config.dreaming.enabled = true;
+        };
         plugins.entries.device-pair.config.publicUrl = "https://${domain}";
         logging.file = "${stateDir}/logs/openclaw.log";
       } cfg.settings;
