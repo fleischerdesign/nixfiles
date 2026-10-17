@@ -1,0 +1,13 @@
+{
+  "name": "composio",
+  "version": "0.4.5",
+  "hash": "sha256-heRpydp1u+SbGbANhJxabHe5uiHDmE/Ja6ZZ/CaeFyA=",
+  "upstream": {
+    "type": "github-release",
+    "owner": "ComposioHQ",
+    "repo": "composio",
+    "tagPrefix": "@composio/cli@",
+    "assetTemplate": "composio-linux-x64.zip",
+    "assetName": "composio-linux-x64.zip"
+  }
+}

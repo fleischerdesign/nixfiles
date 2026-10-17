@@ -4,7 +4,8 @@
 # them when upstream releases change.
 #
 # Supported upstream types:
-#   github-release   — GitHub Release asset (AppImage or explicit asset template)
+#   github-release   — GitHub Release asset (AppImage or explicit asset template;
+#                      .upstream.tagPrefix scans scoped monorepo release tags)
 #   openai-desktop   — Official Linux artifact selected by OpenAI's installer
 #   github-source    — GitHub Release, rebuild from source tarball
 #   github-rev       — Pinned to a git commit, tracks default branch HEAD
@@ -322,17 +323,44 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
     owner="$(jq -r '.upstream.owner' "$manifest_path")"
     repo="$(jq -r '.upstream.repo' "$manifest_path")"
     current_version="$(jq -r '.version' "$manifest_path")"
+    tag_prefix="$(jq -r '.upstream.tagPrefix // empty' "$manifest_path")"
 
     echo "  Current version: $current_version"
     echo "  Checking GitHub upstream: $owner/$repo..."
 
-    RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || {
-      echo "  ⚠️ Could not fetch latest release for $owner/$repo"
-      failures=$((failures + 1))
-      continue
-    }
-
-    latest_tag="$(echo "$RELEASE_JSON" | jq -r '.tag_name // empty' | strip_v)"
+    if [ -n "$tag_prefix" ]; then
+      # Monorepos tag scoped releases (for example @composio/cli@1.2.3); the
+      # newest release may belong to another package, so scan the release list
+      # for the newest stable tag under the prefix.
+      latest_tag=""
+      release_page=1
+      while [ "$release_page" -le 5 ] && [ -z "$latest_tag" ]; do
+        page_json="$(gh_api "https://api.github.com/repos/$owner/$repo/releases?per_page=100&page=$release_page")" || break
+        latest_tag="$(printf '%s\n' "$page_json" | jq -r --arg prefix "$tag_prefix" '[ .[] | .tag_name | select(startswith($prefix)) | ltrimstr($prefix) | select(test("^[0-9]+[.][0-9]+[.][0-9]+$")) ][0] // empty')"
+        printf '%s\n' "$page_json" | grep -q '"tag_name"' || break
+        release_page=$((release_page + 1))
+      done
+      if [ -z "$latest_tag" ]; then
+        echo "  ⚠️ Could not find a stable $tag_prefix release for $owner/$repo"
+        failures=$((failures + 1))
+        continue
+      fi
+      release_tag="$tag_prefix$latest_tag"
+      RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/tags/$(jq -nr --arg t "$release_tag" '$t|@uri')")" || {
+        echo "  ⚠️ Could not fetch release $release_tag for $owner/$repo"
+        failures=$((failures + 1))
+        continue
+      }
+      download_tag="$release_tag"
+    else
+      RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || {
+        echo "  ⚠️ Could not fetch latest release for $owner/$repo"
+        failures=$((failures + 1))
+        continue
+      }
+      latest_tag="$(echo "$RELEASE_JSON" | jq -r '.tag_name // empty' | strip_v)"
+      download_tag="v$latest_tag"
+    fi
 
     if [ -z "$latest_tag" ]; then
       echo "  ⚠️ Could not parse latest release tag"
@@ -368,7 +396,7 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
       continue
     fi
 
-    download_url="https://github.com/$owner/$repo/releases/download/v$latest_tag/$asset_name"
+    download_url="https://github.com/$owner/$repo/releases/download/$download_tag/$asset_name"
     echo "  Downloading and hashing $download_url..."
 
     new_hash="$(nix store prefetch-file "$download_url" --json | jq -r '.hash')"

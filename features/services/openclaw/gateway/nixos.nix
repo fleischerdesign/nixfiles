@@ -33,6 +33,26 @@ let
   # outside the immutable config.
   searxngPlugin =
     inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}."openclaw-runtime-plugin-searxng";
+  # Composio: ClawHub runtime plugin plus the CLI it drives. The plugin ships
+  # the reviewed skill and the routing hook; the CLI performs live tool
+  # discovery and execution inside the agent's exec environment.
+  composioPlugin =
+    pkgs.callPackage "${inputs.openclaw}/nix/lib/openclaw-runtime-plugin.nix"
+      {
+        openclawPackage = package;
+      }
+      {
+        id = "composio";
+        packageName = "@composio/composio";
+        version = "0.1.0";
+        selectedSource = "clawhub";
+        sourceSpec = "clawhub:@composio/composio@0.1.0";
+        nixHash = "sha256-MGeuw1lDzlG+1uqpzKfnc7ikNNfceJ0IL3BcSaBbHA0=";
+        dependencyMode = "none";
+        runtimeExtensions = [ "./dist/index.js" ];
+        openclawCompat = ">=2026.9.1";
+        peerOpenClaw = ">=2026.9.1";
+      };
   subscriptions = lib.imap0 (
     index: subscription:
     subscription
@@ -301,11 +321,19 @@ in
         plugins.entries.acpx.enabled = false;
         plugins.entries.openrouter.enabled = true;
         plugins.entries.openai.enabled = true;
-        plugins.load.paths = [ "${searxngPlugin}" ];
+        plugins.load.paths = [
+          "${searxngPlugin}"
+          "${composioPlugin}"
+        ];
         plugins.entries.searxng = {
           enabled = true;
           config.webSearch.baseUrl = searxngBaseUrl;
         };
+        plugins.entries.composio = {
+          enabled = true;
+          hooks.allowConversationAccess = true;
+        };
+        tools.exec.pathPrepend = [ "${pkgs.custom.composio}/bin" ];
         tools.web.search = {
           enabled = true;
           provider = "searxng";

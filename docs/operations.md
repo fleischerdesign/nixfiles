@@ -241,6 +241,12 @@ covers that path while browser traffic keeps the Authentik gate. The instance mu
 API enabled.
 Client file and image uploads are explicitly enabled (`gateway.uploads.enabled`); the runtime
 default is enabled as well, and the authored value keeps configuration surfaces honest.
+Composio connects external apps (mail, calendar, chat, tickets, source control) through the local
+Composio CLI. The pinned ClawHub runtime plugin ships the reviewed skill and routing hook, and its
+conversation-access grant is authored explicitly; the CLI is packaged from the official
+`@composio/cli` release and prepended to the exec PATH. CLI sign-in and connected
+accounts are runtime state in the service account's home, not Nix. Provenance diagnostics for
+Nix-loaded plugins are expected and informational.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
 cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;
