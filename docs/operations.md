@@ -241,6 +241,11 @@ covers that path while browser traffic keeps the Authentik gate. The instance mu
 API enabled.
 Client file and image uploads are explicitly enabled (`gateway.uploads.enabled`); the runtime
 default is enabled as well, and the authored value keeps configuration surfaces honest.
+Widgets and MCP Apps use `sandbox.openclaw.vyrx.de` as a separate HTTPS origin. Its publication
+routes only to the sandbox listener (gateway port plus one), reachable from the ingress over
+WireGuard. The sandbox serves the public isolation shell and renderer assets without SSO;
+private widget documents arrive through the authenticated gateway connection. The main UI and
+gateway APIs retain their Authentik gate.
 Composio connects external apps (mail, calendar, chat, tickets, source control) through the local
 Composio CLI. The pinned ClawHub runtime plugin ships the reviewed skill and routing hook, and its
 conversation-access grant is authored explicitly; the CLI is packaged from the official

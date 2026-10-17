@@ -10,6 +10,7 @@ let
   stateDir = "/var/lib/openclaw";
   package = inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway;
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
+  sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
   meshAddress = config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4;
   ingressAddress = config.my.topology.hosts.${config.my.topology.ingressHost}.wireguardIpv4;
   # Web search runs through the fleet's single SearXNG instance. A co-located
@@ -281,6 +282,12 @@ in
           };
         };
         cron.enabled = true;
+        # Widgets and MCP Apps share a public shell on a separate origin.
+        # Documents themselves arrive over the authenticated gateway connection.
+        mcp.apps = {
+          sandboxOrigin = sandbox.publicUrl;
+          sandboxPort = sandbox.port;
+        };
         memory.search = {
           enabled = true;
           rememberAcrossConversations = true;
@@ -379,6 +386,24 @@ in
     environment.systemPackages = [ operator ];
 
     my.contracts.provides.openclaw = {
+      endpoints.sandbox = {
+        port = cfg.port + 1;
+        protocol = "tcp";
+        directAccess = {
+          enable = true;
+          interface = "wireguard";
+          protocol = "tcp";
+          fromHosts = [ config.my.topology.ingressHost ];
+        };
+      };
+      publications.sandbox = {
+        scope = "public";
+        endpoint = "sandbox";
+        subdomain = "sandbox.${cfg.subdomain}";
+        ingressOnly = true;
+        auth = "none";
+        publicExempt = "Isolated widget shell and public renderer assets only; private documents use the authenticated gateway connection.";
+      };
       endpoints.http = {
         port = cfg.port;
         protocol = "tcp";
