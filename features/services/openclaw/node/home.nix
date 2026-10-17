@@ -1,0 +1,96 @@
+{ endpoint }:
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  osConfig,
+  ...
+}:
+let
+  package = inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway;
+  stateDir = "${config.xdg.stateHome}/openclaw-node";
+  nodeConfig = pkgs.writeText "openclaw-node.json" (
+    builtins.toJSON { nodeHost.workerRuns.enabled = true; }
+  );
+  # Both enrollment and the daemon use these paths. Never inherit another
+  # profile's config, workspace or gateway credentials from the invoking shell.
+  environment = ''
+    unset OPENCLAW_HOME OPENCLAW_PROFILE OPENCLAW_GATEWAY_TOKEN OPENCLAW_GATEWAY_PASSWORD
+    export OPENCLAW_STATE_DIR=${lib.escapeShellArg stateDir}
+    export OPENCLAW_CONFIG_PATH=${lib.escapeShellArg "${stateDir}/openclaw.json"}
+    export OPENCLAW_WORKSPACE_DIR=${lib.escapeShellArg "${stateDir}/workspace"}
+    umask 077
+    ${pkgs.coreutils}/bin/install -d -m 0700 "$OPENCLAW_STATE_DIR"
+    cd "$OPENCLAW_STATE_DIR"
+  '';
+  cli = pkgs.writeShellScriptBin "openclaw-node" ''
+    set -euo pipefail
+    ${environment}
+    exec ${package}/bin/openclaw "$@"
+  '';
+  arguments = lib.escapeShellArgs (
+    [
+      "node"
+      "run"
+      "--host"
+      endpoint.host
+      "--port"
+      (toString endpoint.port)
+    ]
+    ++ lib.optional endpoint.tls "--tls"
+  );
+  # connect stays in the foreground after enrollment. Stop it with Ctrl-C once
+  # paired; the EXIT trap restarts the HM service using the saved device token.
+  # Do not use connect --service: Home Manager owns this unit.
+  connect = pkgs.writeShellScriptBin "openclaw-node-connect" ''
+    set -euo pipefail
+    if [ "$#" -ne 1 ]; then
+      echo 'Usage: openclaw-node-connect <join-url-or-setup-code>' >&2
+      echo ${
+        lib.escapeShellArg (
+          if endpoint.publicUrl != null then
+            "Create a join URL on the gateway for ${endpoint.publicUrl}."
+          else
+            "Use a setup code for ${endpoint.host}:${toString endpoint.port} (plaintext mesh)."
+        )
+      } >&2
+      exit 2
+    fi
+    ${environment}
+    ${pkgs.systemd}/bin/systemctl --user stop openclaw-node.service
+    trap '${pkgs.systemd}/bin/systemctl --user restart openclaw-node.service' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    ${cli}/bin/openclaw-node connect "$1"
+  '';
+in
+{
+  config = lib.mkIf (config.home.username == osConfig.my.user.primary) {
+    home.packages = [
+      cli
+      connect
+    ];
+
+    # Only this feature's isolated JSON is declarative. Enrollment identity and
+    # paired-device credentials remain runtime-owned inside OPENCLAW_STATE_DIR.
+    home.file."${stateDir}/openclaw.json".source = nodeConfig;
+
+    systemd.user.services.openclaw-node = {
+      Unit = {
+        Description = "OpenClaw native session node";
+        StartLimitIntervalSec = 0;
+      };
+      Service = {
+        ExecStart = "${cli}/bin/openclaw-node ${arguments}";
+        Restart = "always";
+        RestartSec = 30;
+        UMask = "0077";
+        Environment = [
+          "PATH=${config.home.profileDirectory}/bin:/run/current-system/sw/bin"
+        ];
+      };
+      Install.WantedBy = [ "default.target" ];
+    };
+  };
+}

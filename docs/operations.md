@@ -196,6 +196,59 @@ than accepting an unverified dependency tree.
 
 ## 9. The agent workspace
 
+### OpenClaw
+
+The native OpenClaw gateway is assigned to `cld-ops-01`, alongside the Attic binary cache.
+`my.features.services.openclaw.gateway` wraps the official `nix-openclaw` NixOS module. It runs
+as the `openclaw` system account, stores its state in `/var/lib/openclaw`, and publishes
+`https://openclaw.vyrx.de` through the ingress. The native listener includes loopback for local CLI
+administration; the endpoint contract admits remote traffic only from the ingress over WireGuard.
+The publication uses the standard
+Authentik forward-auth contract, provisioning its provider, application and primary-user audience.
+OpenClaw trusts only the ingress address and its overwritten `X-Authentik-Username` header; its
+allowlist and session administrator grant derive from the primary username. Authenticated browser
+devices are enrolled automatically with limited persistent grants. The administrator scope is granted
+only to the verified owner's session. Client identity headers are stripped before forward auth.
+
+Single-use `/j/*` enrollment links, credentialed `/__openclaw__/worker` connections and non-browser
+WebSocket upgrades bypass browser SSO; OpenClaw verifies their own bootstrap, worker or paired-device
+credentials. The direct-local administrative CLI uses a separate password fallback, unavailable to
+proxied requests. This password and the OpenCode Go API key come from SOPS at runtime and never enter
+the Nix store. Shared Gateway tokens are incompatible with trusted-proxy mode and are not configured.
+
+The default model is DeepSeek V4.1 Flash through OpenCode Go, using the native OpenClaw runtime.
+Recurring heartbeats and cron are disabled. Gateway data participates in the host's Restic backup.
+Inspect the service with `journalctl -u openclaw-gateway`; administrative CLI operations run as the
+service account through `sudo openclaw-gateway-admin <command>` on the gateway host.
+
+`my.features.services.openclaw.node` enables a native Home Manager user service on `cld-edge-01`,
+`hom-srv-01`, `hom-wrk-01` and `mob-nb-01`. The gateway host runs no node service. Each node's
+gateway endpoint derives from the fleet's unique enabled gateway. Each node
+keeps its own pairing identity under `~/.local/state/openclaw-node`, separate from other OpenClaw
+profiles. The node runs with the primary user's filesystem permissions. Enrollment uses a new,
+single-use URL for each device:
+
+```bash
+# On cld-ops-01:
+sudo openclaw-gateway-admin devices join-code
+# On the target PC, as its primary user:
+openclaw-node-connect '<join-url>'
+```
+
+After enrollment, stop the foreground connection with Ctrl-C; the helper starts the Home Manager
+service using the saved device credential. Inspect it with
+`systemctl --user status openclaw-node` and `journalctl --user -u openclaw-node`.
+The phone uses the central gateway's Control UI; mobile node enrollment uses the platform's
+companion app and exposes that platform's supported device capabilities. Office computers enroll
+against the same gateway with their platform's node host. A device outside the mesh uses the same
+public TLS endpoint and requires no inbound node port.
+
+The official flake pins OpenClaw `2026.10.4`. Native node session hosting uses managed workspaces
+in this release; the newer existing-device-folder picker is not included. Node identity and
+pairing credentials remain runtime-owned; Nix owns the services, node hosting consent and settings.
+
+### OpenChamber
+
 `hom-srv-01` runs the always-on OpenChamber instance the other devices pair with: a user service bound to the
 overlay address `10.10.100.10:3000`, serving the API, and published as `chamber.vyrx.de` through
 the ingress. Application API calls use device tokens; the publication keeps non-API routes behind fleet

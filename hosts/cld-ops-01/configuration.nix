@@ -23,6 +23,8 @@
 
   my.features.services.attic.server.enable = true;
 
+  my.features.services.openclaw.gateway.enable = true;
+
   my.features.services.crowdsec = {
     enable = true;
     role = "agent";

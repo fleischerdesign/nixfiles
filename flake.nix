@@ -60,6 +60,12 @@
     };
 
     opencode.url = "github:anomalyco/opencode/dev";
+
+    openclaw = {
+      url = "github:openclaw/nix-openclaw";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+      inputs.home-manager.follows = "home-manager-unstable";
+    };
   };
 
   outputs =

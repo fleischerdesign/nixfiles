@@ -14,6 +14,8 @@
   # decide who owns a home directory.
   my.user.primary = "philipp";
 
+  my.features.services.openclaw.node.enable = true;
+
   my.user.extraGroups = [
     "networkmanager"
     "wheel"

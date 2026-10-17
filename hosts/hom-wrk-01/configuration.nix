@@ -23,6 +23,7 @@
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
+  my.features.services.openclaw.node.enable = true;
   # The session comes from the desktop role; only the output layout is a fact of this host.
   my.features.desktop.niri.outputs = {
     "DP-1".position = {

@@ -21,6 +21,7 @@
 
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
+  my.features.services.openclaw.node.enable = true;
 
   my.features.media.gaming.sunshine.enable = false;
 

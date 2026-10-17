@@ -17,6 +17,8 @@
   # decide who owns a home directory.
   my.user.primary = "philipp";
 
+  my.features.services.openclaw.node.enable = true;
+
   my.features.system.networking.cloudflare.enable = true;
 
   my.features.system.common.geoip.enable = true;

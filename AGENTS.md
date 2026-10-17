@@ -55,7 +55,7 @@ and prefer a script file over nested quoting.
 ## Layout
 
 ```
-flake.nix           13 inputs, overlays, one mkSystem call per host
+flake.nix           inputs, overlays, one mkSystem call per host
 hosts/<name>/       entry point: role + hardware + host-specific features
 roles/              base → server | pc → desktop | notebook
 features/           NixOS modules, discovered by the `nixos.nix` marker, each behind `enable`
