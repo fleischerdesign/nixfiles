@@ -322,6 +322,7 @@ in
         plugins.entries.acpx.enabled = false;
         plugins.entries.openrouter.enabled = true;
         plugins.entries.openai.enabled = true;
+        plugins.entries.workboard.enabled = true;
         plugins.load.paths = [
           "${searxngPlugin}"
           "${composioPlugin}"

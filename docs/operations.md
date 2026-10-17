@@ -250,6 +250,8 @@ Nix-loaded plugins are expected and informational.
 The GitHub CLI is installed for the gateway process and the exec path; the GitHub identity stays
 native (`gh` login as the service account), because a managed identity would write runtime config
 that Nix ownership forbids.
+The bundled Workboard plugin provides local Kanban boards for agent-owned cards and rule-based
+session views; its boards live in gateway state, not Nix.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
 cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;
