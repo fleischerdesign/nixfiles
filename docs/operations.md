@@ -225,7 +225,9 @@ service account through `sudo openclaw-gateway-admin <command>` on the gateway h
 `hom-srv-01`, `hom-wrk-01` and `mob-nb-01`. The gateway host runs no node service. Each node's
 gateway endpoint derives from the fleet's unique enabled gateway. Each node
 keeps its own pairing identity under `~/.local/state/openclaw-node`, separate from other OpenClaw
-profiles. The node runs with the primary user's filesystem permissions. Enrollment uses a new,
+profiles. The ingress host resolves the gateway name to its inventory public IPv4 address locally,
+so its own node has a distinguishable client address at the trusted proxy boundary. The node runs
+with the primary user's filesystem permissions. Enrollment uses a new,
 single-use URL for each device:
 
 ```bash

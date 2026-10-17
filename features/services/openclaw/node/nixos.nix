@@ -15,6 +15,7 @@ let
   gateway = systems.${gatewayHost}.config;
   domain = gateway.my.contracts.provides.openclaw.publications.web.canonicalDomain or null;
   meshAddress = config.my.topology.hosts.${gatewayHost}.wireguardIpv4 or null;
+  ingress = config.my.topology.hosts.${config.my.topology.ingressHost};
   # Prefer the published TLS endpoint so join URLs and supervised reconnects use
   # the same gateway scope. Without publication, enroll with a mesh setup code.
   endpoint = {
@@ -47,6 +48,16 @@ in
     home-manager.sharedModules = [
       (import ./home.nix { inherit endpoint; })
     ];
+
+    # A node on the proxy host must not present the proxy's trusted mesh IP
+    # as its own forwarded client address: OpenClaw correctly rejects that
+    # indistinguishable chain. Use this host's public address with the same
+    # TLS name, without widening proxy trust or accepting loopback identities.
+    networking.hosts = lib.optionalAttrs (
+      config.networking.hostName == config.my.topology.ingressHost
+      && domain != null
+      && ingress.ipv4 != null
+    ) { ${ingress.ipv4} = [ domain ]; };
 
     users.users.${config.my.user.primary}.linger = lib.mkIf (config.my.role == "server") (
       lib.mkDefault true
