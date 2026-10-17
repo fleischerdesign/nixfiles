@@ -239,6 +239,8 @@ immutable config, and the provider is selected explicitly. A co-located gateway 
 a remote gateway the provider's overlay address; the instance's machine-facing allowance already
 covers that path while browser traffic keeps the Authentik gate. The instance must keep the JSON
 API enabled.
+Client file and image uploads are explicitly enabled (`gateway.uploads.enabled`); the runtime
+default is enabled as well, and the authored value keeps configuration surfaces honest.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
 cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;

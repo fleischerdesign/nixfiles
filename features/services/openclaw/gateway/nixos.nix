@@ -242,6 +242,9 @@ in
             };
           };
           controlUi.allowedOrigins = [ "https://${domain}" ];
+          # Authored explicitly: the runtime default is enabled, but an unset
+          # value reads as "not configured" in configuration surfaces.
+          uploads.enabled = true;
         };
         agents.defaults = {
           model.primary = cfg.model;
