@@ -14,6 +14,16 @@ import sys
 
 data = json.load(open(sys.argv[1]))
 
+# Client attribution must work on resumed HTTP/3 connections too. During
+# accepted early data Caddy deliberately leaves remote.host empty, which would
+# erase the client address in generated X-Forwarded-For headers.
+servers = data["apps"]["http"]["servers"]
+assert servers, "Expected adapted HTTP servers"
+for name, server in servers.items():
+    assert server.get("allow_0rtt") is False, (
+        f"Expected verified client addresses before forwarding on HTTP server {name}"
+    )
+
 failures = []
 
 

@@ -236,6 +236,10 @@ path exempted from authentication is proxied without `forward_auth`, so it carri
 a page that reads identity must never be exempted, and `checks/vyrx-portal.nix` holds the exempted set
 equal to the set the application declares public.
 
+Caddy disables TLS 0-RTT on its HTTP/3 listeners. Forwarded client attribution requires a verified
+remote address, but Caddy leaves that address empty during early data. Connections finish the TLS
+handshake before requests are forwarded; HTTP/3 and ordinary TLS session resumption remain enabled.
+
 ## 7. What is compiled, and what is still a setting
 
 A projection earns its complexity only where it replaces a manual step.

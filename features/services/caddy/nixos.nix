@@ -171,6 +171,15 @@ in
     services.caddy = {
       enable = true;
 
+      # Forwarded client attribution requires a verified remote address.
+      # Caddy leaves remote.host empty during HTTP/3 early data, so wait for
+      # the handshake instead of forwarding an empty X-Forwarded-For value.
+      globalConfig = ''
+        servers {
+          0rtt off
+        }
+      '';
+
       # Authentik & Error Handling Snippets (docs/design.md 7)
       extraConfig = ''
         (vyrx_errors) {
