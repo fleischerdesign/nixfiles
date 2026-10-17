@@ -247,6 +247,9 @@ conversation-access grant is authored explicitly; the CLI is packaged from the o
 `@composio/cli` release and prepended to the exec PATH. CLI sign-in and connected
 accounts are runtime state in the service account's home, not Nix. Provenance diagnostics for
 Nix-loaded plugins are expected and informational.
+The GitHub CLI is installed for the gateway process and the exec path; the GitHub identity stays
+native (`gh` login as the service account), because a managed identity would write runtime config
+that Nix ownership forbids.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
 cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;

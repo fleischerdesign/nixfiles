@@ -215,6 +215,7 @@ in
       environmentFiles = [ config.sops.templates.openclaw-gateway-env.path ];
       environment.HOME = stateDir;
       servicePath = [
+        pkgs.gh
         pkgs.git
         pkgs.ripgrep
         pkgs.nix
@@ -333,7 +334,10 @@ in
           enabled = true;
           hooks.allowConversationAccess = true;
         };
-        tools.exec.pathPrepend = [ "${pkgs.custom.composio}/bin" ];
+        tools.exec.pathPrepend = [
+          "${pkgs.gh}/bin"
+          "${pkgs.custom.composio}/bin"
+        ];
         tools.web.search = {
           enabled = true;
           provider = "searxng";
