@@ -103,37 +103,33 @@ let
   # `address` mapping also synthesises a reverse PTR for that address, and every public
   # endpoint resolves to the ingress, so the aggregated PTR exceeded Knot's 512 B record
   # limit and the policy loader refused to start (measured 2026-09-21). Wildcard
-  # publications use a redirect subtree rooted at their specific namespace suffix.
+  # publications use an RPZ wildcard CNAME to a plane-specific A record.
   mkRules =
     names: addresses:
-    lib.flatten (
-      lib.map (
-        name:
-        let
-          wildcard = lib.hasPrefix "*." name;
-          suffix = lib.removePrefix "*." name;
-          fqdn = if lib.hasSuffix "." suffix then suffix else "${suffix}.";
-        in
-        lib.mapAttrsToList (
-          plane: address:
-          {
-            tags = [ plane ];
-          }
-          // (
-            if wildcard then
-              {
-                name = fqdn;
-                inherit address;
-                subtree = "redirect";
-                ttl = "60s";
-              }
-            else
+    lib.unique (
+      lib.flatten (
+        lib.map (
+          name:
+          let
+            wildcard = lib.hasPrefix "*." name;
+            suffix = lib.removePrefix "*." name;
+            fqdn = if lib.hasSuffix "." suffix then suffix else "${suffix}.";
+          in
+          lib.mapAttrsToList (
+            plane: address:
+            [
               {
                 records = "${fqdn} 60 IN A ${address}";
+                tags = [ plane ];
               }
-          )
-        ) (lib.filterAttrs (_: address: address != null) addresses)
-      ) names
+            ]
+            ++ lib.optional wildcard {
+              records = "*.${fqdn} 60 IN CNAME ${fqdn}";
+              tags = [ plane ];
+            }
+          ) (lib.filterAttrs (_: address: address != null) addresses)
+        ) names
+      )
     );
 
   nodeRules = lib.concatLists (
@@ -351,17 +347,23 @@ in
     # `{ name, plane, address }` per record. A rule reads `"<fqdn> 60 IN A <address>"`, so the name is
     # its first field and the address its last.
     my.features.services.dns.answers = lib.unique (
-      lib.map (
-        rule:
-        let
-          parts = lib.splitString " " (rule.records or "");
-        in
-        {
-          name = rule.name or (builtins.head parts);
-          plane = builtins.head rule.tags;
-          address = rule.address or (lib.last parts);
-        }
-      ) (nodeRules ++ deviceRules ++ serviceRules ++ resolverRules)
+      lib.map
+        (
+          rule:
+          let
+            parts = lib.splitString " " rule.records;
+          in
+          {
+            name = builtins.head parts;
+            plane = builtins.head rule.tags;
+            address = lib.last parts;
+          }
+        )
+        (
+          lib.filter (rule: lib.hasInfix " IN A " rule.records) (
+            nodeRules ++ deviceRules ++ serviceRules ++ resolverRules
+          )
+        )
     );
 
     # The hosts resolve through `my.topology.resolvers` (the resolver's own zone address),
@@ -419,15 +421,23 @@ in
         ];
 
         local-data = {
-          rules = nodeRules ++ deviceRules ++ serviceRules ++ resolverRules;
-          rpz = lib.optionals (cfg.blocklists != [ ]) [
-            {
-              # No watchdog: it follows the file by inode, and the refresh installs a *new* file and renames
-              # it into place, so the watcher sees the old one vanish and the fresh list never loads. The
-              # effect is triggered explicitly instead, through systemd (see the refresh below).
-              file = blocklistRpz;
-            }
-          ];
+          rules = lib.filter (rule: lib.hasInfix " IN A " rule.records) (
+            nodeRules ++ deviceRules ++ serviceRules ++ resolverRules
+          );
+          rpz =
+            lib.unique (
+              map (rule: {
+                file = pkgs.writeText "dns-wildcard.rpz" "${rule.records}\n";
+              }) (lib.filter (rule: lib.hasInfix " IN CNAME " rule.records) serviceRules)
+            )
+            ++ lib.optionals (cfg.blocklists != [ ]) [
+              {
+                # No watchdog: it follows the file by inode, and the refresh installs a *new* file and renames
+                # it into place, so the watcher sees the old one vanish and the fresh list never loads. The
+                # effect is triggered explicitly instead, through systemd (see the refresh below).
+                file = blocklistRpz;
+              }
+            ];
         };
       }
       // lib.optionalAttrs cfg.publicEntry {
