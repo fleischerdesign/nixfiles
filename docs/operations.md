@@ -251,8 +251,10 @@ The namespace and its base login host use Authentik domain-level forward auth re
 the primary user. Each preview additionally retains OpenClaw's portal bearer/cookie gate.
 The ingress presents a dedicated wildcard certificate and strips Authentik identity headers
 before forwarding application traffic. A socket proxy reachable only by the ingress over
-WireGuard connects to OpenClaw's loopback portal listener. Public DNS and split-horizon
-wildcard answers derive from the publication. Application ports stay private.
+WireGuard connects to OpenClaw's loopback portal listener. Cloudflare publishes the wildcard
+name and the base host it aliases; the fleet resolver answers both per plane, expanding the
+wildcard through an RPZ CNAME onto the plane-specific address, so a preview opened at home
+stays on the mesh. Application ports stay private.
 Custom Plugin UI is enabled for trusted installed native plugin views; Host Desktop remains off.
 Composio connects external apps (mail, calendar, chat, tickets, source control) through the local
 Composio CLI. The pinned ClawHub runtime plugin ships the reviewed skill and routing hook, and its
