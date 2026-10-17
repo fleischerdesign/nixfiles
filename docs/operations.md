@@ -280,6 +280,14 @@ Client microphone permission, audio playback and billable voice sessions require
 session to verify.
 
 Gateway data participates in the host's Restic backup.
+The gateway can launch headless Chromium with its own persistent `openclaw` browser profile.
+Browser routing prefers the gateway; an explicit node selection uses that device's browser proxy.
+Graphical nodes provide a separate managed Google Chrome profile (`openclaw`) and an attach-only
+`user` profile for the primary user's existing Chrome session. The latter uses OpenClaw's packaged
+Chrome DevTools MCP and requires remote debugging enabled at `chrome://inspect/#remote-debugging`
+plus approval of Chrome's connection prompt. Managed PC browsers use the desktop session when
+available and OpenClaw's headless fallback otherwise. Browser control and CDP remain on loopback;
+node browser requests travel through the authenticated node connection.
 Inspect the service with `journalctl -u openclaw-gateway`; administrative CLI operations run as the
 service account through `sudo openclaw-gateway-admin <command>` on the gateway host.
 

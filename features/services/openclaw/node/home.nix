@@ -10,8 +10,39 @@
 let
   package = inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway;
   stateDir = "${config.xdg.stateHome}/openclaw-node";
+  hasDesktop = lib.elem "graphical" osConfig.my.user.profiles;
   nodeConfig = pkgs.writeText "openclaw-node.json" (
-    builtins.toJSON { nodeHost.workerRuns.enabled = true; }
+    builtins.toJSON (
+      {
+        nodeHost = {
+          workerRuns.enabled = true;
+        }
+        // lib.optionalAttrs hasDesktop {
+          browserProxy = {
+            enabled = true;
+            allowProfiles = [
+              "openclaw"
+              "user"
+            ];
+          };
+        };
+      }
+      // lib.optionalAttrs hasDesktop {
+        browser = {
+          enabled = true;
+          executablePath = lib.getExe pkgs.google-chrome;
+          defaultProfile = "openclaw";
+          profiles = {
+            openclaw.cdpPort = 18800;
+            user = {
+              driver = "existing-session";
+              attachOnly = true;
+              userDataDir = "${config.xdg.configHome}/google-chrome";
+            };
+          };
+        };
+      }
+    )
   );
   # Both enrollment and the daemon use these paths. Never inherit another
   # profile's config, workspace or gateway credentials from the invoking shell.
@@ -80,6 +111,7 @@ in
       Unit = {
         Description = "OpenClaw native session node";
         StartLimitIntervalSec = 0;
+        X-Restart-Triggers = [ nodeConfig ];
       };
       Service = {
         ExecStart = "${cli}/bin/openclaw-node ${arguments}";

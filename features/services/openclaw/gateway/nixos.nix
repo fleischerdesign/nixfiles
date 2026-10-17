@@ -267,6 +267,14 @@ in
           # Authored explicitly: the runtime default is enabled, but an unset
           # value reads as "not configured" in configuration surfaces.
           uploads.enabled = true;
+          nodes.browser.mode = "auto";
+        };
+        browser = {
+          enabled = true;
+          executablePath = lib.getExe pkgs.chromium;
+          headless = true;
+          defaultProfile = "openclaw";
+          profiles.openclaw.cdpPort = 18800;
         };
         agents.defaults = {
           model.primary = cfg.model;
