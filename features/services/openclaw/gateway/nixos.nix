@@ -11,6 +11,9 @@ let
   package = inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway;
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
+  portals = config.my.contracts.provides.openclaw.publications.portals;
+  portalDomain = lib.removePrefix "*." portals.canonicalDomain;
+  portalIngressPort = portals.port - 1;
   meshAddress = config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4;
   ingressAddress = config.my.topology.hosts.${config.my.topology.ingressHost}.wireguardIpv4;
   # Web search runs through the fleet's single SearXNG instance. A co-located
@@ -264,6 +267,11 @@ in
             };
           };
           controlUi.allowedOrigins = [ "https://${domain}" ];
+          controlUi.experimental.customPlugins = true;
+          portals.ingress = {
+            domain = portalDomain;
+            port = portalIngressPort;
+          };
           # Authored explicitly: the runtime default is enabled, but an unset
           # value reads as "not configured" in configuration surfaces.
           uploads.enabled = true;
@@ -393,7 +401,55 @@ in
     };
     environment.systemPackages = [ operator ];
 
+    # OpenClaw keeps portal ingress on loopback. Expose only a mesh socket to
+    # the contract-admitted ingress, preserving the original HTTP Host header.
+    systemd.sockets.openclaw-portals = {
+      wantedBy = [ "sockets.target" ];
+      after = [ "wireguard-wg0.service" ];
+      requires = [ "wireguard-wg0.service" ];
+      listenStreams = [ "${meshAddress}:${toString portals.port}" ];
+      socketConfig.NoDelay = true;
+    };
+    systemd.services.openclaw-portals = {
+      requires = [ "openclaw-gateway.service" ];
+      after = [ "openclaw-gateway.service" ];
+      serviceConfig = {
+        ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd 127.0.0.1:${toString portalIngressPort}";
+        DynamicUser = true;
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        ProtectSystem = "strict";
+        ProtectHome = true;
+      };
+    };
+
     my.contracts.provides.openclaw = {
+      endpoints.portals = {
+        port = cfg.port + 102;
+        protocol = "tcp";
+        directAccess = {
+          enable = true;
+          interface = "wireguard";
+          fromHosts = [ config.my.topology.ingressHost ];
+        };
+      };
+      publications.portals = {
+        scope = "public";
+        endpoint = "portals";
+        subdomain = "*.preview.${cfg.subdomain}";
+        extraDomains = [ portalDomain ];
+        ingressOnly = true;
+        auth = "authentik";
+        accessUsers = [ config.my.user.primary ];
+        proxyOptions = ''
+          header_up -X-Authentik-*
+          flush_interval -1
+          transport http {
+            read_timeout 3600s
+            write_timeout 3600s
+          }
+        '';
+      };
       endpoints.sandbox = {
         port = cfg.port + 1;
         protocol = "tcp";

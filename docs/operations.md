@@ -246,6 +246,14 @@ routes only to the sandbox listener (gateway port plus one), reachable from the 
 WireGuard. The sandbox serves the public isolation shell and renderer assets without SSO;
 private widget documents arrive through the authenticated gateway connection. The main UI and
 gateway APIs retain their Authentik gate.
+Portals publish temporary application previews under `*.preview.openclaw.vyrx.de`.
+The namespace and its base login host use Authentik domain-level forward auth restricted to
+the primary user. Each preview additionally retains OpenClaw's portal bearer/cookie gate.
+The ingress presents a dedicated wildcard certificate and strips Authentik identity headers
+before forwarding application traffic. A socket proxy reachable only by the ingress over
+WireGuard connects to OpenClaw's loopback portal listener. Public DNS and split-horizon
+wildcard answers derive from the publication. Application ports stay private.
+Custom Plugin UI is enabled for trusted installed native plugin views; Host Desktop remains off.
 Composio connects external apps (mail, calendar, chat, tickets, source control) through the local
 Composio CLI. The pinned ClawHub runtime plugin ships the reviewed skill and routing hook, and its
 conversation-access grant is authored explicitly; the CLI is packaged from the official

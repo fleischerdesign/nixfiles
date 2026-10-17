@@ -471,13 +471,16 @@ let
             displayName = if ep.displayName != null then ep.displayName else name;
             group = if ep.group != null then ep.group else "Services";
             safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
+            wildcard = lib.hasPrefix "*." ep.canonicalDomain;
+            authDomain = lib.removePrefix "*." ep.canonicalDomain;
           in
           [
             (blueprintLib.proxyProvider {
               id = "provider_proxy_${safeId}";
               name = "Provider for ${displayName}";
-              mode = "forward_single";
-              externalHost = "https://${ep.canonicalDomain}";
+              mode = if wildcard then "forward_domain" else "forward_single";
+              externalHost = "https://${authDomain}";
+              cookieDomain = if wildcard then authDomain else null;
               authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
               invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
             })
@@ -486,7 +489,7 @@ let
               name = displayName;
               provider = blueprintLib.refs.sameBlueprint "provider_proxy_${safeId}";
               group = group;
-              metaLaunchUrl = "https://${ep.canonicalDomain}";
+              metaLaunchUrl = "https://${authDomain}";
               openInNewTab = true;
             })
           ]

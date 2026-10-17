@@ -18,10 +18,10 @@ let
   # ingress - computed once and used both for the certificate declarations and for the `tls`
   # bindings, so the two cannot drift apart.
   #
-  # No wildcard and no apex: Cloudflare's own Universal SSL certificate for this zone is validated by
+  # No zone-wide wildcard and no apex: Cloudflare's own Universal SSL certificate is validated by
   # TXT records at `_acme-challenge.<zone>`, managed internally and invisible to the zone API
   # (measured: DNS serves them, the API does not know them). No third party can prove control of
-  # that name, so `*.${zone}` and `${zone}` cannot be issued by us - while per-name challenges are
+  # that name, so `*.${zone}` and `${zone}` cannot be issued by us. Narrow wildcard namespaces and per-name challenges are
   # free and publish correctly (measured: `_acme-challenge.<name>.<zone>` appears in the zone within
   # three seconds of lego presenting it).
   flakeConfigurations = fleetConfigs.systems config;
@@ -356,8 +356,8 @@ in
       };
       # One certificate per public name, issued where it is used: no key material is copied between
       # hosts, each host rotates its own, and a compromise stays local (the model SPIRE, Vault PKI
-      # and cert-manager follow - one policy, per-consumer credentials). The apex and wildcards are
-      # absent because Cloudflare's own Universal SSL owns `_acme-challenge.${zone}`.
+      # and cert-manager follow - one policy, per-consumer credentials). The apex and zone-wide wildcard
+      # are absent because Cloudflare's own Universal SSL owns `_acme-challenge.${zone}`.
       # The ingress declares none: its names resolve to it, so Caddy's automatic HTTPS already
       # obtains and renews them there, and declaring them again would issue a second, redundant set.
       # Every other host declares one certificate per public name it terminates.
@@ -374,8 +374,8 @@ in
     # Caddy before its own certificate exists and leaves the site down until something restarts
     # it. `wants`, not `requires`: a failed order must not take the whole ingress with it.
     systemd.services.caddy = {
-      wants = map (name: "acme-${name}.service") certificateNames;
-      after = map (name: "acme-${name}.service") certificateNames;
+      wants = map (name: "acme-${certificateId name}.service") certificateNames;
+      after = map (name: "acme-${certificateId name}.service") certificateNames;
     };
 
     my.contracts.provides.caddy = {

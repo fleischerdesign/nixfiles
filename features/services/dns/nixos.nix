@@ -102,23 +102,37 @@ let
   # One rule per (name, plane). `records` (zonefile form) is used rather than `address`: an
   # `address` mapping also synthesises a reverse PTR for that address, and every public
   # endpoint resolves to the ingress, so the aggregated PTR exceeded Knot's 512 B record
-  # limit and the policy loader refused to start (measured 2026-09-21). Names containing a
-  # wildcard are skipped: `local-data` does not expand wildcards, and such names are minted
-  # at runtime and resolve upstream.
+  # limit and the policy loader refused to start (measured 2026-09-21). Wildcard
+  # publications use a redirect subtree rooted at their specific namespace suffix.
   mkRules =
     names: addresses:
     lib.flatten (
       lib.map (
         name:
         let
-          fqdn = if lib.hasSuffix "." name then name else "${name}.";
+          wildcard = lib.hasPrefix "*." name;
+          suffix = lib.removePrefix "*." name;
+          fqdn = if lib.hasSuffix "." suffix then suffix else "${suffix}.";
         in
-        lib.optional (!(lib.hasInfix "*" name)) (
-          lib.mapAttrsToList (plane: address: {
-            records = "${fqdn} 60 IN A ${address}";
+        lib.mapAttrsToList (
+          plane: address:
+          {
             tags = [ plane ];
-          }) (lib.filterAttrs (_: address: address != null) addresses)
-        )
+          }
+          // (
+            if wildcard then
+              {
+                name = fqdn;
+                inherit address;
+                subtree = "redirect";
+                ttl = "60s";
+              }
+            else
+              {
+                records = "${fqdn} 60 IN A ${address}";
+              }
+          )
+        ) (lib.filterAttrs (_: address: address != null) addresses)
       ) names
     );
 
@@ -340,12 +354,12 @@ in
       lib.map (
         rule:
         let
-          parts = lib.splitString " " rule.records;
+          parts = lib.splitString " " (rule.records or "");
         in
         {
-          name = builtins.head parts;
+          name = rule.name or (builtins.head parts);
           plane = builtins.head rule.tags;
-          address = lib.last parts;
+          address = rule.address or (lib.last parts);
         }
       ) (nodeRules ++ deviceRules ++ serviceRules ++ resolverRules)
     );

@@ -326,6 +326,7 @@ let
       invalidationFlow,
       mode ? null,
       interceptHeaderAuth ? null,
+      cookieDomain ? null,
     }:
     entry {
       inherit id;
@@ -337,6 +338,7 @@ let
         invalidation_flow = invalidationFlow;
       }
       // lib.optionalAttrs (mode != null) { inherit mode; }
+      // lib.optionalAttrs (cookieDomain != null) { cookie_domain = cookieDomain; }
       // lib.optionalAttrs (interceptHeaderAuth != null) {
         intercept_header_auth = interceptHeaderAuth;
       };
