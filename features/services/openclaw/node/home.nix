@@ -12,37 +12,31 @@ let
   stateDir = "${config.xdg.stateHome}/openclaw-node";
   hasDesktop = lib.elem "graphical" osConfig.my.user.profiles;
   nodeConfig = pkgs.writeText "openclaw-node.json" (
-    builtins.toJSON (
-      {
-        nodeHost = {
-          workerRuns.enabled = true;
+    builtins.toJSON {
+      nodeHost = {
+        workerRuns.enabled = true;
+        browserProxy = {
+          enabled = true;
+          allowProfiles = [ "openclaw" ] ++ lib.optional hasDesktop "user";
+        };
+      };
+      browser = {
+        enabled = true;
+        executablePath = lib.getExe (if hasDesktop then pkgs.google-chrome else pkgs.chromium);
+        defaultProfile = "openclaw";
+        profiles = {
+          openclaw.cdpPort = 18800;
         }
         // lib.optionalAttrs hasDesktop {
-          browserProxy = {
-            enabled = true;
-            allowProfiles = [
-              "openclaw"
-              "user"
-            ];
+          user = {
+            driver = "existing-session";
+            attachOnly = true;
+            userDataDir = "${config.xdg.configHome}/google-chrome";
           };
         };
       }
-      // lib.optionalAttrs hasDesktop {
-        browser = {
-          enabled = true;
-          executablePath = lib.getExe pkgs.google-chrome;
-          defaultProfile = "openclaw";
-          profiles = {
-            openclaw.cdpPort = 18800;
-            user = {
-              driver = "existing-session";
-              attachOnly = true;
-              userDataDir = "${config.xdg.configHome}/google-chrome";
-            };
-          };
-        };
-      }
-    )
+      // lib.optionalAttrs (!hasDesktop) { headless = true; };
+    }
   );
   # Both enrollment and the daemon use these paths. Never inherit another
   # profile's config, workspace or gateway credentials from the invoking shell.

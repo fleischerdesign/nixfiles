@@ -282,6 +282,7 @@ session to verify.
 Gateway data participates in the host's Restic backup.
 The gateway can launch headless Chromium with its own persistent `openclaw` browser profile.
 Browser routing prefers the gateway; an explicit node selection uses that device's browser proxy.
+Server nodes also provide headless Chromium with a persistent `openclaw` profile, launched on demand.
 Graphical nodes provide a separate managed Google Chrome profile (`openclaw`) and an attach-only
 `user` profile for the primary user's existing Chrome session. The latter uses OpenClaw's packaged
 Chrome DevTools MCP and requires remote debugging enabled at `chrome://inspect/#remote-debugging`
