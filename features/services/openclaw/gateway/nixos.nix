@@ -12,6 +12,52 @@ let
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   meshAddress = config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4;
   ingressAddress = config.my.topology.hosts.${config.my.topology.ingressHost}.wireguardIpv4;
+  subscriptions = lib.imap0 (
+    index: subscription:
+    subscription
+    // {
+      profileId = "opencode-go:${subscription.name}";
+      envVar = "OPENCLAW_OPENCODE_SUBSCRIPTION_${toString index}_KEY";
+    }
+  ) cfg.opencodeSubscriptions;
+  authPlan = pkgs.writeText "openclaw-opencode-auth-plan.json" (
+    builtins.toJSON {
+      version = 1;
+      protocolVersion = 1;
+      options = {
+        scrubEnv = false;
+        scrubAuthProfilesForProviderTargets = false;
+      };
+      targets = map (subscription: {
+        type = "auth-profiles.api_key.key";
+        path = "profiles.${subscription.profileId}.key";
+        pathSegments = [
+          "profiles"
+          subscription.profileId
+          "key"
+        ];
+        agentId = "main";
+        authProfileProvider = "opencode-go";
+        ref = {
+          source = "env";
+          provider = "default";
+          id = subscription.envVar;
+        };
+      }) subscriptions;
+    }
+  );
+  provisionAuth = pkgs.writeShellScript "openclaw-provision-auth" ''
+    set -euo pipefail
+    # The upstream secrets CLI always invokes its config writer, even for
+    # auth-store-only plans. Keep that write away from the immutable Nix config.
+    temporary=$(mktemp -d)
+    trap 'rm -rf "$temporary"' EXIT
+    cp /etc/openclaw/openclaw.json "$temporary/openclaw.json"
+    OPENCLAW_CONFIG_PATH="$temporary/openclaw.json" \
+      CLAWDBOT_CONFIG_PATH="$temporary/openclaw.json" \
+      OPENCLAW_NIX_MODE=0 \
+      ${package}/bin/openclaw secrets apply --from ${authPlan} --json
+  '';
   operator = pkgs.writeShellScriptBin "openclaw-gateway-admin" ''
     set -euo pipefail
     if [ "$EUID" -ne 0 ]; then
@@ -23,7 +69,10 @@ let
     export OPENCLAW_CONFIG_PATH=/etc/openclaw/openclaw.json
     unset OPENCLAW_GATEWAY_TOKEN
     export OPENCLAW_GATEWAY_PASSWORD="$(< ${config.sops.secrets."openclaw/gateway_password".path})"
-    export OPENCODE_API_KEY="$(< ${config.sops.secrets.${cfg.opencodeApiKeySecret}.path})"
+    ${lib.concatMapStringsSep "\n" (subscription: ''
+      export ${subscription.envVar}="$(< ${config.sops.secrets.${subscription.apiKeySecret}.path})"
+    '') subscriptions}
+    export OPENCODE_API_KEY="$${(builtins.head subscriptions).envVar}"
     export OPENROUTER_API_KEY="$(< ${config.sops.secrets."ai/openrouter_api_key".path})"
     export OPENAI_API_KEY="$(< ${config.sops.secrets."ai/openai_api_key".path})"
     exec ${pkgs.util-linux}/bin/runuser -u openclaw -- ${package}/bin/openclaw "$@"
@@ -49,10 +98,28 @@ in
       default = "opencode-go/deepseek-v4.1-flash";
       description = "Default provider/model reference for the native OpenClaw runtime.";
     };
-    opencodeApiKeySecret = lib.mkOption {
-      type = lib.types.str;
-      default = "ai/opencode_api_key";
-      description = "SOPS secret containing the active OpenCode subscription API key.";
+    opencodeSubscriptions = lib.mkOption {
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            name = lib.mkOption {
+              type = lib.types.strMatching "[a-zA-Z0-9-]+";
+              description = "Stable subscription name used for the OpenClaw auth profile.";
+            };
+            apiKeySecret = lib.mkOption {
+              type = lib.types.str;
+              description = "SOPS secret containing this subscription's API key.";
+            };
+          };
+        }
+      );
+      default = [
+        {
+          name = "subscription-1";
+          apiKeySecret = "ai/opencode_api_key";
+        }
+      ];
+      description = "OpenCode Go subscriptions in preferred auth failover order.";
     };
     settings = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
@@ -67,15 +134,30 @@ in
         assertion = meshAddress != null && ingressAddress != null;
         message = "OpenClaw gateway and ingress require inventory mesh addresses.";
       }
+      {
+        assertion =
+          subscriptions != [ ]
+          &&
+            lib.length (lib.unique (map (subscription: subscription.name) subscriptions))
+            == lib.length subscriptions;
+        message = "OpenClaw requires at least one OpenCode subscription with unique names.";
+      }
     ];
 
-    sops.secrets."openclaw/gateway_password" = { };
-    sops.secrets.${cfg.opencodeApiKeySecret} = { };
-    sops.secrets."ai/openrouter_api_key" = { };
-    sops.secrets."ai/openai_api_key" = { };
+    sops.secrets = lib.genAttrs (
+      [
+        "openclaw/gateway_password"
+        "ai/openrouter_api_key"
+        "ai/openai_api_key"
+      ]
+      ++ map (subscription: subscription.apiKeySecret) subscriptions
+    ) (_: { });
     sops.templates.openclaw-gateway-env.content = ''
       OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder."openclaw/gateway_password"}
-      OPENCODE_API_KEY=${config.sops.placeholder.${cfg.opencodeApiKeySecret}}
+      ${lib.concatMapStringsSep "\n" (
+        subscription: "${subscription.envVar}=${config.sops.placeholder.${subscription.apiKeySecret}}"
+      ) subscriptions}
+      OPENCODE_API_KEY=${config.sops.placeholder.${(builtins.head subscriptions).apiKeySecret}}
       OPENROUTER_API_KEY=${config.sops.placeholder."ai/openrouter_api_key"}
       OPENAI_API_KEY=${config.sops.placeholder."ai/openai_api_key"}
     '';
@@ -93,6 +175,18 @@ in
         pkgs.nix
       ];
       config = lib.recursiveUpdate {
+        auth = {
+          profiles = lib.listToAttrs (
+            map (
+              subscription:
+              lib.nameValuePair subscription.profileId {
+                provider = "opencode-go";
+                mode = "api_key";
+              }
+            ) subscriptions
+          );
+          order.opencode-go = map (subscription: subscription.profileId) subscriptions;
+        };
         gateway = {
           mode = "local";
           port = cfg.port;
@@ -199,11 +293,15 @@ in
 
     systemd.services.openclaw-gateway = {
       after = [ "wireguard-wg0.service" ];
-      restartTriggers = [ config.environment.etc."openclaw/openclaw.json".source ];
+      restartTriggers = [
+        config.environment.etc."openclaw/openclaw.json".source
+        authPlan
+      ];
       serviceConfig = {
         UMask = "0077";
         StandardOutput = lib.mkForce "journal";
         StandardError = lib.mkForce "journal";
+        ExecStartPre = [ provisionAuth ];
       };
     };
     environment.systemPackages = [ operator ];

@@ -218,10 +218,19 @@ runtime and never enter the Nix store. Shared Gateway tokens are incompatible wi
 and are not configured.
 
 The default model is DeepSeek V4.1 Flash through OpenCode Go, using the native OpenClaw runtime.
-The gateway's `opencodeApiKeySecret` selects the active subscription for both the service and
-administrative CLI. `cld-ops-01` selects `ai/opencode_api_key_2`; the first subscription remains
-stored separately as `ai/opencode_api_key`. Switching this option requires a gateway deployment.
-Other OpenCode consumers retain their own configured credential selection.
+The gateway's ordered `opencodeSubscriptions` list provisions stable, named auth profiles through
+OpenClaw's supported secrets-plan CLI before startup. Profiles store environment SecretRefs; API keys
+remain in SOPS and the runtime environment. The importer uses a temporary config copy because the
+upstream CLI invokes its config writer even for auth-store-only plans; the gateway's Nix config
+remains immutable. `cld-ops-01` prefers `subscription-2` and falls back to
+`subscription-1`, using `ai/opencode_api_key_2` and `ai/opencode_api_key` respectively. OpenClaw owns
+session affinity and cooldowns, and rotates same-provider profiles on eligible quota, billing, auth
+and transient failures. Exhausting both subscriptions surfaces an error; the model stays DeepSeek.
+Automatic session affinity can keep a healthy fallback selected after the preferred account recovers.
+Provider-specific reset times are used only when OpenClaw recognizes them; no monthly reset date is
+invented. An explicit per-agent auth-order override takes precedence over the declarative default.
+The service and administrative CLI receive both credentials. Other OpenCode consumers retain their
+own configured credential selection.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
 cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;

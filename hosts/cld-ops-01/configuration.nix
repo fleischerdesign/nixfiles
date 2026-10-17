@@ -25,7 +25,16 @@
 
   my.features.services.openclaw.gateway = {
     enable = true;
-    opencodeApiKeySecret = "ai/opencode_api_key_2";
+    opencodeSubscriptions = [
+      {
+        name = "subscription-2";
+        apiKeySecret = "ai/opencode_api_key_2";
+      }
+      {
+        name = "subscription-1";
+        apiKeySecret = "ai/opencode_api_key";
+      }
+    ];
   };
 
   my.features.services.crowdsec = {
