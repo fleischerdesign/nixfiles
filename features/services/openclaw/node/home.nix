@@ -1,4 +1,8 @@
-{ endpoint, camera }:
+{
+  endpoint,
+  camera,
+  webapps,
+}:
 {
   config,
   lib,
@@ -111,6 +115,10 @@ in
     # Only this feature's isolated JSON is declarative. Enrollment identity and
     # paired-device credentials remain runtime-owned inside OPENCLAW_STATE_DIR.
     home.file."${stateDir}/openclaw.json".source = nodeConfig;
+
+    # The Control UI launcher, projected by the feature that knows the gateway
+    # endpoint, so the published domain is never written a second time.
+    my.features.desktop.webapps.apps = webapps;
 
     systemd.user.services.openclaw-node = {
       Unit = {

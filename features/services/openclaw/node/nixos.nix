@@ -26,6 +26,25 @@ let
     publicUrl = if domain != null then "https://${domain}" else null;
   };
   camera = cfg.camera.enable;
+  # The gateway's Control UI as a desktop launcher. Derived rather than declared twice:
+  # the URL comes from the gateway host's publication, and the launcher exists only where
+  # the desktop webapp feature is enabled and the gateway is actually published.
+  webapps =
+    lib.optionalAttrs
+      (endpoint.publicUrl != null && (config.my.features.desktop.webapps.enable or false))
+      {
+        openclaw = {
+          displayName = "OpenClaw";
+          url = endpoint.publicUrl;
+          icon = ../../../../media/openclaw.png;
+          comment = "OpenClaw Gateway Control UI";
+          categories = [
+            "Network"
+            "Utility"
+          ];
+          wmClass = "openclaw";
+        };
+      };
 in
 {
   options.my.features.services.openclaw.node = {
@@ -50,7 +69,7 @@ in
     ];
 
     home-manager.sharedModules = [
-      (import ./home.nix { inherit endpoint camera; })
+      (import ./home.nix { inherit endpoint camera webapps; })
     ];
 
     # Camera capture opens /dev/video*, whose device nodes belong to the video group. The
