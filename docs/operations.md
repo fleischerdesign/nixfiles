@@ -330,6 +330,22 @@ The official flake pins OpenClaw `2026.10.4`. Native node session hosting uses m
 in this release; the newer existing-device-folder picker is not included. Node identity and
 pairing credentials remain runtime-owned; Nix owns the services, node hosting consent and settings.
 
+Node file access is fleet-wide and deliberate. The File Transfer plugin classifies all six of its
+node commands as dangerous, so no platform default carries them and `gateway.nodes.commands.allow`
+names each one; the plugin's path policy admits `/**` for reads and writes on every paired node,
+follows symlinks and takes no per-call approval, because the Nix-owned config file is immutable and
+cannot persist a standing grant. The gateway host runs no node service, so this scope never reaches
+the gateway's own state directory.
+
+The two personal computers also capture from their attached camera. Their nodes enable the Linux
+node plugin's camera capability, carry FFmpeg on the node service PATH and belong to the `video`
+group for `/dev/video*`; `gateway.nodes.commands.allow` carries `camera.snap` and `camera.clip`,
+while `camera.list` is a Linux plugin default. A clip carries the default audio source unless the
+caller disables audio, so camera access includes the microphone. Computer control stays off: the
+bundled CUA driver implements X11 only, and the fleet's Niri session is native Wayland, so an
+enabled provider would advertise `screen.snapshot` and `computer.act` and refuse every call.
+Desktop screenshots on those hosts run through shell execution instead.
+
 ### OpenChamber
 
 `hom-srv-01` runs the always-on OpenChamber instance the other devices pair with: a user service bound to the

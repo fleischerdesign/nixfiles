@@ -1,4 +1,4 @@
-{ endpoint }:
+{ endpoint, camera }:
 {
   config,
   lib,
@@ -12,31 +12,39 @@ let
   stateDir = "${config.xdg.stateHome}/openclaw-node";
   hasDesktop = lib.elem "graphical" osConfig.my.user.profiles;
   nodeConfig = pkgs.writeText "openclaw-node.json" (
-    builtins.toJSON {
-      nodeHost = {
-        workerRuns.enabled = true;
-        browserProxy = {
-          enabled = true;
-          allowProfiles = [ "openclaw" ] ++ lib.optional hasDesktop "user";
-        };
-      };
-      browser = {
-        enabled = true;
-        executablePath = lib.getExe (if hasDesktop then pkgs.google-chrome else pkgs.chromium);
-        defaultProfile = "openclaw";
-        profiles = {
-          openclaw.cdpPort = 18800;
-        }
-        // lib.optionalAttrs hasDesktop {
-          user = {
-            driver = "existing-session";
-            attachOnly = true;
-            userDataDir = "${config.xdg.configHome}/google-chrome";
+    builtins.toJSON (
+      {
+        nodeHost = {
+          workerRuns.enabled = true;
+          browserProxy = {
+            enabled = true;
+            allowProfiles = [ "openclaw" ] ++ lib.optional hasDesktop "user";
           };
         };
+        browser = {
+          enabled = true;
+          executablePath = lib.getExe (if hasDesktop then pkgs.google-chrome else pkgs.chromium);
+          defaultProfile = "openclaw";
+          profiles = {
+            openclaw.cdpPort = 18800;
+          }
+          // lib.optionalAttrs hasDesktop {
+            user = {
+              driver = "existing-session";
+              attachOnly = true;
+              userDataDir = "${config.xdg.configHome}/google-chrome";
+            };
+          };
+        }
+        // lib.optionalAttrs (!hasDesktop) { headless = true; };
       }
-      // lib.optionalAttrs (!hasDesktop) { headless = true; };
-    }
+      // lib.optionalAttrs camera {
+        # The Linux node plugin keeps camera capture off by default, so the node
+        # advertises camera.list/snap/clip only once this is on and FFmpeg is on the
+        # service's PATH.
+        plugins.entries."linux-node".config.camera.enabled = true;
+      }
+    )
   );
   # Both enrollment and the daemon use these paths. Never inherit another
   # profile's config, workspace or gateway credentials from the invoking shell.
@@ -95,7 +103,10 @@ in
     home.packages = [
       cli
       connect
-    ];
+    ]
+    # FFmpeg performs the V4L2 capture and reads the Pulse source for clip audio. The
+    # headless build disables libpulse, so the regular build is the one that works.
+    ++ lib.optionals camera [ pkgs.ffmpeg ];
 
     # Only this feature's isolated JSON is declarative. Enrollment identity and
     # paired-device credentials remain runtime-owned inside OPENCLAW_STATE_DIR.

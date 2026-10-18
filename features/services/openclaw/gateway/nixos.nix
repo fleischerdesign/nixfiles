@@ -275,7 +275,24 @@ in
           # Authored explicitly: the runtime default is enabled, but an unset
           # value reads as "not configured" in configuration surfaces.
           uploads.enabled = true;
-          nodes.browser.mode = "auto";
+          nodes = {
+            browser.mode = "auto";
+            # Every File Transfer command is classified dangerous, so no platform default
+            # ever carries one and this list is the only way in. camera.list is a Linux
+            # plugin default; the two capture commands are the same opt-in shape as the
+            # file commands. The file-transfer workspace commands stay out on purpose:
+            # they relocate an agent's workspace onto a node rather than grant file access.
+            commands.allow = [
+              "dir.list"
+              "dir.fetch"
+              "file.stat"
+              "file.fetch"
+              "file.write"
+              "file.create"
+              "camera.snap"
+              "camera.clip"
+            ];
+          };
         };
         browser = {
           enabled = true;
@@ -346,6 +363,21 @@ in
         plugins.entries.openrouter.enabled = true;
         plugins.entries.openai.enabled = true;
         plugins.entries.workboard.enabled = true;
+        # The plugin denies every call until a node entry exists, even when the node
+        # command itself is allowed. `*` is the fleet-wide key that node-policy resolution
+        # falls back to, and `/**` admits every path on every node for reads and writes
+        # alike; the gateway host runs no node service, so its own state stays out of
+        # reach. Standing approvals cannot be recorded here anyway: the config file is
+        # Nix-owned and immutable, so the policy is authored rather than approved per call.
+        plugins.entries.file-transfer.config = {
+          policyVersion = 2;
+          nodes."*" = {
+            ask = "off";
+            followSymlinks = true;
+            allowReadPaths = [ "/**" ];
+            allowWritePaths = [ "/**" ];
+          };
+        };
         plugins.load.paths = [
           "${searxngPlugin}"
           "${composioPlugin}"

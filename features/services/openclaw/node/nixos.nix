@@ -24,10 +24,13 @@ let
     tls = domain != null;
     publicUrl = if domain != null then "https://${domain}" else null;
   };
+  camera = cfg.camera.enable;
 in
 {
-  options.my.features.services.openclaw.node.enable =
-    lib.mkEnableOption "native OpenClaw session hosting for the primary Home Manager user";
+  options.my.features.services.openclaw.node = {
+    enable = lib.mkEnableOption "native OpenClaw session hosting for the primary Home Manager user";
+    camera.enable = lib.mkEnableOption "camera capture through this node (requires a V4L2 camera and FFmpeg)";
+  };
 
   config = lib.mkIf cfg.enable {
     assertions = [
@@ -46,7 +49,14 @@ in
     ];
 
     home-manager.sharedModules = [
-      (import ./home.nix { inherit endpoint; })
+      (import ./home.nix { inherit endpoint camera; })
+    ];
+
+    # Camera capture opens /dev/video*, whose device nodes belong to the video group. The
+    # group is declared with mkDefault so it merges into the role's group list instead of
+    # replacing it.
+    my.user.extraGroups = lib.mkMerge [
+      (lib.mkIf camera (lib.mkDefault [ "video" ]))
     ];
 
     # A node on the proxy host must not present the proxy's trusted mesh IP
