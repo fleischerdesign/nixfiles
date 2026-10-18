@@ -77,23 +77,61 @@ let
     ]
     ++ lib.optional endpoint.tls "--tls"
   );
+  # Printed under the usage line, so the helper itself says where a join URL comes from.
+  usageHint =
+    if endpoint.publicUrl != null then
+      "Create a join URL on the gateway for ${endpoint.publicUrl}."
+    else
+      "Use a setup code for ${endpoint.host}:${toString endpoint.port} (plaintext mesh).";
   # connect stays in the foreground after enrollment. Stop it with Ctrl-C once
   # paired; the EXIT trap restarts the HM service using the saved device token.
   # Do not use connect --service: Home Manager owns this unit.
+  #
+  # Enrollment needs the unit stopped, because a foreground node and the service share this state
+  # directory. Two rules keep that from becoming an outage of its own: only a join URL or setup
+  # code reaches the service - usage and flags answer and exit - and the run happens in a
+  # transient scope beside the unit, so the stop cannot kill the helper that starts it again.
+  # Called from inside the node (an agent's exec host=node) the stop otherwise signals the
+  # helper's own shell, and an explicit stop suppresses Restart=always.
   connect = pkgs.writeShellScriptBin "openclaw-node-connect" ''
     set -euo pipefail
+
+    usage() {
+      echo 'Usage: openclaw-node-connect <join-url-or-setup-code>'
+      echo ${lib.escapeShellArg usageHint}
+    }
+
+    case "''${1:-}" in
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      -*)
+        echo "openclaw-node-connect: expected a join URL or setup code, got the flag $1" >&2
+        usage >&2
+        exit 2
+        ;;
+      "")
+        usage >&2
+        exit 2
+        ;;
+    esac
+
     if [ "$#" -ne 1 ]; then
-      echo 'Usage: openclaw-node-connect <join-url-or-setup-code>' >&2
-      echo ${
-        lib.escapeShellArg (
-          if endpoint.publicUrl != null then
-            "Create a join URL on the gateway for ${endpoint.publicUrl}."
-          else
-            "Use a setup code for ${endpoint.host}:${toString endpoint.port} (plaintext mesh)."
-        )
-      } >&2
+      echo 'openclaw-node-connect: expected exactly one join URL or setup code' >&2
+      usage >&2
       exit 2
     fi
+
+    # Re-exec in a transient scope: it is a sibling of openclaw-node.service, so the stop below
+    # cannot signal this process. The scope keeps the caller's process group, so the foreground
+    # connection, its output and Ctrl-C behave as documented.
+    if [ -z "''${OPENCLAW_NODE_CONNECT_SCOPED:-}" ]; then
+      OPENCLAW_NODE_CONNECT_SCOPED=1
+      export OPENCLAW_NODE_CONNECT_SCOPED
+      exec ${pkgs.systemd}/bin/systemd-run --user --scope --quiet "$0" "$@"
+    fi
+
     ${environment}
     ${pkgs.systemd}/bin/systemctl --user stop openclaw-node.service
     trap '${pkgs.systemd}/bin/systemctl --user restart openclaw-node.service' EXIT

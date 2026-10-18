@@ -318,9 +318,13 @@ sudo openclaw-gateway-admin devices join-code
 openclaw-node-connect '<join-url>'
 ```
 
-After enrollment, stop the foreground connection with Ctrl-C; the helper starts the Home Manager
-service using the saved device credential. Inspect it with
-`systemctl --user status openclaw-node` and `journalctl --user -u openclaw-node`.
+The helper takes exactly one join URL or setup code: `--help` and any other flag print the usage
+and exit without touching the service. It stops the node unit for the duration of the enrollment -
+a foreground node and the service share the state directory - and runs itself in a transient scope
+beside the unit, so that stop cannot interrupt the enrollment. After enrollment, stop the
+foreground connection with Ctrl-C; the helper starts the Home Manager service using the saved
+device credential. Inspect it with `systemctl --user status openclaw-node` and
+`journalctl --user -u openclaw-node`.
 The phone uses the central gateway's Control UI; mobile node enrollment uses the platform's
 companion app and exposes that platform's supported device capabilities. Office computers enroll
 against the same gateway with their platform's node host. A device outside the mesh uses the same
