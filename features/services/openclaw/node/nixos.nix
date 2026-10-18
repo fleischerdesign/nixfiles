@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -57,6 +58,14 @@ in
     # replacing it.
     my.user.extraGroups = lib.mkMerge [
       (lib.mkIf camera (lib.mkDefault [ "video" ]))
+    ];
+
+    # The File Transfer plugin runs its archive builder as /usr/bin/tar on Unix: a
+    # hardcoded FHS path NixOS does not provide, which makes every dir.fetch fail with
+    # "tar command failed". Materialise it for the node; no other file command reaches
+    # for an FHS binary.
+    systemd.tmpfiles.rules = [
+      "L+ /usr/bin/tar - - - - ${pkgs.gnutar}/bin/tar"
     ];
 
     # A node on the proxy host must not present the proxy's trusted mesh IP

@@ -334,8 +334,9 @@ Node file access is fleet-wide and deliberate. The File Transfer plugin classifi
 node commands as dangerous, so no platform default carries them and `gateway.nodes.commands.allow`
 names each one; the plugin's path policy admits `/**` for reads and writes on every paired node,
 follows symlinks and takes no per-call approval, because the Nix-owned config file is immutable and
-cannot persist a standing grant. The gateway host runs no node service, so this scope never reaches
-the gateway's own state directory.
+cannot persist a standing grant. The plugin builds directory archives with the hardcoded FHS path
+`/usr/bin/tar`, which the node materialises from the Nix store. The gateway host runs no node
+service, so this scope never reaches the gateway's own state directory.
 
 The two personal computers also capture from their attached camera. Their nodes enable the Linux
 node plugin's camera capability, carry FFmpeg on the node service PATH and belong to the `video`
