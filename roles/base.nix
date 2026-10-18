@@ -35,7 +35,7 @@
     };
   };
 
-  # Credentials shared across hosts (consumed by opencode/agents)
+  # Credentials shared across hosts (consumed by the OpenClaw gateway and agent tooling)
   sops.secrets."ai/deepseek_api_key" = lib.mkDefault { };
   sops.secrets."ai/openrouter_api_key" = lib.mkDefault { };
   sops.secrets."ai/opencode_api_key" = lib.mkDefault { };

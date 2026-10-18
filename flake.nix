@@ -59,8 +59,6 @@
       inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
     };
 
-    opencode.url = "github:anomalyco/opencode/dev";
-
     openclaw = {
       url = "github:openclaw/nix-openclaw";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -86,53 +84,7 @@
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
         (import ./packages/overlays/fix/home-assistant)
-        (
-          final: _prev:
-          let
-            # OpenCode's flake can lag behind its own Bun requirement.
-            expectedBunVersion = nixpkgs-unstable.lib.removePrefix "bun@" (
-              (builtins.fromJSON (builtins.readFile "${inputs.opencode}/package.json")).packageManager
-            );
-            upstream = inputs.opencode.packages.${system}.opencode;
-            manifest = builtins.fromJSON (builtins.readFile ./packages/custom/opencode/manifest.json);
-
-            # The source tree upstream builds the CLI from leaves out the repository root
-            # `script/` directory, which packages/cli/script/build.ts imports since v2.0.28,
-            # so the from-source build stops with "Cannot find module '../../../script/native-arch'".
-            # Upstream's fix (adding `../script` to the fileset) is open as PR #55494; until it
-            # lands, the directory is added here. The dependency tree never reads it, so the
-            # measured node_modules hash is unchanged. Remove this once the fix is released.
-            nodeModules =
-              (upstream.node_modules.override {
-                bun = final.bun;
-                hash = manifest.dependencyHashes.${system}.node_modules or "";
-              }).overrideAttrs
-                (old: {
-                  src = final.runCommandLocal "opencode-cli-src" { } ''
-                    mkdir -p $out
-                    cp -r --no-preserve=mode ${old.src}/. $out/
-                    chmod -R u+w $out
-                    cp -r --no-preserve=mode ${inputs.opencode}/script $out/script
-                  '';
-                });
-          in
-          {
-            opencode-v2 =
-              if final.bun.version != expectedBunVersion then
-                throw "OpenCode requires Bun ${expectedBunVersion}, but nixpkgs provides ${final.bun.version}"
-              else
-                # Upstream v2's completion hook currently runs from a missing directory.
-                (upstream.override {
-                  bun = final.bun;
-                  node_modules = nodeModules;
-                }).overrideAttrs
-                  (_: {
-                    postInstall = "";
-                  });
-          }
-        )
         inputs.nix-vscode-extensions.overlays.default
-        (import ./packages/overlays/fix/codex-editor)
         (import ./packages/custom)
       ];
 
@@ -171,9 +123,7 @@
     {
       formatter.${system} = pkgs.nixfmt-tree;
 
-      packages.${system} = pkgs.custom // {
-        opencode = pkgs.opencode-v2;
-      };
+      packages.${system} = pkgs.custom;
 
       apps.${system} = {
         update-custom-packages = {
@@ -283,8 +233,6 @@
           backup-contract = import ./checks/backup-contract.nix checkArgs;
           cloudflare = import ./checks/cloudflare.nix checkArgs;
           webapps = import ./checks/webapps.nix checkArgs;
-          codex-proxy = import ./checks/codex-proxy.nix checkArgs;
-          chatgpt-chrome-native-host = import ./checks/chatgpt-chrome-native-host.nix checkArgs;
           openclaw-node-connect = import ./checks/openclaw-node-connect.nix checkArgs;
 
           custom-package-updater =
@@ -299,7 +247,6 @@
               }
               ''
                 python3 ${./apps/update-custom-packages/tests/test_github_source.py} ${./apps/update-custom-packages/update-custom-packages.sh}
-                python3 ${./apps/update-custom-packages/tests/test_openai_desktop.py} ${./apps/update-custom-packages/openai-desktop-metadata.py}
                 touch $out
               '';
 

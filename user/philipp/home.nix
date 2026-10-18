@@ -9,9 +9,6 @@
 {
   imports = [
     ./packages.nix
-    ./codex.nix
-    ./opencode.nix
-    ./openchamber.nix
     ./fish.nix
     ./rclone.nix
     inputs.nixcord.homeModules.nixcord

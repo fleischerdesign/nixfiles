@@ -354,22 +354,6 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
-      "locked": {
-        "lastModified": 1790510107,
-        "narHash": "sha256-EVMNYv7hYDDD9TGVT/hIyTYgpiXA8y3m5xIEIxuGNU0=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "3181085bfd08663b6b9e60bc7a8395c2aaa741bd",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "nixvim": {
       "inputs": {
         "flake-parts": "flake-parts",
@@ -439,25 +423,6 @@
         "type": "github"
       }
     },
-    "opencode": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_2"
-      },
-      "locked": {
-        "lastModified": 1792164895,
-        "narHash": "sha256-PSFCmDwaC9FgqGiJ/fSkITVC1Cquu84IW/E0fLMwJVQ=",
-        "owner": "anomalyco",
-        "repo": "opencode",
-        "rev": "582c974ee362683f5dd5c7f9741cae207581c6b5",
-        "type": "github"
-      },
-      "original": {
-        "owner": "anomalyco",
-        "ref": "dev",
-        "repo": "opencode",
-        "type": "github"
-      }
-    },
     "portfolio": {
       "inputs": {
         "flake-utils": "flake-utils_2",
@@ -516,7 +481,6 @@
         "nixvim": "nixvim",
         "nod": "nod",
         "openclaw": "openclaw",
-        "opencode": "opencode",
         "portfolio": "portfolio",
         "sops-nix": "sops-nix",
         "spicetify-nix": "spicetify-nix",

@@ -1,7 +1,6 @@
 # roles/server.nix
 # This role defines the default features for a headless server.
 {
-  config,
   lib,
   ...
 }:
@@ -36,21 +35,4 @@
   };
 
   my.features.dev.nixvim.enable = lib.mkDefault true;
-
-  # A server may host the coding workspace, but not every server should: the shape waits here with
-  # the master switch off, so turning one on stays a single flag on that host. The credentials are
-  # the fleet's own declaration, and the operator owns the files the launcher reads.
-  my.features.dev.opencode = {
-    enable = lib.mkDefault false;
-    # The gateway this fleet uses (OpenCode Go, https://opencode.ai/zen/go/v1) offers
-    # deepseek-v4-pro and deepseek-v4.1-flash; a model id it does not offer is a broken default,
-    # not a preference (measured: opencode models lists 482 ids and no deepseek-v4-flash).
-    model = lib.mkDefault "opencode-go/deepseek-v4.1-flash";
-    credentialFiles = config.my.user.aiCredentialFiles;
-  };
-  my.features.dev.openchamber = {
-    enable = lib.mkDefault false;
-    web.enable = lib.mkDefault true;
-    server.enable = lib.mkDefault true;
-  };
 }

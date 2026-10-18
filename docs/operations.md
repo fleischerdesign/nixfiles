@@ -177,22 +177,14 @@ keeps no list of manifest paths of its own.
 
 ```fish
 nix run .#update-custom-packages                 # discover and update every manifest
-nix run .#update-custom-packages -- opencode     # a single package
+nix run .#update-custom-packages -- composio     # a single package
 ```
 
 Manifests under `packages/custom` and `features` select their upstream with `upstream.type` (release,
-revision, PyPI, npm, Obsidian, GitHub release, flake package). Source updates measure fixed-output hashes
+revision, PyPI, npm, Obsidian, GitHub release). Source updates measure fixed-output hashes
 from the package derivations and verify them with a second build; `github-release` can select exactly one
-named asset via `upstream.assetTemplate`; `openai-desktop` reads OpenAI release metadata without executing
-it and rejects missing or ambiguous lists. The mutable `latest` download is never a package source. A
+named asset via `upstream.assetTemplate`. The mutable `latest` download is never a package source. A
 failed refresh restores the previous manifest and leaves errors on stderr.
-
-`upstream.type = "flake-package"` leaves source selection to `flake.lock` and declares
-`dependencyAttributes`, a map of logical dependency names to fixed-output derivations. Hashes are measured
-for the package build platform, not copied between platforms; an empty hash bootstraps a new platform and
-a normal build then fails loudly with a mismatch. OpenCode uses this schema, with the fleet Bun package
-checked against the upstream `packageManager` requirement - an unsupported version fails loudly rather
-than accepting an unverified dependency tree.
 
 ## 9. The agent workspace
 
@@ -231,8 +223,7 @@ and transient failures. Exhausting both subscriptions surfaces an error; the mod
 Automatic session affinity can keep a healthy fallback selected after the preferred account recovers.
 Provider-specific reset times are used only when OpenClaw recognizes them; no monthly reset date is
 invented. An explicit per-agent auth-order override takes precedence over the declarative default.
-The service and administrative CLI receive both credentials. Other OpenCode consumers retain their
-own configured credential selection.
+The service and administrative CLI receive both credentials.
 The `web_search` tool runs against the fleet's SearXNG instance. The `searxng` runtime plugin is
 pinned through `nix-openclaw` and loaded by store path, so plugin installation stays outside the
 immutable config, and the provider is selected explicitly. A co-located gateway queries loopback,
@@ -350,38 +341,3 @@ caller disables audio, so camera access includes the microphone. Computer contro
 bundled CUA driver implements X11 only, and the fleet's Niri session is native Wayland, so an
 enabled provider would advertise `screen.snapshot` and `computer.act` and refuse every call.
 Desktop screenshots on those hosts run through shell execution instead.
-
-### OpenChamber
-
-`hom-srv-01` runs the always-on OpenChamber instance the other devices pair with: a user service bound to the
-overlay address `10.10.100.10:3000`, serving the API, and published as `chamber.vyrx.de` through
-the ingress. Application API calls use device tokens; the publication keeps non-API routes behind fleet
-single sign-on. A personal computer runs its own instance only while its session is
-up, so the machine that never sleeps is the one to pair with.
-
-PC and notebook receive their outgoing connections and individual grants through the declarative mesh
-reconciler described in [Desktop](desktop.md). The server has no outgoing peers. Mobile connections are
-paired manually and remain untouched by that reconciler. Mint a link on the target as the operator:
-
-```bash
-openchamber connect-url --port 3000 --server http://10.10.100.10:3000 --qr
-```
-
-`--server` is the address the link carries, and it is the overlay address on purpose: `OPENCHAMBER_LAN_URL`
-names the same one, so the dialog and the command mint the same link, and a device on the mesh then reaches
-the instance directly. Scan the printed code in the mobile app, or open the printed
-`openchamber://connect?v=2&p=...` link on the machine that runs the desktop app. It is single use, expires on
-its own and never carries the UI password; the device then holds its own token, listed and revocable under
-*Settings - Remote Instances*.
-
-Off the mesh, paired applications can use `https://chamber.vyrx.de` for API access. The instance runs in
-API-only mode; this publication does not serve a browser workspace. Non-API routes require the
-`infra-admins` single sign-on audience. A paired application sends no `Origin` on its
-WebSocket upgrade, so the ingress hands that connection to the instance, which checks the device token
-itself. The instance is bound to the overlay address, so a device that cannot resolve that address needs a
-name it can reach - not the link above.
-
-Two properties of the command are worth knowing before it runs. It writes a relay identity into
-`~/.config/openchamber/relay-identity.json` when none exists: that file must never enter a backup or a
-dotfile repository, and a new identity invalidates every earlier pairing. And it starts a server when nothing
-answers on the port, so read the port before minting a link on a machine that should not be serving.
