@@ -286,10 +286,6 @@
           codex-proxy = import ./checks/codex-proxy.nix checkArgs;
           chatgpt-chrome-native-host = import ./checks/chatgpt-chrome-native-host.nix checkArgs;
 
-          openchamber-mesh = import ./checks/openchamber-mesh.nix checkArgs;
-
-          openchamber-desktop = pkgs.custom.openchamber-desktop.tests.gui;
-
           custom-package-updater =
             pkgs.runCommandLocal "custom-package-updater-check"
               {
