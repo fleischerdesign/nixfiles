@@ -37,6 +37,13 @@ let
   # outside the immutable config.
   searxngPlugin =
     inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}."openclaw-runtime-plugin-searxng";
+  # Tokenjuice compacts noisy `exec` output after the command ran, before the
+  # result reaches the session; commands and exit codes stay untouched. The
+  # derivation comes from nix-openclaw's generated locks, so its version tracks
+  # the gateway's: the official plugin refuses hosts below its compatibility
+  # range, and the lock is generated per host release.
+  tokenjuicePlugin =
+    inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}."openclaw-runtime-plugin-tokenjuice";
   # Composio: ClawHub runtime plugin plus the CLI it drives. The plugin ships
   # the reviewed skill and the routing hook; the CLI performs live tool
   # discovery and execution inside the agent's exec environment.
@@ -381,6 +388,7 @@ in
         plugins.load.paths = [
           "${searxngPlugin}"
           "${composioPlugin}"
+          "${tokenjuicePlugin}"
         ];
         plugins.entries.searxng = {
           enabled = true;
@@ -390,6 +398,7 @@ in
           enabled = true;
           hooks.allowConversationAccess = true;
         };
+        plugins.entries.tokenjuice.enabled = true;
         tools.exec.pathPrepend = [
           "${pkgs.gh}/bin"
           "${pkgs.custom.composio}/bin"
