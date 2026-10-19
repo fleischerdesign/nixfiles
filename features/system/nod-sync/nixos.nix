@@ -116,9 +116,10 @@ in
       sopsFile = ../../../secrets/deploy-key.yaml;
     };
     programs.ssh.extraConfig = ''
-      Match user root
+      Match user root address 10.10.100.0/24
           IdentityFile ${config.sops.secrets."infra/deploy_key".path}
           IdentitiesOnly yes
+          StrictHostKeyChecking accept-new
     '';
 
     systemd.services.nod-sync = {

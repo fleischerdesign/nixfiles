@@ -42,9 +42,9 @@
   # and deploys itself last. Pushing to main is therefore the deploy button,
   # which is why main still needs review before a merge.
   #
-  # Scope is the always-on server fleet. Personal machines are deliberately
-  # operator-deployed: they are not reliably reachable, and their host keys are
-  # not part of the inventory's trust anchors.
+  # Every host is in scope. An unreachable one - a laptop that is off, a phone
+  # away from the mesh - is reported as unreachable and skipped, never treated
+  # as a failed deployment.
   my.features.system.nod-sync = {
     enable = true;
     strategy = "canary";
@@ -52,6 +52,8 @@
       "cld-edge-01"
       "cld-ops-01"
       "hom-srv-01"
+      "hom-wrk-01"
+      "mob-nb-01"
     ];
   };
 

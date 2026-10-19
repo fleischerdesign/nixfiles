@@ -55,9 +55,8 @@ with automatic rollback. Hosts whose closure already matches are skipped, and th
 daemon is deployed last.
 
 Pushing to `main` is therefore the deploy button; the control is the review before the merge, not the
-daemon (ADR-028 in the `nod` repository). The scope is the always-on server fleet - `cld-edge-01`,
-`cld-ops-01`, `hom-srv-01`; personal machines stay operator-deployed because they are not reliably
-reachable.
+daemon (ADR-028 in the `nod` repository). Every host is in scope: a machine that is off or off the mesh
+is reported as unreachable and skipped, and the next cycle picks it up when it is back.
 
 State and the checkout live in `/var/lib/nod`; `systemctl status nod-sync` and
 `journalctl -u nod-sync` show the loop. A refused cycle - dirty checkout, non-fast-forward,
