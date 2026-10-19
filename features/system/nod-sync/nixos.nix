@@ -18,15 +18,20 @@ let
   # this only makes the first start work without an operator step.
   checkout = pkgs.writeShellScript "nod-sync-checkout" ''
     set -euo pipefail
-    if [ ! -d ${lib.escapeShellArg cfg.flakePath}/.git ]; then
-      mkdir -p "$(dirname ${lib.escapeShellArg cfg.flakePath})"
+    root=${lib.escapeShellArg cfg.flakePath}
+    if [ -e "$root" ] && [ ! -d "$root/.git" ]; then
+      echo "nod-sync: $root exists but is not a git checkout; refusing to guess" >&2
+      exit 1
+    fi
+    if [ ! -d "$root/.git" ]; then
+      mkdir -p "$(dirname "$root")"
       ${pkgs.git}/bin/git clone \
         --branch ${lib.escapeShellArg cfg.branch} \
         --single-branch \
         ${lib.escapeShellArg cfg.repository} \
-        ${lib.escapeShellArg cfg.flakePath}
+        "$root"
     fi
-    chown -R root:root ${lib.escapeShellArg cfg.flakePath}
+    chown -R root:root "$root"
   '';
 
   targetFlags =
@@ -150,10 +155,10 @@ in
         KillMode = "mixed";
         UMask = "0077";
         PrivateTmp = true;
-        # The switch runs locally and over SSH as root, so home and the Nix
-        # store stay reachable; only unrelated paths are protected.
-        ProtectSystem = "full";
-        ReadWritePaths = [ cfg.flakePath ];
+        # No ProtectSystem: a local activation writes /etc, /run and the Nix
+        # store, so sandboxing the filesystem here would only produce a
+        # misleading hardening claim. The unit is root by design; the control
+        # is what reaches it (review before merge), not a namespace.
       };
     };
   };
