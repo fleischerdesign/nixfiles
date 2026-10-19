@@ -278,6 +278,19 @@ in
               StateDirectoryMode = "0750";
               CacheDirectory = "obsidian-livesync-bridge/${name}";
               CacheDirectoryMode = "0750";
+              # An empty mirror with a populated scan state is a lie that never clears itself: the
+              # bridge resumes from its stored watermark and only watches forward, so the notes it
+              # never fetched stay missing while the service still reports itself healthy. The
+              # directory is a replica of the CouchDB peer and the state is a cache, so an empty
+              # replica is never worth resuming from - drop the state and let the first sync rebuild
+              # it. A populated mirror is left alone, so this costs one full sync per empty start.
+              ExecStartPre = "${pkgs.writeShellScript "obsidian-livesync-bridge-${name}-reset-empty-mirror" ''
+                set -euo pipefail
+                mirror=${lib.escapeShellArg inst._targetVaultPath}
+                if [ -d "$mirror" ] && [ -z "$(${pkgs.coreutils}/bin/ls -A "$mirror")" ]; then
+                  ${pkgs.coreutils}/bin/rm -rf ${lib.escapeShellArg cacheDir}/location_data
+                fi
+              ''}";
               ExecStart = "${inst.package}/bin/livesync-bridge";
               Restart = "always";
               RestartSec = 5;
