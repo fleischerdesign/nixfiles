@@ -453,6 +453,17 @@ in
       } cfg.settings;
     };
 
+    # The agent commits as itself, not as the operator. The file is scoped to
+    # this service through GIT_CONFIG_GLOBAL, so no other account on the host
+    # inherits the identity and nothing depends on a remembered env prefix.
+    # The values match the identity OpenClaw derives for the agent, so tooling
+    # and committed history cannot disagree.
+    environment.etc."openclaw/gitconfig".text = ''
+      [user]
+          name = Möbius
+          email = moebius@openclaw.local
+    '';
+
     systemd.services.openclaw-gateway = {
       after = [ "wireguard-wg0.service" ];
       restartTriggers = [
@@ -465,6 +476,8 @@ in
         StandardError = lib.mkForce "journal";
         ExecStartPre = [ provisionAuth ];
       };
+      # Git identity for every process the agent starts, including exec.
+      environment.GIT_CONFIG_GLOBAL = "/etc/openclaw/gitconfig";
     };
     environment.systemPackages = [ operator ];
 
