@@ -52,10 +52,17 @@
 
   my.features.services.obsidian-livesync-bridge = {
     enable = true;
-    # The instance name is the owner. The vault path, the run-as account and the CouchDB connection
-    # therefore all follow from the defaults: the bridge owns an `obsidian-bridge` service account and
-    # writes into its own vault directory, and the CouchDB URL derives from the topology domain.
-    instances.philipp.enable = true;
+    # The instance name is the owner and the CouchDB URL derives from the topology domain. This
+    # instance serves the gateway alone, so it runs with the gateway's identity and mirrors into the
+    # gateway's own state instead of a second service account: no shared group, and a note the agent
+    # writes stays readable to the bridge because writer and reader are the same account. The vault
+    # is a replica of CouchDB either way, which is what keeps it out of the backup.
+    instances.philipp = {
+      enable = true;
+      user = "openclaw";
+      group = "openclaw";
+      vaultPath = "/var/lib/openclaw/vaults/philipp";
+    };
   };
 
   my.features.services.searxng = {
