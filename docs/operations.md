@@ -47,6 +47,22 @@ instead of a rollout. There is deliberately no `deploy` output.
 Deployment is not coupled to health probes: a rebuild must be fast and atomic, and the monitoring stack
 alerts independently of who deployed what.
 
+### Automatic reconciliation
+
+`cld-ops-01` runs `nod daemon` (`my.features.system.nod-sync`). It tracks `main`: a `git ls-remote`
+gate every 60 s, a fast-forward-only integration, one drift comparison per host, and a canary rollout
+with automatic rollback. Hosts whose closure already matches are skipped, and the host that runs the
+daemon is deployed last.
+
+Pushing to `main` is therefore the deploy button; the control is the review before the merge, not the
+daemon (ADR-028 in the `nod` repository). The scope is the always-on server fleet - `cld-edge-01`,
+`cld-ops-01`, `hom-srv-01`; personal machines stay operator-deployed because they are not reliably
+reachable.
+
+State and the checkout live in `/var/lib/nod`; `systemctl status nod-sync` and
+`journalctl -u nod-sync` show the loop. A refused cycle - dirty checkout, non-fast-forward,
+downgrade - touches nothing and is visible in the journal.
+
 `nod switch cloudflare --dry-run` previews orchestration, not DNS changes; preview the actual diff with
 `nix run .#sync-cloudflare -- --dry-run --prune` and read it in full before applying.
 `checks/cloudflare.nix` exercises the action contract and reconciliation against isolated fixtures,

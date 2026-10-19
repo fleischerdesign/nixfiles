@@ -37,6 +37,24 @@
     ];
   };
 
+  # The gateway host is the fleet's control plane, so it runs the GitOps
+  # reconciler: it tracks main, deploys by drift, rolls back unhealthy hosts
+  # and deploys itself last. Pushing to main is therefore the deploy button,
+  # which is why main still needs review before a merge.
+  #
+  # Scope is the always-on server fleet. Personal machines are deliberately
+  # operator-deployed: they are not reliably reachable, and their host keys are
+  # not part of the inventory's trust anchors.
+  my.features.system.nod-sync = {
+    enable = true;
+    strategy = "canary";
+    targets = [
+      "cld-edge-01"
+      "cld-ops-01"
+      "hom-srv-01"
+    ];
+  };
+
   my.features.services.crowdsec = {
     enable = true;
     role = "agent";
