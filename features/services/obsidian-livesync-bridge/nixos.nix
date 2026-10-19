@@ -239,6 +239,13 @@ in
         inst = enabledInstances.${name};
       in
       [
+        # The mirror's parent belongs to the instance account too. systemd-tmpfiles refuses to create a
+        # root-owned directory below a directory owned by a service account - it classifies the
+        # user-controlled parent as an unsafe path transition and skips the child, which is exactly the
+        # shape of a mirror placed inside the account's own state root: the parent appears, the mirror
+        # does not. Keeping the whole chain in one account's hands removes that shape; for a default
+        # path the parent is the bridge's own vault root either way.
+        "d ${builtins.dirOf inst._targetVaultPath} 0770 ${inst.user} ${inst.group} - -"
         "d ${inst._targetVaultPath} 0770 ${inst.user} ${inst.group} - -"
       ]
     ) (lib.attrNames enabledInstances);
@@ -284,11 +291,18 @@ in
               # directory is a replica of the CouchDB peer and the state is a cache, so an empty
               # replica is never worth resuming from - drop the state and let the first sync rebuild
               # it. A populated mirror is left alone, so this costs one full sync per empty start.
-              ExecStartPre = "${pkgs.writeShellScript "obsidian-livesync-bridge-${name}-reset-empty-mirror" ''
+              # The mirror is created here when it is missing instead of trusting a tmpfiles rule to
+              # have created it: a mirror the daemon will write into is the daemon's own business, and
+              # a path it cannot create must fail the start rather than leave the service idle.
+              ExecStartPre = "${pkgs.writeShellScript "obsidian-livesync-bridge-${name}-prepare-mirror" ''
                 set -euo pipefail
                 mirror=${lib.escapeShellArg inst._targetVaultPath}
-                if [ -d "$mirror" ] && [ -z "$(${pkgs.coreutils}/bin/ls -A "$mirror")" ]; then
-                  ${pkgs.coreutils}/bin/rm -rf ${lib.escapeShellArg cacheDir}/location_data
+                cache=${lib.escapeShellArg cacheDir}
+                if [ ! -d "$mirror" ]; then
+                  ${pkgs.coreutils}/bin/mkdir -p "$mirror"
+                fi
+                if [ -z "$(${pkgs.coreutils}/bin/ls -A "$mirror")" ]; then
+                  ${pkgs.coreutils}/bin/rm -rf "$cache/location_data"
                 fi
               ''}";
               ExecStart = "${inst.package}/bin/livesync-bridge";
