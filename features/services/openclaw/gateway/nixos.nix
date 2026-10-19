@@ -382,28 +382,15 @@ in
         discovery.mdns.mode = "off";
         # Home Assistant's MCP server authenticates with a long-lived access
         # token from an admin account, so the header carries the sops value and
-        # no OAuth flow is involved. Actuator intents stay excluded until the
-        # probe has listed what the server actually offers; the allowlist then
-        # replaces this deny-list.
+        # no OAuth flow is involved. Every tool the server offers stays
+        # available: the actuators are the point of the integration, and a
+        # client-side allowlist would hide them behind a second list that does
+        # not track upstream tool names.
         mcp.servers.hass = {
           url = hassMcpUrl;
           transport = "streamable-http";
           enabled = true;
           headers.Authorization = "Bearer \${HASS_MCP_TOKEN}";
-          toolFilter.exclude = [
-            "HassTurnOn"
-            "HassTurnOff"
-            "HassLightSet"
-            "HassClimateSetTemperature"
-            "HassMediaPause"
-            "HassMediaUnpause"
-            "HassMediaNext"
-            "HassMediaPrevious"
-            "HassSetVolume"
-            "HassStartTimer"
-            "HassCancelTimer"
-            "HassBroadcast"
-          ];
         };
         plugins.entries.acpx.enabled = false;
         plugins.entries.openrouter.enabled = true;
