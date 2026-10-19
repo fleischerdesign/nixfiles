@@ -456,8 +456,13 @@ in
     # The agent commits as itself, not as the operator. The file is scoped to
     # this service through GIT_CONFIG_GLOBAL, so no other account on the host
     # inherits the identity and nothing depends on a remembered env prefix.
-    # The values match the identity OpenClaw derives for the agent, so tooling
-    # and committed history cannot disagree.
+    #
+    # This is the authoritative author for what the agent commits. OpenClaw's
+    # own GitHub metadata (previews, worker repositories) still derives
+    # `moebius@openclaw.local`: aligning it needs a managed profile whose
+    # identifier belongs in sops and would move GitHub token custody into
+    # OpenClaw. That trade was declined deliberately, and it cannot affect a
+    # commit, because git reads this file.
     environment.etc."openclaw/gitconfig".text = ''
       [user]
           name = Möbius
