@@ -461,7 +461,7 @@ in
     environment.etc."openclaw/gitconfig".text = ''
       [user]
           name = Möbius
-          email = moebius@openclaw.local
+          email = moebius@vyrx.de
     '';
 
     systemd.services.openclaw-gateway = {
