@@ -33,6 +33,18 @@ let
       "http://127.0.0.1:${toString searxng.port}"
     else
       "http://${searxngAddress}:${toString searxng.port}";
+  # Home Assistant publishes the MCP server on its own contract. The gateway is
+  # only a client, so the address comes from the publishing host's projection
+  # rather than a second literal. The integration itself is a config entry in
+  # Home Assistant; the endpoint and its options are documented there, not here.
+  hassHost = fleetConfigs.uniqueHost {
+    inherit systems;
+    matches = host: host.my.features.services.home-assistant.enable or false;
+    role = "Home Assistant";
+  };
+  hassMcpUrl =
+    systems.${hassHost}.config.my.contracts.provides.home-assistant.publications.web.publicUrl
+    + "/api/mcp";
   # Pinned runtime plugin from nix-openclaw; the load path keeps installation
   # outside the immutable config.
   searxngPlugin =
@@ -205,11 +217,13 @@ in
         "openclaw/gateway_password"
         "ai/openrouter_api_key"
         "ai/openai_api_key"
+        "services/home/hass_mcp_token"
       ]
       ++ map (subscription: subscription.apiKeySecret) subscriptions
     ) (_: { });
     sops.templates.openclaw-gateway-env.content = ''
       OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder."openclaw/gateway_password"}
+      HASS_MCP_TOKEN=${config.sops.placeholder."services/home/hass_mcp_token"}
       ${lib.concatMapStringsSep "\n" (
         subscription: "${subscription.envVar}=${config.sops.placeholder.${subscription.apiKeySecret}}"
       ) subscriptions}
@@ -366,6 +380,31 @@ in
           };
         };
         discovery.mdns.mode = "off";
+        # Home Assistant's MCP server authenticates with a long-lived access
+        # token from an admin account, so the header carries the sops value and
+        # no OAuth flow is involved. Actuator intents stay excluded until the
+        # probe has listed what the server actually offers; the allowlist then
+        # replaces this deny-list.
+        mcp.servers.hass = {
+          url = hassMcpUrl;
+          transport = "streamable-http";
+          enabled = true;
+          headers.Authorization = "Bearer \${HASS_MCP_TOKEN}";
+          toolFilter.exclude = [
+            "HassTurnOn"
+            "HassTurnOff"
+            "HassLightSet"
+            "HassClimateSetTemperature"
+            "HassMediaPause"
+            "HassMediaUnpause"
+            "HassMediaNext"
+            "HassMediaPrevious"
+            "HassSetVolume"
+            "HassStartTimer"
+            "HassCancelTimer"
+            "HassBroadcast"
+          ];
+        };
         plugins.entries.acpx.enabled = false;
         plugins.entries.openrouter.enabled = true;
         plugins.entries.openai.enabled = true;
