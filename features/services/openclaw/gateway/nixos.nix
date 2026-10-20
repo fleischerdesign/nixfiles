@@ -469,7 +469,16 @@ in
     # identifier belongs in sops and would move GitHub token custody into
     # OpenClaw. That trade was declined deliberately, and it cannot affect a
     # commit, because git reads this file.
+    # The global Git file is replaced, not extended, so the credential helpers
+    # that lived in the account's ~/.gitconfig have to move here with it.
+    # Without them a push fails with "could not read Username".
     environment.etc."openclaw/gitconfig".text = ''
+      [credential "https://github.com"]
+          helper =
+          helper = !${pkgs.gh}/bin/gh auth git-credential
+      [credential "https://gist.github.com"]
+          helper =
+          helper = !${pkgs.gh}/bin/gh auth git-credential
       [user]
           name = Möbius
           email = moebius@vyrx.de

@@ -8,6 +8,16 @@ let
   cfg = config.my.features.system.networking.ssh;
   hosts = config.my.topology.hosts;
   ownHost = hosts.${config.networking.hostName} or null;
+
+  # The GitOps control plane reaches every host over SSH, while the mesh is
+  # excluded from this endpoint on purpose. It is the named exception the
+  # deployment design needs; deriving it from the fleet keeps it out of a
+  # literal and makes moving the control plane a one-line change.
+  fleetConfigs = import ../../../../lib/fleet-configs.nix { inherit lib; };
+  systems = fleetConfigs.systems config;
+  gitopsHosts = lib.filter (
+    name: systems.${name}.config.my.features.system.nod-sync.enable or false
+  ) (lib.attrNames systems);
   listenAddresses = lib.mkIf (ownHost != null) (
     lib.optional (ownHost.ipv4 != null) {
       addr = ownHost.ipv4;
@@ -102,7 +112,7 @@ in
             "corp"
           ]
           ++ cfg.admits;
-          fromHosts = cfg.admitsHosts;
+          fromHosts = cfg.admitsHosts ++ gitopsHosts;
         };
         # SSH is not HTTP; a TCP connect is the probe that actually answers.
         applicationProtocol = "ssh";
