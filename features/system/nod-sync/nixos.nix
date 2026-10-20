@@ -129,9 +129,14 @@ in
 
     # libssh2 also verifies host keys against the user's known_hosts, not the
     # system-wide file. Root's is a link to the projected trust anchors.
+    #
+    # The fleet metadata declares `identityFile = ~/.ssh/nixfiles-deploy-key`,
+    # and nod passes it verbatim as `-i`. Root's home must therefore contain
+    # that path as well, or every call logs a warning about a missing key.
     systemd.tmpfiles.rules = [
       "d /root/.ssh 0700 root root -"
       "L+ /root/.ssh/known_hosts - - - - /etc/ssh/ssh_known_hosts"
+      "L+ /root/.ssh/nixfiles-deploy-key - - - - /root/.ssh/id_ed25519"
     ];
 
     programs.ssh.extraConfig = ''
