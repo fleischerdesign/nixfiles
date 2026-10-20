@@ -53,6 +53,10 @@ let
     "--remote origin"
     "--branch ${lib.escapeShellArg cfg.branch}"
     "--interval ${toString cfg.interval}"
+    "--gate-interval ${toString cfg.gateInterval}"
+    "--offline-backoff ${toString cfg.offlineBackoff}"
+    "--offline-backoff-max ${toString cfg.offlineBackoffMax}"
+    "--gone-after ${toString cfg.goneAfter}"
     "--jitter ${toString cfg.jitter}"
     "--strategy ${cfg.strategy}"
     "--concurrency ${toString cfg.concurrency}"
@@ -92,6 +96,43 @@ in
       type = lib.types.ints.between 15 3600;
       default = 60;
       description = "Reconciliation interval in seconds (ADR-028 minimum is 15).";
+    };
+
+    gateInterval = lib.mkOption {
+      type = lib.types.ints.between 0 3600;
+      default = 15;
+      description = ''
+        Interval in seconds between remote-head checks that may start a sweep
+        early. The sweep keeps its own cadence regardless: host drift happens
+        without a push. Set to 0 to disable the gate, which is what a
+        repository on a local path requires.
+      '';
+    };
+
+    offlineBackoff = lib.mkOption {
+      type = lib.types.ints.between 1 3600;
+      default = 60;
+      description = ''
+        First retry delay in seconds for a host that does not answer. The delay
+        doubles per failed probe, so an absent host costs no probe instead of
+        one per interval.
+      '';
+    };
+
+    offlineBackoffMax = lib.mkOption {
+      type = lib.types.ints.between 1 86400;
+      default = 1800;
+      description = "Ceiling in seconds for the offline retry delay.";
+    };
+
+    goneAfter = lib.mkOption {
+      type = lib.types.ints.between 0 2592000;
+      default = 86400;
+      description = ''
+        Seconds offline after which `nod sync-status` labels a host as gone
+        rather than unreachable. A label, never a removal: the inventory stays
+        the truth. Set to 0 to disable the distinction.
+      '';
     };
 
     jitter = lib.mkOption {
