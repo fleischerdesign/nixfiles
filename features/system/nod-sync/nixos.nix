@@ -113,13 +113,27 @@ in
   config = lib.mkIf cfg.enable {
     # The reconciler deploys remote hosts as root over SSH, so root needs the
     # fleet deploy key and no interactive prompt. The key is the fleet's
-    # existing deploy identity, not a second one; the SSH rule is scoped to
-    # root so no other account silently picks it up.
+    # existing deploy identity, not a second one.
+    #
+    # It is installed at the default identity path on purpose: `nix copy --to
+    # ssh://` uses Nix's own SSH client (libssh2), which never reads
+    # /etc/ssh/ssh_config. A Match rule alone therefore authenticates the
+    # interactive `ssh` calls but not the closure transfer.
     sops.secrets."infra/deploy_key" = {
       # The fleet deploy key is a separate SOPS document, deliberately not
       # encrypted to the CI identity; sops-nix needs the file named explicitly.
       sopsFile = ../../../secrets/deploy-key.yaml;
+      path = "/root/.ssh/id_ed25519";
+      mode = "0400";
     };
+
+    # libssh2 also verifies host keys against the user's known_hosts, not the
+    # system-wide file. Root's is a link to the projected trust anchors.
+    systemd.tmpfiles.rules = [
+      "d /root/.ssh 0700 root root -"
+      "L+ /root/.ssh/known_hosts - - - - /etc/ssh/ssh_known_hosts"
+    ];
+
     programs.ssh.extraConfig = ''
       Match user root address 10.10.100.0/24
           IdentityFile ${config.sops.secrets."infra/deploy_key".path}
