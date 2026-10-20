@@ -80,7 +80,13 @@
     };
   };
 
-  my.features.desktop.noctalia.wallpaper = ../../media/wallpaper.jpg;
+  # A content-addressed copy, not the path literal: a literal inside the flake tree pins the whole
+  # tree's hash, so any file in the repository - a document included - would change this wallpaper's
+  # store path and rebuild the workstation.
+  my.features.desktop.noctalia.wallpaper = builtins.path {
+    path = ../../media/wallpaper.jpg;
+    name = "wallpaper.jpg";
+  };
 
   # Personal Noctalia defaults. GUI changes in settings.toml may still override these.
   # Which templates are selected and how each application consumes them is owned by the

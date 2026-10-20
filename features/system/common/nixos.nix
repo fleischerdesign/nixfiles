@@ -95,7 +95,12 @@ in
       ];
 
     sops = {
-      defaultSopsFile = ../../../secrets/secrets.yaml;
+      # Content-addressed, not a path literal: a literal into the flake tree pins that tree's hash, and
+      # the encrypted file would change the secret manifest whenever any other file changed.
+      defaultSopsFile = builtins.path {
+        path = ../../../secrets/secrets.yaml;
+        name = "secrets.yaml";
+      };
       age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
     };
   };
