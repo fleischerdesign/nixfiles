@@ -62,6 +62,11 @@ evaluates a host in seconds while a script using `nix eval` pays 50 s every time
 *build* of the systems, and that happens whenever a shared input changes: `nod`
 is one, so a single bump to it invalidates every host closure.
 
+No derivation reads the commit hash. The portal reports the revision its host
+*runs*, taken from the reconciler's state at start, so a commit that changes no
+evaluated value produces identical closures - and a documentation change does
+not roll the fleet.
+
 ### A change through the gate
 
 1. `nix fmt && deadnix --fail && statix check` - seconds.
