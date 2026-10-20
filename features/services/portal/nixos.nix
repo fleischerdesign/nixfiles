@@ -15,7 +15,6 @@ let
   # `accessGroups` the ingress enforces decides which tile a user sees, and the same `displayName` /
   # `group` / `dashboard.show` the cluster dashboard uses names it. A service added, renamed or
   # re-audienced in Nix appears in the projection without touching the landing repository.
-  flake = config._module.specialArgs.flake or { };
   flakeConfigurations = fleetConfigs.systems config;
 
   # Live status is read from the collector on this host: the endpoint contracts already generate the
@@ -31,19 +30,14 @@ let
   # address, no port and no person: a projection that named a machine would be an address book, and one
   # that named a user would be a membership - which the identity model keeps in Authentik.
   #
-  # `generatedAt` is the source revision's timestamp, not this build's: a build timestamp cannot be
-  # read in a pure evaluation and would make the projection irreproducible, and the app only shows it
-  # next to `revision` ("built is not rolled out"). Nix hands it as `YYYYMMDDHHMMSS`, so it is
-  # re-spelled to ISO-8601 here.
-  revision = flake.rev or (flake.dirtyRev or "unknown");
-  generatedAt =
-    let
-      stamp = flake.lastModifiedDate or null;
-    in
-    if stamp != null && builtins.stringLength stamp == 14 then
-      "${builtins.substring 0 4 stamp}-${builtins.substring 4 2 stamp}-${builtins.substring 6 2 stamp}T${builtins.substring 8 2 stamp}:${builtins.substring 10 2 stamp}:${builtins.substring 12 2 stamp}Z"
-    else
-      "1970-01-01T00:00:00Z";
+  # The projection carries no revision and no timestamp. Both used to be baked in from `flake.rev` and
+  # `flake.lastModifiedDate`, which made every commit - a comment in a document included - change the
+  # store path of this file, and with it the closure of every host that serves the portal. A commit
+  # that changes nothing in the fleet now changes nothing here either.
+  #
+  # The two fields the app shows are added where they are true: at start, from the revision this host
+  # actually runs and the moment it activated that system. `revision` therefore reads "rolled out",
+  # which is what the page claims, instead of "built by CI".
 
   # The labels the portal shows are localized. The contract offers one string for a tile name and a
   # per-locale description; a product name is language-neutral, so it is repeated, while the summary
@@ -182,7 +176,6 @@ let
   fleet = pkgs.writeText "fleet.json" (
     builtins.toJSON {
       schema = 1;
-      inherit revision generatedAt;
       locales = config.my.portal.locales;
       adminGroups = portalAdminGroups;
       inherit categories;
@@ -218,6 +211,42 @@ let
     cp ${fleet} $out/fleet.json
     cp ${adapters} $out/adapters.json
   '';
+
+  # The revision the portal reports is the one this host runs, not the one the file was built from.
+  # Writing it at start keeps the closure content-stable while the page stays truthful, and it turns
+  # "built is not rolled out" into an answer instead of a warning.
+  projectionWriter = pkgs.writeShellApplication {
+    name = "vyrx-portal-projection";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.jq
+    ];
+    text = ''
+      set -euo pipefail
+
+      source=${portalArtifact}/fleet.json
+      target="$STATE_DIRECTORY/fleet.json"
+
+      revision="unknown"
+      state=/var/lib/nod/state.json
+      if [ -r "$state" ]; then
+        revision=$(jq -r '.last_applied_rev // "unknown"' "$state" 2>/dev/null || printf 'unknown')
+      fi
+
+      # When this host activated the system it reports, not when this file was built: the two differ
+      # exactly when a rollout happened. Nix stamps every store path with mtime 1, so the target is
+      # useless here; the symlink's own mtime is the moment the switch recreated it.
+      generated="unknown"
+      if [ -L /run/current-system ]; then
+        generated=$(date -u -d "@$(stat -c %Y /run/current-system)" +%Y-%m-%dT%H:%M:%SZ)
+      fi
+
+      jq --arg revision "$revision" --arg generatedAt "$generated" \
+        '. + {revision: $revision, generatedAt: $generatedAt}' \
+        "$source" > "$target.tmp"
+      mv "$target.tmp" "$target"
+    '';
+  };
 
   # The API port. The process serves everything - pages, assets and API - so this is the port the
   # endpoint declares, not a private one behind a hand-written proxy.
@@ -267,6 +296,10 @@ in
     systemd.services.vyrx-portal-api = {
       description = "VYRX portal (landing page and its API)";
       wantedBy = [ "multi-user.target" ];
+      # The projection is materialised before the app starts: it is the artifact's file plus the
+      # revision and timestamp that only the running host can know. `preStart` belongs to the unit,
+      # not to `serviceConfig`: `PreStart=` is not a systemd service option.
+      preStart = "${projectionWriter}/bin/vyrx-portal-projection";
       serviceConfig = {
         ExecStart = "${pkgs.nodejs_24}/bin/node ${portalArtifact}/server/entry.mjs";
         Environment = [
@@ -275,7 +308,7 @@ in
           # should be able to reach it. `directAccess` stays off, so the firewall opens nothing either.
           "HOST=127.0.0.1"
           "PORT=${toString portalApiPort}"
-          "PORTAL_FLEET=${portalArtifact}/fleet.json"
+          "PORTAL_FLEET=%S/vyrx-portal/fleet.json"
           "PORTAL_ADAPTERS=${portalArtifact}/adapters.json"
           # Favorites, reports and the action log are this host's own state, not a projection: the
           # dynamic user gets a state directory systemd makes writable under `ProtectSystem = "strict"`.
