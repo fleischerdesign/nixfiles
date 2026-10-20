@@ -67,6 +67,11 @@ No derivation reads the commit hash. The portal reports the revision its host
 evaluated value produces identical closures - and a documentation change does
 not roll the fleet.
 
+Path literals need the same care. A literal into the tree (`../../media/x.jpg`)
+resolves inside the single `<hash>-source` copy, so its hash covers every file
+in the repository: a document would change the store path of a wallpaper. Files
+that end up in a derivation are content-addressed with `builtins.path`.
+
 ### A change through the gate
 
 1. `nix fmt && deadnix --fail && statix check` - seconds.
