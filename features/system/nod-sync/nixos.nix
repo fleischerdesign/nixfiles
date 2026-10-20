@@ -135,7 +135,7 @@ in
     ];
 
     programs.ssh.extraConfig = ''
-      Match user root address 10.10.100.0/24
+      Match host 10.10.100.* user root
           IdentityFile ${config.sops.secrets."infra/deploy_key".path}
           IdentitiesOnly yes
           StrictHostKeyChecking accept-new
