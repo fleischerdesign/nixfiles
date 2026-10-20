@@ -184,7 +184,13 @@ in
         # invocation exits, and then systemd must not spin.
         Restart = "on-failure";
         RestartSec = 30;
-        KillMode = "mixed";
+        # Activating this host stops this unit, because the unit itself is
+        # part of the generation being switched to. With the default kill mode
+        # systemd would also kill the `switch-to-configuration` child that is
+        # performing the activation - the daemon shot itself in the foot and
+        # left the host on the old generation. `process` limits the stop signal
+        # to the daemon, so the switch completes and starts the new unit.
+        KillMode = "process";
         UMask = "0077";
         PrivateTmp = true;
         # No ProtectSystem: a local activation writes /etc, /run and the Nix
