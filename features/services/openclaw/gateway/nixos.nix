@@ -212,6 +212,12 @@ in
       }
     ];
 
+    # Read-only journal access: the agent diagnoses the units on the hosts it
+    # manages - including the GitOps reconciler - without holding root. The
+    # group is the permission the operator grants deliberately, not a sandbox
+    # escape: it can read logs, not change them.
+    users.users.openclaw.extraGroups = [ "systemd-journal" ];
+
     sops.secrets = lib.genAttrs (
       [
         "openclaw/gateway_password"
