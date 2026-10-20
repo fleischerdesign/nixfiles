@@ -40,6 +40,12 @@ let
     else
       lib.concatMapStringsSep " " (t: "--target ${lib.escapeShellArg t}") cfg.targets;
 
+  # The public entry point is the last thing a rollout may disturb; everything
+  # else can be replaced while it keeps serving.
+  lastHostFlags = lib.concatMapStringsSep " " (
+    h: "--last-host ${lib.escapeShellArg h}"
+  ) cfg.lastHosts;
+
   command = lib.concatStringsSep " " [
     "${nod}/bin/nod"
     "daemon"
@@ -51,6 +57,7 @@ let
     "--strategy ${cfg.strategy}"
     "--concurrency ${toString cfg.concurrency}"
     targetFlags
+    lastHostFlags
   ];
 in
 {
@@ -107,6 +114,12 @@ in
       type = lib.types.ints.positive;
       default = 2;
       description = "Maximum in-flight hosts.";
+    };
+
+    lastHosts = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Hosts deployed after every other target (public ingress, control plane).";
     };
   };
 

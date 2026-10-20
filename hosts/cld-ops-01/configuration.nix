@@ -1,4 +1,8 @@
-{ inputs, ... }:
+{
+  config,
+  inputs,
+  ...
+}:
 {
   imports = [
     inputs.disko.nixosModules.disko
@@ -55,6 +59,9 @@
       "hom-wrk-01"
       "mob-nb-01"
     ];
+    # The public entry point is deployed last: a canary that starts with the
+    # ingress turns a rollout mistake into an outage.
+    lastHosts = [ config.my.topology.ingressHost ];
   };
 
   my.features.services.crowdsec = {
