@@ -211,24 +211,46 @@ in
       "systemd-journal"
       "caddy"
     ];
-    # The upstream NixOS module links declarative parsers using their /nix/store/<hash>-...
-    # path directly into /etc/crowdsec/parsers/s02-enrich/ via systemd-tmpfiles without pruning
-    # old generations. CrowdSec discards duplicate parsers when multiple hashed copies accumulate,
-    # causing whitelist parsers to be silently ignored. We purge broken and stale store links.
+    # A declarative parser reaches /etc/crowdsec through systemd-tmpfiles, and a link into the
+    # store carries the store hash in its name, so every generation adds a file next to the last
+    # one instead of replacing it. CrowdSec keeps the first parser it reads per name and discards
+    # the rest, so an old copy silently wins over the one in the repository. The module now writes
+    # `<index>-nixos-generated.yaml`; every link named after an earlier scheme is a leftover.
     systemd.services.crowdsec.serviceConfig.ExecStartPre = lib.mkBefore [
       "${pkgs.writeShellScript "crowdsec-prune-stale-parsers" ''
-        for dir in /etc/crowdsec/parsers/*; do
+        legacy="parsers-s00-raw.yaml parsers-s01-parse.yaml parsers-s02-enrich.yaml postoverflows-s01-whitelist.yaml scenario.yaml context.yaml notification.yaml"
+
+        for dir in \
+          /etc/crowdsec/parsers/* \
+          /etc/crowdsec/postoverflows/* \
+          /etc/crowdsec/scenarios \
+          /etc/crowdsec/contexts \
+          /etc/crowdsec/notifications; do
           [ -d "$dir" ] || continue
           for link in "$dir"/*; do
             [ -L "$link" ] || continue
             target="$(readlink "$link")" || continue
             case "$target" in
-              /nix/store/*)
-                if [ ! -e "$link" ]; then
-                  rm -f "$link"
-                fi
-                ;;
+              /nix/store/*) ;;
+              *) continue ;;
             esac
+
+            # A dangling link is dead whatever its name.
+            if [ ! -e "$link" ]; then
+              rm -f "$link"
+              continue
+            fi
+
+            base="$(basename "$link")"
+            for name in $legacy; do
+              case "$base" in
+                *"-$name")
+                  rm -f "$link"
+                  echo "pruned legacy crowdsec link $link" >&2
+                  break
+                  ;;
+              esac
+            done
           done
         done
       ''}"
