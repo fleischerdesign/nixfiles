@@ -178,6 +178,10 @@ in
             };
           })
           {
+            # The previous module disabled the local API on an agent; the restructured one enables
+            # it and binds 127.0.0.1:8080, which is taken on hosts that run an agent. Only the
+            # master publishes an API.
+            api.server.enable = isMaster;
             api.client.credentials_path =
               if isMaster then
                 "/etc/crowdsec/local_api_credentials.yaml"
