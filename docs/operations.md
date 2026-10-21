@@ -182,6 +182,7 @@ Standing conditions that will bite an operator who does not know them.
 | A public name gets its certificate only once the name exists in DNS | the CA's resolvers cache the answer it saw before the name was created, so a challenge can keep failing until that cache expires - the zone's SOA minimum, 1800 s here. Order a deployment that introduces a public name the other way round - record first, vhost second - and read the ACME log instead of the site's silence |
 | The Bluetooth adapter on `hom-srv-01` can return on a different `hci` index | a replug can bring it back as `hci1` while Home Assistant still looks for `hci0`, leaving the integration in `setup_retry` until the service restarts |
 | An OIDC identity link can move under a service | a changed `auth_id` makes the service read the login as a new account and the sync fail. Repair the one row, never delete the user - and derive role names from the publication (`adminGroups`), because a hand-written name that does not exist silently makes everyone a Viewer |
+| A `nix-openclaw` bump can need a database migration that no check sees | `nix flake check` proves the closure builds, not that the gateway's schema matches its store. The migration lives in `/var/lib/openclaw` and the flake applies none, so a bump passes CI and fails at startup. `openclaw doctor` reports and applies the migration; it is written for non-Nix installs, so run it deliberately - a green check is not proof the gateway starts |
 
 ## 8. Maintaining the fleet
 
