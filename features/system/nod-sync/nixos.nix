@@ -221,6 +221,12 @@ in
         ExecStartPre = checkout;
         ExecStart = command;
         StateDirectory = "nod";
+        # The history must outlive the daemon and stay readable for whoever asks
+        # `nod audit`. Left to `$HOME`, the service account's copy would be
+        # invisible to every operator; the path is shared instead. The store
+        # itself sets the file mode, so the directory only needs to be traversable.
+        Environment = "NOD_AUDIT_PATH=/var/lib/nod/history.json";
+        StateDirectoryMode = "0755";
         # A refusal or a failed cycle is reported, not fatal; only a broken
         # invocation exits, and then systemd must not spin.
         Restart = "on-failure";
