@@ -125,7 +125,7 @@ in
     services.crowdsec = {
       enable = true;
 
-      localConfig = {
+      settings = {
         parsers.s02Enrich = [
           {
             name = "custom/trusted-internal";
@@ -149,48 +149,48 @@ in
             };
           }
         ];
+
+        acquisitions = [
+          {
+            filenames = [ "/var/log/caddy/access-*.log" ];
+            exclude_regexps = cfg.excludeLogPatterns;
+            labels.type = "caddy";
+          }
+          {
+            source = "journalctl";
+            journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
+            labels.type = "syslog";
+          }
+        ];
+
+        # Der Master liest die lokal erzeugten Credentials, der Agent das Template.
+        config = lib.mkMerge [
+          (lib.mkIf isMaster {
+            api.server = {
+              listen_uri = "0.0.0.0:8085";
+              enable = true;
+            };
+            prometheus = {
+              enabled = true;
+              level = "full";
+              listen_addr = "0.0.0.0";
+              listen_port = 6060;
+            };
+          })
+          {
+            api.client.credentials_path =
+              if isMaster then
+                "/etc/crowdsec/local_api_credentials.yaml"
+              else
+                config.sops.templates."crowdsec_lapi.yaml".path;
+          }
+        ];
       };
 
       hub.collections = [
         "crowdsecurity/linux"
         "crowdsecurity/caddy"
       ];
-
-      localConfig.acquisitions = [
-        {
-          filenames = [ "/var/log/caddy/access-*.log" ];
-          exclude_regexps = cfg.excludeLogPatterns;
-          labels.type = "caddy";
-        }
-        {
-          source = "journalctl";
-          journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
-          labels.type = "syslog";
-        }
-      ];
-
-      settings = {
-        # Master-spezifische Server-Einstellungen
-        general = lib.mkIf isMaster {
-          api.server = {
-            listen_uri = "0.0.0.0:8085";
-            enable = true;
-          };
-          prometheus = {
-            enabled = true;
-            level = "full";
-            listen_addr = "0.0.0.0";
-            listen_port = 6060;
-          };
-        };
-
-        # Agent-Konfiguration: Nutzt das generierte Template
-        lapi.credentialsFile =
-          if isMaster then
-            "/etc/crowdsec/local_api_credentials.yaml"
-          else
-            config.sops.templates."crowdsec_lapi.yaml".path;
-      };
     };
 
     # Firewall-Bouncer

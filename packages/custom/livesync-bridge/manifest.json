@@ -1,8 +1,8 @@
 {
   "name": "livesync-bridge",
   "version": "0.1.0",
-  "rev": "5645cf6a74e863ccc29bc2e9dedef1c4941e096b",
-  "srcHash": "sha256-CjAU2ThV33M86mHbf+9YfIsAgPymmj9VGd+bNV7fXpc=",
+  "rev": "fc0e028d33b3a12ddee1322951375e05107edc55",
+  "srcHash": "sha256-GW9e6Vr60/7U+Bx7m1KKzzijzu221nWWg/aVs5M38A8=",
   "upstream": {
     "type": "github-rev",
     "owner": "vrtmrz",
