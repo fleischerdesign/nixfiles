@@ -200,6 +200,11 @@ in
           StrictHostKeyChecking accept-new
     '';
 
+    # The daemon writes the history, operators read it, and both must mean the
+    # same file. A unit-only variable would leave every interactive `nod audit`
+    # reading its own home again - the exact confusion the shared path removes.
+    environment.variables.NOD_AUDIT_PATH = "/var/lib/nod/history.json";
+
     systemd.services.nod-sync = {
       description = "nod GitOps reconciler (${cfg.branch})";
       wantedBy = [ "multi-user.target" ];
