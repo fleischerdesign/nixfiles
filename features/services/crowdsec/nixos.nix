@@ -184,6 +184,16 @@ in
               else
                 config.sops.templates."crowdsec_lapi.yaml".path;
           }
+          # The module defaults data_dir to /var/lib/crowdsec/data; the state this host accumulated
+          # lives under /var/lib/crowdsec/state. Leaving the default moves the database and the hub
+          # out from under the engine, which then exits on missing hub data. Pin the layout.
+          {
+            config_paths = {
+              config_dir = "/etc/crowdsec";
+              data_dir = "/var/lib/crowdsec/state";
+              hub_dir = "/var/lib/crowdsec/state/hub";
+            };
+          }
         ];
       };
 
