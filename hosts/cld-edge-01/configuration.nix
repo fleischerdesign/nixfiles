@@ -19,7 +19,10 @@
 
   my.features.services.openclaw.node.enable = true;
 
-  my.features.system.networking.cloudflare.enable = true;
+  my.features.system.networking.cloudflare = {
+    enable = true;
+    writer = false;
+  };
 
   my.features.system.common.geoip.enable = true;
 

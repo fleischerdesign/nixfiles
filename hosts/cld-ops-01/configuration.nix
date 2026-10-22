@@ -65,6 +65,9 @@
     # The example provider runs in dry-run; the declaration lives in the
     # flake's `nod` output and is read by the daemon itself.
     reconcileProviders = true;
+    extraEnvironmentFiles = [
+      config.sops.templates."nod-cloudflare.env".path
+    ];
   };
 
   # Stage 0 of the provider rollout (ADR-030): observe the real zone from the
@@ -73,6 +76,7 @@
   my.features.system.networking.cloudflare = {
     enable = true;
     observeOnly = true;
+    adopt = true;
   };
 
   my.features.services.crowdsec = {

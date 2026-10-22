@@ -151,6 +151,35 @@
               max_deletions = 0;
             };
           };
+
+          # The real zone. The declaration lives on the control-plane host,
+          # which also projects it for the observer; the daemon reads the same
+          # store path. `cloudflare-sync` is off, so this is the only writer.
+          cloudflare = {
+            command = "${
+              self.inputs.nod.packages.${system}.nod-provider-cloudflare
+            }/bin/nod-provider-cloudflare";
+            settings = {
+              zone = self.nixosConfigurations.cld-ops-01.config.my.features.system.networking.cloudflare.domain;
+              token_env = "CLOUDFLARE_API_TOKEN";
+            };
+            desired =
+              self.nixosConfigurations.cld-ops-01.config.my.features.system.networking.cloudflare.nodDesiredStateFile;
+            apply = true;
+            interval_secs = 300;
+            timeout_secs = 120;
+            env = [ "CLOUDFLARE_API_TOKEN" ];
+            policy = {
+              # The apex and the mail/delegation records are never deleted; one
+              # deletion per run is enough for a deliberate removal.
+              protect = [
+                "A:vyrx.de"
+                "MX:*"
+                "NS:*"
+              ];
+              max_deletions = 1;
+            };
+          };
         };
       };
 

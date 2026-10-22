@@ -286,6 +286,32 @@ let
 
   nodCanaryEmpty = pkgs.writeText "cloudflare-nod-empty.json" (builtins.toJSON { resources = [ ]; });
 
+  # Adoption configuration: the full declaration, no policy. `--apply` is the
+  # CLI's decision, not the file's.
+  nodAdoptConfig = pkgs.writeText "cloudflare-nod-adopt.toml" ''
+    [providers.cloudflare]
+    command = "${nodProvider}/bin/nod-provider-cloudflare"
+    desired = "${nodDesiredState}"
+    timeout_secs = 120
+    env = [ "CLOUDFLARE_API_TOKEN" ]
+
+    [providers.cloudflare.settings]
+    zone = "${cfg.domain}"
+    token_env = "CLOUDFLARE_API_TOKEN"
+  '';
+
+  nodAdoptScript = pkgs.writeShellScript "nod-cloudflare-adopt" ''
+    set -euo pipefail
+    nod=${nodPkg}/bin/nod
+    config=${nodAdoptConfig}
+
+    echo "== adopt =="
+    "$nod" provider adopt cloudflare --config "$config" --apply
+
+    echo "== verify =="
+    "$nod" provider adopt cloudflare --config "$config"
+  '';
+
   # Python reconciliation engine script wrapper
   syncScript = pkgs.writeShellScriptBin "cloudflare-sync" ''
     exec ${pkgs.python3}/bin/python3 ${./sync.py} --spec ${desiredStateJson} "$@"
@@ -334,6 +360,36 @@ in
         Run the write canary once per activation: create a TXT record, prove the
         second run is a no-op, then roll it back. Off by default; it writes to the
         real zone and exists to prove the write path, not to run continuously.
+      '';
+    };
+
+    writer = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Run the legacy `cloudflare-sync` writer. Turn it off once nod owns the
+        zone; the timer and the service disappear from the generation.
+      '';
+    };
+
+    adopt = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Run the one-off adoption (ADR-032): stamp the nod marker on declared
+        records that already match. Off after the proof; adoption is an event,
+        not a schedule.
+      '';
+    };
+
+    nodDesiredStateFile = lib.mkOption {
+      type = lib.types.str;
+      readOnly = true;
+      default = "${nodDesiredState}";
+      description = ''
+        The record declaration in nod's provider format. The flake's `nod`
+        output points at this path; the observer already puts it in the
+        system closure.
       '';
     };
 
@@ -474,8 +530,27 @@ in
       };
     };
 
+    # One-off adoption (ADR-032): stamp the nod marker on declared records that
+    # already match. The second call proves the result: 0 unowned, 0 eligible.
+    systemd.services.nod-cloudflare-adopt = lib.mkIf cfg.adopt {
+      description = "Adopt the existing Cloudflare records into nod (ADR-032)";
+      after = [
+        "network-online.target"
+        "sops-nix.service"
+      ];
+      wants = [ "network-online.target" ];
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        EnvironmentFile = config.sops.templates."nod-cloudflare.env".path;
+        ExecStart = "${nodAdoptScript}";
+        StandardOutput = "journal";
+        StandardError = "journal";
+      };
+    };
+
     # Systemd periodic reconciliation timer
-    systemd.services.cloudflare-dns-sync = lib.mkIf (!cfg.observeOnly) {
+    systemd.services.cloudflare-dns-sync = lib.mkIf (cfg.writer && !cfg.observeOnly) {
       description = "Declarative Cloudflare Edge & DNS Reconciliation";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
@@ -495,7 +570,7 @@ in
       };
     };
 
-    systemd.timers.cloudflare-dns-sync = lib.mkIf (!cfg.observeOnly) {
+    systemd.timers.cloudflare-dns-sync = lib.mkIf (cfg.writer && !cfg.observeOnly) {
       description = "Periodic Cloudflare Edge & DNS Reconciliation Timer";
       wantedBy = [ "timers.target" ];
       timerConfig = {

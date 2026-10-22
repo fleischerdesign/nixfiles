@@ -173,6 +173,16 @@ in
         rendered here.
       '';
     };
+
+    extraEnvironmentFiles = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [ ];
+      description = ''
+        Additional systemd EnvironmentFile paths for the daemon, used to pass
+        provider credentials by name (ADR-030). The values stay out of the Nix
+        store; the files are rendered from SOPS.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -242,6 +252,7 @@ in
         # invisible to every operator; the path is shared instead. The store
         # itself sets the file mode, so the directory only needs to be traversable.
         Environment = "NOD_AUDIT_PATH=/var/lib/nod/history.json";
+        EnvironmentFile = cfg.extraEnvironmentFiles;
         StateDirectoryMode = "0755";
         # A refusal or a failed cycle is reported, not fatal; only a broken
         # invocation exits, and then systemd must not spin.
