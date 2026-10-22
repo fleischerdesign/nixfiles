@@ -140,7 +140,7 @@
                 ];
               }
             );
-            apply = false;
+            apply = true;
             interval_secs = 300;
             order = "independent";
           };
