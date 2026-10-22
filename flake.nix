@@ -143,6 +143,13 @@
             apply = true;
             interval_secs = 300;
             order = "independent";
+            policy = {
+              # The example record is never deleted, and this provider may not
+              # delete at all: a declaration that wants to remove records has
+              # to say so explicitly.
+              protect = [ "demo" ];
+              max_deletions = 0;
+            };
           };
         };
       };
