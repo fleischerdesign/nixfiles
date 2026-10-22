@@ -203,7 +203,18 @@ let
 
   nodDesiredState = pkgs.writeText "cloudflare-nod-desired.json" (
     builtins.toJSON {
-      resources = map (r: {
+      resources = [
+        {
+          kind = "zone.settings";
+          id = "zone.settings";
+          attributes = {
+            ssl = cfg.settings.ssl;
+            always_use_https = if cfg.settings.alwaysUseHttps then "on" else "off";
+            min_tls_version = cfg.settings.minTlsVersion;
+          };
+        }
+      ]
+      ++ map (r: {
         kind = "dns.record";
         id = "${r.type}:${nodFqdn r.name}";
         attributes = {
