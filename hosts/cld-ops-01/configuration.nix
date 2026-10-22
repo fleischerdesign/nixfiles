@@ -76,7 +76,6 @@
   my.features.system.networking.cloudflare = {
     enable = true;
     observeOnly = true;
-    adopt = true;
   };
 
   my.features.services.crowdsec = {
