@@ -250,22 +250,41 @@ let
   nodCanaryScript = pkgs.writeShellScript "nod-cloudflare-canary" ''
     set -euo pipefail
     nod=${nodPkg}/bin/nod
-    provider=${nodProvider}/bin/nod-provider-cloudflare
-    settings=${nodSettings}
+    config=${nodCanaryConfig}
     state=/var/lib/nod-cloudflare-canary
 
+    echo "== cleanup =="
+    "$nod" reconcile cloudflare --config "$config" --desired ${nodCanaryEmpty} --apply
+
     echo "== create =="
-    "$nod" reconcile --command "$provider" --desired ${nodCanaryDesired} \
-      --settings "$settings" --state-dir "$state" --env CLOUDFLARE_API_TOKEN --apply
+    "$nod" reconcile cloudflare --config "$config" --desired ${nodCanaryDesired} --apply
 
     echo "== idempotent =="
-    "$nod" reconcile --command "$provider" --desired ${nodCanaryDesired} \
-      --settings "$settings" --state-dir "$state" --env CLOUDFLARE_API_TOKEN --apply
+    "$nod" reconcile cloudflare --config "$config" --desired ${nodCanaryDesired} --apply
 
     echo "== rollback =="
-    "$nod" reconcile cloudflare --rollback --command "$provider" \
-      --settings "$settings" --state-dir "$state" --env CLOUDFLARE_API_TOKEN
+    "$nod" reconcile cloudflare --config "$config" --rollback
   '';
+
+  # The canary owns exactly one deletion: the record it creates. The cleanup
+  # pass uses it to remove a record left behind by an earlier failed canary.
+  nodCanaryConfig = pkgs.writeText "cloudflare-nod-canary.toml" ''
+    [providers.cloudflare]
+    command = "${nodProvider}/bin/nod-provider-cloudflare"
+    desired = "${nodCanaryDesired}"
+    apply = true
+    timeout_secs = 120
+    env = [ "CLOUDFLARE_API_TOKEN" ]
+
+    [providers.cloudflare.settings]
+    zone = "${cfg.domain}"
+    token_env = "CLOUDFLARE_API_TOKEN"
+
+    [providers.cloudflare.policy]
+    max_deletions = 1
+  '';
+
+  nodCanaryEmpty = pkgs.writeText "cloudflare-nod-empty.json" (builtins.toJSON { resources = [ ]; });
 
   # Python reconciliation engine script wrapper
   syncScript = pkgs.writeShellScriptBin "cloudflare-sync" ''
