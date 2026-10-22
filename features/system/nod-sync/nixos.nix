@@ -241,6 +241,10 @@ in
         pkgs.nix
         pkgs.openssh
         pkgs.coreutils
+        # The local health probe runs `systemctl` and `sh`; without them in the
+        # unit's PATH, a self-deploy reports `unverified` by construction.
+        pkgs.systemd
+        pkgs.bash
       ];
       serviceConfig = {
         Type = "simple";
