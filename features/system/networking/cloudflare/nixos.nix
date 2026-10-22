@@ -227,6 +227,46 @@ let
   nodPkg = inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default;
   nodProvider = inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-cloudflare;
 
+  # One TXT record that neither the declaration nor the legacy engine knows.
+  # The canary creates it, proves the second run is a no-op, then rolls it back.
+  nodCanaryDesired = pkgs.writeText "cloudflare-nod-canary.json" (
+    builtins.toJSON {
+      resources = [
+        {
+          kind = "dns.record";
+          id = "TXT:nod-canary.${cfg.domain}";
+          attributes = {
+            type = "TXT";
+            name = "nod-canary.${cfg.domain}";
+            content = "ok";
+            ttl = 60;
+            proxied = false;
+          };
+        }
+      ];
+    }
+  );
+
+  nodCanaryScript = pkgs.writeShellScript "nod-cloudflare-canary" ''
+    set -euo pipefail
+    nod=${nodPkg}/bin/nod
+    provider=${nodProvider}/bin/nod-provider-cloudflare
+    settings=${nodSettings}
+    state=/var/lib/nod-cloudflare-canary
+
+    echo "== create =="
+    "$nod" reconcile --command "$provider" --desired ${nodCanaryDesired} \
+      --settings "$settings" --state-dir "$state" --env CLOUDFLARE_API_TOKEN --apply
+
+    echo "== idempotent =="
+    "$nod" reconcile --command "$provider" --desired ${nodCanaryDesired} \
+      --settings "$settings" --state-dir "$state" --env CLOUDFLARE_API_TOKEN --apply
+
+    echo "== rollback =="
+    "$nod" reconcile cloudflare --rollback --command "$provider" \
+      --settings "$settings" --state-dir "$state" --env CLOUDFLARE_API_TOKEN
+  '';
+
   # Python reconciliation engine script wrapper
   syncScript = pkgs.writeShellScriptBin "cloudflare-sync" ''
     exec ${pkgs.python3}/bin/python3 ${./sync.py} --spec ${desiredStateJson} "$@"
@@ -265,6 +305,16 @@ in
         Run only the read-only nod observation on this host. The writer service and
         timer stay off, so exactly one host owns the zone. Used to observe from the
         reconciler host without creating a second writer.
+      '';
+    };
+
+    canary = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Run the write canary once per activation: create a TXT record, prove the
+        second run is a no-op, then roll it back. Off by default; it writes to the
+        real zone and exists to prove the write path, not to run continuously.
       '';
     };
 
@@ -377,6 +427,29 @@ in
           "--env"
           "CLOUDFLARE_API_TOKEN"
         ];
+        StandardOutput = "journal";
+        StandardError = "journal";
+      };
+    };
+
+    # Stage 2 of the provider rollout (ADR-030): the write canary. It creates a
+    # record nobody else knows, proves the second run is a no-op, and rolls it
+    # back. It runs once per activation while enabled; it is a proof, not a
+    # schedule.
+    systemd.services.nod-cloudflare-canary = lib.mkIf cfg.canary {
+      description = "Cloudflare write canary: create, prove idempotent, roll back";
+      after = [
+        "network-online.target"
+        "sops-nix.service"
+      ];
+      wants = [ "network-online.target" ];
+      wantedBy = [ "multi-user.target" ];
+      environment.NOD_AUDIT_PATH = "/var/lib/nod-cloudflare-canary/history.json";
+      serviceConfig = {
+        Type = "oneshot";
+        StateDirectory = "nod-cloudflare-canary";
+        EnvironmentFile = config.sops.templates."nod-cloudflare.env".path;
+        ExecStart = "${nodCanaryScript}";
         StandardOutput = "journal";
         StandardError = "journal";
       };
