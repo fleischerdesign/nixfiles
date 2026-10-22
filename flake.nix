@@ -121,6 +121,32 @@
       ) hostNames;
     in
     {
+      # The fleet declaration for nod (ADR-031): the same structure the
+      # configuration file uses, evaluated by nod with `nix eval`.
+      nod = {
+        schema = 1;
+        providers = {
+          example = {
+            command = "${self.inputs.nod.packages.${system}.nod-provider-example}/bin/nod-provider-example";
+            settings.state = "/var/lib/nod/example-state.json";
+            desired = pkgs.writeText "nod-example-desired.json" (
+              builtins.toJSON {
+                resources = [
+                  {
+                    kind = "example.record";
+                    id = "demo";
+                    attributes.value = "dry-run";
+                  }
+                ];
+              }
+            );
+            apply = false;
+            interval_secs = 300;
+            order = "independent";
+          };
+        };
+      };
+
       formatter.${system} = pkgs.nixfmt-tree;
 
       packages.${system} = pkgs.custom;

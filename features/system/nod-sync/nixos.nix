@@ -62,6 +62,7 @@ let
     "--concurrency ${toString cfg.concurrency}"
     targetFlags
     lastHostFlags
+    (lib.optionalString cfg.reconcileProviders "--reconcile-providers")
   ];
 in
 {
@@ -161,6 +162,16 @@ in
       type = lib.types.listOf lib.types.str;
       default = [ ];
       description = "Hosts deployed after every other target (public ingress, control plane).";
+    };
+
+    reconcileProviders = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Also reconcile the providers declared in the flake's `nod` output
+        (ADR-030/031). The declaration is read by nod itself; no config file is
+        rendered here.
+      '';
     };
   };
 

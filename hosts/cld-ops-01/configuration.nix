@@ -62,6 +62,9 @@
     # The public entry point is deployed last: a canary that starts with the
     # ingress turns a rollout mistake into an outage.
     lastHosts = [ config.my.topology.ingressHost ];
+    # The example provider runs in dry-run; the declaration lives in the
+    # flake's `nod` output and is read by the daemon itself.
+    reconcileProviders = true;
   };
 
   my.features.services.crowdsec = {
