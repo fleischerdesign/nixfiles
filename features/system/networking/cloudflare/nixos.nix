@@ -364,7 +364,6 @@ in
         ExecStart = lib.escapeShellArgs [
           "${nodPkg}/bin/nod"
           "reconcile"
-          "cloudflare"
           "--flake"
           "/var/lib/nod-cloudflare-observe"
           "--command"
