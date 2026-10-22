@@ -245,6 +245,9 @@ in
         # unit's PATH, a self-deploy reports `unverified` by construction.
         pkgs.systemd
         pkgs.bash
+        # The restart-loop probe pipes through awk; without it the probe
+        # silently reports an empty list.
+        pkgs.gawk
       ];
       serviceConfig = {
         Type = "simple";
