@@ -67,6 +67,14 @@
     reconcileProviders = true;
   };
 
+  # Stage 0 of the provider rollout (ADR-030): observe the real zone from the
+  # control plane, never write. cld-edge-01 stays the only writer, so the two
+  # engines cannot fight over a record.
+  my.features.system.networking.cloudflare = {
+    enable = true;
+    observeOnly = true;
+  };
+
   my.features.services.crowdsec = {
     enable = true;
     role = "agent";

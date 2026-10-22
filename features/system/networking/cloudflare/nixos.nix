@@ -8,6 +8,7 @@
   lib,
   fleetConfigs,
   pkgs,
+  inputs,
   ...
 }:
 
@@ -186,6 +187,46 @@ let
     }
   );
 
+  # The same records in nod's provider format (ADR-030): `resources` with
+  # `kind`, `id` and `attributes`. Derived from the same projections, never a
+  # second source of truth. Cloudflare reports absolute names, the declaration
+  # uses `@` and relative labels, so the projection normalises exactly as
+  # `sync.py` does.
+  nodFqdn =
+    name:
+    if name == "@" then
+      cfg.domain
+    else if name == cfg.domain || lib.hasSuffix ".${cfg.domain}" name then
+      name
+    else
+      "${name}.${cfg.domain}";
+
+  nodDesiredState = pkgs.writeText "cloudflare-nod-desired.json" (
+    builtins.toJSON {
+      resources = map (r: {
+        kind = "dns.record";
+        id = "${r.type}:${nodFqdn r.name}";
+        attributes = {
+          type = r.type;
+          name = nodFqdn r.name;
+          content = r.content;
+          ttl = r.ttl;
+          proxied = r.proxied;
+        };
+      }) projectedRecords;
+    }
+  );
+
+  nodSettings = pkgs.writeText "cloudflare-nod-settings.json" (
+    builtins.toJSON {
+      zone = cfg.domain;
+      token_env = "CLOUDFLARE_API_TOKEN";
+    }
+  );
+
+  nodPkg = inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  nodProvider = inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-cloudflare;
+
   # Python reconciliation engine script wrapper
   syncScript = pkgs.writeShellScriptBin "cloudflare-sync" ''
     exec ${pkgs.python3}/bin/python3 ${./sync.py} --spec ${desiredStateJson} "$@"
@@ -214,6 +255,16 @@ in
         Publish a `*.<zone>` catch-all to the ingress. Off by default: unknown names — including
         the internal planes — then return NXDOMAIN instead of leaking to the ingress
         (Naming spec §5.1, option A).
+      '';
+    };
+
+    observeOnly = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Run only the read-only nod observation on this host. The writer service and
+        timer stay off, so exactly one host owns the zone. Used to observe from the
+        reconciler host without creating a second writer.
       '';
     };
 
@@ -288,8 +339,52 @@ in
     # Ensure SOPS token is accessible
     sops.secrets.${cfg.apiTokenSecret} = lib.mkDefault { };
 
+    # The provider reads its credential from the environment; the value comes
+    # from SOPS through a template, never from the Nix store or argv.
+    sops.templates."nod-cloudflare.env".content = ''
+      CLOUDFLARE_API_TOKEN=${config.sops.placeholder.${cfg.apiTokenSecret}}
+    '';
+
+    # Stage 0 of the provider rollout (ADR-030): observe and plan, never apply.
+    # It runs where the zone's data already lives, uses the existing token and
+    # logs the report; the daemon is not involved, so no second writer exists.
+    systemd.services.nod-cloudflare-observe = {
+      description = "Read-only Cloudflare observation with nod (ADR-030 stage 0)";
+      after = [
+        "network-online.target"
+        "sops-nix.service"
+      ];
+      wants = [ "network-online.target" ];
+      wantedBy = [ "multi-user.target" ];
+      environment.NOD_AUDIT_PATH = "/var/lib/nod-cloudflare-observe/history.json";
+      serviceConfig = {
+        Type = "oneshot";
+        StateDirectory = "nod-cloudflare-observe";
+        EnvironmentFile = config.sops.templates."nod-cloudflare.env".path;
+        ExecStart = lib.escapeShellArgs [
+          "${nodPkg}/bin/nod"
+          "reconcile"
+          "cloudflare"
+          "--flake"
+          "/var/lib/nod-cloudflare-observe"
+          "--command"
+          "${nodProvider}/bin/nod-provider-cloudflare"
+          "--desired"
+          "${nodDesiredState}"
+          "--settings"
+          "${nodSettings}"
+          "--state-dir"
+          "/var/lib/nod-cloudflare-observe"
+          "--env"
+          "CLOUDFLARE_API_TOKEN"
+        ];
+        StandardOutput = "journal";
+        StandardError = "journal";
+      };
+    };
+
     # Systemd periodic reconciliation timer
-    systemd.services.cloudflare-dns-sync = {
+    systemd.services.cloudflare-dns-sync = lib.mkIf (!cfg.observeOnly) {
       description = "Declarative Cloudflare Edge & DNS Reconciliation";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
@@ -309,7 +404,7 @@ in
       };
     };
 
-    systemd.timers.cloudflare-dns-sync = {
+    systemd.timers.cloudflare-dns-sync = lib.mkIf (!cfg.observeOnly) {
       description = "Periodic Cloudflare Edge & DNS Reconciliation Timer";
       wantedBy = [ "timers.target" ];
       timerConfig = {
