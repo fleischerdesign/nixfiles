@@ -174,24 +174,11 @@ let
     )
   );
 
-  # Render desired state configuration as JSON derivation
-  desiredStateJson = pkgs.writeText "cloudflare-desired-state.json" (
-    builtins.toJSON {
-      domain = cfg.domain;
-      settings = {
-        ssl = cfg.settings.ssl;
-        always_use_https = if cfg.settings.alwaysUseHttps then "on" else "off";
-        min_tls_version = cfg.settings.minTlsVersion;
-      };
-      records = cfg.effectiveRecords;
-    }
-  );
-
   # The same records in nod's provider format (ADR-030): `resources` with
   # `kind`, `id` and `attributes`. Derived from the same projections, never a
   # second source of truth. Cloudflare reports absolute names, the declaration
-  # uses `@` and relative labels, so the projection normalises exactly as
-  # `sync.py` does.
+  # uses `@` and relative labels, so the projection normalises to the names
+  # the API reports.
   nodFqdn =
     name:
     if name == "@" then
@@ -238,95 +225,6 @@ let
   nodPkg = inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default;
   nodProvider = inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-cloudflare;
 
-  # One TXT record that neither the declaration nor the legacy engine knows.
-  # The canary creates it, proves the second run is a no-op, then rolls it back.
-  nodCanaryDesired = pkgs.writeText "cloudflare-nod-canary.json" (
-    builtins.toJSON {
-      resources = [
-        {
-          kind = "dns.record";
-          id = "TXT:nod-canary.${cfg.domain}";
-          attributes = {
-            type = "TXT";
-            name = "nod-canary.${cfg.domain}";
-            content = "ok";
-            ttl = 60;
-            proxied = false;
-          };
-        }
-      ];
-    }
-  );
-
-  nodCanaryScript = pkgs.writeShellScript "nod-cloudflare-canary" ''
-    set -euo pipefail
-    nod=${nodPkg}/bin/nod
-    config=${nodCanaryConfig}
-    state=/var/lib/nod-cloudflare-canary
-
-    echo "== cleanup =="
-    "$nod" reconcile cloudflare --config "$config" --desired ${nodCanaryEmpty} --apply
-
-    echo "== create =="
-    "$nod" reconcile cloudflare --config "$config" --desired ${nodCanaryDesired} --apply
-
-    echo "== idempotent =="
-    "$nod" reconcile cloudflare --config "$config" --desired ${nodCanaryDesired} --apply
-
-    echo "== rollback =="
-    "$nod" reconcile cloudflare --config "$config" --rollback
-  '';
-
-  # The canary owns exactly one deletion: the record it creates. The cleanup
-  # pass uses it to remove a record left behind by an earlier failed canary.
-  nodCanaryConfig = pkgs.writeText "cloudflare-nod-canary.toml" ''
-    [providers.cloudflare]
-    command = "${nodProvider}/bin/nod-provider-cloudflare"
-    desired = "${nodCanaryDesired}"
-    apply = true
-    timeout_secs = 120
-    env = [ "CLOUDFLARE_API_TOKEN" ]
-
-    [providers.cloudflare.settings]
-    zone = "${cfg.domain}"
-    token_env = "CLOUDFLARE_API_TOKEN"
-
-    [providers.cloudflare.policy]
-    max_deletions = 1
-  '';
-
-  nodCanaryEmpty = pkgs.writeText "cloudflare-nod-empty.json" (builtins.toJSON { resources = [ ]; });
-
-  # Adoption configuration: the full declaration, no policy. `--apply` is the
-  # CLI's decision, not the file's.
-  nodAdoptConfig = pkgs.writeText "cloudflare-nod-adopt.toml" ''
-    [providers.cloudflare]
-    command = "${nodProvider}/bin/nod-provider-cloudflare"
-    desired = "${nodDesiredState}"
-    timeout_secs = 120
-    env = [ "CLOUDFLARE_API_TOKEN" ]
-
-    [providers.cloudflare.settings]
-    zone = "${cfg.domain}"
-    token_env = "CLOUDFLARE_API_TOKEN"
-  '';
-
-  nodAdoptScript = pkgs.writeShellScript "nod-cloudflare-adopt" ''
-    set -euo pipefail
-    nod=${nodPkg}/bin/nod
-    config=${nodAdoptConfig}
-
-    echo "== adopt =="
-    "$nod" provider adopt cloudflare --config "$config" --apply
-
-    echo "== verify =="
-    "$nod" provider adopt cloudflare --config "$config"
-  '';
-
-  # Python reconciliation engine script wrapper
-  syncScript = pkgs.writeShellScriptBin "cloudflare-sync" ''
-    exec ${pkgs.python3}/bin/python3 ${./sync.py} --spec ${desiredStateJson} "$@"
-  '';
 in
 {
   options.my.features.system.networking.cloudflare = {
@@ -361,35 +259,6 @@ in
         Run only the read-only nod observation on this host. The writer service and
         timer stay off, so exactly one host owns the zone. Used to observe from the
         reconciler host without creating a second writer.
-      '';
-    };
-
-    canary = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Run the write canary once per activation: create a TXT record, prove the
-        second run is a no-op, then roll it back. Off by default; it writes to the
-        real zone and exists to prove the write path, not to run continuously.
-      '';
-    };
-
-    writer = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Run the legacy `cloudflare-sync` writer. Turn it off once nod owns the
-        zone; the timer and the service disappear from the generation.
-      '';
-    };
-
-    adopt = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Run the one-off adoption (ADR-032): stamp the nod marker on declared
-        records that already match. Off after the proof; adoption is an event,
-        not a schedule.
       '';
     };
 
@@ -452,25 +321,10 @@ in
       description = "The fully reconciled record set (topology/contract projection + operator extras).";
     };
 
-    syncInterval = lib.mkOption {
-      type = lib.types.str;
-      default = "daily";
-      description = "Systemd timer oncalendar interval for automated state reconciliation";
-    };
-
-    package = lib.mkOption {
-      type = lib.types.package;
-      default = syncScript;
-      readOnly = true;
-      description = "The compiled cloudflare-sync executable package";
-    };
   };
 
   config = lib.mkIf cfg.enable {
     my.features.system.networking.cloudflare.effectiveRecords = projectedRecords ++ cfg.records;
-
-    # Expose cloudflare-sync in system packages
-    environment.systemPackages = [ cfg.package ];
 
     # Ensure SOPS token is accessible
     sops.secrets.${cfg.apiTokenSecret} = lib.mkDefault { };
@@ -518,77 +372,5 @@ in
       };
     };
 
-    # Stage 2 of the provider rollout (ADR-030): the write canary. It creates a
-    # record nobody else knows, proves the second run is a no-op, and rolls it
-    # back. It runs once per activation while enabled; it is a proof, not a
-    # schedule.
-    systemd.services.nod-cloudflare-canary = lib.mkIf cfg.canary {
-      description = "Cloudflare write canary: create, prove idempotent, roll back";
-      after = [
-        "network-online.target"
-        "sops-nix.service"
-      ];
-      wants = [ "network-online.target" ];
-      wantedBy = [ "multi-user.target" ];
-      environment.NOD_AUDIT_PATH = "/var/lib/nod-cloudflare-canary/history.json";
-      serviceConfig = {
-        Type = "oneshot";
-        StateDirectory = "nod-cloudflare-canary";
-        EnvironmentFile = config.sops.templates."nod-cloudflare.env".path;
-        ExecStart = "${nodCanaryScript}";
-        StandardOutput = "journal";
-        StandardError = "journal";
-      };
-    };
-
-    # One-off adoption (ADR-032): stamp the nod marker on declared records that
-    # already match. The second call proves the result: 0 unowned, 0 eligible.
-    systemd.services.nod-cloudflare-adopt = lib.mkIf cfg.adopt {
-      description = "Adopt the existing Cloudflare records into nod (ADR-032)";
-      after = [
-        "network-online.target"
-        "sops-nix.service"
-      ];
-      wants = [ "network-online.target" ];
-      wantedBy = [ "multi-user.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        EnvironmentFile = config.sops.templates."nod-cloudflare.env".path;
-        ExecStart = "${nodAdoptScript}";
-        StandardOutput = "journal";
-        StandardError = "journal";
-      };
-    };
-
-    # Systemd periodic reconciliation timer
-    systemd.services.cloudflare-dns-sync = lib.mkIf (cfg.writer && !cfg.observeOnly) {
-      description = "Declarative Cloudflare Edge & DNS Reconciliation";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        # The zone is a pure function of this configuration: a record this engine owns and the
-        # current spec no longer describes is removed. Pruning is ownership-scoped (see sync.py),
-        # so only records carrying this engine's own comment vocabulary, inside the managed zone,
-        # and absent from the desired set can be deleted -- manual entries, ACME DNS-01 records
-        # and other tooling are never touched. The desired set is evaluated across every host's
-        # contracts, so drift in the repository is corrected by deploying it, not by hand.
-        ExecStart = "${cfg.package}/bin/cloudflare-sync --token-file ${
-          config.sops.secrets.${cfg.apiTokenSecret}.path
-        } --prune";
-        StandardOutput = "journal";
-        StandardError = "journal";
-      };
-    };
-
-    systemd.timers.cloudflare-dns-sync = lib.mkIf (cfg.writer && !cfg.observeOnly) {
-      description = "Periodic Cloudflare Edge & DNS Reconciliation Timer";
-      wantedBy = [ "timers.target" ];
-      timerConfig = {
-        OnCalendar = cfg.syncInterval;
-        Persistent = true;
-        RandomizedDelaySec = "10m";
-      };
-    };
   };
 }

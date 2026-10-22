@@ -21,7 +21,6 @@
 
   my.features.system.networking.cloudflare = {
     enable = true;
-    writer = false;
   };
 
   my.features.system.common.geoip.enable = true;

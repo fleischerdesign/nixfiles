@@ -154,7 +154,7 @@
 
           # The real zone. The declaration lives on the control-plane host,
           # which also projects it for the observer; the daemon reads the same
-          # store path. `cloudflare-sync` is off, so this is the only writer.
+          # store path. nod is the only writer.
           cloudflare = {
             command = "${
               self.inputs.nod.packages.${system}.nod-provider-cloudflare
@@ -217,17 +217,6 @@
           };
         };
 
-        sync-cloudflare = {
-          type = "app";
-          program = "${
-            self.nixosConfigurations.${
-              self.nixosConfigurations.${builtins.head hostNames}.config.my.topology.ingressHost
-            }.config.my.features.system.networking.cloudflare.package
-          }/bin/cloudflare-sync";
-          meta = {
-            description = "Declarative Cloudflare Edge & DNS GitOps Reconciliation Tool";
-          };
-        };
         network-audit = {
           type = "app";
           program = "${
@@ -293,7 +282,6 @@
           dependencies-contract = import ./checks/dependencies-contract.nix checkArgs;
 
           backup-contract = import ./checks/backup-contract.nix checkArgs;
-          cloudflare = import ./checks/cloudflare.nix checkArgs;
           webapps = import ./checks/webapps.nix checkArgs;
           openclaw-node-connect = import ./checks/openclaw-node-connect.nix checkArgs;
 
@@ -561,23 +549,6 @@
           inventoryHosts = self.nixosConfigurations.cld-edge-01.config.my.topology.hosts;
         in
         {
-          cloudflare = {
-            targetHost = "api.cloudflare.com";
-            role = "cloud";
-            targetType = "agentless";
-            tags = [
-              "edge"
-              "dns"
-              "gitops"
-            ];
-            package = import ./features/system/networking/cloudflare/target.nix {
-              inherit pkgs;
-              lib = nixpkgs-unstable.lib;
-              reconciler =
-                self.nixosConfigurations.cld-edge-01.config.my.features.system.networking.cloudflare.package;
-            };
-          };
-
           hom-rt-01 = {
             targetHost = inventoryHosts.hom-rt-01.ipv4 or null;
             role = "router";
