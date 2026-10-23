@@ -180,6 +180,37 @@
               max_deletions = 1;
             };
           };
+
+          # Authentik's directory. Read-only stage 0: the provider observes and
+          # plans; the blueprint compiler remains the writer until the cutover.
+          authentik = {
+            command = "${self.inputs.nod.packages.${system}.nod-provider-authentik}/bin/nod-provider-authentik";
+            settings = {
+              url = "http://10.10.100.1:9055";
+              token_env = "AUTHENTIK_TOKEN";
+              # The fleet's existing ownership marker; another installation
+              # chooses its own key and value.
+              marker_key = "vyrx";
+              marker_value = "owned";
+            };
+            desired =
+              self.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodDesiredStateFile;
+            apply = false;
+            interval_secs = 300;
+            timeout_secs = 60;
+            env = [ "AUTHENTIK_TOKEN" ];
+            policy = {
+              # Stage 0 never deletes; the bootstrap and default groups stay
+              # protected even after apply is enabled.
+              protect = [
+                "authentik Admins"
+                "authentik Read-only"
+                "authentik Users"
+                "nod-provider"
+              ];
+              max_deletions = 0;
+            };
+          };
         };
       };
 

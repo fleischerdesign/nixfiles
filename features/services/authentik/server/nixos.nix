@@ -644,6 +644,12 @@ in
       readOnly = true;
       description = "Compiled directory of static and dynamically compiled Authentik blueprints";
     };
+    nodDesiredStateFile = lib.mkOption {
+      type = lib.types.str;
+      readOnly = true;
+      default = "${blueprints.nodDesiredState}";
+      description = "The directory's group declaration in nod's provider format.";
+    };
   };
 
   config = lib.mkIf cfg.enable {

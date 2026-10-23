@@ -923,6 +923,26 @@ let
     };
   generatedDirectoryBlueprint = toBlueprintYaml "users-and-groups" directoryBlueprint;
 
+  # The provider's view of the directory: the same entries the YAML renderer
+  # consumes, projected into nod's resource shape. The YAML renderer stays for
+  # the kinds that are not migrated yet; this projection is the bridge.
+  authentikGroupResources =
+    map
+      (entry: {
+        kind = "authentik.group";
+        id = entry.identifiers.name;
+        attributes.is_superuser = (entry.attrs or { }).is_superuser or false;
+      })
+      (
+        lib.filter (
+          entry: entry.model == blueprintLib.models.group && (entry.state or "present") != "absent"
+        ) directoryBlueprint.entries
+      );
+
+  nodDesiredState = pkgs.writeText "authentik-nod-desired.json" (
+    builtins.toJSON { resources = authentikGroupResources; }
+  );
+
   effectiveBlueprintsDir = pkgs.runCommandLocal "authentik-blueprints" { } ''
     mkdir -p "$out"
     # 1. Inherit upstream system and default blueprints (required for initial flows and setup)
@@ -961,5 +981,6 @@ in
     sortedLdapEndpointNames
     oidcEndpoints
     ldapConsumerSecretPath
+    nodDesiredState
     ;
 }

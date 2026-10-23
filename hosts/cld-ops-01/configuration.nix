@@ -68,6 +68,7 @@
     reconcileProviders = true;
     extraEnvironmentFiles = [
       config.sops.templates."nod-cloudflare.env".path
+      "/var/lib/nod/authentik-token"
     ];
   };
 
