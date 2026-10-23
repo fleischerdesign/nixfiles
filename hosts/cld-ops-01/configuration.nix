@@ -68,8 +68,23 @@
     reconcileProviders = true;
     extraEnvironmentFiles = [
       config.sops.templates."nod-cloudflare.env".path
-      "/var/lib/nod/authentik-token"
+      config.sops.templates."nod-authentik.env".path
     ];
+  };
+
+  # The provider's token is the same secret the access blueprint creates on the
+  # edge host: SOPS is the single source, and the daemon reads it from the
+  # environment, never from argv or the store.
+  sops.secrets."services/authentik/nod_provider_token" = {
+    sopsFile = ../../secrets/nod-provider.yaml;
+    key = "token";
+  };
+
+  sops.templates."nod-authentik.env" = {
+    content = ''
+      AUTHENTIK_TOKEN=${config.sops.placeholder."services/authentik/nod_provider_token"}
+    '';
+    restartUnits = [ "nod-sync.service" ];
   };
 
   my.features.system.networking.cloudflare.enable = true;

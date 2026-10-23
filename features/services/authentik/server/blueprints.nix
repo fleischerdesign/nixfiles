@@ -959,6 +959,48 @@ let
     builtins.toJSON { resources = authentikGroupResources; }
   );
 
+  # The provider's own access. This is the one object an external writer cannot
+  # create for itself: the token must exist before the first API call. Authentik's
+  # own bootstrap creates it, with the key from SOPS, so a database restore
+  # recreates the credential instead of needing a manual step.
+  providerAccessBlueprint = blueprintLib.blueprint {
+    name = "vyrx-provider-access";
+    entries = [
+      (blueprintLib.serviceAccount {
+        id = "sa_nod_provider";
+        username = "nod-provider";
+        name = "nod provider";
+      })
+      (blueprintLib.role {
+        id = "role_nod_provider";
+        name = "nod-provider";
+        permissions = [
+          "authentik_core.view_group"
+          "authentik_core.view_user"
+          "authentik_core.change_group"
+          "authentik_core.add_group"
+        ];
+      })
+      (blueprintLib.entry {
+        id = "group_nod_provider";
+        model = blueprintLib.models.group;
+        identifiers.name = "nod-provider";
+        attrs = {
+          users = [ (blueprintLib.refs.sameBlueprint "sa_nod_provider") ];
+          roles = [ (blueprintLib.refs.sameBlueprint "role_nod_provider") ];
+        };
+      })
+      (blueprintLib.token {
+        identifier = "nod-provider";
+        intent = "api";
+        user = blueprintLib.refs.sameBlueprint "sa_nod_provider";
+        key = blueprintLib.refs.file config.sops.secrets."services/authentik/nod_provider_token".path;
+      })
+    ];
+  };
+
+  generatedProviderAccessBlueprint = toBlueprintYaml "provider-access" providerAccessBlueprint;
+
   effectiveBlueprintsDir = pkgs.runCommandLocal "authentik-blueprints" { } ''
     mkdir -p "$out"
     # 1. Inherit upstream system and default blueprints (required for initial flows and setup)
@@ -967,11 +1009,15 @@ let
 
     # 2. Overlay VYRX custom blueprints
     cp -r ${./blueprints}/* "$out/"
+    # The overlay lands read-only, like every store copy; the generated
+    # blueprints below write into these directories.
+    chmod -R u+w "$out"
 
     # 3. Inject the compiled directory and applications
     mkdir -p "$out/01-rbac"
     chmod u+w "$out/01-rbac"
     cp ${generatedDirectoryBlueprint} "$out/01-rbac/users-and-groups.yaml"
+    cp ${generatedProviderAccessBlueprint} "$out/00-system/provider-access.yaml"
     mkdir -p "$out/03-apps"
     cp ${generatedProxyBlueprint} "$out/03-apps/proxy-apps-generated.yaml"
     cp ${generatedOidcBlueprint} "$out/03-apps/oidc-apps-generated.yaml"

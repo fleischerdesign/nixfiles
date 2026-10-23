@@ -925,6 +925,13 @@ in
         "services/authentik/core_env" = {
           owner = "authentik";
         };
+        # The provider's own token: the worker reads it through !File when it
+        # applies the access blueprint, so it must be readable as `authentik`.
+        "services/authentik/nod_provider_token" = {
+          sopsFile = ../../../../secrets/nod-provider.yaml;
+          key = "token";
+          owner = "authentik";
+        };
       }
       # Per-outpost LDAP tokens are declared on the server as well so the worker can
       # read them through !File when applying the outpost blueprint.

@@ -9,6 +9,16 @@ keys:
   - &ci age19hdr3x7538f0w26dtj877srt7fg804hmhaktr053r9kme9veqv5q8d7w7g
 
 creation_rules:
+  # The provider token is a write credential for Authentik's directory: only the
+  # two hosts that apply the blueprint and run the daemon may decrypt it, never CI.
+  - path_regex: secrets/nod-provider\.yaml$
+    key_groups:
+      - pgp: []
+        age:
+          - *philipp
+          - *cld-edge-01
+          - *cld-ops-01
+
   # Node-to-gateway tunnel key: encrypted to the hosts and the operator, deliberately NOT to
   # the `ci` age key. A compromised CI identity must not be able to obtain root SSH to the
   # whole fleet. Sops uses the first matching rule, so this must stay above the generic one.
