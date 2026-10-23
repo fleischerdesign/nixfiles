@@ -74,6 +74,15 @@ list (including an explicitly empty one) is owned by the repository, and `state 
 group - deleting an inventory entry alone is not a deletion request. Service audiences keep the reserved
 `svc-` prefix and are derived, never declared by hand.
 
+The writer is the `authentik` provider, not a blueprint: the renderer emits no group entries, and `nod`
+reconciles `description`, `is_superuser` and the declared membership against the API. Only declared keys
+are written, so an undeclared membership stays interface-owned and an attribute outside the declaration
+survives an update. A group the fleet did not create must be adopted once (`nod provider adopt`), which
+stamps the ownership marker and changes nothing else - a blueprint cannot do that, because it assigns
+the whole `attributes` object and wipes a marker it does not declare. Deletion is the core's decision:
+`max_deletions = 0` and the protect list mean an `absent` declaration plans a delete that the policy
+refuses until the cap is raised deliberately.
+
 ## 4. Who owns what
 
 > **This repository owns the shape of the system. The interface owns the people in it.**
