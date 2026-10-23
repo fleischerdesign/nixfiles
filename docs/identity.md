@@ -83,6 +83,12 @@ the whole `attributes` object and wipes a marker it does not declare. Deletion i
 `max_deletions = 0` and the protect list mean an `absent` declaration plans a delete that the policy
 refuses until the cap is raised deliberately.
 
+The provider's own credential is the one object it cannot create for itself, because the token must
+exist before the first API call. A generated blueprint (`vyrx-provider-access`) declares the service
+account, its role with exactly the permissions the provider's manifest names, and the token; the key
+comes from a SOPS file encrypted only to the edge and control-plane hosts. A database restore therefore
+recreates the credential with everything else, and no bootstrap script survives on the host.
+
 ## 4. Who owns what
 
 > **This repository owns the shape of the system. The interface owns the people in it.**
