@@ -190,6 +190,15 @@ in
       default = { };
       description = "Additional OpenClaw settings; credentials belong in runtime secret files.";
     };
+    adminSudo = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Allow the gateway user passwordless sudo for host administration.
+        This is a deliberate trust decision: the agent can run root commands
+        on this host. Scope it down here if the trust model changes.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -217,6 +226,22 @@ in
     # group is the permission the operator grants deliberately, not a sandbox
     # escape: it can read logs, not change them.
     users.users.openclaw.extraGroups = [ "systemd-journal" ];
+
+    # The agent is the operator's admin assistant on this host. The grant is a
+    # declarative sudoers rule, not `tools.elevated`: that setting only escapes
+    # a sandbox, while this gateway runs unsandboxed and already executes as
+    # `openclaw`. `sudo -n` is what turns that into root.
+    security.sudo.extraRules = lib.mkIf cfg.adminSudo [
+      {
+        users = [ "openclaw" ];
+        commands = [
+          {
+            command = "ALL";
+            options = [ "NOPASSWD" ];
+          }
+        ];
+      }
+    ];
 
     sops.secrets = lib.genAttrs (
       [

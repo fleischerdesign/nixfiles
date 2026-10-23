@@ -29,6 +29,7 @@
 
   my.features.services.openclaw.gateway = {
     enable = true;
+    adminSudo = true;
     opencodeSubscriptions = [
       {
         name = "subscription-2";
