@@ -29,7 +29,7 @@ root, verifier, expectations_path, snapshot_path = map(Path, sys.argv[1:5])
 expectations = json.loads(expectations_path.read_text())
 directory = expectations["directory"]
 superuser_groups = expectations["superuserGroups"]
-path = "01-rbac/users-and-groups.yaml"
+path = "01-rbac/users.yaml"
 source = (root / path).read_text()
 
 def apply(content=source):

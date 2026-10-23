@@ -402,7 +402,7 @@ let
     # The accounts the derived audience groups name are seeded by that document. Declaring the
     # dependency makes the resolution order explicit instead of hoping for discovery order - and it
     # covers the role-group lookups in these blueprints, which relied on it all along.
-    (metaApply "01-rbac/users-and-groups.yaml")
+    (metaApply "01-rbac/users.yaml")
   ];
 
   # The 2026-09-20 authorization-flow experiment left two user-scoped policy bindings on the shared
@@ -446,7 +446,7 @@ let
   # `vyrx-ldap-consumers`. Declared as a dependency rather than hoped for, because authentik guarantees no
   # apply order across files.
   ldapDependencies = providerFlowDependencies ++ [
-    (metaApply "01-rbac/users-and-groups.yaml")
+    (metaApply "01-rbac/users.yaml")
     (blueprintLib.metaApplyInstance "vyrx-ldap-consumers")
   ];
 
@@ -876,7 +876,7 @@ let
       config.my.features.services.authentik.server.superuserGroups
     ) "Authentik superuserGroups must reference present directory groups.";
     blueprintLib.blueprint {
-      name = "vyrx-rbac-groups-and-users";
+      name = "vyrx-rbac-users";
       entries =
         lib.mapAttrsToList (
           username: user:
@@ -921,7 +921,7 @@ let
           }
         ) retiredAudienceGroups;
     };
-  generatedDirectoryBlueprint = toBlueprintYaml "users-and-groups" (
+  generatedDirectoryBlueprint = toBlueprintYaml "users" (
     directoryBlueprint
     // {
       entries = lib.filter (entry: entry.model != blueprintLib.models.group) directoryBlueprint.entries;
@@ -1016,7 +1016,7 @@ let
     # 3. Inject the compiled directory and applications
     mkdir -p "$out/01-rbac"
     chmod u+w "$out/01-rbac"
-    cp ${generatedDirectoryBlueprint} "$out/01-rbac/users-and-groups.yaml"
+    cp ${generatedDirectoryBlueprint} "$out/01-rbac/users.yaml"
     cp ${generatedProviderAccessBlueprint} "$out/00-system/provider-access.yaml"
     mkdir -p "$out/03-apps"
     cp ${generatedProxyBlueprint} "$out/03-apps/proxy-apps-generated.yaml"

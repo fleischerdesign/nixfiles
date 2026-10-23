@@ -1,4 +1,4 @@
-"""Negative and positive measurements of the verifier shared by apply and drift."""
+"""Negative and positive measurements of the directory preflight and the blueprint renderer."""
 
 import importlib.util
 import json

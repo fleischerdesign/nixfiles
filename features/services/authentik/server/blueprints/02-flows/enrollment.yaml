@@ -14,7 +14,7 @@ entries:
   - model: authentik_blueprints.metaapplyblueprint
     attrs:
       identifiers:
-        path: 01-rbac/users-and-groups.yaml
+        path: 01-rbac/users.yaml
 
   - model: authentik_flows.flow
     id: flow

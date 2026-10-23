@@ -72,6 +72,6 @@ pkgs.runCommand "directory-check"
   { nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ]; }
   ''
       set -euo pipefail
-    python3 ${./directory-membership.py} ${../features/services/authentik/lib/render-blueprint.py} \
+    python3 ${./directory-preflight.py} ${../features/services/authentik/lib/render-blueprint.py} \
       ${references} ${../contracts/directory/lib/preflight.py} > "$out"
   ''
