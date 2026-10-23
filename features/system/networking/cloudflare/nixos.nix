@@ -8,7 +8,6 @@
   lib,
   fleetConfigs,
   pkgs,
-  inputs,
   ...
 }:
 
@@ -215,16 +214,6 @@ let
     }
   );
 
-  nodSettings = pkgs.writeText "cloudflare-nod-settings.json" (
-    builtins.toJSON {
-      zone = cfg.domain;
-      token_env = "CLOUDFLARE_API_TOKEN";
-    }
-  );
-
-  nodPkg = inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default;
-  nodProvider = inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-cloudflare;
-
 in
 {
   options.my.features.system.networking.cloudflare = {
@@ -249,16 +238,6 @@ in
         Publish a `*.<zone>` catch-all to the ingress. Off by default: unknown names — including
         the internal planes — then return NXDOMAIN instead of leaking to the ingress
         (Naming spec §5.1, option A).
-      '';
-    };
-
-    observeOnly = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Run only the read-only nod observation on this host. The writer service and
-        timer stay off, so exactly one host owns the zone. Used to observe from the
-        reconciler host without creating a second writer.
       '';
     };
 
@@ -334,43 +313,6 @@ in
     sops.templates."nod-cloudflare.env".content = ''
       CLOUDFLARE_API_TOKEN=${config.sops.placeholder.${cfg.apiTokenSecret}}
     '';
-
-    # Stage 0 of the provider rollout (ADR-030): observe and plan, never apply.
-    # It runs where the zone's data already lives, uses the existing token and
-    # logs the report; the daemon is not involved, so no second writer exists.
-    systemd.services.nod-cloudflare-observe = {
-      description = "Read-only Cloudflare observation with nod (ADR-030 stage 0)";
-      after = [
-        "network-online.target"
-        "sops-nix.service"
-      ];
-      wants = [ "network-online.target" ];
-      wantedBy = [ "multi-user.target" ];
-      environment.NOD_AUDIT_PATH = "/var/lib/nod-cloudflare-observe/history.json";
-      serviceConfig = {
-        Type = "oneshot";
-        StateDirectory = "nod-cloudflare-observe";
-        EnvironmentFile = config.sops.templates."nod-cloudflare.env".path;
-        ExecStart = lib.escapeShellArgs [
-          "${nodPkg}/bin/nod"
-          "reconcile"
-          "--flake"
-          "/var/lib/nod-cloudflare-observe"
-          "--command"
-          "${nodProvider}/bin/nod-provider-cloudflare"
-          "--desired"
-          "${nodDesiredState}"
-          "--settings"
-          "${nodSettings}"
-          "--state-dir"
-          "/var/lib/nod-cloudflare-observe"
-          "--env"
-          "CLOUDFLARE_API_TOKEN"
-        ];
-        StandardOutput = "journal";
-        StandardError = "journal";
-      };
-    };
 
   };
 }

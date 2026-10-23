@@ -71,12 +71,7 @@
     ];
   };
 
-  # The control plane observes the real zone; the daemon reconciles it. The
-  # observation is read-only and runs at activation.
-  my.features.system.networking.cloudflare = {
-    enable = true;
-    observeOnly = true;
-  };
+  my.features.system.networking.cloudflare.enable = true;
 
   my.features.services.crowdsec = {
     enable = true;
