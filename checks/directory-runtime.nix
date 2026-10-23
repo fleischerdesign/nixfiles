@@ -16,6 +16,7 @@ let
         referenceUser = "directory-fixture-ui-reference";
         managed = "directory-fixture-managed";
         ordinary = "directory-fixture-ordinary";
+        retired = "directory-fixture-retired";
       };
       config =
         (host.extendModules {
@@ -33,6 +34,7 @@ let
                     subjects.referenceUser
                   ];
                   ${subjects.ordinary} = { };
+                  ${subjects.retired}.state = "absent";
                 };
               };
             }

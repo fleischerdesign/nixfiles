@@ -955,8 +955,26 @@ let
         ) directoryBlueprint.entries
       );
 
+  # A group the declaration retires is an authorized deletion: it goes into
+  # `absent`, so the core does not count it against the deletion cap. The same
+  # graph produces both lists, so present and absent cannot disagree.
+  authentikAbsentGroups =
+    map
+      (entry: {
+        kind = "authentik.group";
+        id = entry.identifiers.name;
+      })
+      (
+        lib.filter (
+          entry: entry.model == blueprintLib.models.group && (entry.state or "present") == "absent"
+        ) directoryBlueprint.entries
+      );
+
   nodDesiredState = pkgs.writeText "authentik-nod-desired.json" (
-    builtins.toJSON { resources = authentikGroupResources; }
+    builtins.toJSON {
+      resources = authentikGroupResources;
+      absent = authentikAbsentGroups;
+    }
   );
 
   # The provider's own access. This is the one object an external writer cannot

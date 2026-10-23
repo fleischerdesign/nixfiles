@@ -198,7 +198,13 @@ def provider(requests):
     assert completed.stderr == "", completed.stderr
     return [json.loads(line) for line in completed.stdout.splitlines()]
 
-desired = json.loads(Path(expectations["desiredState"]).read_text())["resources"]
+desired_state = json.loads(Path(expectations["desiredState"]).read_text())
+desired = desired_state["resources"]
+absent = [entry["id"] for entry in desired_state.get("absent", [])]
+assert expectations["subjects"]["retired"] in absent, (
+    "a retired group must be an authorized deletion, not an implicit one",
+    absent,
+)
 
 def observe(settings):
     return provider([{"op": "observe", "config": settings}])[0]["resources"]
