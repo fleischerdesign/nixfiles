@@ -650,6 +650,12 @@ in
       default = "${blueprints.nodDesiredState}";
       description = "The directory's group declaration in nod's provider format.";
     };
+    nodDesiredStatePackage = lib.mkOption {
+      type = lib.types.package;
+      readOnly = true;
+      default = blueprints.nodDesiredState;
+      description = "The group declaration as a buildable package, so a consumer can put it in its closure.";
+    };
   };
 
   config = lib.mkIf cfg.enable {

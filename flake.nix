@@ -216,7 +216,11 @@
 
       formatter.${system} = pkgs.nixfmt-tree;
 
-      packages.${system} = pkgs.custom;
+      packages.${system} = pkgs.custom // {
+        authentik-desired =
+          self.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodDesiredStatePackage;
+        nod-provider-authentik = self.inputs.nod.packages.${system}.nod-provider-authentik;
+      };
 
       apps.${system} = {
         update-custom-packages = {
