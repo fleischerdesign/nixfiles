@@ -446,8 +446,6 @@ let
   # and returns what differs from the database. The apply fails on a non-empty result; the drift report
   # prints it. Only objects our entries touch are asserted, because upstream owns its own bindings.
   relationsPython = ''
-    ${builtins.readFile ../lib/membership.py}
-
     def relation_diffs(paths):
         """Declared-vs-actual relation differences for the owned blueprints; empty means they match."""
         from django.apps import apps
@@ -456,7 +454,6 @@ let
         from authentik.blueprints.v1.importer import Importer
         from authentik.flows.models import Flow, FlowStageBinding
         from authentik.policies.models import PolicyBinding, PolicyBindingModel
-        from authentik.core.models import Group, User
 
         flow_model = "authentik_flows.flow"
         binding_model = "authentik_policies.policybinding"
@@ -490,14 +487,6 @@ let
             return f"{key[0]} {key[1]}={key[2]}"
 
         diffs = []
-        memberships = []
-        def lookup_members(name):
-            group = Group.objects.filter(name=name).first()
-            return None if group is None else group.users.values_list("username", flat=True)
-
-        def resolve_username(key):
-            obj = resolve(key)
-            return obj.username if isinstance(obj, User) else None
 
         for path in paths:
             blueprint = Importer.from_string((root / path).read_text(encoding="utf-8"), {}).blueprint
@@ -523,10 +512,6 @@ let
                 # contributes a target to assert on.
                 if entry.get_state(blueprint) == BlueprintEntryDesiredState.ABSENT:
                     continue
-                if model == "authentik_core.group" and "users" in (entry.attrs or {}):
-                    memberships.append((identifiers.get("name"), [
-                        key_of(reference, index) for reference in entry.attrs["users"]
-                    ]))
                 # An object we declare: we own its relation sets.
                 if len(identifiers) == 1 and not any(isinstance(v, (Find, KeyOf)) for v in identifiers.values()):
                     field, value = next(iter(identifiers.items()))
@@ -567,7 +552,7 @@ let
                     diffs.append(
                         f"stage bindings on {description}: {found} in the database, {expected} declared"
                     )
-        return diffs + group_membership_diffs(memberships, lookup_members, resolve_username)
+        return diffs
   '';
 
   # The directory's structure comes from the fleet-wide contract, never from a literal here.

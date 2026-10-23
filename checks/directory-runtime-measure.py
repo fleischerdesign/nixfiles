@@ -1,11 +1,16 @@
-"""Measure profile ownership, UI users and exact membership with the real importer and ORM."""
+"""Measure the directory with the real importer, the real provider binary and the ORM."""
 
 import ast
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
+import http.server
 import io
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
+import threading
+import urllib.parse
 
 from authentik.root.setup import setup
 
@@ -23,27 +28,188 @@ import yaml
 root, verifier, expectations_path, snapshot_path = map(Path, sys.argv[1:5])
 expectations = json.loads(expectations_path.read_text())
 directory = expectations["directory"]
+superuser_groups = expectations["superuserGroups"]
 path = "01-rbac/users-and-groups.yaml"
 source = (root / path).read_text()
 
 def apply(content=source):
     assert Importer.from_string(content, {}).apply(), "Native directory blueprint apply failed"
 
-def change_group(name, attrs=None, state="present"):
-    entry = {"model": "authentik_core.group", "identifiers": {"name": name}, "state": state}
-    if attrs is not None:
-        entry["attrs"] = attrs
-    apply(yaml.safe_dump({"version": 1, "metadata": {"name": "fixture"}, "entries": [entry]}))
-
 # Execute the exact verification functions embedded in the shipped apply script, not a test reimplementation.
 tree = ast.parse(verifier.read_text())
 functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
-             and node.name in {"group_membership_diffs", "relation_diffs", "directory_preflight", "directory_observations"}]
-assert len(functions) == 4, "Expected the production membership verifier and directory preflight"
+             and node.name in {"relation_diffs", "directory_preflight", "directory_observations"}]
+assert len(functions) == 3, "Expected the production relation verifier and directory preflight"
 namespace = {"root": root, "Importer": Importer, "json": json}
 exec(compile(ast.Module(body=functions, type_ignores=[]), str(verifier), "exec"), namespace)
 verify = lambda: namespace["relation_diffs"]([path])
 preflight = namespace["directory_observations"]
+
+# The provider is the only writer for groups. This adapter translates the three endpoints it speaks into
+# the ORM calls the API would make; the binary under test is the shipped one, not a reimplementation.
+TOKEN = "fixture-token"
+PAGE_SIZE = 2
+
+def group_payload(group):
+    return {
+        "pk": str(group.pk),
+        "name": group.name,
+        "is_superuser": group.is_superuser,
+        "attributes": group.attributes or {},
+        "users": list(group.users.values_list("pk", flat=True)),
+        "users_obj": [
+            {"pk": user.pk, "username": user.username}
+            for user in group.users.order_by("username")
+        ],
+    }
+
+class StubAuthentik(http.server.BaseHTTPRequestHandler):
+    """The Authentik group and user endpoints, backed by the real ORM."""
+
+    def log_message(self, *args):
+        pass
+
+    def _authorised(self):
+        if self.headers.get("Authorization") == f"Bearer {TOKEN}":
+            return True
+        self._send(401, {"detail": "unauthorised"})
+        return False
+
+    def _send(self, status, payload=None):
+        body = b"" if payload is None else json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _body(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        return json.loads(self.rfile.read(length) or b"{}")
+
+    def _page(self, rows, render):
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        page = int(query.get("page", ["1"])[0])
+        size = int(query.get("page_size", [str(PAGE_SIZE)])[0])
+        window = rows[(page - 1) * size:page * size]
+        following = page + 1 if page * size < len(rows) else None
+        self._send(200, {
+            "pagination": {"next": following},
+            "results": [render(row) for row in window],
+        })
+
+    def do_GET(self):
+        try:
+            if not self._authorised():
+                return
+            route = urllib.parse.urlparse(self.path).path
+            if route == "/api/v3/core/groups/":
+                self._page(list(Group.objects.order_by("name")), group_payload)
+            elif route == "/api/v3/core/users/":
+                self._page(list(User.objects.order_by("username")),
+                           lambda user: {"pk": user.pk, "username": user.username})
+            else:
+                self._send(404, {"detail": "not found"})
+        finally:
+            django.db.connections.close_all()
+
+    def do_POST(self):
+        try:
+            if not self._authorised():
+                return
+            body = self._body()
+            group = Group.objects.create(
+                name=body["name"],
+                is_superuser=body.get("is_superuser", False),
+                attributes=body.get("attributes") or {},
+            )
+            if "users" in body:
+                group.users.set(User.objects.filter(pk__in=body["users"]))
+            self._send(201, group_payload(group))
+        finally:
+            django.db.connections.close_all()
+
+    def _group(self):
+        route = urllib.parse.urlparse(self.path).path.rstrip("/")
+        try:
+            pk = route.rsplit("/", 1)[1]
+            return Group.objects.get(pk=pk)
+        except (IndexError, Group.DoesNotExist):
+            self._send(404, {"detail": "not found"})
+            return None
+
+    def do_PATCH(self):
+        try:
+            if not self._authorised():
+                return
+            group = self._group()
+            if group is None:
+                return
+            body = self._body()
+            if "is_superuser" in body:
+                group.is_superuser = body["is_superuser"]
+            if "attributes" in body:
+                group.attributes = body["attributes"] or {}
+            group.save()
+            if "users" in body:
+                group.users.set(User.objects.filter(pk__in=body["users"]))
+            self._send(200, group_payload(group))
+        finally:
+            django.db.connections.close_all()
+
+    def do_DELETE(self):
+        try:
+            if not self._authorised():
+                return
+            group = self._group()
+            if group is None:
+                return
+            group.delete()
+            self._send(204)
+        finally:
+            django.db.connections.close_all()
+
+@contextmanager
+def provider_settings():
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), StubAuthentik)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield {
+            "url": f"http://127.0.0.1:{server.server_address[1]}",
+            "token_env": "AUTHENTIK_TOKEN",
+            "marker_key": "vyrx",
+            "marker_value": "owned",
+            "page_size": PAGE_SIZE,
+        }
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+def provider(requests):
+    completed = subprocess.run(
+        [expectations["provider"]],
+        input="".join(json.dumps(request) + "\n" for request in requests),
+        text=True, capture_output=True, check=True,
+        env={**os.environ, "AUTHENTIK_TOKEN": TOKEN},
+    )
+    assert completed.stderr == "", completed.stderr
+    return [json.loads(line) for line in completed.stdout.splitlines()]
+
+desired = json.loads(Path(expectations["desiredState"]).read_text())["resources"]
+
+def observe(settings):
+    return provider([{"op": "observe", "config": settings}])[0]["resources"]
+
+def plan(settings, observed):
+    return provider([{"op": "plan", "desired": desired, "observed": observed}])[0]["changes"]
+
+def reconcile(settings, changes):
+    result = provider([{"op": "apply", "config": settings, "changes": changes}])[0]
+    assert all(item["ok"] for item in result["applied"]), result
+    return result
 
 def personal_state():
     usernames = list(directory["users"]) + ["ui-created-fixture"]
@@ -108,13 +274,86 @@ blueprint = Importer.from_string(source, {}).blueprint
 assert not any(entry.get_model(blueprint) == "authentik_core.user"
                and entry.identifiers.get("username") == reference_user
                for entry in blueprint.iter_entries())
+assert not any(entry.get_model(blueprint) == "authentik_core.group"
+               for entry in blueprint.iter_entries()), "The blueprint must not create groups any more"
 apply()
 assert verify() == [], verify()
-assert preflight() == {"failures": [], "pending": [], "inactive": []}, preflight()
-diagnose(preflight())
-seeded = expectations["subjects"]["user"]
+
 managed = expectations["subjects"]["managed"]
 ordinary = expectations["subjects"]["ordinary"]
+seeded = expectations["subjects"]["user"]
+
+with provider_settings() as settings:
+    observed = observe(settings)
+    assert observed == [], observed
+    changes = plan(settings, observed)
+    assert changes and {change["kind"] for change in changes} == {"create"}, changes
+    reconcile(settings, changes)
+
+    for name, declaration in sorted(directory["groups"].items()):
+        if declaration["state"] != "present":
+            continue
+        group = Group.objects.get(name=name)
+        assert group.attributes.get("vyrx") == "owned", (name, group.attributes)
+        assert group.attributes.get("description") == declaration["description"], (name, group.attributes)
+        assert group.is_superuser == (name in superuser_groups), name
+        if declaration["members"] is not None:
+            assert sorted(group.users.values_list("username", flat=True)) == sorted(declaration["members"]), name
+    print("Expected the provider to create every declared group with marker, description and membership: verified")
+
+    changes = plan(settings, observe(settings))
+    assert changes == [], changes
+    print("Expected a converged directory to plan nothing: verified")
+
+    drifted = Group.objects.get(name=managed)
+    drifted.attributes = {**drifted.attributes, "description": "drifted"}
+    drifted.save(update_fields=["attributes"])
+    changes = plan(settings, observe(settings))
+    assert len(changes) == 1 and changes[0]["resource"]["id"] == managed and changes[0]["kind"] == "update", changes
+    reconcile(settings, changes)
+    drifted.refresh_from_db()
+    assert drifted.attributes["description"] == directory["groups"][managed]["description"]
+    print("Expected a drifted description to plan exactly one update and be restored: verified")
+
+    target = Group.objects.get(name=managed)
+    target.users.remove(User.objects.get(username=seeded))
+    changes = plan(settings, observe(settings))
+    assert len(changes) == 1 and changes[0]["kind"] == "update", changes
+    reconcile(settings, changes)
+    assert sorted(target.users.values_list("username", flat=True)) == sorted(directory["groups"][managed]["members"])
+    print("Expected a missing managed member to be restored by the provider: verified")
+
+    extra = User.objects.create(username="provider-extra-fixture", name="Extra", email="extra@example.test")
+    target.users.add(extra)
+    changes = plan(settings, observe(settings))
+    assert len(changes) == 1 and changes[0]["kind"] == "update", changes
+    reconcile(settings, changes)
+    assert extra.username not in set(target.users.values_list("username", flat=True))
+    print("Expected an extra member on a declared group to be removed by the provider: verified")
+
+    foreign = Group.objects.create(name="unowned-fixture")
+    changes = plan(settings, observe(settings))
+    assert not any(change["resource"]["id"] == "unowned-fixture" for change in changes), changes
+    refused = provider([{"op": "apply", "config": settings, "changes": [{
+        "kind": "update", "owned": False, "destructive": False,
+        "resource": {"kind": "authentik.group", "id": "unowned-fixture",
+                     "attributes": {"is_superuser": True, "description": "x"}}}]}])[0]["applied"]
+    assert refused[0]["ok"] is False and "unowned" in refused[0]["message"], refused
+    foreign.refresh_from_db()
+    assert foreign.is_superuser is False and foreign.attributes == {}
+    print("Expected an unowned group to be left alone and a forced change to be refused: verified")
+
+    Group.objects.create(name="retired-fixture", attributes={"vyrx": "owned"})
+    changes = plan(settings, observe(settings))
+    deletes = [change for change in changes if change["kind"] == "delete"]
+    assert [change["resource"]["id"] for change in deletes] == ["retired-fixture"], changes
+    reconcile(settings, deletes)
+    assert not Group.objects.filter(name="retired-fixture").exists()
+    print("Expected an owned group outside the declaration to be deleted: verified")
+
+assert preflight() == {"failures": [], "pending": [], "inactive": []}, preflight()
+diagnose(preflight())
+
 user = User.objects.get(username=seeded)
 user.name = "Personal changed name"
 user.email = "personal-change@example.test"
@@ -127,7 +366,6 @@ credential = WebAuthnDevice.objects.create(
 )
 group = Group.objects.get(name=ordinary)
 group.users.add(user)
-
 serializer = UserSerializer(data={"username": "ui-created-fixture", "name": "UI user",
                                   "email": "ui@example.test", "groups": [group.pk]})
 serializer.is_valid(raise_exception=True)
@@ -139,11 +377,18 @@ assert (user.name, user.email, user.attributes) == (
     "Personal changed name", "personal-change@example.test", {"personal_preference": "keep"})
 assert user.check_password("disposable-personal-password")
 assert WebAuthnDevice.objects.filter(pk=credential.pk, user=user).exists()
-assert set(group.users.values_list("username", flat=True)) == {seeded, invited.username}
 assert User.objects.filter(pk=invited.pk).exists()
 assert verify() == [], verify()
 assert User.objects.get(username=reference_user).email == "existing-ui@example.test"
 print("Expected personal email/name/password/passkey record and UI memberships to survive repeat apply: preserved")
+
+# `ordinary` declares no membership: a UI-owned membership must survive a reconcile untouched.
+with provider_settings() as settings:
+    changes = plan(settings, observe(settings))
+    assert changes == [], changes
+    reconcile(settings, changes)
+assert set(group.users.values_list("username", flat=True)) == {seeded, invited.username}
+print("Expected an undeclared membership to stay UI-owned through a provider reconcile: verified")
 
 user.is_active = False
 user.save(update_fields=["is_active"])
@@ -160,48 +405,33 @@ user.save(update_fields=["is_active"])
 print("Expected UI suspension to remain effective after apply without destroying credentials: verified")
 
 target = Group.objects.get(name=managed)
-target.users.remove(user)
 target.users.add(invited)
-diffs = verify()
-assert any("missing members" in diff and seeded in diff and invited.username in diff for diff in diffs), diffs
-apply()
-assert verify() == [], verify()
-print("Expected both missing and extra managed members to be detected, then exact membership restored: verified")
-
-apply(f"""version: 1
-metadata:
-  name: fixture-ui-reference
-entries:
-  - model: authentik_core.group
-    identifiers:
-      name: {managed}
-    attrs:
-      users:
-        - !Find [authentik_core.user, [username, {invited.username}]]
-""")
+with provider_settings() as settings:
+    changes = plan(settings, observe(settings))
+    assert len(changes) == 1 and changes[0]["kind"] == "update", changes
+    reconcile(settings, changes)
 invited.refresh_from_db()
-assert set(target.users.values_list("username", flat=True)) == {invited.username}
+assert set(target.users.values_list("username", flat=True)) == {seeded, reference_user}
 assert (invited.name, invited.email) == ("UI user", "ui@example.test")
-apply()
-assert verify() == [], verify()
 print("Expected an existing UI-created identity to resolve without reseeding its profile: verified")
 
-change_group(managed, {"users": []})
+target.users.clear()
 assert not target.users.exists()
-assert verify(), "Expected emptying a managed group to fail the original declaration"
-apply()
-assert verify() == [], verify()
-assert set(group.users.values_list("username", flat=True)) == {seeded, invited.username}
-print("Expected explicit empty membership to remove only that group's memberships: verified")
+with provider_settings() as settings:
+    changes = plan(settings, observe(settings))
+    assert len(changes) == 1 and changes[0]["kind"] == "update", changes
+    reconcile(settings, changes)
+assert set(target.users.values_list("username", flat=True)) == {seeded, reference_user}
+print("Expected an emptied managed group to be restored to its exact declared membership: verified")
 
 target.delete()
-assert any("declared membership has no group" in diff for diff in verify()), verify()
-apply()
-assert verify() == [], verify()
-print("Expected a missing managed group to fail verification, then be recreated: verified")
+assert any("declared but not created yet" in value for value in preflight()["pending"]), preflight()
+with provider_settings() as settings:
+    changes = plan(settings, observe(settings))
+    assert [change["kind"] for change in changes] == ["create"], changes
+    reconcile(settings, changes)
+assert Group.objects.filter(name=managed).exists()
+assert preflight()["pending"] == [], preflight()
+print("Expected a missing managed group to be planned, recreated and observed again: verified")
 
-Group.objects.create(name="retired-fixture")
-change_group("retired-fixture", state="absent")
-assert not Group.objects.filter(name="retired-fixture").exists()
-print("Expected explicit group tombstone to remove the group: verified")
 snapshot_path.write_text(json.dumps(personal_state(), default=str))

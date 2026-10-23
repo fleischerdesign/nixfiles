@@ -181,8 +181,8 @@
             };
           };
 
-          # Authentik's directory. Read-only stage 0: the provider observes and
-          # plans; the blueprint compiler remains the writer until the cutover.
+          # Authentik's directory. The provider is the only writer for groups:
+          # the blueprint renderer no longer emits group entries.
           authentik = {
             command = "${self.inputs.nod.packages.${system}.nod-provider-authentik}/bin/nod-provider-authentik";
             settings = {
@@ -195,13 +195,14 @@
             };
             desired =
               self.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodDesiredStateFile;
-            apply = false;
+            apply = true;
             interval_secs = 300;
             timeout_secs = 60;
             env = [ "AUTHENTIK_TOKEN" ];
             policy = {
-              # Stage 0 never deletes; the bootstrap and default groups stay
-              # protected even after apply is enabled.
+              # The bootstrap and default groups are never deleted, and this
+              # provider may not delete at all: a declaration that wants to
+              # remove a group has to say so explicitly.
               protect = [
                 "authentik Admins"
                 "authentik Read-only"

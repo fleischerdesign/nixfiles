@@ -27,5 +27,8 @@ def directory_preflight(directory, lookup_users, lookup_groups):
         if len(matches) > 1:
             result["failures"].append(f"group {name}: ambiguous name (at least {len(matches)} matches)")
         elif not matches and declaration["state"] == "present":
-            result["pending"].append(f"group {name}: definition will create a group")
+            # Groups are created by the directory provider, not by a blueprint: the
+            # observation still reports a declared-but-missing group, and the
+            # provider's plan is what turns it into a create.
+            result["pending"].append(f"group {name}: declared but not created yet")
     return result

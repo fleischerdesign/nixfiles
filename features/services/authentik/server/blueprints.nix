@@ -921,17 +921,33 @@ let
           }
         ) retiredAudienceGroups;
     };
-  generatedDirectoryBlueprint = toBlueprintYaml "users-and-groups" directoryBlueprint;
+  generatedDirectoryBlueprint = toBlueprintYaml "users-and-groups" (
+    directoryBlueprint
+    // {
+      entries = lib.filter (entry: entry.model != blueprintLib.models.group) directoryBlueprint.entries;
+    }
+  );
 
   # The provider's view of the directory: the same entries the YAML renderer
-  # consumes, projected into nod's resource shape. The YAML renderer stays for
-  # the kinds that are not migrated yet; this projection is the bridge.
+  # consumes, projected into nod's resource shape. The YAML renderer no longer
+  # writes groups; the graph keeps them, so removing the YAML entries loses no
+  # declaration.
   authentikGroupResources =
     map
       (entry: {
         kind = "authentik.group";
         id = entry.identifiers.name;
-        attributes.is_superuser = (entry.attrs or { }).is_superuser or false;
+        attributes = {
+          is_superuser = (entry.attrs or { }).is_superuser or false;
+          description = ((entry.attrs or { }).attributes or { }).description or "";
+        }
+        // lib.optionalAttrs ((entry.attrs or { }) ? users) {
+          # `members = null` omits the key: the provider then leaves the
+          # membership UI-owned instead of emptying the group.
+          users = lib.sort (a: b: a < b) (
+            map (ref: builtins.elemAt (builtins.elemAt ref.value 1) 1) entry.attrs.users
+          );
+        };
       })
       (
         lib.filter (

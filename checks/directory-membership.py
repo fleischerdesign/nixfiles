@@ -6,9 +6,6 @@ import sys
 import unittest
 import yaml
 
-spec = importlib.util.spec_from_file_location("membership", sys.argv.pop(1))
-membership = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(membership)
 renderer_spec = importlib.util.spec_from_file_location("renderer", sys.argv.pop(1))
 renderer = importlib.util.module_from_spec(renderer_spec)
 renderer_spec.loader.exec_module(renderer)
@@ -79,34 +76,6 @@ class RenderingTests(unittest.TestCase):
     def test_unknown_reference_tags_fail(self):
         with self.assertRaises(ValueError):
             yaml.dump({"__authentikTag": "unknown", "value": "x"}, Dumper=renderer.BlueprintDumper)
-
-
-class MembershipTests(unittest.TestCase):
-    def measure(self, declarations, groups):
-        return membership.group_membership_diffs(
-            declarations, groups.get, lambda name: name if name in {"owner", "other"} else None
-        )
-
-    def test_exact_membership_and_unowned_groups(self):
-        self.assertEqual(self.measure([("managed", ["owner"])], {
-            "managed": ["owner"], "ordinary": ["other"]
-        }), [])
-
-    def test_missing_and_extra_members_are_both_reported(self):
-        diffs = self.measure([("managed", ["owner"])], {"managed": ["other"]})
-        self.assertIn("missing members ['owner'], extra members ['other']", diffs[0])
-
-    def test_explicit_empty_group_is_enforced(self):
-        self.assertEqual(self.measure([("empty", [])], {"empty": []}), [])
-        self.assertTrue(self.measure([("empty", [])], {"empty": ["owner"]}))
-
-    def test_missing_group_and_user_fail(self):
-        self.assertTrue(self.measure([("missing", [])], {}))
-        self.assertTrue(self.measure([("managed", ["missing"])], {"managed": []}))
-
-    def test_duplicate_ownership_and_members_fail(self):
-        self.assertTrue(self.measure([("managed", []), ("managed", [])], {"managed": []}))
-        self.assertTrue(self.measure([("managed", ["owner", "owner"])], {"managed": ["owner"]}))
 
 
 if __name__ == "__main__":

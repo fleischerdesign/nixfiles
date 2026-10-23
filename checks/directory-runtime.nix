@@ -42,6 +42,13 @@ let
         builtins.toJSON {
           inherit subjects;
           directory = config.my.directory;
+          superuserGroups = config.my.features.services.authentik.server.superuserGroups;
+          # The provider is the only writer for groups; the check runs the shipped binary against the
+          # same database the importer writes, so the replacement is measured, not assumed.
+          provider = "${
+            self.inputs.nod.packages.${pkgs.system}.nod-provider-authentik
+          }/bin/nod-provider-authentik";
+          desiredState = config.my.features.services.authentik.server.nodDesiredStateFile;
           reportScript = lib.removePrefix "file:" config.systemd.services.authentik-directory-report.serviceConfig.StandardInput;
         }
       );
