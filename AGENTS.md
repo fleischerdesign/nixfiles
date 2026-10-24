@@ -11,6 +11,7 @@ deadnix --fail # no unused code
 statix check   # lint; statix.toml disables repeated_keys, manual_inherit, manual_inherit_from,
                # useless_parens
 nix flake check                         # all five hosts evaluate, plus format, statix and deadnix
+nix flake check --max-jobs 1            # the same gate, serialised: the answer you can trust under load
 nix build .#checks.x86_64-linux.<name>  # a single check from checks/, in isolation
 
 nod switch <host>                                                # fleet deploy: build, transfer, activate
@@ -20,6 +21,13 @@ nixos-rebuild switch --flake .#<host> --target-host root@<addr>  # one host, rem
 
 `nix flake check` is the gate - it is what CI runs and what must pass before a change is done. Read
 its whole output, warnings included.
+
+Every check is deterministic: a real failure reproduces when that one check is
+built alone. A failure that does not reproduce is memory pressure, not a defect -
+the runtime checks boot a Django/Postgres database and build shells, and this
+host has 15 GB. A builder killed by the kernel is reported as a failed check, so
+`--max-jobs 1` is the difference between a green gate and a lie. CI already builds
+serially for the same reason.
 
 The shell is **fish**, locally and on the hosts: `VAR=value cmd`, `$?`, `${PIPESTATUS[0]}` and
 `for … do … done` all fail. Wrap anything non-trivial in `bash -c '…'` or `bash -s` with a heredoc,
@@ -54,6 +62,7 @@ Measured on `cld-ops-01`, so the recipe below has numbers rather than habit behi
 | `config.system.build.toplevel.outPath` | 50 s | the derivation graph of one system |
 | `nix flake check --no-build` | 70 s | evaluation of every check |
 | `nix flake check` | 98 s | the checks themselves add ~28 s |
+| `nix flake check --max-jobs 1` | 2-3 min | the same checks, one builder at a time: no false failure under load |
 
 `nix eval` does not use the eval cache; `nix build` does. That is why the daemon
 evaluates a host in seconds while a script using `nix eval` pays 50 s every time.
@@ -76,7 +85,9 @@ that end up in a derivation are content-addressed with `builtins.path`.
 
 1. `nix fmt && deadnix --fail && statix check` - seconds.
 2. `nix flake check` - about two minutes warm. It stays the gate; do not replace
-   it with `--no-build`, which only proves the checks evaluate.
+   it with `--no-build`, which only proves the checks evaluate. Add `--max-jobs 1`
+   while the reconciler is building: parallel builders exhaust memory, and a
+   killed builder is indistinguishable from a real failure until you rebuild it.
 3. Build the host that deploys first, not the fleet:
    `nix build .#nixosConfigurations.<host>.config.system.build.toplevel`.
    The reconciler builds every other host before activating it, and CI proves the
