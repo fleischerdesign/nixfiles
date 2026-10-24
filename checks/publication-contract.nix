@@ -197,6 +197,7 @@ let
   aliasDnsAnswers = aliasHost.config.my.features.services.dns.answers;
   cloudflareRecords = authentikHost.config.my.features.system.networking.cloudflare.effectiveRecords;
   authentikBlueprints = authentikHost.config.my.features.services.authentik.server.blueprintsDir;
+  authentikDesired = authentikHost.config.my.features.services.authentik.server.nodDesiredStateFile;
   blueprintRedirectCheck =
     pkgs.runCommandLocal "publication-authentik-redirect-check"
       {
@@ -204,7 +205,8 @@ let
       }
       ''
         grep -F 'https://audit-legacy.vyrx.de/callback' ${authentikBlueprints}/03-apps/oidc-apps-generated.yaml >/dev/null
-        grep -F 'https://audit-mesh.mesh.vyrx.de' ${authentikBlueprints}/03-apps/proxy-apps-generated.yaml >/dev/null
+        # The proxy stack belongs to the reconciler (ADR-041); its projection is the declaration, not the blueprint.
+        grep -F 'https://audit-mesh.mesh.vyrx.de' ${authentikDesired} >/dev/null
         touch "$out"
       '';
   contains = text: strings: lib.any (lib.hasInfix text) strings;

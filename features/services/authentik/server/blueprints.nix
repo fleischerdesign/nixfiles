@@ -458,64 +458,7 @@ let
       entries =
         providerFlowDependencies
         ++ (lib.replicate 2 orphanedAuthorizationFlowBinding)
-        ++ retiredOpenClawApplications
-        ++ (lib.concatMap (
-          name:
-          let
-            ep = authEndpoints.${name};
-            displayName = if ep.displayName != null then ep.displayName else name;
-            group = if ep.group != null then ep.group else "Services";
-            safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-            wildcard = lib.hasPrefix "*." ep.canonicalDomain;
-            authDomain = lib.removePrefix "*." ep.canonicalDomain;
-          in
-          [
-            (blueprintLib.proxyProvider {
-              id = "provider_proxy_${safeId}";
-              name = "Provider for ${displayName}";
-              mode = if wildcard then "forward_domain" else "forward_single";
-              externalHost = "https://${authDomain}";
-              cookieDomain = if wildcard then authDomain else null;
-              authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
-              invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
-            })
-            (blueprintLib.application {
-              slug = name;
-              name = displayName;
-              provider = blueprintLib.refs.sameBlueprint "provider_proxy_${safeId}";
-              group = group;
-              metaLaunchUrl = "https://${authDomain}";
-              openInNewTab = true;
-            })
-          ]
-          ++ audienceBindings name ep
-          ++ retiredAudienceBindings name ep
-        ) sortedEndpointNames)
-        ++ [
-          # The outpost embedded in the server itself. authentik creates it on startup with `type = proxy` and
-          # the managed marker; we declare both so the entry is reproducible on a fresh database instead of
-          # depending on the reconcile having run first. `type` is required on create, and `managed` is the
-          # marker the reconcile looks up - without it a create races the reconcile into a duplicate-name
-          # error. It has no service connection: it runs inside the server process.
-          (blueprintLib.entry {
-            id = "embedded_outpost";
-            model = blueprintLib.models.outpost;
-            identifiers.name = "authentik Embedded Outpost";
-            attrs = {
-              type = "proxy";
-              managed = "goauthentik.io/outposts/embedded";
-              providers = map (
-                name:
-                blueprintLib.refs.sameBlueprint "provider_proxy_${builtins.replaceStrings [ "-" ] [ "_" ] name}"
-              ) sortedEndpointNames;
-              config = {
-                authentik_host = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
-                authentik_host_browser = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
-                authentik_host_insecure = false;
-              };
-            };
-          })
-        ];
+        ++ retiredOpenClawApplications;
     };
 
   # Declarative model-driven blueprint compiling all OIDC endpoints into Authentik OAuth2Providers and Applications
