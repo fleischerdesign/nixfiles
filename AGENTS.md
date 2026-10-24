@@ -151,6 +151,24 @@ A check is removed when the layer beneath it starts covering the statement: an a
 `nixosTest`, or the reconciler running it continuously. The checks that predate these rules are
 removed when they are touched, not maintained in parallel to a lower layer.
 
+### The file contract
+
+A check is a file, not an entry in a list. `checks/<name>.nix` is a check,
+`checks/integration/<name>.nix` is one that boots a service, and the file name is the output name.
+`lib/checks.nix` discovers them and `flake.nix` imports the directory once, so adding a check is
+adding a file and no manifest can drift.
+
+- Two directories are reserved: `integration/` for a check that boots something, `lib/` for a value a
+  check computes before wrapping it in a derivation. A fixture tree is a directory without `.nix`
+  files; a directory that holds a `default.nix` is a mistake and fails the evaluation.
+- Every file is a function `checkArgs -> derivation`: it declares the slice it needs and ignores the
+  rest, so adding an argument to the shared set never touches the checks that do not use it.
+- The first comment names the failure the check catches. That line is the justification; without it,
+  the answer to "which defect would this have caught" is missing.
+- Python is for artifacts (YAML, generated text) and for the Authentik package, with paths as argv,
+  messages on stderr and the exit code derived from the checks. A statement about the configuration
+  graph is Nix and a `throw`; a statement about a service is a `nixosTest`.
+
 ## Verification
 
 1. **Prove the replacement before deleting the original** - measure at the level the consumer sees,
