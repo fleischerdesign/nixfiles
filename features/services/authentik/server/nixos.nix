@@ -69,6 +69,25 @@ let
       ;
   };
 
+  # The provider declaration rendered as the one file `nod reconcile` reads on
+  # this host. It is the same entry the daemon uses, so the bootstrap and the
+  # daemon cannot disagree.
+  providerConfig =
+    if cfg.provider == null then
+      null
+    else
+      (pkgs.formats.toml { }).generate "authentik-provider.toml" {
+        providers.authentik = {
+          command = cfg.provider.command;
+          settings = cfg.provider.settings;
+          desired = cfg.provider.desired;
+          apply = true;
+          env = cfg.provider.env;
+          timeout_secs = cfg.provider.timeout_secs;
+          policy = cfg.provider.policy;
+        };
+      };
+
   # What the feature depends on, checked after every apply. A successful apply is not the same as a world
   # that matches the declaration: the object permission that lets a consumer read the directory lives in the
   # database rather than in a blueprint, so a fresh install would come up looking healthy while Jellyfin could
@@ -81,6 +100,7 @@ let
   # apply leaves the previous value behind and a blueprint can read `successful` while the object it declares
   # does not exist.
   blueprintsApplyScript = pkgs.writeText "authentik-apply-blueprints.py" ''
+    import os
     import sys
     import time
     from pathlib import Path
@@ -113,14 +133,28 @@ let
         print("FAILED: no owned blueprints in " + str(CONFIG.get("blueprints_dir")))
         sys.exit(1)
 
-    preflight = directory_observations()
-    if preflight["failures"]:
-        for failure in preflight["failures"]:
-            print("FAILED directory preflight: " + failure, file=sys.stderr)
+    # Two phases: the credential must exist before the provider can run, and the
+    # provider must create the directory before the blueprints that reference it
+    # apply. The bootstrap phase applies only the access blueprint and skips the
+    # checks that need the full world; the rest phase runs the full verification.
+    phase = os.environ.get("AUTHENTIK_BLUEPRINT_PHASE", "all")
+    if phase == "bootstrap":
+        paths = [path for path in paths if path == "00-system/provider-access.yaml"]
+    elif phase == "rest":
+        paths = [path for path in paths if path != "00-system/provider-access.yaml"]
+    if not paths:
+        print(f"FAILED: no owned blueprints for phase {phase}")
         sys.exit(1)
-    for category in ("pending", "inactive"):
-        for observation in preflight[category]:
-            print(f"DIRECTORY {category}: {observation}")
+
+    if phase != "bootstrap":
+        preflight = directory_observations()
+        if preflight["failures"]:
+            for failure in preflight["failures"]:
+                print("FAILED directory preflight: " + failure, file=sys.stderr)
+            sys.exit(1)
+        for category in ("pending", "inactive"):
+            for observation in preflight[category]:
+                print(f"DIRECTORY {category}: {observation}")
 
     # The worker's discovery creates the instance rows, asynchronously and not necessarily before this unit
     # starts on a fresh database. Wait for every owned file to be instantiated before applying any of them.
@@ -171,6 +205,10 @@ let
     if waiting:
         print("FAILED apply, still not settled: " + ", ".join(sorted(waiting)))
         sys.exit(1)
+
+    if phase == "bootstrap":
+        print("applied and verified: " + ", ".join(sorted(before)))
+        sys.exit(0)
 
     failures = []
 
@@ -641,6 +679,20 @@ in
       default = blueprints.nodDesiredState;
       description = "The group declaration as a buildable package, so a consumer can put it in its closure.";
     };
+    provider = lib.mkOption {
+      type = lib.types.nullOr lib.types.attrs;
+      default = null;
+      description = ''
+        The fleet declaration for the directory provider. When set, this host
+        reconciles the directory after the credential and before the remaining
+        blueprints, so a fresh database converges in one activation.
+      '';
+    };
+    nodPackage = lib.mkOption {
+      type = lib.types.nullOr lib.types.package;
+      default = null;
+      description = "The nod binary that runs the directory provider on this host.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -774,11 +826,64 @@ in
     # restartTriggers content-hashes the blueprints directory into the unit, so systemd starts it exactly
     # when a deploy produced different blueprints - and on boot, where authentik applies nothing by itself.
     # It queues the task the API's apply endpoint queues and waits for every instance to settle.
-    systemd.services.authentik-blueprints-apply = {
-      description = "Apply the generated authentik blueprints";
+    # The credential must exist before the provider can authenticate, and the
+    # provider must create the directory before the blueprints that reference it
+    # apply. Three units make that order explicit on a fresh database.
+    sops.templates."authentik-nod-provider.env" = {
+      content = ''
+        AUTHENTIK_TOKEN=${config.sops.placeholder."services/authentik/nod_provider_token"}
+      '';
+      restartUnits = [ "authentik-provider-directory.service" ];
+    };
+
+    systemd.services.authentik-blueprints-bootstrap = {
+      description = "Apply the provider credential blueprint";
       wantedBy = [ "multi-user.target" ];
       after = [ "authentik-worker.service" ];
       requires = [ "authentik-worker.service" ];
+      restartTriggers = [ cfg.blueprintsDir ];
+      serviceConfig = authentikShellServiceConfig // {
+        TimeoutStartSec = toString (blueprintsApplyTimeoutSeconds + 60);
+        Environment =
+          authentikDatabaseEnvironment
+          ++ authentikBlueprintEnvironment
+          ++ [ "AUTHENTIK_BLUEPRINT_PHASE=bootstrap" ];
+        StandardInput = "file:${blueprintsApplyScript}";
+      };
+    };
+
+    systemd.services.authentik-provider-directory = lib.mkIf (cfg.provider != null) {
+      description = "Reconcile the Authentik directory before the blueprints";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "authentik-blueprints-bootstrap.service" ];
+      requires = [ "authentik-blueprints-bootstrap.service" ];
+      before = [ "authentik-blueprints-apply.service" ];
+      restartTriggers = [
+        cfg.provider.desired
+        cfg.nodPackage
+      ];
+      path = [ pkgs.nix ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        RuntimeDirectory = "authentik-nod";
+        WorkingDirectory = "/var/lib/authentik";
+        EnvironmentFile = config.sops.templates."authentik-nod-provider.env".path;
+        ExecStart = "${cfg.nodPackage}/bin/nod reconcile authentik --config ${providerConfig} --apply --state-dir /run/authentik-nod";
+      };
+    };
+
+    systemd.services.authentik-blueprints-apply = {
+      description = "Apply the generated authentik blueprints";
+      wantedBy = [ "multi-user.target" ];
+      after = [
+        "authentik-worker.service"
+      ]
+      ++ lib.optional (cfg.provider != null) "authentik-provider-directory.service";
+      requires = [
+        "authentik-worker.service"
+      ]
+      ++ lib.optional (cfg.provider != null) "authentik-provider-directory.service";
 
       restartTriggers = [ cfg.blueprintsDir ];
 

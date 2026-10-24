@@ -1,5 +1,7 @@
 {
   inputs,
+  flake,
+  pkgs,
   ...
 }:
 {
@@ -37,6 +39,9 @@
   my.features.services.postgresql.enable = true;
   my.features.services.redis.enable = true;
   my.features.services.authentik.server.enable = true;
+  my.features.services.authentik.server.provider = flake.nod.providers.authentik;
+  my.features.services.authentik.server.nodPackage =
+    flake.inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.default;
   my.features.services.authentik.outpost.ldap.enable = true;
 
   my.features.services.vyrx-landing.enable = true;
