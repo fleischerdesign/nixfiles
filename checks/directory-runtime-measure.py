@@ -144,6 +144,14 @@ class StubAuthentik(http.server.BaseHTTPRequestHandler):
                 self._page(list(Application.objects.order_by("slug")), application_payload)
             elif route == "/api/v3/policies/bindings/":
                 self._page(list(PolicyBinding.objects.all()), binding_payload)
+            elif route == "/api/v3/providers/proxy/":
+                self._page([], lambda provider: provider)
+            elif route == "/api/v3/flows/instances/":
+                self._page([], lambda flow: flow)
+            elif route == "/api/v3/providers/all/":
+                self._page([], lambda provider: provider)
+            elif route == "/api/v3/outposts/instances/":
+                self._page([], lambda outpost: outpost)
             else:
                 self._send(404, {"detail": "not found"})
         finally:
@@ -262,7 +270,9 @@ desired_state = json.loads(Path(expectations["desiredState"]).read_text())
 # own kind, covered by its tests and the live fleet; the sandbox has no application create path, and adding
 # one would test a stub, not the directory.
 desired = [
-    entry for entry in desired_state["resources"] if entry["kind"] != "authentik.application"
+    entry
+    for entry in desired_state["resources"]
+    if entry["kind"] in {"authentik.group", "authentik.user"}
 ]
 absent = [entry["id"] for entry in desired_state.get("absent", [])]
 assert expectations["subjects"]["retired"] in absent, (

@@ -479,8 +479,6 @@ let
               authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
               invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
             })
-          ]
-          ++ lib.optionals (!ep.applicationManagedExternally) [
             (blueprintLib.application {
               slug = name;
               name = displayName;
@@ -490,8 +488,8 @@ let
               openInNewTab = true;
             })
           ]
-          ++ lib.optionals (!ep.applicationManagedExternally) (audienceBindings name ep)
-          ++ lib.optionals (!ep.applicationManagedExternally) (retiredAudienceBindings name ep)
+          ++ audienceBindings name ep
+          ++ retiredAudienceBindings name ep
         ) sortedEndpointNames)
         ++ [
           # The outpost embedded in the server itself. authentik creates it on startup with `type = proxy` and
@@ -604,8 +602,6 @@ let
                   mappingName: _: blueprintLib.refs.sameBlueprint "scope_${safeId}_${mappingName}"
                 ) ep.oidc.scopeMappings;
             })
-          ]
-          ++ lib.optionals (!ep.applicationManagedExternally) [
             (blueprintLib.application {
               slug = name;
               name = displayName;
@@ -615,8 +611,8 @@ let
               openInNewTab = true;
             })
           ]
-          ++ lib.optionals (!ep.applicationManagedExternally) (audienceBindings name ep)
-          ++ lib.optionals (!ep.applicationManagedExternally) (retiredAudienceBindings name ep)
+          ++ audienceBindings name ep
+          ++ retiredAudienceBindings name ep
         ) sortedOidcEndpointNames;
     };
 
@@ -972,63 +968,82 @@ let
     };
   }) (lib.filterAttrs (_: user: user.initialProfile != null) config.my.directory.users);
 
-  # The applications the blueprint compiler leaves to the reconciler. The flag decides who writes;
-  # the facts come from the same publication the blueprint reads, so both agree on name, provider,
-  # launch URL and audience. An application here is not created by a blueprint; it is adopted once
-  # and then owned through the reconciler's record (ADR-040).
-  externallyManagedApplications = map (item: item.name) (
-    lib.filter (item: item.ep.applicationManagedExternally) (
-      map (name: {
-        inherit name;
-        ep = authEndpoints.${name};
-        oidc = false;
-      }) sortedEndpointNames
-      ++ map (name: {
-        inherit name;
-        ep = oidcEndpoints.${name};
-        oidc = true;
-      }) sortedOidcEndpointNames
-    )
-  );
-
-  nodApplicationResources = map (
-    name:
+  # The proxy stack, projected from the same publication facts the blueprint reads
+  # (ADR-041). One writer: the reconciler declares provider, outpost and application;
+  # the blueprint hands the stack over in the same migration.
+  proxyFacts =
+    name: ep:
     let
-      proxyEndpoint = authEndpoints.${name} or null;
-      oidc = proxyEndpoint == null;
-      ep = if oidc then oidcEndpoints.${name} else proxyEndpoint;
       displayName = if ep.displayName != null then ep.displayName else name;
-      group = if ep.group != null then ep.group else (if oidc then "Applications" else "Services");
-      launchUrl =
-        if oidc then
-          (
-            if ep.publicUrl != null then
-              ep.publicUrl
-            else if ep.canonicalDomain != null then
-              "https://${ep.canonicalDomain}"
-            else
-              null
-          )
-        else
-          "https://${lib.removePrefix "*." ep.canonicalDomain}";
+      authDomain = lib.removePrefix "*." ep.canonicalDomain;
+      wildcard = lib.hasPrefix "*." ep.canonicalDomain;
     in
     {
-      kind = "authentik.application";
-      id = name;
+      inherit displayName authDomain wildcard;
+      group = if ep.group != null then ep.group else "Services";
+      mode = if wildcard then "forward_domain" else "forward_single";
+      externalHost = "https://${authDomain}";
+      cookieDomain = if wildcard then authDomain else "";
+      providerName = "Provider for ${displayName}";
+      authorizationFlow = "default-provider-authorization-implicit-consent";
+      invalidationFlow = "default-provider-invalidation-flow";
+    };
+
+  proxyProjections = map (name: {
+    inherit name;
+    ep = authEndpoints.${name};
+    facts = proxyFacts name authEndpoints.${name};
+  }) sortedEndpointNames;
+
+  nodProviderResources = map (item: {
+    kind = "authentik.provider.proxy";
+    id = item.facts.providerName;
+    attributes = {
+      mode = item.facts.mode;
+      external_host = item.facts.externalHost;
+      cookie_domain = item.facts.cookieDomain;
+      authorization_flow = item.facts.authorizationFlow;
+      invalidation_flow = item.facts.invalidationFlow;
+    };
+  }) proxyProjections;
+
+  nodOutpostResources = [
+    {
+      kind = "authentik.outpost";
+      id = "authentik Embedded Outpost";
       attributes = {
-        name = displayName;
-        provider = "Provider for ${displayName}";
-        meta_launch_url = launchUrl;
-        inherit group;
-        open_in_new_tab = true;
-        access_groups = ep.accessGroups;
+        type = "proxy";
+        providers = lib.sort (a: b: a < b) (map (item: item.facts.providerName) proxyProjections);
+        config = {
+          authentik_host = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
+          authentik_host_browser = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
+          authentik_host_insecure = false;
+        };
       };
     }
-  ) externallyManagedApplications;
+  ];
+
+  nodApplicationResources = map (item: {
+    kind = "authentik.application";
+    id = item.name;
+    attributes = {
+      name = item.facts.displayName;
+      provider = item.facts.providerName;
+      meta_launch_url = item.facts.externalHost;
+      group = item.facts.group;
+      open_in_new_tab = true;
+      access_groups = item.ep.accessGroups;
+    };
+  }) proxyProjections;
 
   nodDesiredState = pkgs.writeText "authentik-nod-desired.json" (
     builtins.toJSON {
-      resources = authentikUserResources ++ authentikGroupResources ++ nodApplicationResources;
+      resources =
+        authentikUserResources
+        ++ authentikGroupResources
+        ++ nodProviderResources
+        ++ nodOutpostResources
+        ++ nodApplicationResources;
       absent = authentikAbsentGroups;
     }
   );
