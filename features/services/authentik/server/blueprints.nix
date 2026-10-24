@@ -443,6 +443,10 @@ let
   # retirement tombstones, and nothing else. The provider references its custom
   # mappings by name, so the mapping must exist before a reconcile can create
   # the provider; the blueprint applies at server start, the reconciler repeats.
+  # What is left of the OIDC blueprint after the reconciler took the providers,
+  # applications and custom scope mappings: the `accessAuthenticated` policy and
+  # the retirement tombstones. A policy is not an audience group - "any
+  # authenticated human" has no group to name - so it stays here (ADR-046).
   oidcBlueprint =
     assert ingressPolicyCheck;
     assert audiencePolicyCheck;
@@ -460,27 +464,6 @@ let
             identifiers.client_id = "open-webui";
           })
         ]
-        ++ lib.concatMap (
-          name:
-          let
-            ep = oidcEndpoints.${name};
-            safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-          in
-          lib.mapAttrsToList (
-            mappingName: mapping:
-            blueprintLib.entry {
-              id = "scope_${safeId}_${mappingName}";
-              model = blueprintLib.models.scopeMapping;
-              identifiers.name = "${name}-${mappingName}";
-              attrs = {
-                scope_name = mapping.scopeName;
-                inherit (mapping) expression;
-              };
-            }
-          ) ep.oidc.scopeMappings
-        ) sortedOidcEndpointNames
-        # A policy is not an audience group: it is the only binding the blueprint
-        # still writes, because "any authenticated human" has no group.
         ++ lib.concatMap (name: authenticatedAudience name oidcEndpoints.${name}) sortedOidcEndpointNames;
     };
 
@@ -941,6 +924,22 @@ let
     })
   ];
 
+  # A custom scope mapping belongs to the endpoint that declares it: the name is
+  # stable (`<endpoint>-<mapping>`), the expression is the declaration. The
+  # provider references the same name, so one plan creates the mapping before the
+  # provider that uses it (ADR-046).
+  nodScopeMappingResources = lib.concatMap (
+    item:
+    lib.mapAttrsToList (
+      mappingName: mapping:
+      nod.scopeMapping {
+        name = "${item.name}-${mappingName}";
+        scopeName = mapping.scopeName;
+        expression = mapping.expression;
+      }
+    ) item.ep.oidc.scopeMappings
+  ) oidcProjections;
+
   nodOutpostResources = [
     (nod.outpost {
       name = "authentik Embedded Outpost";
@@ -982,6 +981,7 @@ let
       authentikUserResources
       ++ authentikGroupResources
       ++ nodCertificateKeyPairResources
+      ++ nodScopeMappingResources
       ++ nodProviderResources
       ++ nodOauth2ProviderResources
       ++ nodOutpostResources

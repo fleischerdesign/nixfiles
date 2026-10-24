@@ -138,6 +138,20 @@ rec {
       private_key_path = privateKeyPath;
     };
 
+  # A custom OAuth2 scope mapping. Built-in mappings (openid, email, …) are not
+  # resources: a provider references them by scope key (ADR-046).
+  scopeMapping =
+    {
+      name,
+      scopeName,
+      expression,
+      description ? "",
+    }:
+    nod.resource "authentik.scope_mapping" name {
+      scope_name = scopeName;
+      inherit expression description;
+    };
+
   # One document, with the duplicate check from the generic layer.
   desired = nod.desired;
 
