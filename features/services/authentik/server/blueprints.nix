@@ -1009,6 +1009,8 @@ let
           "authentik_core.view_user"
           "authentik_core.change_group"
           "authentik_core.add_group"
+          "authentik_core.add_user"
+          "authentik_core.change_user"
         ];
       })
       (blueprintLib.entry {
