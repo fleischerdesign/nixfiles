@@ -687,6 +687,20 @@ in
       default = blueprints.nodDesiredState;
       description = "The group declaration as a buildable package, so a consumer can put it in its closure.";
     };
+    nodOidcSecrets = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      readOnly = true;
+      default = lib.mapAttrs' (
+        name: ep: lib.nameValuePair (blueprints.oidcSecretEnv name ep) ep.oidc.secretPath
+      ) (lib.filterAttrs (_: ep: ep.oidc.secretPath != null) blueprints.oidcEndpoints);
+      description = ''
+        Environment variable → SOPS path for every OIDC client secret. The
+        reconciler names the variable in the provider declaration, so a host that
+        owns the providers must be able to render the secret as well. It is the
+        same value the blueprint worker reads; a fresh install therefore needs no
+        second writer for the credential.
+      '';
+    };
     provider = lib.mkOption {
       type = lib.types.nullOr lib.types.attrs;
       default = null;
@@ -1080,16 +1094,7 @@ in
       owner = "authentik";
       content = lib.concatStringsSep "\n" (
         lib.mapAttrsToList (
-          name: ep:
-          let
-            safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-            envVar =
-              if ep.oidc.clientSecretEnv != null then
-                ep.oidc.clientSecretEnv
-              else
-                "AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
-          in
-          "${envVar}=${config.sops.placeholder.${ep.oidc.secretPath}}"
+          name: ep: "${blueprints.oidcSecretEnv name ep}=${config.sops.placeholder.${ep.oidc.secretPath}}"
         ) (lib.filterAttrs (_: ep: ep.oidc.secretPath != null) blueprints.oidcEndpoints)
       );
     };

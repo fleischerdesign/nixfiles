@@ -204,9 +204,15 @@ let
         nativeBuildInputs = [ pkgs.gnugrep ];
       }
       ''
-        grep -F 'https://audit-legacy.vyrx.de/callback' ${authentikBlueprints}/03-apps/oidc-apps-generated.yaml >/dev/null
-        # The proxy stack belongs to the reconciler (ADR-041); its projection is the declaration, not the blueprint.
+        # Both stacks belong to the reconciler (ADR-041, ADR-043): the redirect
+        # URI is the declaration, and the blueprint must no longer carry an OIDC
+        # provider at all - one writer, provable by grep.
+        grep -F 'https://audit-legacy.vyrx.de/callback' ${authentikDesired} >/dev/null
         grep -F 'https://audit-mesh.mesh.vyrx.de' ${authentikDesired} >/dev/null
+        if grep -F 'client_secret:' ${authentikBlueprints}/03-apps/oidc-apps-generated.yaml >/dev/null; then
+          echo "the OIDC blueprint still declares a provider credential; the reconciler owns it" >&2
+          exit 1
+        fi
         touch "$out"
       '';
   contains = text: strings: lib.any (lib.hasInfix text) strings;

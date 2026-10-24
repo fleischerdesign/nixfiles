@@ -78,6 +78,50 @@ rec {
     }:
     nod.resource "authentik.outpost" name { inherit type providers config; };
 
+  oauth2Provider =
+    {
+      name,
+      clientId,
+      redirectUris,
+      authorizationFlow ? "default-provider-authorization-implicit-consent",
+      invalidationFlow ? "default-provider-invalidation-flow",
+      subMode ? "hashed_user_id",
+      includeClaimsInIdToken ? true,
+      grantTypes ? [
+        "authorization_code"
+        "refresh_token"
+      ],
+      accessTokenValidity ? null,
+      propertyMappings ? [
+        "openid"
+        "email"
+        "profile"
+      ],
+      clientSecretEnv ? null,
+    }:
+    nod.resource "authentik.provider.oauth2" name (
+      {
+        client_id = clientId;
+        authorization_flow = authorizationFlow;
+        invalidation_flow = invalidationFlow;
+        redirect_uris = redirectUris;
+        sub_mode = subMode;
+        include_claims_in_id_token = includeClaimsInIdToken;
+        grant_types = grantTypes;
+        # Sorted, because the provider observes the resolved set in that order:
+        # an unsorted declaration would report drift against itself.
+        property_mappings = lib.sort (a: b: a < b) propertyMappings;
+      }
+      // lib.optionalAttrs (accessTokenValidity != null) {
+        access_token_validity = accessTokenValidity;
+      }
+      # Names the variable, never the value. It is declared but not compared: a
+      # create needs it, an observation can never echo it (ADR-043).
+      // lib.optionalAttrs (clientSecretEnv != null) {
+        client_secret_env = clientSecretEnv;
+      }
+    );
+
   # One document, with the duplicate check from the generic layer.
   desired = nod.desired;
 

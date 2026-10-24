@@ -150,6 +150,10 @@ class StubAuthentik(http.server.BaseHTTPRequestHandler):
                 self._page([], lambda flow: flow)
             elif route == "/api/v3/providers/all/":
                 self._page([], lambda provider: provider)
+            elif route == "/api/v3/providers/oauth2/":
+                self._page([], lambda provider: provider)
+            elif route == "/api/v3/propertymappings/provider/scope/":
+                self._page([], lambda mapping: mapping)
             elif route == "/api/v3/outposts/instances/":
                 self._page([], lambda outpost: outpost)
             else:

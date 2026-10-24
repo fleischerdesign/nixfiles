@@ -226,24 +226,9 @@ let
   # Derived personal groups are owned by the directory blueprint. Application blueprints
   # depend on that blueprint and use cross-file lookups, just like ordinary role groups.
 
-  # Retiring an audience is a declaration, not an omission. The apply adds and updates; it never deletes
-  # a binding that is no longer named, so a migration that merely stops declaring a group leaves the
-  # old binding in the database - with the access the change was meant to end. The endpoint says which
-  # group it stopped accepting and this projects the tombstone.
-  retiredAudienceBindings =
-    name: ep:
-    map (
-      groupName:
-      blueprintLib.absent {
-        model = blueprintLib.models.policyBinding;
-        identifiers = {
-          target = blueprintLib.refs.policyTargetBySlug "application" name;
-          group = blueprintLib.refs.byName blueprintLib.models.group groupName;
-          order = 0;
-        };
-      }
-    ) ep.retiredAccessGroups;
-
+  # Retiring an audience used to be a tombstone in this blueprint. It is not any more: an application's
+  # group bindings are its `access_groups` in the reconciler, and a group outside that list is removed
+  # by the reconcile - the same guarantee, one writer.
   audienceGroupEntries =
     ep:
     map (
@@ -338,44 +323,34 @@ let
     else
       true;
 
-  # A group binding per declared audience, on the application the endpoint projects. The target is the
-  # application's PolicyBindingModel, never the application's own pk: `PolicyBinding.target_id` is the
-  # `pbm_uuid` (blueprint.nix `policyTargetBySlug`).
-  audienceBindings =
+  # An endpoint that admits every authenticated human says so through a policy, not a group: there is
+  # no group whose membership is "anyone active". Group bindings are the reconciler's (an
+  # application's `access_groups`), so this is the one audience the blueprint still writes.
+  authenticatedAudience =
     name: ep:
-    if ep.accessAuthenticated then
-      [
-        (blueprintLib.entry {
-          id = "audience_${name}_authenticated";
-          model = blueprintLib.models.expressionPolicy;
-          identifiers.name = "${name}-authenticated-humans";
-          attrs.expression = ''
-            return bool(request.user.is_authenticated and request.user.is_active and request.user.type != "service_account")
-          '';
-        })
-        (blueprintLib.entry {
-          model = blueprintLib.models.policyBinding;
-          identifiers = {
-            target = blueprintLib.refs.policyTargetBySlug "application" name;
-            policy = blueprintLib.refs.sameBlueprint "audience_${name}_authenticated";
-            order = 0;
-          };
-          attrs = {
-            enabled = true;
-            negate = false;
-            timeout = 30;
-          };
-        })
-      ]
-    else
-      map (
-        groupName:
-        blueprintLib.groupBinding {
+    lib.optionals ep.accessAuthenticated [
+      (blueprintLib.entry {
+        id = "audience_${name}_authenticated";
+        model = blueprintLib.models.expressionPolicy;
+        identifiers.name = "${name}-authenticated-humans";
+        attrs.expression = ''
+          return bool(request.user.is_authenticated and request.user.is_active and request.user.type != "service_account")
+        '';
+      })
+      (blueprintLib.entry {
+        model = blueprintLib.models.policyBinding;
+        identifiers = {
           target = blueprintLib.refs.policyTargetBySlug "application" name;
-          group = blueprintLib.refs.byName blueprintLib.models.group groupName;
+          policy = blueprintLib.refs.sameBlueprint "audience_${name}_authenticated";
           order = 0;
-        }
-      ) ep.accessGroups;
+        };
+        attrs = {
+          enabled = true;
+          negate = false;
+          timeout = 30;
+        };
+      })
+    ];
 
   # Blueprints must be *.yaml: authentik's discovery and the blueprint migration only scan for that
   # extension, while everything else about the encoding lives in the constructors.
@@ -463,16 +438,19 @@ let
         ++ retiredOpenClawApplications;
     };
 
-  # Declarative model-driven blueprint compiling all OIDC endpoints into Authentik OAuth2Providers and Applications
+  # What is left of the OIDC blueprint after the reconciler took the providers
+  # and applications: the custom scope mappings (nod has no kind for them), the
+  # retirement tombstones, and nothing else. The provider references its custom
+  # mappings by name, so the mapping must exist before a reconcile can create
+  # the provider; the blueprint applies at server start, the reconciler repeats.
   oidcBlueprint =
     assert ingressPolicyCheck;
     assert audiencePolicyCheck;
     blueprintLib.blueprint {
       name = "vyrx-apps-oidc";
       entries =
-        providerFlowDependencies
         # Removed applications need explicit absence: omission does not revoke an OIDC client.
-        ++ [
+        [
           (blueprintLib.absent {
             model = blueprintLib.models.application;
             identifiers.slug = "open-webui";
@@ -486,25 +464,9 @@ let
           name:
           let
             ep = oidcEndpoints.${name};
-            displayName = if ep.displayName != null then ep.displayName else name;
-            group = if ep.group != null then ep.group else "Applications";
             safeId = builtins.replaceStrings [ "-" ] [ "_" ] name;
-            secretAttr =
-              if ep.oidc.clientSecretEnv != null then
-                blueprintLib.refs.env ep.oidc.clientSecretEnv
-              else if ep.oidc.clientSecret != null then
-                ep.oidc.clientSecret
-              else
-                blueprintLib.refs.env "AUTHENTIK_OIDC_${lib.toUpper safeId}_SECRET";
-            launchUrl =
-              if ep.publicUrl != null then
-                ep.publicUrl
-              else if ep.canonicalDomain != null then
-                "https://${ep.canonicalDomain}"
-              else
-                null;
           in
-          (lib.mapAttrsToList (
+          lib.mapAttrsToList (
             mappingName: mapping:
             blueprintLib.entry {
               id = "scope_${safeId}_${mappingName}";
@@ -515,50 +477,11 @@ let
                 inherit (mapping) expression;
               };
             }
-          ) ep.oidc.scopeMappings)
-          ++ [
-            (blueprintLib.oauth2Provider {
-              id = "provider_${safeId}";
-              name = "Provider for ${displayName}";
-              clientId = ep.oidc.clientId;
-              clientSecret = secretAttr;
-              authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
-              invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
-              redirectUris = map (uri: {
-                matching_mode = "strict";
-                url = uri;
-              }) ep.oidc.redirectUris;
-              subMode = ep.oidc.subMode;
-              includeClaimsInIdToken = ep.oidc.includeClaimsInIdToken;
-              grantTypes = ep.oidc.grantTypes;
-              accessTokenValidity = ep.oidc.accessTokenValidity;
-              signingKey =
-                if ep.oidc.signingKey != null then
-                  blueprintLib.refs.byName blueprintLib.models.certificateKeyPair ep.oidc.signingKey
-                else
-                  null;
-              propertyMappings =
-                map (
-                  scope:
-                  blueprintLib.refs.byField blueprintLib.models.scopeMapping "managed"
-                    "goauthentik.io/providers/oauth2/scope-${scope}"
-                ) ep.oidc.propertyMappings
-                ++ lib.mapAttrsToList (
-                  mappingName: _: blueprintLib.refs.sameBlueprint "scope_${safeId}_${mappingName}"
-                ) ep.oidc.scopeMappings;
-            })
-            (blueprintLib.application {
-              slug = name;
-              name = displayName;
-              provider = blueprintLib.refs.sameBlueprint "provider_${safeId}";
-              group = group;
-              metaLaunchUrl = launchUrl;
-              openInNewTab = true;
-            })
-          ]
-          ++ audienceBindings name ep
-          ++ retiredAudienceBindings name ep
-        ) sortedOidcEndpointNames;
+          ) ep.oidc.scopeMappings
+        ) sortedOidcEndpointNames
+        # A policy is not an audience group: it is the only binding the blueprint
+        # still writes, because "any authenticated human" has no group.
+        ++ lib.concatMap (name: authenticatedAudience name oidcEndpoints.${name}) sortedOidcEndpointNames;
     };
 
   generatedProxyBlueprint = toBlueprintYaml "proxy-apps-generated" proxyBlueprint;
@@ -936,6 +859,41 @@ let
     facts = proxyFacts name authEndpoints.${name};
   }) sortedEndpointNames;
 
+  # The variable a client secret is read from. The blueprint worker reads it
+  # from the authentik host's environment; the reconciler names the same
+  # variable, so a provider it creates on a fresh install gets the same secret.
+  oidcSecretEnv =
+    name: ep:
+    if ep.oidc.clientSecretEnv != null then
+      ep.oidc.clientSecretEnv
+    else
+      "AUTHENTIK_OIDC_${lib.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] name)}_SECRET";
+
+  # The facts an OIDC endpoint and its application share. `secretEnv` is the
+  # variable the blueprint worker reads today; the reconciler names the same
+  # variable, so a provider nod creates on a fresh install gets the same secret.
+  oidcFacts = name: ep: {
+    displayName = if ep.displayName != null then ep.displayName else name;
+    providerName = "Provider for ${if ep.displayName != null then ep.displayName else name}";
+    group = if ep.group != null then ep.group else "Applications";
+    launchUrl = if ep.publicUrl != null then ep.publicUrl else "https://${ep.canonicalDomain}";
+    secretEnv = oidcSecretEnv name ep;
+    # Managed scopes plus this endpoint's custom mappings. The mappings are
+    # blueprint entries (nod has no kind for them); the provider names them, so
+    # the declared set matches what the provider holds - an omission would make
+    # every reconcile strip the custom scopes.
+    propertyMappings = lib.sort (a: b: a < b) (
+      ep.oidc.propertyMappings
+      ++ map (mappingName: "${name}-${mappingName}") (builtins.attrNames ep.oidc.scopeMappings)
+    );
+  };
+
+  oidcProjections = map (name: {
+    inherit name;
+    ep = oidcEndpoints.${name};
+    facts = oidcFacts name oidcEndpoints.${name};
+  }) sortedOidcEndpointNames;
+
   nodProviderResources = map (
     item:
     nod.proxyProvider {
@@ -947,6 +905,21 @@ let
       invalidationFlow = item.facts.invalidationFlow;
     }
   ) proxyProjections;
+
+  nodOauth2ProviderResources = map (
+    item:
+    nod.oauth2Provider {
+      name = item.facts.providerName;
+      clientId = item.ep.oidc.clientId;
+      redirectUris = item.ep.oidc.redirectUris;
+      subMode = item.ep.oidc.subMode;
+      includeClaimsInIdToken = item.ep.oidc.includeClaimsInIdToken;
+      grantTypes = item.ep.oidc.grantTypes;
+      accessTokenValidity = item.ep.oidc.accessTokenValidity;
+      propertyMappings = item.facts.propertyMappings;
+      clientSecretEnv = item.facts.secretEnv;
+    }
+  ) oidcProjections;
 
   nodOutpostResources = [
     (nod.outpost {
@@ -960,23 +933,36 @@ let
     })
   ];
 
-  nodApplicationResources = map (
-    item:
-    nod.application {
-      slug = item.name;
-      name = item.facts.displayName;
-      provider = item.facts.providerName;
-      launchUrl = item.facts.externalHost;
-      group = item.facts.group;
-      accessGroups = item.ep.accessGroups;
-    }
-  ) proxyProjections;
+  nodApplicationResources =
+    map (
+      item:
+      nod.application {
+        slug = item.name;
+        name = item.facts.displayName;
+        provider = item.facts.providerName;
+        launchUrl = item.facts.externalHost;
+        group = item.facts.group;
+        accessGroups = item.ep.accessGroups;
+      }
+    ) proxyProjections
+    ++ map (
+      item:
+      nod.application {
+        slug = item.name;
+        name = item.facts.displayName;
+        provider = item.facts.providerName;
+        launchUrl = item.facts.launchUrl;
+        group = item.facts.group;
+        accessGroups = item.ep.accessGroups;
+      }
+    ) oidcProjections;
 
   nodDesired = nod.desired {
     resources =
       authentikUserResources
       ++ authentikGroupResources
       ++ nodProviderResources
+      ++ nodOauth2ProviderResources
       ++ nodOutpostResources
       ++ nodApplicationResources;
     absent = authentikAbsentGroups;
@@ -1061,6 +1047,7 @@ in
     ldapEndpoints
     sortedLdapEndpointNames
     oidcEndpoints
+    oidcSecretEnv
     ldapConsumerSecretPath
     nodDesired
     nodDesiredState

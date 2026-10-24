@@ -2,6 +2,7 @@
   config,
   inputs,
   flake,
+  lib,
   pkgs,
   ...
 }:
@@ -183,15 +184,34 @@
   # The provider's token is the same secret the access blueprint creates on the
   # edge host: SOPS is the single source, and the daemon reads it from the
   # environment, never from argv or the store.
-  sops.secrets."services/authentik/nod_provider_token" = {
-    sopsFile = ../../secrets/nod-provider.yaml;
-    key = "token";
-  };
+  sops.secrets = lib.mergeAttrsList [
+    # The OIDC client secrets the reconciler must be able to present when it
+    # creates a provider on a fresh install. This host already holds a
+    # superuser token, which can read every client secret through the API, so
+    # rendering them here widens no boundary - it only removes the second
+    # writer the blueprint used to be.
+    (lib.genAttrs
+      (builtins.attrValues flake.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodOidcSecrets)
+      (_: { })
+    )
+    {
+      "services/authentik/nod_provider_token" = {
+        sopsFile = ../../secrets/nod-provider.yaml;
+        key = "token";
+      };
+    }
+  ];
 
   sops.templates."nod-authentik.env" = {
     content = ''
       AUTHENTIK_TOKEN=${config.sops.placeholder."services/authentik/nod_provider_token"}
-    '';
+    ''
+    + lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (
+        env: path: "${env}=${config.sops.placeholder.${path}}"
+      ) flake.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodOidcSecrets
+    )
+    + "\n";
     restartUnits = [ "nod-sync.service" ];
   };
 
