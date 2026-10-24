@@ -26,7 +26,10 @@ in
         auth = "authentik";
         accessGroups = [ "media-users" ];
         subdomain = "bazarr";
-
+        # The application and its audience are owned by the reconciler (ADR-039/040); the
+        # provider stays declared by the blueprint. Adoption of the existing application is the
+        # one explicit step of the migration.
+        applicationManagedExternally = true;
       };
       presentation.tiles."web" = {
         endpoint = "web";

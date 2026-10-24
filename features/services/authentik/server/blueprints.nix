@@ -479,6 +479,8 @@ let
               authorizationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-authorization-implicit-consent";
               invalidationFlow = blueprintLib.refs.bySlug blueprintLib.models.flow "default-provider-invalidation-flow";
             })
+          ]
+          ++ lib.optionals (!ep.applicationManagedExternally) [
             (blueprintLib.application {
               slug = name;
               name = displayName;
@@ -488,8 +490,8 @@ let
               openInNewTab = true;
             })
           ]
-          ++ audienceBindings name ep
-          ++ retiredAudienceBindings name ep
+          ++ lib.optionals (!ep.applicationManagedExternally) (audienceBindings name ep)
+          ++ lib.optionals (!ep.applicationManagedExternally) (retiredAudienceBindings name ep)
         ) sortedEndpointNames)
         ++ [
           # The outpost embedded in the server itself. authentik creates it on startup with `type = proxy` and
@@ -602,6 +604,8 @@ let
                   mappingName: _: blueprintLib.refs.sameBlueprint "scope_${safeId}_${mappingName}"
                 ) ep.oidc.scopeMappings;
             })
+          ]
+          ++ lib.optionals (!ep.applicationManagedExternally) [
             (blueprintLib.application {
               slug = name;
               name = displayName;
@@ -611,8 +615,8 @@ let
               openInNewTab = true;
             })
           ]
-          ++ audienceBindings name ep
-          ++ retiredAudienceBindings name ep
+          ++ lib.optionals (!ep.applicationManagedExternally) (audienceBindings name ep)
+          ++ lib.optionals (!ep.applicationManagedExternally) (retiredAudienceBindings name ep)
         ) sortedOidcEndpointNames;
     };
 
@@ -968,9 +972,63 @@ let
     };
   }) (lib.filterAttrs (_: user: user.initialProfile != null) config.my.directory.users);
 
+  # The applications the blueprint compiler leaves to the reconciler. The flag decides who writes;
+  # the facts come from the same publication the blueprint reads, so both agree on name, provider,
+  # launch URL and audience. An application here is not created by a blueprint; it is adopted once
+  # and then owned through the reconciler's record (ADR-040).
+  externallyManagedApplications = map (item: item.name) (
+    lib.filter (item: item.ep.applicationManagedExternally) (
+      map (name: {
+        inherit name;
+        ep = authEndpoints.${name};
+        oidc = false;
+      }) sortedEndpointNames
+      ++ map (name: {
+        inherit name;
+        ep = oidcEndpoints.${name};
+        oidc = true;
+      }) sortedOidcEndpointNames
+    )
+  );
+
+  nodApplicationResources = map (
+    name:
+    let
+      proxyEndpoint = authEndpoints.${name} or null;
+      oidc = proxyEndpoint == null;
+      ep = if oidc then oidcEndpoints.${name} else proxyEndpoint;
+      displayName = if ep.displayName != null then ep.displayName else name;
+      group = if ep.group != null then ep.group else (if oidc then "Applications" else "Services");
+      launchUrl =
+        if oidc then
+          (
+            if ep.publicUrl != null then
+              ep.publicUrl
+            else if ep.canonicalDomain != null then
+              "https://${ep.canonicalDomain}"
+            else
+              null
+          )
+        else
+          "https://${lib.removePrefix "*." ep.canonicalDomain}";
+    in
+    {
+      kind = "authentik.application";
+      id = name;
+      attributes = {
+        name = displayName;
+        provider = "Provider for ${displayName}";
+        meta_launch_url = launchUrl;
+        inherit group;
+        open_in_new_tab = true;
+        access_groups = ep.accessGroups;
+      };
+    }
+  ) externallyManagedApplications;
+
   nodDesiredState = pkgs.writeText "authentik-nod-desired.json" (
     builtins.toJSON {
-      resources = authentikUserResources ++ authentikGroupResources;
+      resources = authentikUserResources ++ authentikGroupResources ++ nodApplicationResources;
       absent = authentikAbsentGroups;
     }
   );

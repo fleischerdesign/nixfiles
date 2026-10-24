@@ -258,7 +258,12 @@ def provider(requests):
     return [json.loads(line) for line in completed.stdout.splitlines()]
 
 desired_state = json.loads(Path(expectations["desiredState"]).read_text())
-desired = desired_state["resources"]
+# This check measures the directory: groups and the users they contain. Applications are the provider's
+# own kind, covered by its tests and the live fleet; the sandbox has no application create path, and adding
+# one would test a stub, not the directory.
+desired = [
+    entry for entry in desired_state["resources"] if entry["kind"] != "authentik.application"
+]
 absent = [entry["id"] for entry in desired_state.get("absent", [])]
 assert expectations["subjects"]["retired"] in absent, (
     "a retired group must be an authorized deletion, not an implicit one",

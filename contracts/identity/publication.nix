@@ -55,5 +55,18 @@ in
       default = [ ];
       description = "Groups whose members administer this publication (usually a subset of accessGroups).";
     };
+
+    # Two writers on one object is the failure this flag prevents: the blueprint compiler still declares the
+    # provider (the application needs it), but leaves the application and its audience bindings to the
+    # reconciler, which declares them from the same publication facts. Adoption of the existing object is an
+    # explicit operator step (nod `provider adopt`), never a side effect of this flag.
+    applicationManagedExternally = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Whether the application and its audience bindings are created by the reconciler instead of the
+        blueprint. The provider remains declared here; only the application is skipped.
+      '';
+    };
   };
 }
