@@ -993,10 +993,15 @@ let
         permissions = [
           "authentik_core.view_group"
           "authentik_core.view_user"
+          "authentik_core.view_application"
+          "authentik_core.view_provider"
           "authentik_core.change_group"
           "authentik_core.add_group"
           "authentik_core.add_user"
           "authentik_core.change_user"
+          "authentik_core.add_application"
+          "authentik_core.change_application"
+          "authentik_core.delete_application"
         ];
       })
       (blueprintLib.entry {
