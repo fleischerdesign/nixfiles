@@ -74,7 +74,7 @@ list (including an explicitly empty one) is owned by the repository, and `state 
 group - deleting an inventory entry alone is not a deletion request. Service audiences keep the reserved
 `svc-` prefix and are derived, never declared by hand.
 
-The writer is the `authentik` provider, not a blueprint: the renderer emits no group entries, and `nod`
+The writer is the `authentik` provider, not a blueprint: the renderer emits no directory entries, and `nod`
 reconciles `description`, `is_superuser` and the declared membership against the API. Only declared keys
 are written, so an undeclared membership stays interface-owned and an attribute outside the declaration
 survives an update. A group the fleet did not create must be adopted once (`nod provider adopt`), which
