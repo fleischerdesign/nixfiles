@@ -1,6 +1,7 @@
 {
   config,
   inputs,
+  flake,
   ...
 }:
 {
@@ -70,6 +71,11 @@
       config.sops.templates."nod-cloudflare.env".path
       config.sops.templates."nod-authentik.env".path
     ];
+    # The daemon reads these at startup; naming them here builds them with this
+    # host, so a rollout cannot restart the daemon before its desired state exists.
+    desiredStatePaths = map (provider: provider.desired) (
+      builtins.filter (provider: provider ? desired) (builtins.attrValues flake.nod.providers)
+    );
   };
 
   # The provider's token is the same secret the access blueprint creates on the

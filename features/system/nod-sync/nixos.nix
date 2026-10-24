@@ -183,6 +183,16 @@ in
         store; the files are rendered from SOPS.
       '';
     };
+
+    desiredStatePaths = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [ ];
+      description = ''
+        Desired-state files the daemon reads. Referencing them here makes them
+        part of this host's closure, so a deployment builds them before the
+        daemon starts; a daemon that starts first exits on a missing file.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -229,6 +239,9 @@ in
     systemd.services.nod-sync = {
       description = "nod GitOps reconciler (${cfg.branch})";
       wantedBy = [ "multi-user.target" ];
+      # The desired state is read at startup; a missing file must fail the unit
+      # before the daemon runs, and the reference puts it in this host's closure.
+      preStart = lib.concatMapStrings (path: "test -e ${path}\n") cfg.desiredStatePaths;
       wants = [ "network-online.target" ];
       after = [
         "network-online.target"
