@@ -22,6 +22,7 @@ django.setup()
 from authentik.blueprints.v1.importer import Importer
 from authentik.core.api.users import UserSerializer
 from authentik.core.models import Application, Group, User, UserTypes
+from authentik.policies.models import PolicyBinding
 from authentik.stages.authenticator_webauthn.models import WebAuthnDevice
 
 root, verifier, expectations_path, snapshot_path = map(Path, sys.argv[1:5])
@@ -85,6 +86,16 @@ def application_payload(app):
         "meta_hide": app.meta_hide,
     }
 
+def binding_payload(binding):
+    return {
+        "pk": str(binding.pk),
+        "target": str(binding.target_id),
+        "group": str(binding.group_id) if binding.group_id else None,
+        "user": binding.user_id,
+        "policy": str(binding.policy_id) if binding.policy_id else None,
+        "enabled": binding.enabled,
+    }
+
 class StubAuthentik(http.server.BaseHTTPRequestHandler):
     """The Authentik group, user and application endpoints, backed by the real ORM."""
 
@@ -131,6 +142,8 @@ class StubAuthentik(http.server.BaseHTTPRequestHandler):
                 self._page(list(User.objects.order_by("username")), user_payload)
             elif route == "/api/v3/core/applications/":
                 self._page(list(Application.objects.order_by("slug")), application_payload)
+            elif route == "/api/v3/policies/bindings/":
+                self._page(list(PolicyBinding.objects.all()), binding_payload)
             else:
                 self._send(404, {"detail": "not found"})
         finally:
