@@ -240,50 +240,57 @@
         }
       );
 
-      # Agentless targets are addressed from the inventory, not literals: the check on
-      # nodTargets fails loudly when a target has no address, so a renamed device cannot
-      # silently keep its old one here.
+      # Agentless targets are addressed from the inventory, not literals: the projection
+      # refuses a target without an address, so a renamed device cannot silently keep its
+      # old one here.
       nodTargets =
         let
           inventoryHosts = self.nixosConfigurations.cld-edge-01.config.my.topology.hosts;
-        in
-        {
-          hom-rt-01 = {
-            targetHost = inventoryHosts.hom-rt-01.ipv4 or null;
-            role = "router";
-            targetType = "agentless";
-            tags = [
-              "router"
-              "tr064"
-              "gitops"
-            ];
-            package = self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.fritzbox.package;
-          };
+          targets = {
+            hom-rt-01 = {
+              targetHost = inventoryHosts.hom-rt-01.ipv4 or null;
+              role = "router";
+              targetType = "agentless";
+              tags = [
+                "router"
+                "tr064"
+                "gitops"
+              ];
+              package = self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.fritzbox.package;
+            };
 
-          hom-ap-01 = {
-            targetHost = inventoryHosts.hom-ap-01.ipv4 or null;
+            hom-ap-01 = {
+              targetHost = inventoryHosts.hom-ap-01.ipv4 or null;
+              role = "embedded";
+              targetType = "agentless";
+              tags = [
+                "ap"
+                "wifi"
+                "gitops"
+              ];
+              package =
+                self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.tplink-ap.package;
+            };
+          }
+          // (builtins.mapAttrs (devName: devPkg: {
+            targetHost = self.nixosConfigurations.hom-srv-01.config.my.topology.devices.${devName}.ipv4;
             role = "embedded";
             targetType = "agentless";
             tags = [
-              "ap"
-              "wifi"
+              "esphome"
+              "iot"
               "gitops"
             ];
-            package =
-              self.nixosConfigurations.hom-srv-01.config.my.features.system.networking.tplink-ap.package;
-          };
-        }
-        // (builtins.mapAttrs (devName: devPkg: {
-          targetHost = self.nixosConfigurations.hom-srv-01.config.my.topology.devices.${devName}.ipv4;
-          role = "embedded";
-          targetType = "agentless";
-          tags = [
-            "esphome"
-            "iot"
-            "gitops"
-          ];
-          package = devPkg;
-        }) self.nixosConfigurations.hom-srv-01.config.my.features.services.esphome.devicePackages);
+            package = devPkg;
+          }) self.nixosConfigurations.hom-srv-01.config.my.features.services.esphome.devicePackages);
+          withoutAddress = nixpkgs-unstable.lib.filter (name: (targets.${name}.targetHost or null) == null) (
+            builtins.attrNames targets
+          );
+        in
+        assert
+          withoutAddress == [ ]
+          || throw "nodTargets without a targetHost: ${nixpkgs-unstable.lib.concatStringsSep ", " withoutAddress}";
+        targets;
 
       # The binary cache CI pulls from, derived from the service contract so the workflow names no
       # contract path of its own: a reshape changes this definition, not the workflow. The one
