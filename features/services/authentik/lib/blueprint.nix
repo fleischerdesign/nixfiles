@@ -164,6 +164,7 @@ let
       name,
       id,
       roles ? [ ],
+      isSuperuser ? false,
     }:
     entry {
       inherit id;
@@ -173,7 +174,8 @@ let
         inherit name;
         inherit roles;
         type = "service_account";
-      };
+      }
+      // lib.optionalAttrs isSuperuser { is_superuser = true; };
     };
 
   token =

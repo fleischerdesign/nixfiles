@@ -986,6 +986,11 @@ let
         id = "sa_nod_provider";
         username = "nod-provider";
         name = "nod provider";
+        # nod is the only writer for the objects it owns, and the token is host-local
+        # in SOPS. Superuser is not a convenience: Authentik filters the application
+        # list by policy for every non-superuser, so without it the reconciler cannot
+        # see the applications it created (core/api/applications.py, `superuser_full_list`).
+        isSuperuser = true;
       })
       (blueprintLib.role {
         id = "role_nod_provider";
