@@ -21,7 +21,7 @@ django.setup()
 
 from authentik.blueprints.v1.importer import Importer
 from authentik.core.api.users import UserSerializer
-from authentik.core.models import Group, User, UserTypes
+from authentik.core.models import Application, Group, User, UserTypes
 from authentik.stages.authenticator_webauthn.models import WebAuthnDevice
 
 root, verifier, expectations_path, snapshot_path = map(Path, sys.argv[1:5])
@@ -67,8 +67,26 @@ def user_payload(user):
         "is_active": user.is_active,
     }
 
+def application_payload(app):
+    return {
+        "slug": app.slug,
+        "name": app.name,
+        "provider_obj": (
+            {"pk": app.provider.pk, "name": app.provider.name}
+            if app.provider
+            else None
+        ),
+        "open_in_new_tab": app.open_in_new_tab,
+        "meta_launch_url": app.meta_launch_url,
+        "meta_description": app.meta_description,
+        "meta_publisher": app.meta_publisher,
+        "policy_engine_mode": app.policy_engine_mode,
+        "group": app.group,
+        "meta_hide": app.meta_hide,
+    }
+
 class StubAuthentik(http.server.BaseHTTPRequestHandler):
-    """The Authentik group and user endpoints, backed by the real ORM."""
+    """The Authentik group, user and application endpoints, backed by the real ORM."""
 
     def log_message(self, *args):
         pass
@@ -98,7 +116,7 @@ class StubAuthentik(http.server.BaseHTTPRequestHandler):
         window = rows[(page - 1) * size:page * size]
         following = page + 1 if page * size < len(rows) else None
         self._send(200, {
-            "pagination": {"next": following},
+            "pagination": {"next": following, "count": len(rows)},
             "results": [render(row) for row in window],
         })
 
@@ -111,6 +129,8 @@ class StubAuthentik(http.server.BaseHTTPRequestHandler):
                 self._page(list(Group.objects.order_by("name")), group_payload)
             elif route == "/api/v3/core/users/":
                 self._page(list(User.objects.order_by("username")), user_payload)
+            elif route == "/api/v3/core/applications/":
+                self._page(list(Application.objects.order_by("slug")), application_payload)
             else:
                 self._send(404, {"detail": "not found"})
         finally:

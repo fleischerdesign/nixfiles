@@ -986,28 +986,6 @@ let
         id = "sa_nod_provider";
         username = "nod-provider";
         name = "nod provider";
-        # nod is the only writer for the objects it owns, and the token is host-local
-        # in SOPS. Superuser is not a convenience: Authentik filters the application
-        # list by policy for every non-superuser, so without it the reconciler cannot
-        # see the applications it created (core/api/applications.py, `superuser_full_list`).
-        isSuperuser = true;
-      })
-      (blueprintLib.role {
-        id = "role_nod_provider";
-        name = "nod-provider";
-        permissions = [
-          "authentik_core.view_group"
-          "authentik_core.view_user"
-          "authentik_core.view_application"
-          "authentik_core.view_provider"
-          "authentik_core.change_group"
-          "authentik_core.add_group"
-          "authentik_core.add_user"
-          "authentik_core.change_user"
-          "authentik_core.add_application"
-          "authentik_core.change_application"
-          "authentik_core.delete_application"
-        ];
       })
       (blueprintLib.entry {
         id = "group_nod_provider";
@@ -1015,7 +993,12 @@ let
         identifiers.name = "nod-provider";
         attrs = {
           users = [ (blueprintLib.refs.sameBlueprint "sa_nod_provider") ];
-          roles = [ (blueprintLib.refs.sameBlueprint "role_nod_provider") ];
+          # One grant, not a list: nod is the only writer for the objects it owns, its token is host-local
+          # in SOPS, and authentik derives `User.is_superuser` from membership in a group with this flag
+          # (core/models.py). A narrower role cannot see the application list, which authentik filters by
+          # policy for every non-superuser — the provider refuses such a filtered view (ADR-038). What the
+          # provider touches is documented in its README, not duplicated here.
+          is_superuser = true;
         };
       })
       (blueprintLib.token {

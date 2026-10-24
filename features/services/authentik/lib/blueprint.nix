@@ -158,13 +158,15 @@ let
 
   # A service account, and the token it authenticates with. `intent` distinguishes an API token (for the
   # HTTP API) from an app password (for an LDAP bind); authentik rejects the wrong one at the other end.
+  # Superuser status is not a user attribute in authentik: it is derived from membership in a group with
+  # `is_superuser = true` (core/models.py, `User.is_superuser`). The user serializer exposes the field
+  # read-only, so a blueprint grants it through the group, never through the user.
   serviceAccount =
     {
       username,
       name,
       id,
       roles ? [ ],
-      isSuperuser ? false,
     }:
     entry {
       inherit id;
@@ -174,8 +176,7 @@ let
         inherit name;
         inherit roles;
         type = "service_account";
-      }
-      // lib.optionalAttrs isSuperuser { is_superuser = true; };
+      };
     };
 
   token =
