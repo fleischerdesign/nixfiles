@@ -291,7 +291,15 @@ seeded = expectations["subjects"]["user"]
 
 with provider_settings() as settings:
     observed = observe(settings)
-    assert observed == [], observed
+    groups = [resource for resource in observed if resource["kind"] == "authentik.group"]
+    assert groups == [], groups
+    seeded_resources = [
+        resource
+        for resource in observed
+        if resource["kind"] == "authentik.user"
+        and resource["id"] == expectations["subjects"]["user"]
+    ]
+    assert seeded_resources and seeded_resources[0]["owned"] is False, seeded_resources
     changes = plan(settings, observed)
     assert changes and {change["kind"] for change in changes} == {"create"}, changes
     reconcile(settings, changes)

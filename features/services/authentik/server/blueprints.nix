@@ -970,9 +970,21 @@ let
         ) directoryBlueprint.entries
       );
 
+  # Users are seeds (ADR-035): the provider creates a missing account once and
+  # never touches it again. Only entries with an initial profile are seeded;
+  # `initialProfile = null` references an existing account and is not declared.
+  authentikUserResources = lib.mapAttrsToList (username: user: {
+    kind = "authentik.user";
+    id = username;
+    attributes = {
+      name = user.initialProfile.displayName;
+      inherit (user.initialProfile) email;
+    };
+  }) (lib.filterAttrs (_: user: user.initialProfile != null) config.my.directory.users);
+
   nodDesiredState = pkgs.writeText "authentik-nod-desired.json" (
     builtins.toJSON {
-      resources = authentikGroupResources;
+      resources = authentikUserResources ++ authentikGroupResources;
       absent = authentikAbsentGroups;
     }
   );
