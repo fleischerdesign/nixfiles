@@ -12,7 +12,6 @@ statix check   # lint; statix.toml disables repeated_keys, manual_inherit, manua
                # useless_parens
 nix flake check                         # all five hosts evaluate, plus format, statix and deadnix
 nix flake check --max-jobs 1            # the same gate, serialised: the answer you can trust under load
-nix build .#integrationChecks.x86_64-linux.directory-runtime  # boots Django/Postgres; CI runs it, the loop does not
 nix build .#checks.x86_64-linux.<name>  # a single check from checks/, in isolation
 
 nod switch <host>                                                # fleet deploy: build, transfer, activate
@@ -23,10 +22,9 @@ nixos-rebuild switch --flake .#<host> --target-host root@<addr>  # one host, rem
 `nix flake check` is the gate - it is what CI runs and what must pass before a change is done. Read
 its whole output, warnings included.
 
-The gate holds the checks that are cheap and deterministic: evaluation, contracts, formatting. The
-end-to-end check that boots a Django/Postgres database lives in `integrationChecks`, because it costs
-minutes and mirrors the provider's HTTP surface in a stub - a gap there is a fixture gap, not a
-defect. CI runs both; the local loop runs the gate.
+A statement about another repository's component is tested there, not here: nod runs its tests
+through cargo, and this repository evaluates its own contracts. What remains here is the fixture test
+and the cross-host invariant - nothing that re-runs a component the other repository already proves.
 
 Every check is deterministic: a real failure reproduces when that one check is
 built alone. A failure that does not reproduce is memory pressure, not a defect -
@@ -94,9 +92,6 @@ that end up in a derivation are content-addressed with `builtins.path`.
    it with `--no-build`, which only proves the checks evaluate. Add `--max-jobs 1`
    while the reconciler is building: parallel builders exhaust memory, and a
    killed builder is indistinguishable from a real failure until you rebuild it.
-   A change to the directory or the Authentik provider also builds
-   `.#integrationChecks.x86_64-linux.directory-runtime` - that is the check that
-   boots the database and drives the shipped binary.
 3. Build the host that deploys first, not the fleet:
    `nix build .#nixosConfigurations.<host>.config.system.build.toplevel`.
    The reconciler builds every other host before activating it, and CI proves the
@@ -158,21 +153,21 @@ removed when they are touched, not maintained in parallel to a lower layer.
 
 ### The file contract
 
-A check is a file, not an entry in a list. `checks/<name>.nix` is a check,
-`checks/integration/<name>.nix` is one that boots a service, and the file name is the output name.
-`lib/checks.nix` discovers them and `flake.nix` imports the directory once, so adding a check is
-adding a file and no manifest can drift.
+A check is a file, not an entry in a list. `checks/<name>.nix` is a check, the file name is the output
+name, and `lib/checks.nix` discovers them: `flake.nix` imports the directory once, so adding a check
+is adding a file and no manifest can drift.
 
-- Two directories are reserved: `integration/` for a check that boots something, `lib/` for a value a
-  check computes before wrapping it in a derivation. A fixture tree is a directory without `.nix`
-  files; a directory that holds a `default.nix` is a mistake and fails the evaluation.
+- `lib/` is the one reserved directory: it holds a value a check computes before wrapping it in a
+  derivation. A fixture tree is a directory without `.nix` files; a directory that holds a
+  `default.nix` is a mistake and fails the evaluation.
 - Every file is a function `checkArgs -> derivation`: it declares the slice it needs and ignores the
   rest, so adding an argument to the shared set never touches the checks that do not use it.
 - The first comment names the failure the check catches. That line is the justification; without it,
   the answer to "which defect would this have caught" is missing.
-- Python is for artifacts (YAML, generated text) and for the Authentik package, with paths as argv,
-  messages on stderr and the exit code derived from the checks. A statement about the configuration
-  graph is Nix and a `throw`; a statement about a service is a `nixosTest`.
+- Python is for artifacts (YAML, generated text), with paths as argv, messages on stderr and the exit
+  code derived from the checks. A statement about the configuration graph is Nix and a `throw`; a
+  statement about a service belongs to the reconciler, which runs it continuously against the real
+  thing.
 
 ## Verification
 

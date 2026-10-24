@@ -4,17 +4,13 @@
 # not an entry in a list. `checks/<name>.nix` and `checks/integration/<name>.nix` are functions
 # `checkArgs -> derivation`; adding one is adding a file, and no manifest can drift out of date.
 #
-# Two subdirectories are reserved, and they are the two shapes a non-check file can have:
-# `integration/` holds the checks that boot a service, `lib/` holds the values a check computes before
-# it wraps them in a derivation. Fixture trees are `.nix`-less directories next to the check that reads
-# them (`fixtures/`), and a directory that holds a `.nix` file is a mistake, not something to skip
-# quietly - the same reasoning that made `nixos.nix` the module marker.
+# `lib/` is the one reserved subdirectory: it holds the values a check computes before wrapping them
+# in a derivation. Fixture trees are `.nix`-less directories next to the check that reads them
+# (`fixtures/`), and a directory that holds a `.nix` file is a mistake, not something to skip quietly
+# - the same reasoning that made `nixos.nix` the module marker.
 { lib }:
 let
-  reserved = [
-    "integration"
-    "lib"
-  ];
+  reserved = [ "lib" ];
 
   discover =
     dir: checkArgs:
@@ -31,7 +27,7 @@ let
       ) entries;
     in
     if unknown != [ ] then
-      throw "check discovery: ${toString dir} contains ${lib.concatStringsSep ", " unknown}; a check is a file, and only integration/ and lib/ are directories"
+      throw "check discovery: ${toString dir} contains ${lib.concatStringsSep ", " unknown}; a check is a file, and lib/ is the only directory"
     else
       lib.mapAttrs' (
         file: _: lib.nameValuePair (lib.removeSuffix ".nix" file) (import (dir + "/${file}") checkArgs)

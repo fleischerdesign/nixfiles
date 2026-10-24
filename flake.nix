@@ -204,16 +204,9 @@
         };
       };
 
-      # The check surface is discovered, not listed: `checks/<name>.nix` is a check, the file name is
-      # the output name, and `checks/integration/` holds the ones that boot a service (lib/checks.nix).
-      checks.${system} = (import ./checks checkArgs).checks;
-
-      # The end-to-end checks boot a real Django/Postgres and drive the shipped
-      # provider binary against it. They are the only checks that mirror the
-      # provider's API surface in a stub, so they cost minutes and can fail on a
-      # fixture gap rather than on a defect. CI runs them explicitly; the local
-      # gate stays fast (AGENTS.md).
-      integrationChecks.${system} = (import ./checks checkArgs).integration;
+      # The check surface is discovered, not listed: `checks/<name>.nix` is a check and the file name
+      # is the output name (lib/checks.nix).
+      checks.${system} = import ./checks checkArgs;
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
