@@ -667,6 +667,12 @@ in
       readOnly = true;
       description = "Compiled directory of static and dynamically compiled Authentik blueprints";
     };
+    nodDesired = lib.mkOption {
+      type = lib.types.attrs;
+      readOnly = true;
+      default = blueprints.nodDesired;
+      description = "The directory and proxy stack as a nod declaration value (schema 2).";
+    };
     nodDesiredStateFile = lib.mkOption {
       type = lib.types.str;
       readOnly = true;
@@ -859,7 +865,9 @@ in
       requires = [ "authentik-blueprints-bootstrap.service" ];
       before = [ "authentik-blueprints-apply.service" ];
       restartTriggers = [
-        cfg.provider.desired
+        # The declaration may be a file or a value; the hash changes with either,
+        # and a systemd trigger must be a string.
+        (builtins.hashString "sha256" (builtins.toJSON cfg.provider.desired))
         cfg.nodPackage
       ];
       path = [ pkgs.nix ];

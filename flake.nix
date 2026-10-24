@@ -124,7 +124,7 @@
       # The fleet declaration for nod (ADR-031): the same structure the
       # configuration file uses, evaluated by nod with `nix eval`.
       nod = {
-        schema = 1;
+        schema = 2;
         providers = {
           example = {
             command = "${self.inputs.nod.packages.${system}.nod-provider-example}/bin/nod-provider-example";
@@ -194,7 +194,7 @@
               marker_value = "owned";
             };
             desired =
-              self.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodDesiredStateFile;
+              self.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodDesired;
             apply = true;
             interval_secs = 300;
             timeout_secs = 60;

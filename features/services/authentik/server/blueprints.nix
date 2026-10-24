@@ -16,6 +16,7 @@
 let
   audience = import ../../../../contracts/identity/lib/audience.nix;
   endpointIdentifiers = import ../../../../contracts/endpoints/lib/identifiers.nix { };
+  nod = import ../lib/nod.nix { inherit lib; };
 
   authentikPackage = pkgs.authentik;
   directory = config.my.directory.ldap;
@@ -863,21 +864,23 @@ let
   # more; the provider is the only writer.
   authentikGroupResources =
     map
-      (entry: {
-        kind = "authentik.group";
-        id = entry.identifiers.name;
-        attributes = {
-          is_superuser = (entry.attrs or { }).is_superuser or false;
+      (
+        entry:
+        nod.group {
+          name = entry.identifiers.name;
+          isSuperuser = (entry.attrs or { }).is_superuser or false;
           description = ((entry.attrs or { }).attributes or { }).description or "";
-        }
-        // lib.optionalAttrs ((entry.attrs or { }) ? users) {
           # `members = null` omits the key: the provider then leaves the
           # membership UI-owned instead of emptying the group.
-          users = lib.sort (a: b: a < b) (
-            map (ref: builtins.elemAt (builtins.elemAt ref.value 1) 1) entry.attrs.users
-          );
-        };
-      })
+          users =
+            if (entry.attrs or { }) ? users then
+              lib.sort (a: b: a < b) (
+                map (ref: builtins.elemAt (builtins.elemAt ref.value 1) 1) entry.attrs.users
+              )
+            else
+              null;
+        }
+      )
       (
         lib.filter (
           entry: entry.model == blueprintLib.models.group && (entry.state or "present") != "absent"
@@ -887,29 +890,23 @@ let
   # A group the declaration retires is an authorized deletion: it goes into
   # `absent`, so the core does not count it against the deletion cap. The same
   # graph produces both lists, so present and absent cannot disagree.
-  authentikAbsentGroups =
-    map
-      (entry: {
-        kind = "authentik.group";
-        id = entry.identifiers.name;
-      })
-      (
-        lib.filter (
-          entry: entry.model == blueprintLib.models.group && (entry.state or "present") == "absent"
-        ) directoryGraph.entries
-      );
+  authentikAbsentGroups = map (entry: nod.resource "authentik.group" entry.identifiers.name { }) (
+    lib.filter (
+      entry: entry.model == blueprintLib.models.group && (entry.state or "present") == "absent"
+    ) directoryGraph.entries
+  );
 
   # Users are seeds (ADR-035): the provider creates a missing account once and
   # never touches it again. Only entries with an initial profile are seeded;
   # `initialProfile = null` references an existing account and is not declared.
-  authentikUserResources = lib.mapAttrsToList (username: user: {
-    kind = "authentik.user";
-    id = username;
-    attributes = {
+  authentikUserResources = lib.mapAttrsToList (
+    username: user:
+    nod.user {
+      inherit username;
       name = user.initialProfile.displayName;
       inherit (user.initialProfile) email;
-    };
-  }) (lib.filterAttrs (_: user: user.initialProfile != null) config.my.directory.users);
+    }
+  ) (lib.filterAttrs (_: user: user.initialProfile != null) config.my.directory.users);
 
   # The proxy stack, projected from the same publication facts the blueprint reads
   # (ADR-041). One writer: the reconciler declares provider, outpost and application;
@@ -938,58 +935,55 @@ let
     facts = proxyFacts name authEndpoints.${name};
   }) sortedEndpointNames;
 
-  nodProviderResources = map (item: {
-    kind = "authentik.provider.proxy";
-    id = item.facts.providerName;
-    attributes = {
+  nodProviderResources = map (
+    item:
+    nod.proxyProvider {
+      name = item.facts.providerName;
       mode = item.facts.mode;
-      external_host = item.facts.externalHost;
-      cookie_domain = item.facts.cookieDomain;
-      authorization_flow = item.facts.authorizationFlow;
-      invalidation_flow = item.facts.invalidationFlow;
-    };
-  }) proxyProjections;
+      externalHost = item.facts.externalHost;
+      cookieDomain = item.facts.cookieDomain;
+      authorizationFlow = item.facts.authorizationFlow;
+      invalidationFlow = item.facts.invalidationFlow;
+    }
+  ) proxyProjections;
 
   nodOutpostResources = [
-    {
-      kind = "authentik.outpost";
-      id = "authentik Embedded Outpost";
-      attributes = {
-        type = "proxy";
-        providers = lib.sort (a: b: a < b) (map (item: item.facts.providerName) proxyProjections);
-        config = {
-          authentik_host = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
-          authentik_host_browser = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
-          authentik_host_insecure = false;
-        };
+    (nod.outpost {
+      name = "authentik Embedded Outpost";
+      providers = lib.sort (a: b: a < b) (map (item: item.facts.providerName) proxyProjections);
+      config = {
+        authentik_host = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
+        authentik_host_browser = "https://${config.my.contracts.provides.authentik.publications.web.canonicalDomain}";
+        authentik_host_insecure = false;
       };
-    }
+    })
   ];
 
-  nodApplicationResources = map (item: {
-    kind = "authentik.application";
-    id = item.name;
-    attributes = {
+  nodApplicationResources = map (
+    item:
+    nod.application {
+      slug = item.name;
       name = item.facts.displayName;
       provider = item.facts.providerName;
-      meta_launch_url = item.facts.externalHost;
+      launchUrl = item.facts.externalHost;
       group = item.facts.group;
-      open_in_new_tab = true;
-      access_groups = lib.sort (a: b: a < b) item.ep.accessGroups;
-    };
-  }) proxyProjections;
-
-  nodDesiredState = pkgs.writeText "authentik-nod-desired.json" (
-    builtins.toJSON {
-      resources =
-        authentikUserResources
-        ++ authentikGroupResources
-        ++ nodProviderResources
-        ++ nodOutpostResources
-        ++ nodApplicationResources;
-      absent = authentikAbsentGroups;
+      accessGroups = item.ep.accessGroups;
     }
-  );
+  ) proxyProjections;
+
+  nodDesired = nod.desired {
+    resources =
+      authentikUserResources
+      ++ authentikGroupResources
+      ++ nodProviderResources
+      ++ nodOutpostResources
+      ++ nodApplicationResources;
+    absent = authentikAbsentGroups;
+  };
+
+  # A rendered artifact for consumers that need a file (checks, a manual apply).
+  # The daemon reads the value above; the file is not its configuration path.
+  nodDesiredState = pkgs.writeText "authentik-nod-desired.json" (builtins.toJSON nodDesired);
 
   # The provider's own access. This is the one object an external writer cannot
   # create for itself: the token must exist before the first API call. Authentik's
@@ -1067,6 +1061,7 @@ in
     sortedLdapEndpointNames
     oidcEndpoints
     ldapConsumerSecretPath
+    nodDesired
     nodDesiredState
     ;
 }

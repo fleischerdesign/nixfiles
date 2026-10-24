@@ -77,8 +77,12 @@
     ];
     # The daemon reads these at startup; naming them here builds them with this
     # host, so a rollout cannot restart the daemon before its desired state exists.
-    desiredStatePaths = map (provider: provider.desired) (
-      builtins.filter (provider: provider ? desired) (builtins.attrValues flake.nod.providers)
+    # Only file-backed declarations have a path to check at startup; an inline
+    # declaration is already part of the flake evaluation.
+    desiredStatePaths = builtins.filter (desired: !builtins.isAttrs desired) (
+      map (provider: provider.desired) (
+        builtins.filter (provider: provider ? desired) (builtins.attrValues flake.nod.providers)
+      )
     );
   };
 
