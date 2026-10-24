@@ -23,17 +23,12 @@ from authentik.blueprints.v1.importer import Importer
 from authentik.core.api.users import UserSerializer
 from authentik.core.models import Group, User, UserTypes
 from authentik.stages.authenticator_webauthn.models import WebAuthnDevice
-import yaml
 
 root, verifier, expectations_path, snapshot_path = map(Path, sys.argv[1:5])
 expectations = json.loads(expectations_path.read_text())
 directory = expectations["directory"]
 superuser_groups = expectations["superuserGroups"]
-path = "01-rbac/users.yaml"
-source = (root / path).read_text()
-
-def apply(content=source):
-    assert Importer.from_string(content, {}).apply(), "Native directory blueprint apply failed"
+# The directory has no blueprint: the provider is its only writer.
 
 # Execute the exact verification functions embedded in the shipped apply script, not a test reimplementation.
 tree = ast.parse(verifier.read_text())
@@ -42,7 +37,6 @@ functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
 assert len(functions) == 3, "Expected the production relation verifier and directory preflight"
 namespace = {"root": root, "Importer": Importer, "json": json}
 exec(compile(ast.Module(body=functions, type_ignores=[]), str(verifier), "exec"), namespace)
-verify = lambda: namespace["relation_diffs"]([path])
 preflight = namespace["directory_observations"]
 
 # The provider is the only writer for groups. This adapter translates the three endpoints it speaks into
@@ -61,6 +55,16 @@ def group_payload(group):
             {"pk": user.pk, "username": user.username}
             for user in group.users.order_by("username")
         ],
+    }
+
+def user_payload(user):
+    return {
+        "pk": user.pk,
+        "username": user.username,
+        "name": user.name,
+        "email": user.email,
+        "attributes": user.attributes or {},
+        "is_active": user.is_active,
     }
 
 class StubAuthentik(http.server.BaseHTTPRequestHandler):
@@ -106,8 +110,7 @@ class StubAuthentik(http.server.BaseHTTPRequestHandler):
             if route == "/api/v3/core/groups/":
                 self._page(list(Group.objects.order_by("name")), group_payload)
             elif route == "/api/v3/core/users/":
-                self._page(list(User.objects.order_by("username")),
-                           lambda user: {"pk": user.pk, "username": user.username})
+                self._page(list(User.objects.order_by("username")), user_payload)
             else:
                 self._send(404, {"detail": "not found"})
         finally:
@@ -117,7 +120,18 @@ class StubAuthentik(http.server.BaseHTTPRequestHandler):
         try:
             if not self._authorised():
                 return
+            route = urllib.parse.urlparse(self.path).path
             body = self._body()
+            if route == "/api/v3/core/users/":
+                user = User.objects.create(
+                    username=body["username"],
+                    name=body.get("name", ""),
+                    email=body.get("email", ""),
+                    attributes=body.get("attributes") or {},
+                    is_active=body.get("is_active", True),
+                )
+                self._send(201, user_payload(user))
+                return
             group = Group.objects.create(
                 name=body["name"],
                 is_superuser=body.get("is_superuser", False),
@@ -142,10 +156,22 @@ class StubAuthentik(http.server.BaseHTTPRequestHandler):
         try:
             if not self._authorised():
                 return
+            route = urllib.parse.urlparse(self.path).path
+            body = self._body()
+            if route.startswith("/api/v3/core/users/"):
+                try:
+                    user = User.objects.get(pk=route.rstrip("/").rsplit("/", 1)[1])
+                except (IndexError, User.DoesNotExist):
+                    self._send(404, {"detail": "not found"})
+                    return
+                if "attributes" in body:
+                    user.attributes = body["attributes"] or {}
+                user.save()
+                self._send(200, user_payload(user))
+                return
             group = self._group()
             if group is None:
                 return
-            body = self._body()
             if "is_superuser" in body:
                 group.is_superuser = body["is_superuser"]
             if "attributes" in body:
@@ -217,6 +243,13 @@ def reconcile(settings, changes):
     assert all(item["ok"] for item in result["applied"]), result
     return result
 
+def provider_apply(settings):
+    """Converge the provider and return what it planned; an empty plan is converged."""
+    changes = plan(settings, observe(settings))
+    if changes:
+        reconcile(settings, changes)
+    return changes
+
 def personal_state():
     usernames = list(directory["users"]) + ["ui-created-fixture"]
     return {
@@ -244,8 +277,8 @@ def diagnose(expected):
 if sys.argv[5:] == ["--restore"]:
     expected = json.loads(snapshot_path.read_text())
     assert json.loads(json.dumps(personal_state(), default=str)) == expected, "Database restore changed personal state"
-    apply()
-    assert verify() == [], verify()
+    with provider_settings() as settings:
+        assert provider_apply(settings) == [], "a restored database is already converged"
     assert preflight() == {"failures": [], "pending": [], "inactive": []}, preflight()
     diagnose(preflight())
     assert json.loads(json.dumps(personal_state(), default=str)) == expected, "Apply after restore changed personal state"
@@ -276,14 +309,8 @@ referenced.type = UserTypes.INTERNAL
 referenced.save(update_fields=["type"])
 assert preflight()["failures"] == [], preflight()
 print("Expected service-account collisions to fail before explicit apply: verified")
-blueprint = Importer.from_string(source, {}).blueprint
-assert not any(entry.get_model(blueprint) == "authentik_core.user"
-               and entry.identifiers.get("username") == reference_user
-               for entry in blueprint.iter_entries())
-assert not any(entry.get_model(blueprint) == "authentik_core.group"
-               for entry in blueprint.iter_entries()), "The blueprint must not create groups any more"
-apply()
-assert verify() == [], verify()
+# The directory is provider-owned: no blueprint file may exist for it.
+assert not (root / "01-rbac/users.yaml").exists(), "the directory blueprint must be gone"
 
 managed = expectations["subjects"]["managed"]
 ordinary = expectations["subjects"]["ordinary"]
@@ -293,16 +320,18 @@ with provider_settings() as settings:
     observed = observe(settings)
     groups = [resource for resource in observed if resource["kind"] == "authentik.group"]
     assert groups == [], groups
-    seeded_resources = [
-        resource
-        for resource in observed
-        if resource["kind"] == "authentik.user"
+    # The seed does not exist yet: the provider creates it in this run.
+    assert not any(
+        resource["kind"] == "authentik.user"
         and resource["id"] == expectations["subjects"]["user"]
-    ]
-    assert seeded_resources and seeded_resources[0]["owned"] is False, seeded_resources
+        for resource in observed
+    )
     changes = plan(settings, observed)
     assert changes and {change["kind"] for change in changes} == {"create"}, changes
     reconcile(settings, changes)
+
+    seeded_user = User.objects.get(username=expectations["subjects"]["user"])
+    assert seeded_user.attributes.get("vyrx") == "owned", seeded_user.attributes
 
     for name, declaration in sorted(directory["groups"].items()):
         if declaration["state"] != "present":
@@ -384,15 +413,14 @@ serializer = UserSerializer(data={"username": "ui-created-fixture", "name": "UI 
                                   "email": "ui@example.test", "groups": [group.pk]})
 serializer.is_valid(raise_exception=True)
 invited = serializer.save()
-apply()
-apply()
+with provider_settings() as settings:
+    assert provider_apply(settings) == [], "a converged directory plans nothing"
 user.refresh_from_db()
 assert (user.name, user.email, user.attributes) == (
     "Personal changed name", "personal-change@example.test", {"personal_preference": "keep"})
 assert user.check_password("disposable-personal-password")
 assert WebAuthnDevice.objects.filter(pk=credential.pk, user=user).exists()
 assert User.objects.filter(pk=invited.pk).exists()
-assert verify() == [], verify()
 assert User.objects.get(username=reference_user).email == "existing-ui@example.test"
 print("Expected personal email/name/password/passkey record and UI memberships to survive repeat apply: preserved")
 
@@ -409,7 +437,8 @@ user.save(update_fields=["is_active"])
 observation = preflight()
 assert observation["failures"] == [] and any(seeded in value for value in observation["inactive"]), observation
 diagnose(observation)
-apply()
+with provider_settings() as settings:
+    provider_apply(settings)
 user.refresh_from_db()
 assert user.is_active is False, "Apply reactivated a UI-suspended account"
 assert user.check_password("disposable-personal-password")

@@ -399,10 +399,6 @@ let
   providerFlowDependencies = [
     (metaApply "default/flow-default-provider-authorization-implicit-consent.yaml")
     (metaApply "default/flow-default-provider-invalidation.yaml")
-    # The accounts the derived audience groups name are seeded by that document. Declaring the
-    # dependency makes the resolution order explicit instead of hoping for discovery order - and it
-    # covers the role-group lookups in these blueprints, which relied on it all along.
-    (metaApply "01-rbac/users.yaml")
   ];
 
   # The 2026-09-20 authorization-flow experiment left two user-scoped policy bindings on the shared
@@ -446,7 +442,6 @@ let
   # `vyrx-ldap-consumers`. Declared as a dependency rather than hoped for, because authentik guarantees no
   # apply order across files.
   ldapDependencies = providerFlowDependencies ++ [
-    (metaApply "01-rbac/users.yaml")
     (blueprintLib.metaApplyInstance "vyrx-ldap-consumers")
   ];
 
@@ -868,15 +863,14 @@ let
   generatedLdapConsumerBlueprint = toBlueprintYaml "ldap-consumers-generated" ldapConsumerBlueprint;
 
   # Merged blueprints directory containing upstream base blueprints, custom blueprints and generated applications
-  directoryBlueprint =
+  directoryGraph =
     assert lib.assertMsg (lib.all (name: !audience.isAudienceGroup name) (
       lib.attrNames config.my.directory.groups
     )) "Directory role groups may not use the reserved personal audience prefix.";
     assert lib.assertMsg (lib.all (name: lib.elem name rbacRoleGroupNames)
       config.my.features.services.authentik.server.superuserGroups
     ) "Authentik superuserGroups must reference present directory groups.";
-    blueprintLib.blueprint {
-      name = "vyrx-rbac-users";
+    {
       entries =
         lib.mapAttrsToList (
           username: user:
@@ -921,17 +915,9 @@ let
           }
         ) retiredAudienceGroups;
     };
-  generatedDirectoryBlueprint = toBlueprintYaml "users" (
-    directoryBlueprint
-    // {
-      entries = lib.filter (entry: entry.model != blueprintLib.models.group) directoryBlueprint.entries;
-    }
-  );
-
-  # The provider's view of the directory: the same entries the YAML renderer
-  # consumes, projected into nod's resource shape. The YAML renderer no longer
-  # writes groups; the graph keeps them, so removing the YAML entries loses no
-  # declaration.
+  # The provider's view of the directory: the same entries the graph holds,
+  # projected into nod's resource shape. Nothing renders them as blueprints any
+  # more; the provider is the only writer.
   authentikGroupResources =
     map
       (entry: {
@@ -952,7 +938,7 @@ let
       (
         lib.filter (
           entry: entry.model == blueprintLib.models.group && (entry.state or "present") != "absent"
-        ) directoryBlueprint.entries
+        ) directoryGraph.entries
       );
 
   # A group the declaration retires is an authorized deletion: it goes into
@@ -967,7 +953,7 @@ let
       (
         lib.filter (
           entry: entry.model == blueprintLib.models.group && (entry.state or "present") == "absent"
-        ) directoryBlueprint.entries
+        ) directoryGraph.entries
       );
 
   # Users are seeds (ADR-035): the provider creates a missing account once and
@@ -1045,10 +1031,7 @@ let
     # blueprints below write into these directories.
     chmod -R u+w "$out"
 
-    # 3. Inject the compiled directory and applications
-    mkdir -p "$out/01-rbac"
-    chmod u+w "$out/01-rbac"
-    cp ${generatedDirectoryBlueprint} "$out/01-rbac/users.yaml"
+    # 3. Inject the compiled applications
     cp ${generatedProviderAccessBlueprint} "$out/00-system/provider-access.yaml"
     mkdir -p "$out/03-apps"
     cp ${generatedProxyBlueprint} "$out/03-apps/proxy-apps-generated.yaml"

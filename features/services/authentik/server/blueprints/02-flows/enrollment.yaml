@@ -10,12 +10,6 @@ metadata:
   labels:
     vyrx: "owned"
 entries:
-  # The baseline group must exist before it can be referenced below.
-  - model: authentik_blueprints.metaapplyblueprint
-    attrs:
-      identifiers:
-        path: 01-rbac/users.yaml
-
   - model: authentik_flows.flow
     id: flow
     identifiers:
