@@ -383,11 +383,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792865498,
-        "narHash": "sha256-+MRtftbJG0QJmt0k2mB0DAcqp1WwTxohQuabrDqchAw=",
+        "lastModified": 1792870204,
+        "narHash": "sha256-GwJVU5fHY/FrHmlUDrBFiDirUm26VVbDadV+xIkCQoA=",
         "owner": "fleischerdesign",
         "repo": "nod",
-        "rev": "5a4e00356b1e23dbcbbc0c2cd9de0ddb05514394",
+        "rev": "1384e218696e695f62e0dbcec10c3e0e231fab2f",
         "type": "github"
       },
       "original": {

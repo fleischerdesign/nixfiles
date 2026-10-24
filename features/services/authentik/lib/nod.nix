@@ -83,6 +83,7 @@ rec {
       name,
       clientId,
       redirectUris,
+      signingKey ? null,
       authorizationFlow ? "default-provider-authorization-implicit-consent",
       invalidationFlow ? "default-provider-invalidation-flow",
       subMode ? "hashed_user_id",
@@ -112,6 +113,7 @@ rec {
         # an unsorted declaration would report drift against itself.
         property_mappings = lib.sort (a: b: a < b) propertyMappings;
       }
+      // lib.optionalAttrs (signingKey != null) { signing_key = signingKey; }
       // lib.optionalAttrs (accessTokenValidity != null) {
         access_token_validity = accessTokenValidity;
       }
@@ -121,6 +123,20 @@ rec {
         client_secret_env = clientSecretEnv;
       }
     );
+
+  # A signing key: the material is a PEM document, so the declaration names the
+  # files it lives in, never its content. Both are inputs, not state — the
+  # provider observes facts about the keypair and never the key (ADR-044).
+  certificateKeyPair =
+    {
+      name,
+      certificatePath,
+      privateKeyPath,
+    }:
+    nod.resource "authentik.certificatekeypair" name {
+      certificate_path = certificatePath;
+      private_key_path = privateKeyPath;
+    };
 
   # One document, with the duplicate check from the generic layer.
   desired = nod.desired;

@@ -44,6 +44,17 @@ creation_rules:
           - *cld-ops-01
           - *hom-wrk-01
           - *mob-nb-01
+  # The OIDC signing keypair. The identity server holds the same key in its own
+  # database, so only the two hosts that own the identity may decrypt it - and
+  # not CI, which must never be able to sign tokens.
+  - path_regex: secrets/authentik-signing\.yaml$
+    key_groups:
+      - pgp: []
+        age:
+          - *philipp
+          - *cld-edge-01
+          - *cld-ops-01
+
   - path_regex: secrets/.*\.yaml$
     key_groups:
       - pgp: []

@@ -60,6 +60,9 @@ jobs:
       - name: Check updated flake
         run: nix flake check --print-build-logs
 
+      - name: Check integration
+        run: nix build .#integrationChecks.x86_64-linux.directory-runtime --print-build-logs
+
   build:
     needs: prepare
     if: needs.prepare.outputs.has-updates == 'true'

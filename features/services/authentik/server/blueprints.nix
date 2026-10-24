@@ -869,6 +869,16 @@ let
     else
       "AUTHENTIK_OIDC_${lib.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] name)}_SECRET";
 
+  # The keypair that signs OIDC tokens. It is declared here — not borrowed from
+  # Authentik's managed internal certificate, which the API hides (ADR-044) —
+  # and the material lives in SOPS as a file, the natural carrier for a PEM.
+  oidcSigningKeyName = "nod OIDC signing key";
+
+  oidcSigningKeySecrets = {
+    certificate = "services/authentik/oidc_signing_cert";
+    key = "services/authentik/oidc_signing_key";
+  };
+
   # The facts an OIDC endpoint and its application share. `secretEnv` is the
   # variable the blueprint worker reads today; the reconciler names the same
   # variable, so a provider nod creates on a fresh install gets the same secret.
@@ -878,6 +888,7 @@ let
     group = if ep.group != null then ep.group else "Applications";
     launchUrl = if ep.publicUrl != null then ep.publicUrl else "https://${ep.canonicalDomain}";
     secretEnv = oidcSecretEnv name ep;
+    signingKey = oidcSigningKeyName;
     # Managed scopes plus this endpoint's custom mappings. The mappings are
     # blueprint entries (nod has no kind for them); the provider names them, so
     # the declared set matches what the provider holds - an omission would make
@@ -918,8 +929,17 @@ let
       accessTokenValidity = item.ep.oidc.accessTokenValidity;
       propertyMappings = item.facts.propertyMappings;
       clientSecretEnv = item.facts.secretEnv;
+      signingKey = item.facts.signingKey;
     }
   ) oidcProjections;
+
+  nodCertificateKeyPairResources = [
+    (nod.certificateKeyPair {
+      name = oidcSigningKeyName;
+      certificatePath = config.sops.secrets.${oidcSigningKeySecrets.certificate}.path;
+      privateKeyPath = config.sops.secrets.${oidcSigningKeySecrets.key}.path;
+    })
+  ];
 
   nodOutpostResources = [
     (nod.outpost {
@@ -961,6 +981,7 @@ let
     resources =
       authentikUserResources
       ++ authentikGroupResources
+      ++ nodCertificateKeyPairResources
       ++ nodProviderResources
       ++ nodOauth2ProviderResources
       ++ nodOutpostResources
@@ -1048,6 +1069,7 @@ in
     sortedLdapEndpointNames
     oidcEndpoints
     oidcSecretEnv
+    oidcSigningKeySecrets
     ldapConsumerSecretPath
     nodDesired
     nodDesiredState

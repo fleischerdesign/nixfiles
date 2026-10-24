@@ -194,6 +194,15 @@
       (builtins.attrValues flake.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodOidcSecrets)
       (_: { })
     )
+    # The signing keypair's two PEMs. The declaration names these files; the
+    # provider reads them once, on create, and never reports them (ADR-044).
+    (lib.genAttrs
+      (builtins.attrValues flake.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.oidcSigningKeySecrets)
+      (_: {
+        sopsFile = ../../secrets/authentik-signing.yaml;
+        mode = "0400";
+      })
+    )
     {
       "services/authentik/nod_provider_token" = {
         sopsFile = ../../secrets/nod-provider.yaml;

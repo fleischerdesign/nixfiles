@@ -27,6 +27,12 @@ jobs:
       - name: Check flake
         run: nix flake check --print-build-logs
 
+      # The end-to-end checks boot a Django/Postgres database and drive the
+      # shipped provider binary against it. They are the expensive, fixture-bound
+      # half of the gate: CI proves them, the local loop does not pay for them.
+      - name: Check integration
+        run: nix build .#integrationChecks.x86_64-linux.directory-runtime --print-build-logs
+
   hosts:
     runs-on: ubuntu-latest
     timeout-minutes: 20

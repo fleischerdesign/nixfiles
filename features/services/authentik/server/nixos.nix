@@ -701,6 +701,16 @@ in
         second writer for the credential.
       '';
     };
+    oidcSigningKeySecrets = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      readOnly = true;
+      default = blueprints.oidcSigningKeySecrets;
+      description = ''
+        SOPS names of the OIDC signing keypair's certificate and private key.
+        The declaration names the files they are rendered to, so every host that
+        creates or holds the keypair declares the same two names (ADR-044).
+      '';
+    };
     provider = lib.mkOption {
       type = lib.types.nullOr lib.types.attrs;
       default = null;
@@ -1060,6 +1070,20 @@ in
           sopsFile = ../../../../secrets/nod-provider.yaml;
           key = "token";
           owner = "authentik";
+        };
+        # The OIDC signing keypair: the same material the reconciler sends when
+        # it creates the keypair. Declared here as well because this module
+        # names its path in the declaration; the identity server holds the
+        # private key in its own database in any case (ADR-044).
+        ${blueprints.oidcSigningKeySecrets.certificate} = {
+          sopsFile = ../../../../secrets/authentik-signing.yaml;
+          key = "certificate";
+          mode = "0400";
+        };
+        ${blueprints.oidcSigningKeySecrets.key} = {
+          sopsFile = ../../../../secrets/authentik-signing.yaml;
+          key = "key";
+          mode = "0400";
         };
       }
       # Per-outpost LDAP tokens are declared on the server as well so the worker can

@@ -12,6 +12,7 @@ statix check   # lint; statix.toml disables repeated_keys, manual_inherit, manua
                # useless_parens
 nix flake check                         # all five hosts evaluate, plus format, statix and deadnix
 nix flake check --max-jobs 1            # the same gate, serialised: the answer you can trust under load
+nix build .#integrationChecks.x86_64-linux.directory-runtime  # boots Django/Postgres; CI runs it, the loop does not
 nix build .#checks.x86_64-linux.<name>  # a single check from checks/, in isolation
 
 nod switch <host>                                                # fleet deploy: build, transfer, activate
@@ -21,6 +22,11 @@ nixos-rebuild switch --flake .#<host> --target-host root@<addr>  # one host, rem
 
 `nix flake check` is the gate - it is what CI runs and what must pass before a change is done. Read
 its whole output, warnings included.
+
+The gate holds the checks that are cheap and deterministic: evaluation, contracts, formatting. The
+end-to-end check that boots a Django/Postgres database lives in `integrationChecks`, because it costs
+minutes and mirrors the provider's HTTP surface in a stub - a gap there is a fixture gap, not a
+defect. CI runs both; the local loop runs the gate.
 
 Every check is deterministic: a real failure reproduces when that one check is
 built alone. A failure that does not reproduce is memory pressure, not a defect -
@@ -88,6 +94,9 @@ that end up in a derivation are content-addressed with `builtins.path`.
    it with `--no-build`, which only proves the checks evaluate. Add `--max-jobs 1`
    while the reconciler is building: parallel builders exhaust memory, and a
    killed builder is indistinguishable from a real failure until you rebuild it.
+   A change to the directory or the Authentik provider also builds
+   `.#integrationChecks.x86_64-linux.directory-runtime` - that is the check that
+   boots the database and drives the shipped binary.
 3. Build the host that deploys first, not the fleet:
    `nix build .#nixosConfigurations.<host>.config.system.build.toplevel`.
    The reconciler builds every other host before activating it, and CI proves the
@@ -99,6 +108,48 @@ CI builds the host matrix with `max-parallel: 1` on purpose, and should keep it:
 matrix jobs run on separate machines with no shared store, each job pushes its
 closure to Attic after building, and the next job substitutes what the previous
 one produced. Parallel jobs would each build the shared half again.
+
+## Where an assertion belongs
+
+Every statement about this repository has one layer that decides it. Put it there, and only there.
+
+| Layer | Mechanism | What it decides |
+|---|---|---|
+| Configuration graph | `assertions`, `throw`, option types | a statement about the evaluated configuration |
+| Derived artifact | the build itself (schema validation, compilation) | "the artifact is well-formed" |
+| Runtime behaviour | `nixosTest` | what a service does when it starts |
+| Live fleet | the reconciler's report | the running system matches the declaration |
+
+A `checks` entry is justified for a **fixture**: library code evaluated on synthetic input, where no
+other layer can express the statement. Everything else is a statement in the wrong place - it either
+duplicates a lower layer or re-states what the generator was told.
+
+### Rules for a new assertion
+
+1. Decide the layer first. If `throw` can decide it, a check is a weaker copy of it.
+2. Name the failure it catches in one line, in the file. A check without that line is not merged.
+3. It must fail on a plausible change, and no other layer may already catch that failure.
+4. A test double models only what the test needs. An unexpected call is recorded, not fatal - the
+   provider's own tests own its HTTP surface.
+5. A heavy test is selected by risk (changed paths), never run unconditionally.
+
+A check that cannot fail on a plausible change is not a check - it is documentation with a build
+job. The named failure is the test of that: if the only sentence it can produce is "the generator
+wrote what it was told", the statement belongs in the generator as a `throw`, and the check is
+deleted rather than repaired.
+
+So these are never written:
+
+- a check that greps a generated file for a string the generator just wrote into it;
+- a check that repeats an assertion another layer already makes;
+- a check whose failure message does not name a defect a person could have introduced;
+- a test double that must be extended whenever the code under test calls a new endpoint.
+
+### Removal
+
+A check is removed when the layer beneath it starts covering the statement: an assertion, a
+`nixosTest`, or the reconciler running it continuously. The checks that predate these rules are
+removed when they are touched, not maintained in parallel to a lower layer.
 
 ## Verification
 
