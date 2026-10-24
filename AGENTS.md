@@ -121,8 +121,13 @@ Every statement about this repository has one layer that decides it. Put it ther
 | Live fleet | the reconciler's report | the running system matches the declaration |
 
 A `checks` entry is justified for a **fixture**: library code evaluated on synthetic input, where no
-other layer can express the statement. Everything else is a statement in the wrong place - it either
-duplicates a lower layer or re-states what the generator was told.
+other layer can express the statement. The same holds for a **statement that spans hosts** - the
+server's firewall rule against the consumer's `ExecStart`, two hosts' routes contradicting each other -
+because no single module can decide it, and aggregating the evaluated fleet reads the same values the
+hosts will run without building any of them.
+
+Everything else is a statement in the wrong place: it either duplicates a lower layer or re-states what
+the generator was told.
 
 ### Rules for a new assertion
 
