@@ -12,11 +12,12 @@
   pkgs,
   blueprintLib,
   fleetConfigs,
+  nodLib,
 }:
 let
   audience = import ../../../../contracts/identity/lib/audience.nix;
   endpointIdentifiers = import ../../../../contracts/endpoints/lib/identifiers.nix { };
-  nod = import ../lib/nod.nix { inherit lib; };
+  nod = import ../lib/nod.nix { inherit lib nodLib; };
 
   authentikPackage = pkgs.authentik;
   directory = config.my.directory.ldap;

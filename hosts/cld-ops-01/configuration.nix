@@ -2,11 +2,13 @@
   config,
   inputs,
   flake,
+  pkgs,
   ...
 }:
 {
   imports = [
     inputs.disko.nixosModules.disko
+    inputs.nod.nixosModules.fleet
     ./hardware-configuration.nix
     ./hardware-specific.nix
     ./disk-config.nix
@@ -80,10 +82,102 @@
     # Only file-backed declarations have a path to check at startup; an inline
     # declaration is already part of the flake evaluation.
     desiredStatePaths = builtins.filter (desired: !builtins.isAttrs desired) (
-      map (provider: provider.desired) (
-        builtins.filter (provider: provider ? desired) (builtins.attrValues flake.nod.providers)
-      )
+      map (provider: provider.desired) (builtins.attrValues config.services.nod.providers)
     );
+  };
+
+  # The fleet declaration, typed by nod's `services.nod` module. The daemon
+  # reads `config.services.nod.fleet` through the flake output; the provider
+  # entries below are the only hand-written part, and every field is checked at
+  # evaluation.
+  services.nod.providers = {
+    example = {
+      command = "${
+        inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-example
+      }/bin/nod-provider-example";
+      settings.state = "/var/lib/nod/example-state.json";
+      desired = "${pkgs.writeText "nod-example-desired.json" (
+        builtins.toJSON {
+          resources = [
+            {
+              kind = "example.record";
+              id = "demo";
+              attributes.value = "dry-run";
+            }
+          ];
+        }
+      )}";
+      apply = true;
+      interval = 300;
+      policy = {
+        # The example record is never deleted, and this provider may not
+        # delete at all: a declaration that wants to remove records has to
+        # say so explicitly.
+        protect = [ "demo" ];
+        maxDeletions = 0;
+      };
+    };
+
+    # The real zone. The declaration lives on the control-plane host, which also
+    # projects it for the observer; the daemon reads the same store path. nod is
+    # the only writer.
+    cloudflare = {
+      command = "${
+        inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-cloudflare
+      }/bin/nod-provider-cloudflare";
+      settings = {
+        zone = config.my.features.system.networking.cloudflare.domain;
+        token_env = "CLOUDFLARE_API_TOKEN";
+      };
+      desired = config.my.features.system.networking.cloudflare.nodDesiredStateFile;
+      apply = true;
+      interval = 300;
+      timeout = 120;
+      env = [ "CLOUDFLARE_API_TOKEN" ];
+      policy = {
+        # The apex and the mail/delegation records are never deleted; one
+        # deletion per run is enough for a deliberate removal.
+        protect = [
+          "A:vyrx.de"
+          "MX:*"
+          "NS:*"
+        ];
+        maxDeletions = 1;
+      };
+    };
+
+    # Authentik's directory and proxy stack. The provider is the only writer.
+    authentik = {
+      command = "${
+        inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-authentik
+      }/bin/nod-provider-authentik";
+      settings = {
+        url = "http://10.10.100.1:9055";
+        token_env = "AUTHENTIK_TOKEN";
+        # The fleet's existing ownership marker; another installation chooses
+        # its own key and value.
+        marker_key = "vyrx";
+        marker_value = "owned";
+      };
+      desired =
+        flake.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodDesired;
+      apply = true;
+      interval = 300;
+      timeout = 60;
+      env = [ "AUTHENTIK_TOKEN" ];
+      policy = {
+        # The bootstrap and default groups are never deleted, and this provider
+        # may not delete at all: a declaration that wants to remove a group has
+        # to say so explicitly.
+        protect = [
+          "authentik Admins"
+          "authentik Read-only"
+          "authentik Users"
+          "nod-provider"
+        ];
+        maxDeletions = 0;
+      };
+    };
   };
 
   # The provider's token is the same secret the access blueprint creates on the

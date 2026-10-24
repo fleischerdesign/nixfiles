@@ -2,9 +2,9 @@
 #
 # Constructors, not hand-written attribute sets: a wrong field name or an
 # unknown provider mode is an evaluation error, not a reconcile surprise.
-{ lib }:
+{ lib, nodLib }:
 let
-  nod = import ../../../../lib/nod.nix { inherit lib; };
+  nod = nodLib;
 in
 rec {
   group =

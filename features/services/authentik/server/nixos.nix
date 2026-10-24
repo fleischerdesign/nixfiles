@@ -3,6 +3,7 @@
   lib,
   pkgs,
   fleetConfigs,
+  inputs,
   ...
 }:
 
@@ -67,6 +68,7 @@ let
       blueprintLib
       fleetConfigs
       ;
+    nodLib = inputs.nod.lib.nod;
   };
 
   # The provider declaration rendered as the one file `nod reconcile` reads on
