@@ -1032,7 +1032,7 @@ let
       meta_launch_url = item.facts.externalHost;
       group = item.facts.group;
       open_in_new_tab = true;
-      access_groups = item.ep.accessGroups;
+      access_groups = lib.sort (a: b: a < b) item.ep.accessGroups;
     };
   }) proxyProjections;
 
