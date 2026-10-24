@@ -1030,26 +1030,40 @@ let
 
   generatedProviderAccessBlueprint = toBlueprintYaml "provider-access" providerAccessBlueprint;
 
-  effectiveBlueprintsDir = pkgs.runCommandLocal "authentik-blueprints" { } ''
-    mkdir -p "$out"
-    # 1. Inherit upstream system and default blueprints (required for initial flows and setup)
-    cp -r ${authentikPackage.src}/blueprints/* "$out/"
-    chmod -R u+w "$out"
+  effectiveBlueprintsDir =
+    pkgs.runCommandLocal "authentik-blueprints"
+      {
+        nativeBuildInputs = [
+          (pkgs.python3.withPackages (pythonPackages: [ pythonPackages.pyyaml ]))
+        ];
+      }
+      ''
+        mkdir -p "$out"
+        # 1. Inherit upstream system and default blueprints (required for initial flows and setup)
+        cp -r ${authentikPackage.src}/blueprints/* "$out/"
+        chmod -R u+w "$out"
 
-    # 2. Overlay VYRX custom blueprints
-    cp -r ${./blueprints}/* "$out/"
-    # The overlay lands read-only, like every store copy; the generated
-    # blueprints below write into these directories.
-    chmod -R u+w "$out"
+        # 2. Overlay VYRX custom blueprints
+        cp -r ${./blueprints}/* "$out/"
+        # The overlay lands read-only, like every store copy; the generated
+        # blueprints below write into these directories.
+        chmod -R u+w "$out"
 
-    # 3. Inject the compiled applications
-    cp ${generatedProviderAccessBlueprint} "$out/00-system/provider-access.yaml"
-    mkdir -p "$out/03-apps"
-    cp ${generatedProxyBlueprint} "$out/03-apps/proxy-apps-generated.yaml"
-    cp ${generatedOidcBlueprint} "$out/03-apps/oidc-apps-generated.yaml"
-    cp ${generatedLdapOutpostBlueprint} "$out/03-apps/ldap-outposts-generated.yaml"
-    cp ${generatedLdapConsumerBlueprint} "$out/03-apps/ldap-consumers-generated.yaml"
-  '';
+        # 3. Inject the compiled applications
+        cp ${generatedProviderAccessBlueprint} "$out/00-system/provider-access.yaml"
+        mkdir -p "$out/03-apps"
+        cp ${generatedProxyBlueprint} "$out/03-apps/proxy-apps-generated.yaml"
+        cp ${generatedOidcBlueprint} "$out/03-apps/oidc-apps-generated.yaml"
+        cp ${generatedLdapOutpostBlueprint} "$out/03-apps/ldap-outposts-generated.yaml"
+        cp ${generatedLdapConsumerBlueprint} "$out/03-apps/ldap-consumers-generated.yaml"
+
+        # The artifact validates itself: a model name without a dot, a `!KeyOf` that points nowhere, a
+        # dependency on a blueprint that is not there or a person declared instead of seeded fails this
+        # build, not the deploy that would consume it (AGENTS.md, "Where an assertion belongs").
+        python3 ${../lib/blueprints-check.py} \
+          --owner-label ${lib.escapeShellArg "${blueprintLib.ownerLabelName}=${blueprintLib.ownerLabelValue}"} \
+          "$out"
+      '';
 
 in
 {

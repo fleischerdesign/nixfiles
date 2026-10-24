@@ -101,7 +101,19 @@ let
   # asserts on `last_applied` rather than on `status` alone: status describes the last attempt, so a failed
   # apply leaves the previous value behind and a blueprint can read `successful` while the object it declares
   # does not exist.
-  blueprintsApplyScript = pkgs.writeText "authentik-apply-blueprints.py" ''
+  # A Python script that is compiled as part of its own build. The script runs on the host, but a
+  # syntax error must fail the build here, not the deploy there: a derived artifact validates itself
+  # (AGENTS.md, "Where an assertion belongs").
+  pythonScript =
+    name: text:
+    pkgs.runCommandLocal name { nativeBuildInputs = [ pkgs.python3 ]; } ''
+      cat > "$out" <<'PY'
+      ${text}
+      PY
+      python3 -c 'import py_compile, sys; py_compile.compile(sys.argv[1], cfile="/tmp/script.pyc", doraise=True)' "$out"
+    '';
+
+  blueprintsApplyScript = pythonScript "authentik-apply-blueprints.py" ''
     import os
     import sys
     import time
@@ -283,7 +295,7 @@ let
   # owns; a seed (`state: created`) supplies an initial value the interface owns afterwards, so a
   # difference there is not drift and reporting it would be a false alarm that never clears
   # (docs/identity.md §11, practices.md §6.14).
-  driftReportScript = pkgs.writeText "authentik-drift-report.py" ''
+  driftReportScript = pythonScript "authentik-drift-report.py" ''
     import sys
     import time
     from pathlib import Path
@@ -411,7 +423,7 @@ let
         return directory_preflight(directory, users, groups)
   '';
 
-  directoryReportScript = pkgs.writeText "authentik-directory-report.py" ''
+  directoryReportScript = pythonScript "authentik-directory-report.py" ''
     import sys
 
     ${directoryPython}
