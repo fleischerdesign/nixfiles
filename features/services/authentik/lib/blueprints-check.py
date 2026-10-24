@@ -104,7 +104,7 @@ def is_person(model, attrs):
     return model == MODEL_USER and attrs.get(USER_TYPE_FIELD) != SERVICE_ACCOUNT_TYPE
 
 
-def check_owned(rel, raw, names, directory, problems):
+def check_owned(rel, raw, names, directory, problems, require_label=True, references=True):
     if "__parse_error__" in raw:
         problems.append(f"{rel}: not valid YAML: {raw['__parse_error__']}")
         return
@@ -115,7 +115,7 @@ def check_owned(rel, raw, names, directory, problems):
     name = metadata.get("name")
     if not isinstance(name, str) or not name:
         problems.append(f"{rel}: metadata.name is missing")
-    if not isinstance(metadata.get("labels"), dict):
+    if require_label and not isinstance(metadata.get("labels"), dict):
         problems.append(f"{rel}: metadata.labels is missing")
 
     entries = raw.get("entries")
@@ -149,12 +149,14 @@ def check_owned(rel, raw, names, directory, problems):
                 problems.append(f"{where}: duplicate id {entry_id!r}")
             ids[entry_id] = model
 
-        check_references(where, entry, problems)
+        if references:
+            check_references(where, entry, problems)
         check_ownership(where, model, state, attrs, problems)
-        if model == MODEL_META_APPLY:
+        if references and model == MODEL_META_APPLY:
             check_meta_apply(where, attrs, names, directory, problems)
 
-    check_key_of(rel, entries, ids, problems)
+    if references:
+        check_key_of(rel, entries, ids, problems)
 
 
 def check_references(where, entry, problems):
@@ -257,7 +259,7 @@ def check_cycles(owned, names, problems):
         visit(node)
 
 
-def check_directory(directory, owner_name, owner_value):
+def check_directory(directory, owner_name, owner_value, all_files=False):
     root = Path(directory)
     problems = []
     owned = {}
@@ -271,7 +273,7 @@ def check_directory(directory, owner_name, owner_value):
             # Without a parse there is no label to read, so ownership is decided from the raw text.
             # Upstream files do not name the owner; our own do, and a broken one must still fail here
             # rather than at the blueprint migration on the host.
-            if looks_owned(path, owner_name):
+            if all_files or looks_owned(path, owner_name):
                 problems.append(f"{rel}: not valid YAML: {raw['__parse_error__']}")
             continue
         metadata = raw.get("metadata") or {}
@@ -281,15 +283,16 @@ def check_directory(directory, owner_name, owner_value):
             if name in names and names[name] != rel:
                 problems.append(f"{rel}: blueprint name {name!r} is also used by {names[name]}")
             names.setdefault(name, rel)
-        if labels.get(owner_name) == owner_value:
+        if all_files or labels.get(owner_name) == owner_value:
             owned[rel] = raw
 
-    if not owned:
+    if not owned and not all_files:
         problems.append(f"{directory}: no blueprint carries {owner_name}={owner_value!r}")
 
     for rel, raw in owned.items():
-        check_owned(rel, raw, names, root, problems)
-    check_cycles(owned, names, problems)
+        check_owned(rel, raw, names, root, problems, require_label=not all_files, references=not all_files)
+    if not all_files:
+        check_cycles(owned, names, problems)
     return owned, problems
 
 
@@ -298,15 +301,24 @@ def main(argv=None):
     parser.add_argument("directories", nargs="+", type=Path)
     parser.add_argument(
         "--owner-label",
-        required=True,
         help="the ownership marker as NAME=VALUE; only labelled blueprints are checked",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="treat every file as ours: structure and references, no ownership filter or label",
     )
     args = parser.parse_args(argv)
 
-    try:
-        owner_name, owner_value = args.owner_label.split("=", 1)
-    except ValueError:
-        parser.error("--owner-label must be NAME=VALUE")
+    if args.all:
+        owner_name, owner_value = "", ""
+    elif args.owner_label:
+        try:
+            owner_name, owner_value = args.owner_label.split("=", 1)
+        except ValueError:
+            parser.error("--owner-label must be NAME=VALUE")
+    else:
+        parser.error("--owner-label is required unless --all is given")
 
     problems = []
     total = 0
@@ -314,7 +326,7 @@ def main(argv=None):
         if not directory.is_dir():
             problems.append(f"{directory}: not a directory")
             continue
-        owned, found = check_directory(directory, owner_name, owner_value)
+        owned, found = check_directory(directory, owner_name, owner_value, all_files=args.all)
         total += len(owned)
         problems.extend(f"{directory}: {problem}" for problem in found)
 
@@ -324,7 +336,8 @@ def main(argv=None):
         print(f"failed: {len(problems)} violation(s)", file=sys.stderr)
         return 1
 
-    print(f"ok: {total} owned blueprint(s) parsed, referenced and owned correctly")
+    scope = "shipped" if args.all else "owned"
+    print(f"ok: {total} {scope} blueprint(s) parsed, referenced and owned correctly")
     return 0
 
 

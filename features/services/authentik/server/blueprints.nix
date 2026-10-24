@@ -1038,6 +1038,10 @@ let
         ];
       }
       ''
+        # Every blueprint we ship is ours, label or not: the label decides who applies it, not whether
+        # it is well-formed. This reads the overlay before it is mixed with upstream's files.
+        python3 ${../lib/blueprints-check.py} --all ${./blueprints}
+
         mkdir -p "$out"
         # 1. Inherit upstream system and default blueprints (required for initial flows and setup)
         cp -r ${authentikPackage.src}/blueprints/* "$out/"
