@@ -484,6 +484,7 @@
           directory-runtime = import ./checks/directory-runtime.nix checkArgs;
           caddy-auth-order = import ./checks/caddy-auth-order.nix checkArgs;
           authentication-paths = import ./checks/authentication-paths.nix checkArgs;
+          nod-declaration = import ./checks/nod-declaration.nix checkArgs;
 
           authentik-blueprints =
             let
