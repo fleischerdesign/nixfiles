@@ -49,7 +49,12 @@
     containers.enable = lib.mkDefault true;
     codium.enable = lib.mkDefault true;
     nixvim.enable = lib.mkDefault true;
-    obsidian.enable = lib.mkDefault true;
+    obsidian = {
+      enable = lib.mkDefault true;
+      # Dataview and Meta Bind are not part of the new stack; Bases and Operon replace them.
+      plugins.dataview = lib.mkDefault false;
+      plugins.metaBind = lib.mkDefault false;
+    };
   };
 
   my.features.media = {
