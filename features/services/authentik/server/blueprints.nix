@@ -976,18 +976,60 @@ let
       }
     ) oidcProjections;
 
-  nodDesired = nod.desired {
-    resources =
-      authentikUserResources
-      ++ authentikGroupResources
-      ++ nodCertificateKeyPairResources
-      ++ nodScopeMappingResources
-      ++ nodProviderResources
-      ++ nodOauth2ProviderResources
-      ++ nodOutpostResources
-      ++ nodApplicationResources;
-    absent = authentikAbsentGroups;
-  };
+  # Every resource the declaration projects, once: the reference checks and the
+  # desired document read the same list.
+  nodResources =
+    authentikUserResources
+    ++ authentikGroupResources
+    ++ nodCertificateKeyPairResources
+    ++ nodScopeMappingResources
+    ++ nodProviderResources
+    ++ nodOauth2ProviderResources
+    ++ nodOutpostResources
+    ++ nodApplicationResources;
+
+  # A declaration that names something it does not declare is a typo, not a request:
+  # the provider would fail the change after the plan, on the host. The projection
+  # owns the two references it can decide - an application's provider and a
+  # provider's signing key - and refuses a name no declaration carries.
+  nodReferenceProblems =
+    let
+      namesOf =
+        kind: map (resource: resource.id) (builtins.filter (resource: resource.kind == kind) nodResources);
+      providerNames = namesOf "authentik.provider.proxy" ++ namesOf "authentik.provider.oauth2";
+      keypairNames = namesOf "authentik.certificatekeypair";
+      applications = builtins.filter (resource: resource.kind == "authentik.application") nodResources;
+      oauth2Providers = builtins.filter (
+        resource: resource.kind == "authentik.provider.oauth2"
+      ) nodResources;
+    in
+    lib.concatMap (
+      application:
+      lib.optional
+        (
+          application.attributes.provider != ""
+          && !(builtins.elem application.attributes.provider providerNames)
+        )
+        "application ${application.id} names provider ${application.attributes.provider}, which is not declared"
+    ) applications
+    ++ lib.concatMap (
+      provider:
+      lib.optional
+        (
+          (provider.attributes.signing_key or null) != null
+          && !(builtins.elem provider.attributes.signing_key keypairNames)
+        )
+        "provider ${provider.id} names signing key ${provider.attributes.signing_key}, which is not declared"
+    ) oauth2Providers;
+
+  nodDesired =
+    if nodReferenceProblems != [ ] then
+      throw "authentik declaration: ${lib.concatStringsSep "; " nodReferenceProblems}"
+    else
+      nod.desired {
+        resources = nodResources;
+        absent = authentikAbsentGroups;
+      };
 
   # A rendered artifact for consumers that need a file (checks, a manual apply).
   # The daemon reads the value above; the file is not its configuration path.
