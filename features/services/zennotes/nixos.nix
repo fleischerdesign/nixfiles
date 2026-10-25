@@ -77,6 +77,7 @@ in
       wants = [ "network-online.target" ];
 
       environment = {
+        ZENNOTES_BEHIND_TLS = "1";
         ZENNOTES_BIND = "127.0.0.1:${toString cfg.port}";
         ZENNOTES_CONFIG_PATH = "${cfg.dataDir}/server.json";
         ZENNOTES_DEFAULT_VAULT_PATH = cfg.vaultDir;
