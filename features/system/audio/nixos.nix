@@ -2,7 +2,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 
@@ -31,8 +30,5 @@ in
       };
     };
 
-    environment.systemPackages = with pkgs; [
-      easyeffects # Audio effects processor
-    ];
   };
 }
