@@ -45,7 +45,6 @@ let
     };
 
   obsidianLiveSyncPkg = mkPluginFromManifest ./plugins/livesync/manifest.json;
-  obsidianTemplaterPkg = mkPluginFromManifest ./plugins/templater/manifest.json;
   obsidianDataviewPkg = mkPluginFromManifest ./plugins/dataview/manifest.json;
   obsidianLinterPkg = mkPluginFromManifest ./plugins/linter/manifest.json;
   obsidianMetaBindPkg = mkPluginFromManifest ./plugins/meta-bind/manifest.json;
@@ -66,7 +65,6 @@ in
               pkg = obsidianLiveSyncPkg;
             }
           ]
-          ++ lib.optionals sys.plugins.templater [ obsidianTemplaterPkg ]
           ++ lib.optionals sys.plugins.dataview [ obsidianDataviewPkg ]
           ++ lib.optionals sys.plugins.linter [ obsidianLinterPkg ]
           ++ lib.optionals sys.plugins.metaBind [ obsidianMetaBindPkg ]
@@ -81,4 +79,9 @@ in
       {
         source = config.lib.file.mkOutOfStoreSymlink "/run/secrets/rendered/obsidian_livesync_data.json";
       };
+
+  # Core Templates replaces Templater: static folders and date/title variables are enough.
+  home.file."${sys.vaultTarget}/.obsidian/templates.json" = {
+    text = builtins.toJSON { folder = "_templates"; };
+  };
 }

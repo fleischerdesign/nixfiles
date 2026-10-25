@@ -44,11 +44,6 @@ in
     };
 
     plugins = {
-      templater = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Install Templater community plugin.";
-      };
       dataview = lib.mkOption {
         type = lib.types.bool;
         default = true;
