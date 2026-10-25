@@ -113,6 +113,22 @@ roles, group *definitions*, certificates, branding, sources, machine tokens and 
 is topology, policy or integration, and all three must be readable, reviewable and reproducible here. The
 test for a new case is one question: would I comment on this in a review?
 
+**What writes what.** The `authentik` provider reconciles every object with a stable name and no
+reference graph: groups, users (as seeds), applications, proxy and OAuth2 providers, custom scope
+mappings, the signing keypair and outposts. The blueprints keep what Authentik consumes as a graph -
+flows, stages, brand, the provider-access bootstrap and the retirement tombstones - plus the
+`accessAuthenticated` policy binding, which is not a group and therefore not an audience the provider
+can express. The split has one test: an object whose identity is a name belongs to the provider; an
+object whose identity is a reference (`!KeyOf`, `!Find`, apply order) belongs to the blueprint.
+
+Two consequences worth knowing when reading a change:
+
+- The signing keypair is declared. Authentik's own JWT certificate is managed and invisible to the API,
+  so a provider created without `signing_key` would sign HS256 with its client secret; the declaration
+  carries its own pair instead (ADR-044).
+- Built-in scope mappings (`openid`, `email`, `profile`, …) are not resources. A provider references
+  them by scope key; only the mappings an endpoint adds are declared (ADR-046).
+
 **Group names are part of the shape.** Access hangs on them - every consumer filter names the groups it
 accepts - so renaming a group in the interface removes access for everyone without anything turning red.
 A rename here means a new entry *and* `state: absent` for the old one. There are no per-user application
