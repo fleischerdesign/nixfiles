@@ -107,7 +107,7 @@ in
         usePluginSyncV2 = true;
         customChunkSize = 60;
         enableChunkSplitterV2 = true;
-        E2EEAlgorithm = 2;
+        E2EEAlgorithm = "v2";
         doctorProcessedVersion = "1.0.0";
         setupFinish = true;
         settingVersion = 2;
