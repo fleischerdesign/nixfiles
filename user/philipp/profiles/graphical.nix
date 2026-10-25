@@ -16,8 +16,6 @@
     telegram-desktop
     nerd-fonts.jetbrains-mono
     gimp
-    custom.zennotes-desktop
-    custom.zennotes-tui
     orca-slicer
     lycheeslicer
     resources
