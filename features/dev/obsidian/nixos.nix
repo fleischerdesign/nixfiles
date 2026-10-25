@@ -108,6 +108,8 @@ in
         customChunkSize = 60;
         enableChunkSplitterV2 = true;
         E2EEAlgorithm = "v2";
+        encrypt = true;
+        passphrase = config.sops.placeholder."services/storage/couchdb_obsidian_passphrase";
         doctorProcessedVersion = "1.0.0";
         setupFinish = true;
         settingVersion = 2;

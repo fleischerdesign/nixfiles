@@ -260,6 +260,7 @@
       user = "openclaw";
       group = "openclaw";
       vaultPath = "/var/lib/openclaw/vaults/philipp";
+      couchdb.passphraseSecret = "services/storage/couchdb_obsidian_passphrase";
     };
   };
 

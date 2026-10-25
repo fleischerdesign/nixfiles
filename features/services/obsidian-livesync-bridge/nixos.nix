@@ -43,6 +43,9 @@ let
             }
             // lib.optionalAttrs (inst.couchdb.passphraseSecret != null) {
               passphrase = osConfig.sops.placeholder.${inst.couchdb.passphraseSecret};
+              # Follow the remote's encryption and chunk tweaks, otherwise the bridge would
+              # write plaintext into an encrypted database.
+              useRemoteTweaks = true;
             }
           )
           {
