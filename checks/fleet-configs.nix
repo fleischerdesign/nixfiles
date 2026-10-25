@@ -1,3 +1,6 @@
+# Projecting the fleet must neither lose a host nor invent one, and evaluating outside a flake must
+# fail with a domain message instead of silently projecting nothing. Both are properties of the
+# projection library, which no host build exercises.
 { pkgs, lib, ... }:
 let
   fleetConfigs = import ../lib/fleet-configs.nix { inherit lib; };

@@ -1,3 +1,6 @@
+# A consumer that spells the interface name instead of reading the option works on the host where it
+# was written and breaks on every host that renames it. The fixture renames the interface and fails
+# if any consumer's output still says the old name.
 {
   pkgs,
   lib,

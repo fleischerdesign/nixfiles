@@ -1,3 +1,6 @@
+# Discovery must read `usersDir`, not traversal order: with two users where the alphabetically first
+# is not the primary, a module that picks by order names the wrong person. The fixture directory also
+# proves the repository's own users are absent when another directory is given.
 {
   pkgs,
   lib,

@@ -1,3 +1,6 @@
+# A database whose ownership never hands over, or a separate role without an owner, is legal Nix
+# and yields a database nobody may drop. The contract's assertions are the only layer that refuses
+# it, so the fixture proves both the accepted and the rejected declaration.
 { pkgs, lib, ... }:
 let
   fixture =

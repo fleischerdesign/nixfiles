@@ -1,3 +1,6 @@
+# A tile that names an endpoint nobody serves, or a locale nobody translated, is a typo that builds.
+# The presentation contract's assertions are the only layer that refuses it, so the fixture proves
+# both the accepted tile and the rejected misspelling.
 { pkgs, lib, ... }:
 let
   fixture =

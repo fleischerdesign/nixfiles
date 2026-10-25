@@ -57,8 +57,10 @@ jobs:
           path: ${{ runner.temp }}/update.patch
           retention-days: 1
 
+      # The gate is `--max-jobs 1`: parallel builders on a 16 GB runner exhaust memory, and a builder
+      # killed by the kernel is reported as a failed check - indistinguishable from a real one.
       - name: Check updated flake
-        run: nix flake check --print-build-logs
+        run: nix flake check --print-build-logs --max-jobs 1
 
   build:
     needs: prepare

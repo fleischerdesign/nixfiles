@@ -1,3 +1,6 @@
+# An identity naming an unknown publication, an OIDC ingress without an enabled directory
+# integration, or two integrations claiming the same publication all evaluate cleanly and fail at
+# login. The contract's assertions are the only layer that sees it before a user does.
 { pkgs, lib, ... }:
 let
   fixture =

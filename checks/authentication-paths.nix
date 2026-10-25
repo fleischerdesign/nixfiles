@@ -1,3 +1,6 @@
+# A service that reads a credential from a file must name that file in the ExecStart argument
+# directly before the credential it feeds. Move or drop the reference and systemd finds nothing at
+# start, so the service runs unauthenticated instead of failing. The order is a runtime property.
 {
   lib,
   pkgs,

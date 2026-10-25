@@ -1,3 +1,6 @@
+# A directory declaration Authentik cannot represent - a group without the profile it needs, an
+# invite without an initial profile - evaluates without complaint. Only the contract's assertions
+# reject it, so the fixture feeds both shapes through the same evaluation.
 { pkgs, lib, ... }:
 let
   evaluate =

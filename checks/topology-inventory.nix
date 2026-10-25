@@ -1,3 +1,6 @@
+# An extension module that adds a host must not discard the others, and two zones sharing a trust
+# level must both resolve through it. The inventory is composed explicitly; this proves the
+# composition keeps what it was given.
 {
   pkgs,
   lib,

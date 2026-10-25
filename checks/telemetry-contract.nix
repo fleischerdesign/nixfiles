@@ -1,3 +1,6 @@
+# Two consumers behind one probe identity, or a scrape path not set per target, produce metrics that
+# look healthy and belong to the wrong service. Only the contract's assertions and the rendered
+# Prometheus config can tell, so the fixture checks both.
 { pkgs, lib, ... }:
 let
   fixture =

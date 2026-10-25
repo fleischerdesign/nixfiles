@@ -1,3 +1,6 @@
+# A service with data directories and no backup target is silently not backed up, and a declined
+# target without a reason cannot be told apart from an oversight. Both declarations are legal Nix;
+# only the contract's assertions refuse them, so the fixture exercises accept and reject.
 { pkgs, lib, ... }:
 let
   fixture =

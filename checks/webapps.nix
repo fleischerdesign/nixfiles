@@ -1,3 +1,6 @@
+# An app name with a space or a slash is legal Nix and becomes a broken URL or path. The webapp
+# contract's assertions are the only layer that refuses it; the fixture proves they do while the
+# valid declaration still passes.
 {
   pkgs,
   lib,
