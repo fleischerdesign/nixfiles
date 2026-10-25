@@ -37,7 +37,6 @@ in
     ./integrations/gtk.nix
     ./integrations/hassio.nix
     ./integrations/nvim.nix
-    ./integrations/obsidian.nix
     ./integrations/phone-operate.nix
     ./integrations/printers.nix
     ./integrations/qt.nix

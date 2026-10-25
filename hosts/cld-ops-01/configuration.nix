@@ -248,22 +248,6 @@
     enable = true;
   };
 
-  my.features.services.obsidian-livesync-bridge = {
-    enable = true;
-    # The instance name is the owner and the CouchDB URL derives from the topology domain. This
-    # instance serves the gateway alone, so it runs with the gateway's identity and mirrors into the
-    # gateway's own state instead of a second service account: no shared group, and a note the agent
-    # writes stays readable to the bridge because writer and reader are the same account. The vault
-    # is a replica of CouchDB either way, which is what keeps it out of the backup.
-    instances.philipp = {
-      enable = true;
-      user = "openclaw";
-      group = "openclaw";
-      vaultPath = "/var/lib/openclaw/vaults/philipp";
-      couchdb.passphraseSecret = "services/storage/couchdb_obsidian_passphrase";
-    };
-  };
-
   my.features.services.searxng = {
     enable = true;
     port = 8888;

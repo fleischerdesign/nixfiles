@@ -53,7 +53,6 @@
       "org.gnome.Nautilus.desktop"
       "codium.desktop"
       "spotify.desktop"
-      "obsidian.desktop"
       "google-chrome.desktop"
       "com.mitchellh.ghostty.desktop"
     ];

@@ -16,7 +16,6 @@
     telegram-desktop
     nerd-fonts.jetbrains-mono
     gimp
-    obsidian
     orca-slicer
     lycheeslicer
     resources
