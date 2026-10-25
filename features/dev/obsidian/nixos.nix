@@ -79,6 +79,7 @@ in
 
   config = lib.mkIf cfg.enable {
     sops.secrets."services/storage/couchdb_obsidian_password" = { };
+    sops.secrets."services/storage/couchdb_obsidian_passphrase" = { };
 
     sops.templates."obsidian_livesync_data.json" = {
       mode = "0444";
