@@ -64,6 +64,16 @@ in
         default = true;
         description = "Install Meta Bind community plugin.";
       };
+      operon = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Install Operon plugin.";
+      };
+      quickAdd = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Install QuickAdd community plugin.";
+      };
     };
   };
 

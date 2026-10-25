@@ -49,6 +49,8 @@ let
   obsidianDataviewPkg = mkPluginFromManifest ./plugins/dataview/manifest.json;
   obsidianLinterPkg = mkPluginFromManifest ./plugins/linter/manifest.json;
   obsidianMetaBindPkg = mkPluginFromManifest ./plugins/meta-bind/manifest.json;
+  obsidianOperonPkg = mkPluginFromManifest ./plugins/operon/manifest.json;
+  obsidianQuickAddPkg = mkPluginFromManifest ./plugins/quickadd/manifest.json;
 in
 {
   programs.obsidian = {
@@ -67,7 +69,9 @@ in
           ++ lib.optionals sys.plugins.templater [ obsidianTemplaterPkg ]
           ++ lib.optionals sys.plugins.dataview [ obsidianDataviewPkg ]
           ++ lib.optionals sys.plugins.linter [ obsidianLinterPkg ]
-          ++ lib.optionals sys.plugins.metaBind [ obsidianMetaBindPkg ];
+          ++ lib.optionals sys.plugins.metaBind [ obsidianMetaBindPkg ]
+          ++ lib.optionals sys.plugins.operon [ obsidianOperonPkg ]
+          ++ lib.optionals sys.plugins.quickAdd [ obsidianQuickAddPkg ];
       };
     };
   };
