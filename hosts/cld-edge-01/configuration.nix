@@ -55,6 +55,7 @@
     dot = true;
   };
   my.features.services.ntfy.enable = true;
+  my.features.services.zennotes.enable = true;
   my.features.system.backups.restic = {
     enable = true;
   };

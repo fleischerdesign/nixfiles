@@ -1,0 +1,11 @@
+{
+  "name": "zennotes-tui",
+  "version": "0.11.0",
+  "srcHash": "sha256-4yb9IFSBEFn0Z2z4e8pcr+OnmabfwNhTZ7b9lwCEGJY=",
+  "vendorHash": "sha256-sGHO+48ghb14bx0R8aT1lrYuG85h2MP7ZtIhwL/tzfY=",
+  "upstream": {
+    "type": "github-source",
+    "owner": "ZenNotes",
+    "repo": "tui"
+  }
+}
