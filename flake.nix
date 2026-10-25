@@ -81,7 +81,6 @@
         (import ./packages/overlays/fix/authentik)
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
-        (import ./packages/overlays/fix/home-assistant)
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];
@@ -134,6 +133,9 @@
     {
       # The fleet declaration for nod (ADR-031): the same structure the
       # configuration file uses, evaluated by nod with `nix eval`.
+      # `nix flake check` reports "unknown flake output 'nod'" because the name is
+      # outside the flake schema. The warning is expected: this output is the
+      # contract with the reconciler, not a misspelling.
       nod = self.nixosConfigurations.cld-ops-01.config.services.nod.fleet;
       formatter.${system} = pkgs.nixfmt-tree;
 

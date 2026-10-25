@@ -70,8 +70,6 @@ in
     services.home-assistant = {
       enable = true;
 
-      # The OAuth backports the ChatGPT connector needs are a package fix and live in
-      # `packages/overlays/fix/home-assistant` until nixpkgs ships Home Assistant 2026.10.x.
       customComponents = [
         pkgs.home-assistant-custom-components.moonraker
       ];
@@ -125,10 +123,10 @@ in
     services.avahi = {
       enable = true;
       nssmdns4 = true;
-      publish = {
-        enable = true;
-        addresses = true;
-        userServices = true;
+      settings.publish = {
+        "disable-publishing" = false;
+        "publish-addresses" = true;
+        "disable-user-service-publishing" = false;
       };
     };
 
