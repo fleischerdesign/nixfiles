@@ -51,6 +51,8 @@ in
 {
   programs.obsidian = {
     enable = true;
+    # The module installs nothing by default (`package` is nullable), so the feature names it.
+    package = pkgs.obsidian;
     cli.enable = true;
 
     vaults.${sys.vaultName} = {
