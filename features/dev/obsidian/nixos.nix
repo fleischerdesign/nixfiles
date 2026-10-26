@@ -94,8 +94,12 @@ in
         idDerivationVersion = 0;
         pathNormalizationVersion = 0;
 
-        usePluginSync = false;
-        usePluginSyncV2 = false;
+        # Customisation sync is the only channel by which plugin settings reach unmanaged
+        # devices (phone, tablet). V2 stores them per file; the older flag is its master
+        # switch, so both are on. What Nix still owns - the plugin list and the template
+        # folder - is rewritten at each activation and the sync follows it.
+        usePluginSync = true;
+        usePluginSyncV2 = true;
 
         writeDocumentsIfConflicted = false;
         trashInsteadDelete = true;
