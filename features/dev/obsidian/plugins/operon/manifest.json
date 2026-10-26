@@ -1,10 +1,10 @@
 {
   "name": "operon",
   "pname": "operon",
-  "version": "4.2.0",
-  "mainHash": "sha256-E9pSYllUJHlEr5y5D+JzezfRMI4G+wy/LvotnPpPYf4=",
-  "manifestHash": "sha256-QIzHWi7MJk0FnC55vzW7OvUfwB4KFkuf7Bu7ZMX6aa4=",
-  "stylesHash": "sha256-U64b7nYtRwGSjV9UrNWJC8DOPhEg3tSyMdiasM6l3Q0=",
+  "version": "4.3.0",
+  "mainHash": "169ziif7fn27kvh9jyarrzlmhg29j8xiqpxr4lfqw2q36ldg92ib",
+  "manifestHash": "1ai1qdal7gv2m440cqn6zln2nj4wjrqq6d0rxm4qy2iqw2kp5lc0",
+  "stylesHash": "0mprsa3k2vdk8zx0pi4gqs733r6y4qvpkbmrza9ff2px3yfia771",
   "upstream": {
     "type": "obsidian-plugin",
     "owner": "hasanyilmaz",
