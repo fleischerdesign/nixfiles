@@ -61,39 +61,52 @@ in
     sops.secrets."services/storage/couchdb_obsidian_password" = { };
     sops.secrets."services/storage/couchdb_obsidian_passphrase" = { };
 
+    # The plugin reads this file instead of its own settings UI, so every value the user might
+    # change has to be declared here: anything missing returns to a plugin default at the next
+    # activation. Three groups carry an invariant - the identity and chunk parameters must match
+    # on every device (a mismatch re-chunks files and produces duplicate revisions), the plugin-sync
+    # flags stay off because they write a second, competing settings file, and the plugin-managed
+    # keys (settingVersion, doctorProcessedVersion) stay absent so the plugin migrates itself.
     sops.templates."obsidian_livesync_data.json" = {
       mode = "0444";
       content = builtins.toJSON {
-        remoteType = 0;
+        remoteType = "";
         couchDB_URI = cfg.livesync.couchdbUrl;
         couchDB_DBNAME = cfg.livesync.databaseName;
         couchDB_USER = "obsidian";
         couchDB_PASSWORD = config.sops.placeholder."services/storage/couchdb_obsidian_password";
-        couchdb_url = cfg.livesync.couchdbUrl;
-        couchdb_dbname = cfg.livesync.databaseName;
-        couchdb_user = "obsidian";
-        couchdb_password = config.sops.placeholder."services/storage/couchdb_obsidian_password";
+
         liveSync = true;
-        syncOnSave = true;
         syncOnStart = true;
+        syncOnSave = true;
         syncOnFileOpen = true;
         periodicReplication = true;
         periodicReplicationInterval = 60;
-        isConfigured = true;
-        preset = "livesync";
-        isCustomizationOpen = false;
-        isManualSettingsOpen = false;
-        autoApplyCustomization = true;
-        useDynamicIterationCount = true;
-        usePluginSyncV2 = true;
-        customChunkSize = 60;
-        enableChunkSplitterV2 = true;
-        E2EEAlgorithm = "v2";
+
         encrypt = true;
+        E2EEAlgorithm = "v2";
         passphrase = config.sops.placeholder."services/storage/couchdb_obsidian_passphrase";
-        doctorProcessedVersion = "1.0.0";
-        setupFinish = true;
-        settingVersion = 2;
+
+        enableChunkSplitterV2 = true;
+        chunkSplitterVersion = "v3-rabin-karp";
+        customChunkSize = 0;
+        useDynamicIterationCount = true;
+        idDerivationVersion = 0;
+        pathNormalizationVersion = 0;
+
+        usePluginSync = false;
+        usePluginSyncV2 = false;
+
+        writeDocumentsIfConflicted = false;
+        trashInsteadDelete = true;
+        checkIntegrityOnSave = true;
+        syncMaxSizeInMB = 100;
+
+        showStatusOnStatusbar = false;
+        showStatusOnEditor = false;
+        showOnlyIconsOnEditor = false;
+
+        isConfigured = true;
       };
     };
 
