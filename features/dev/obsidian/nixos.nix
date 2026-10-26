@@ -6,6 +6,12 @@
 
 let
   cfg = config.my.features.dev.obsidian;
+
+  # The plugin stores connections as sls+ URIs: the original scheme becomes the sub-scheme and
+  # the database name moves into a query parameter.
+  livesyncUrl = cfg.livesync.couchdbUrl;
+  scheme = lib.head (builtins.match "([a-z]+)://.*" livesyncUrl);
+  hostPath = lib.removePrefix "${scheme}://" livesyncUrl;
 in
 {
   options.my.features.dev.obsidian = {
@@ -75,6 +81,24 @@ in
         couchDB_DBNAME = cfg.livesync.databaseName;
         couchDB_USER = "obsidian";
         couchDB_PASSWORD = config.sops.placeholder."services/storage/couchdb_obsidian_password";
+
+        # Without an entry here the plugin re-migrates the legacy fields on every start and
+        # announces it; the URI is the plugin's own sls+ form with the database as `db`.
+        remoteConfigurations = {
+          legacy-couchdb = {
+            id = "legacy-couchdb";
+            name = "CouchDB Remote";
+            uri = "sls+${scheme}://obsidian:${
+              config.sops.placeholder."services/storage/couchdb_obsidian_password"
+            }@${hostPath}?db=${cfg.livesync.databaseName}";
+            isEncrypted = false;
+          };
+        };
+        activeConfigurationId = "legacy-couchdb";
+
+        # The plugin refuses customisation sync without a device name; the host name makes it
+        # unique per device, and the phone sets its own.
+        deviceAndVaultName = config.networking.hostName;
 
         liveSync = true;
         syncOnStart = true;
