@@ -110,6 +110,12 @@ in
         showStatusOnEditor = false;
         showOnlyIconsOnEditor = false;
 
+        # Both toasts below are prompts for unset values: the plugin offers the translations it
+        # found for the display language, and asks for a remote storage threshold while the
+        # setting is negative. Declaring them answers the questions once, for every device.
+        displayLanguage = "de";
+        notifyThresholdOfRemoteStorageSize = 0;
+
         isConfigured = true;
       };
     };
