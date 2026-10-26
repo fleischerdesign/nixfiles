@@ -23,7 +23,6 @@
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
-  my.features.desktop.anytype.enable = true;
   my.features.services.openclaw.node = {
     enable = true;
     camera.enable = true;
