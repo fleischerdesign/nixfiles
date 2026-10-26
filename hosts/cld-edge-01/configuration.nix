@@ -54,6 +54,8 @@
     # The public door terminates DNS-over-TLS itself, on the ingress address.
     dot = true;
   };
+  my.features.services.obsidian-livesync.enable = true;
+
   my.features.services.ntfy.enable = true;
   my.features.system.backups.restic = {
     enable = true;

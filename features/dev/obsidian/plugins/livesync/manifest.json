@@ -1,0 +1,14 @@
+{
+  "name": "obsidian-livesync",
+  "pname": "obsidian-livesync",
+  "version": "1.0.40",
+  "mainHash": "1sd6mhns8mz3zv53qnjakrapklvhkf45gs3lwwnag9inzs7v3mmx",
+  "manifestHash": "0fxsy7frjq1by2s2gpwzshvsizljxpdh8lgaz7khrfjs23xmg3wg",
+  "stylesHash": "1w5rnad6kbahjh38x7pwkja5arfwjavyp7yxcad8vsby87php82b",
+  "upstream": {
+    "type": "obsidian-plugin",
+    "owner": "vrtmrz",
+    "repo": "obsidian-livesync",
+    "tagPrefix": ""
+  }
+}
