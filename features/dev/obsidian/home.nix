@@ -66,23 +66,6 @@ in
           ]
           ++ lib.optionals sys.plugins.linter [ obsidianLinterPkg ]
           ++ lib.optionals sys.plugins.operon [ obsidianOperonPkg ];
-
-        # LiveSync adds four ribbon icons without offering a switch. Hiding them by class keeps
-        # the commands in the palette and does not touch the plugin's own appearance.
-        cssSnippets = [
-          {
-            name = "hide-livesync-ribbon";
-            enable = true;
-            text = ''
-              .livesync-ribbon-showlog,
-              .livesync-ribbon-replicate,
-              .livesync-ribbon-showcustom,
-              .livesync-ribbon-p2p-server-status {
-                display: none;
-              }
-            '';
-          }
-        ];
       };
     };
   };
