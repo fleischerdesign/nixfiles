@@ -40,6 +40,7 @@ let
               username = inst.couchdb.username;
               password = osConfig.sops.placeholder.${inst.couchdb.passwordSecret};
               baseDir = "";
+              includeInternal = inst.couchdb.includeInternal;
             }
             // lib.optionalAttrs (inst.couchdb.passphraseSecret != null) {
               passphrase = osConfig.sops.placeholder.${inst.couchdb.passphraseSecret};
@@ -99,6 +100,16 @@ let
             type = lib.types.nullOr lib.types.str;
             default = null;
             description = "Optional SOPS secret key holding the E2EE passphrase.";
+          };
+
+          includeInternal = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+            description = ''
+              Path patterns (minimatch) whose internal documents are written into the storage
+              peer. LiveSync carries hidden files like .obsidian/... as `i:` documents; without
+              a pattern here the bridge mirrors vault content only.
+            '';
           };
         };
 

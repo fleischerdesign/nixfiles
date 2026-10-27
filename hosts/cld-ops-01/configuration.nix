@@ -261,6 +261,9 @@
       group = "openclaw";
       vaultPath = "/var/lib/openclaw/vaults/philipp";
       couchdb.passphraseSecret = "services/storage/couchdb_obsidian_passphrase";
+      # Plugin state (project serials, pinned tasks, trackers) rides along as `i:` documents;
+      # the bridge materialises it so the agent can read the app's own state, not just content.
+      couchdb.includeInternal = [ ".obsidian/plugins/operon/state/**" ];
     };
   };
 

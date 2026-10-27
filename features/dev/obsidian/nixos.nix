@@ -129,6 +129,12 @@ in
         usePluginSync = true;
         usePluginSyncV2 = true;
 
+        # Hidden files ride to the bridge as `i:` documents; it materialises what its
+        # includeInternal patterns allow. Scoped to Operon's own state directory, so the agent
+        # can read project serials and tracker state without touching plugin code.
+        syncInternalFiles = true;
+        syncInternalFilesTargetPatterns = "\\.obsidian/plugins/operon/state/.*";
+
         writeDocumentsIfConflicted = false;
         trashInsteadDelete = true;
         checkIntegrityOnSave = true;
