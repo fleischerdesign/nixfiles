@@ -133,7 +133,7 @@ in
         # includeInternal patterns allow. Scoped to Operon's own state directory, so the agent
         # can read project serials and tracker state without touching plugin code.
         syncInternalFiles = true;
-        syncInternalFilesTargetPatterns = "\\.obsidian/plugins/operon/state/.*";
+        syncInternalFilesTargetPatterns = "(^|/)\\.obsidian/plugins/operon/state/.*";
 
         writeDocumentsIfConflicted = false;
         trashInsteadDelete = true;
