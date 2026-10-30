@@ -62,6 +62,19 @@
     openclaw = {
       url = "github:openclaw/nix-openclaw";
     };
+
+    # The two agent tools follow `main` between nixpkgs releases on purpose: both projects move
+    # faster than nixpkgs' tagged packages, and their flakes pin the rest of their input graph.
+    # nixpkgs still supplies the Hub, which has no flake of its own.
+    pi = {
+      url = "github:earendil-works/pi";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
+    paseo = {
+      url = "github:getpaseo/paseo";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
   };
 
   outputs =

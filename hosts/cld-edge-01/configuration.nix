@@ -21,6 +21,10 @@
 
   my.features.services.openclaw.node.enable = true;
 
+  my.features.dev.pi.enable = true;
+  my.features.dev.paseo.daemon.enable = true;
+  my.features.dev.paseo.hub.enable = true;
+
   my.features.system.networking.cloudflare = {
     enable = true;
   };

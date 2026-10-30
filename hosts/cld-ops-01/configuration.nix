@@ -31,6 +31,11 @@
 
   my.features.services.attic.server.enable = true;
 
+  # The agent stack: Pi on every host that develops and the daemon as this host's peer. Hub lives
+  # on the ingress host, because a public publication has to terminate where the ingress runs.
+  my.features.dev.pi.enable = true;
+  my.features.dev.paseo.daemon.enable = true;
+
   my.features.services.openclaw.gateway = {
     enable = true;
     adminSudo = true;

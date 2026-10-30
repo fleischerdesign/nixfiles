@@ -23,6 +23,10 @@
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
+
+  my.features.dev.pi.enable = true;
+  my.features.dev.paseo.daemon.enable = true;
+  my.features.dev.paseo.client.enable = true;
   my.features.services.openclaw.node = {
     enable = true;
     camera.enable = true;
