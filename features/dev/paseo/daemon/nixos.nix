@@ -1,8 +1,8 @@
 # The Paseo daemon: one per machine, owning that machine's agents, workspaces and schedules.
 #
 # Peers are not configured here. A host that enables the daemon is a peer of every other one, and
-# the address is the inventory's WireGuard address - the fleet decides the mesh once, in
-# `inventory/hosts.nix`, and this module reads it instead of repeating it.
+# the address and port come from that peer's own evaluated configuration - the fleet decides the
+# mesh once, in `inventory/hosts.nix`, and this module reads it instead of repeating it.
 {
   config,
   lib,
@@ -22,11 +22,62 @@ let
   ) systems;
   plugins = (import ../plugins.nix { inherit lib; }).findPlugins ../plugins;
   paseo = "${cfg.package}/bin/paseo";
+  quote = lib.escapeShellArg;
   daemonEnv = {
     PASEO_HOME = cfg.stateDir;
     HOME = cfg.stateDir;
     PASEO_LISTEN = "${cfg.listenAddress}:${toString cfg.port}";
     PASEO_RELAY_ENABLED = lib.boolToString cfg.relay;
+  };
+
+  # Peers, Hub enrollment and plugins are runtime state in `$PASEO_HOME`, because the daemon owns
+  # those files. The unit reconciles them on every boot instead of writing them: a repeated
+  # registration of an unchanged host returns the saved entry, so the pass is a no-op unless the
+  # fleet, the plugin list or the credential changed.
+  #
+  # The script is a derivation rather than a systemd `script` block so shellcheck and `set -euo
+  # pipefail` apply to it, and so a broken invocation fails the build instead of a host.
+  configure = pkgs.writeShellApplication {
+    name = "paseo-configure";
+    runtimeInputs = [ cfg.package ];
+    text = ''
+      # The unit starts after the daemon, not when it is ready to answer; wait for the socket
+      # instead of racing it.
+      for _ in {1..60}; do
+        if paseo --home ${quote cfg.stateDir} daemon status >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+      done
+
+      ${
+        if cfg.connectPeers then
+          lib.concatMapStringsSep "\n" (
+            peer:
+            let
+              peerCfg = systems.${peer}.config.my.features.dev.paseo.daemon;
+              address = systems.${peer}.config.my.topology.hosts.${peer}.wireguardIpv4;
+            in
+            "paseo --home ${quote cfg.stateDir} host add ${quote "tcp://${address}:${toString peerCfg.port}"} --label ${quote peer}"
+          ) (lib.attrNames peers)
+        else
+          ": peer registration disabled"
+      }
+
+      ${lib.optionalString cfg.hub.enable ''
+        # The key travels in the environment, not in argv: a command line is world-readable in
+        # the process list.
+        PASEO_HUB_API_KEY="$(< ${quote config.sops.secrets.${cfg.hub.apiKeySecret}.path})" \
+          paseo --home ${quote cfg.stateDir} hub connect ${quote cfg.hub.origin} \
+          ${lib.concatMapStringsSep " " (
+            permission: "--permission ${quote permission}"
+          ) cfg.hub.permissions}
+      ''}
+
+      ${lib.concatMapStringsSep "\n" (
+        plugin: "paseo --home ${quote cfg.stateDir} plugin add ${quote plugin.source}"
+      ) plugins}
+    '';
   };
 in
 {
@@ -91,6 +142,39 @@ in
         unit runs on every boot and after a host joins the fleet.
       '';
     };
+
+    hub = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Enroll this daemon with the Hub. Off until the credential exists: the API key is issued
+          by a Hub operator account, and a declared secret whose key is absent fails activation.
+          Enable it in the same change that adds the key to SOPS.
+        '';
+      };
+
+      origin = lib.mkOption {
+        type = lib.types.str;
+        default = "https://paseo.vyrx.de";
+        description = "Hub origin.";
+      };
+
+      apiKeySecret = lib.mkOption {
+        type = lib.types.str;
+        default = "services/paseo/hub_api_key";
+        description = "SOPS secret holding the organization API key the daemon enrolls with.";
+      };
+
+      permissions = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "hub.execute" ];
+        description = ''
+          Grants the daemon requests while enrolling. A daemon that grants nothing stays visible
+          to Hub but can never be a workflow target.
+        '';
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -121,12 +205,8 @@ in
       };
     };
 
-    # Peers and plugins are runtime state in `$PASEO_HOME`, because the daemon owns those files.
-    # The unit therefore reconciles them on boot instead of writing them: a repeated registration
-    # of an unchanged host returns the saved entry, so running this every start is a no-op unless
-    # the fleet or the plugin list changed.
     systemd.services.paseo-configure = {
-      description = "Register Paseo peers and declared plugins";
+      description = "Reconcile Paseo peers, Hub enrollment and plugins";
       wantedBy = [ "multi-user.target" ];
       after = [ "paseo.service" ];
       requires = [ "paseo.service" ];
@@ -136,36 +216,14 @@ in
         RemainAfterExit = true;
         inherit (cfg) user group;
         StateDirectory = baseNameOf cfg.stateDir;
+        ExecStart = "${configure}/bin/paseo-configure";
       };
-      script = ''
-        set -eu
+    };
 
-        # The unit starts after the daemon, not when it is ready to answer; wait for the socket
-        # instead of racing it.
-        for _ in $(seq 1 60); do
-          if ${paseo} --home ${cfg.stateDir} daemon status >/dev/null 2>&1; then
-            break
-          fi
-          sleep 1
-        done
-
-        ${
-          if cfg.connectPeers then
-            lib.concatMapStringsSep "\n" (
-              peer:
-              let
-                address = config.my.topology.hosts.${peer}.wireguardIpv4;
-              in
-              ''${paseo} --home ${cfg.stateDir} host add "tcp://${address}:${toString cfg.port}" --label ${peer} >/dev/null''
-            ) (lib.attrNames peers)
-          else
-            ": peer registration disabled"
-        }
-
-        ${lib.concatMapStringsSep "\n" (
-          plugin: ''${paseo} --home ${cfg.stateDir} plugin add "${plugin.source}" >/dev/null''
-        ) plugins}
-      '';
+    # The daemon reads the key, so it must be able to; nobody else needs it.
+    sops.secrets.${cfg.hub.apiKeySecret} = lib.mkIf cfg.hub.enable {
+      owner = cfg.user;
+      mode = "0400";
     };
   };
 }
