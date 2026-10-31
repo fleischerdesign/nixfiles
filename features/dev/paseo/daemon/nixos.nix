@@ -100,7 +100,9 @@ in
 
     port = lib.mkOption {
       type = lib.types.port;
-      default = 6767;
+      # 6767 is Bazarr's port; a daemon that collides with a media service on one host fails only
+      # there, which is the kind of defect nobody finds by reading the module.
+      default = 6867;
       description = "Daemon port, reachable by peers over the mesh.";
     };
 
