@@ -24,9 +24,20 @@ let
   # Which registrations are stale: a saved host whose label is one of ours but whose target is no
   # longer the address in the inventory. Kept as a file so the jq program is not shell-quoted.
   staleHostsQuery = pkgs.writeText "paseo-stale-hosts.jq" ''
-    .[]
-    | select((.label | in($want)) and ($want[.label] != .targetDescription))
-    | .registrationId
+    def key: .label + "\u0000" + .targetDescription;
+    . as $all
+    | (
+        $all[]
+        | select((.label | in($want)) and ($want[.label] != .targetDescription))
+        | .registrationId
+      ),
+      (
+        $all
+        | group_by(key)
+        | map(sort_by(.status != "online") | .[1:])
+        | add // []
+        | .[].registrationId
+      )
   '';
   # What each peer must look like in the daemon's own registry. A changed address does not replace
   # an old registration - `host add` appends - so the reconciliation compares and removes what it
