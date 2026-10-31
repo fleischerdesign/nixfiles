@@ -42,10 +42,12 @@ let
     "PASEO_HOME=${stateDir}"
     "PASEO_LISTEN=${daemon.listenAddress}:${toString daemon.port}"
     "PASEO_RELAY_ENABLED=${lib.boolToString daemon.relay}"
+    # The daemon spawns agent CLIs and reads its own process identity; a user unit starts with a
+    # minimal PATH, so the tools it needs are declared rather than inherited.
+    "PATH=${lib.makeBinPath runtimePath}"
   ];
 
-  # The daemon spawns agent CLIs; a user unit gets the same minimal PATH a system unit does.
-  path = [
+  runtimePath = [
     pkgs.procps
     pkgs.git
     pkgs.bashInteractive
@@ -62,7 +64,9 @@ in
       };
       Service = {
         ExecStart = "${daemon.package}/bin/paseo daemon run --home ${stateDir}";
-        inherit environment path;
+        # `Environment=` is the systemd directive; a lowercase key is silently ignored and the
+        # daemon then falls back to config.json, which binds loopback and is unreachable by peers.
+        Environment = environment;
         Restart = "always";
         RestartSec = 2;
       };
@@ -80,7 +84,7 @@ in
         RemainAfterExit = true;
         TimeoutStartSec = 300;
         ExecStart = "${peerSet.configure}/bin/paseo-configure";
-        inherit environment path;
+        Environment = environment;
       };
       Install.WantedBy = [ "default.target" ];
     };
