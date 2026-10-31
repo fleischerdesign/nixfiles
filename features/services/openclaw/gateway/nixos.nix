@@ -440,9 +440,17 @@ in
           realtime = {
             provider = "openai";
             providers.openai = {
-              model = "gpt-live-1";
-              speakerVoice = "marin";
-              apiKey = "\${OPENAI_API_KEY}";
+              # Codex GPT-Live is the ChatGPT-subscription route: OpenClaw
+              # tries the account's OAuth profile before any Platform key.
+              model = "gpt-live-1-codex";
+              speakerVoice = "cove";
+              # Fail closed. The upstream resolver tries the configured Talk
+              # key before OPENAI_API_KEY and does not consult the environment
+              # when a configured value exists, so this non-secret sentinel
+              # shadows the gateway's Platform key. If OAuth is unavailable or
+              # the account loses Live access, session creation fails with an
+              # auth error instead of silently billing OpenAI Platform credits.
+              apiKey = "platform-fallback-disabled";
             };
             mode = "realtime";
             # Android requires the relay; the browser supports it as well.
