@@ -21,6 +21,29 @@ let
     name: host: name != hostName && (host.config.my.features.dev.paseo.daemon.enable or false)
   ) systems;
   plugins = (import ../plugins.nix { inherit lib; }).findPlugins ../plugins;
+  # Which registrations are stale: a saved host whose label is one of ours but whose target is no
+  # longer the address in the inventory. Kept as a file so the jq program is not shell-quoted.
+  staleHostsQuery = pkgs.writeText "paseo-stale-hosts.jq" ''
+    .[]
+    | select((.label | in($want)) and ($want[.label] != .targetDescription))
+    | .registrationId
+  '';
+  # What each peer must look like in the daemon's own registry. A changed address does not replace
+  # an old registration - `host add` appends - so the reconciliation compares and removes what it
+  # would otherwise leave behind.
+  peerTargets = builtins.listToAttrs (
+    map (
+      peer:
+      let
+        peerCfg = systems.${peer}.config.my.features.dev.paseo.daemon;
+        address = systems.${peer}.config.my.topology.hosts.${peer}.wireguardIpv4;
+      in
+      {
+        name = peer;
+        value = "tcp://${address}:${toString peerCfg.port}";
+      }
+    ) (lib.attrNames peers)
+  );
   paseo = "${cfg.package}/bin/paseo";
   quote = lib.escapeShellArg;
   daemonEnv = {
@@ -39,7 +62,10 @@ let
   # pipefail` apply to it, and so a broken invocation fails the build instead of a host.
   configure = pkgs.writeShellApplication {
     name = "paseo-configure";
-    runtimeInputs = [ cfg.package ];
+    runtimeInputs = [
+      cfg.package
+      pkgs.jq
+    ];
     text = ''
       # The unit starts after the daemon, not when it is ready to answer. `daemon status` only
       # proves a PID exists; an RPC does, so the wait is a real request rather than a liveness
@@ -57,16 +83,23 @@ let
         exit 1
       fi
 
+      # A saved host is identified by its target, so a changed address appends a second entry with
+      # the same label instead of replacing the old one. Remove the stale ones first: the registry
+      # then converges on the inventory instead of accumulating every port move.
+      registry="$(mktemp)"
+      paseo --home ${quote cfg.stateDir} host ls --json > "$registry"
+      jq -r --argjson want '${builtins.toJSON peerTargets}' -f ${staleHostsQuery} "$registry" \
+        | while read -r stale; do
+          paseo --home ${quote cfg.stateDir} host rm "$stale"
+        done
+      rm -f "$registry"
+
       ${
         if cfg.connectPeers then
           lib.concatMapStringsSep "\n" (
             peer:
-            let
-              peerCfg = systems.${peer}.config.my.features.dev.paseo.daemon;
-              address = systems.${peer}.config.my.topology.hosts.${peer}.wireguardIpv4;
-            in
-            "paseo --home ${quote cfg.stateDir} host add ${quote "tcp://${address}:${toString peerCfg.port}"} --label ${quote peer}"
-          ) (lib.attrNames peers)
+            "paseo --home ${quote cfg.stateDir} host add ${quote peerTargets.${peer}} --label ${quote peer}"
+          ) (lib.attrNames peerTargets)
         else
           ": peer registration disabled"
       }
