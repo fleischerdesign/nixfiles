@@ -96,6 +96,16 @@
   # reads `config.services.nod.fleet` through the flake output; the provider
   # entries below are the only hand-written part, and every field is checked at
   # evaluation.
+
+  # A `command` string does not put a binary in the closure: nod spawns each provider itself, and
+  # only packages on this host's PATH can be spawned. Without this list the cloudflare provider has
+  # been unable to start since its last closure change - it reconciled DNS until 23 October and
+  # then silently stopped, which is why paseo.vyrx.de was never created.
+  systemd.services.nod-sync.path = [
+    inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-cloudflare
+    inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-example
+  ];
+
   services.nod.providers = {
     example = {
       command = "${

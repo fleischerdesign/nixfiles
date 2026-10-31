@@ -31,7 +31,9 @@ in
 
     port = lib.mkOption {
       type = lib.types.port;
-      default = 3000;
+      # 3000 is Grafana's port on the ingress host; a default that collides fails only on the one
+      # host that runs both, which is the kind of defect nobody finds by reading the module.
+      default = 7670;
       description = "HTTP port; upstream reads it from PORT.";
     };
 
