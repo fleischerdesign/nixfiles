@@ -23,16 +23,6 @@
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
-
-  my.features.dev.pi.enable = true;
-  # The daemon belongs to the user here: the agents run with philipp's credentials, and the
-  # desktop app expects its daemon in ~/.paseo on the default port.
-  my.features.dev.paseo.daemon = {
-    enable = true;
-    scope = "user";
-    port = 6767;
-  };
-  my.features.dev.paseo.client.enable = true;
   my.features.services.openclaw.node = {
     enable = true;
     camera.enable = true;

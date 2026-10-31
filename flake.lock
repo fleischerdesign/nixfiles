@@ -330,22 +330,6 @@
         "url": "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.zst"
       }
     },
-    "nixpkgs-darwin-x64": {
-      "locked": {
-        "lastModified": 1788334797,
-        "narHash": "sha256-nskSa8kDimM7F0VFSP8IdoSNo4G0vKzOtxwvOFpoGDI=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "c19db427a1fdfc7591c0b0baeb4665dcef2c61da",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-26.05-darwin",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "nixpkgs-packages": {
       "locked": {
         "lastModified": 1792812153,
@@ -472,47 +456,6 @@
         "type": "github"
       }
     },
-    "paseo": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs-unstable"
-        ]
-      },
-      "locked": {
-        "lastModified": 1793370447,
-        "narHash": "sha256-vxfHfiOSyPutoKrXnaLS1qrCLpCf30z+MMPPGPKD/vE=",
-        "owner": "getpaseo",
-        "repo": "paseo",
-        "rev": "a4f696620b5d248598a882b1a78d82ec5038c74b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "getpaseo",
-        "repo": "paseo",
-        "type": "github"
-      }
-    },
-    "pi": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs-unstable"
-        ],
-        "nixpkgs-darwin-x64": "nixpkgs-darwin-x64"
-      },
-      "locked": {
-        "lastModified": 1793391790,
-        "narHash": "sha256-42C+2/J2sc+zRzd1Zbbwc41Hh+y72UfImV+9O0Rhlag=",
-        "owner": "earendil-works",
-        "repo": "pi",
-        "rev": "c2760d32cc8d3d4a9237c680883fad5fc6e34183",
-        "type": "github"
-      },
-      "original": {
-        "owner": "earendil-works",
-        "repo": "pi",
-        "type": "github"
-      }
-    },
     "portfolio": {
       "inputs": {
         "flake-utils": "flake-utils_2",
@@ -571,8 +514,6 @@
         "nixvim": "nixvim",
         "nod": "nod",
         "openclaw": "openclaw",
-        "paseo": "paseo",
-        "pi": "pi",
         "portfolio": "portfolio",
         "sops-nix": "sops-nix",
         "spicetify-nix": "spicetify-nix",

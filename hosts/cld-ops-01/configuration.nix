@@ -31,11 +31,6 @@
 
   my.features.services.attic.server.enable = true;
 
-  # The agent stack: Pi on every host that develops and the daemon as this host's peer. Hub lives
-  # on the ingress host, because a public publication has to terminate where the ingress runs.
-  my.features.dev.pi.enable = true;
-  my.features.dev.paseo.daemon.enable = true;
-
   my.features.services.openclaw.gateway = {
     enable = true;
     adminSudo = true;
@@ -98,9 +93,8 @@
   # evaluation.
 
   # A `command` string does not put a binary in the closure: nod spawns each provider itself, and
-  # only packages on this host's PATH can be spawned. Without this list the cloudflare provider has
-  # been unable to start since its last closure change - it reconciled DNS until 23 October and
-  # then silently stopped, which is why paseo.vyrx.de was never created.
+  # only packages on this host's PATH can be spawned. Without this list the cloudflare provider
+  # could not start at all, so no service record was ever reconciled.
   systemd.services.nod-sync.path = [
     inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-cloudflare
     inputs.nod.packages.${pkgs.stdenv.hostPlatform.system}.nod-provider-example
