@@ -250,6 +250,21 @@ in
       };
     };
 
+    # The daemon is a TCP listener on the mesh, not an HTTP service behind the ingress. It
+    # declares direct access instead of a publication: the firewall rule then comes from the same
+    # statement the daemon binds to, and no port is opened beyond the WireGuard interface.
+    my.contracts.provides.paseo-daemon = {
+      endpoints.daemon = {
+        port = cfg.port;
+        protocol = "tcp";
+        directAccess = {
+          enable = true;
+          protocol = "tcp";
+          interface = "wireguard";
+        };
+      };
+    };
+
     # The daemon reads the key, so it must be able to; nobody else needs it.
     sops.secrets.${cfg.hub.apiKeySecret} = lib.mkIf cfg.hub.enable {
       owner = cfg.user;
