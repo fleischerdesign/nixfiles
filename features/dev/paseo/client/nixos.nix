@@ -7,13 +7,11 @@
   config,
   lib,
   pkgs,
-  inputs,
   ...
 }:
 
 let
   cfg = config.my.features.dev.paseo.client;
-  system = pkgs.stdenv.hostPlatform.system;
 in
 {
   options.my.features.dev.paseo.client = {
@@ -21,15 +19,11 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      # Upstream builds the desktop with `--ignore-scripts`, so `npm run postinstall` never runs and
-      # `patches/@gorhom+bottom-sheet+5.2.14.patch` is not applied; the renderer then has no
-      # `BottomSheetModalInternalProvider` and any chat crashes with React #130. The upstream issue
-      # names this override as the fix (getpaseo/paseo#7673).
-      default = inputs.paseo.packages.${system}.desktop.overrideAttrs (previous: {
-        preBuild = (previous.preBuild or "") + "\nnpm run postinstall";
-      });
-      defaultText = lib.literalExpression "inputs.paseo.packages.${pkgs.stdenv.hostPlatform.system}.desktop";
-      description = "Paseo desktop package, with the postinstall patch upstream's Nix build skips.";
+      # The overlay in packages/overlays/fix/paseo-desktop owns the build step upstream's Nix
+      # desktop package skips; this module only decides where the app is installed.
+      default = pkgs.paseo-desktop;
+      defaultText = lib.literalExpression "pkgs.paseo-desktop";
+      description = "Paseo desktop package.";
     };
   };
 
