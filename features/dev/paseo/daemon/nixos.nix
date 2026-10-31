@@ -90,7 +90,7 @@ let
       paseo --home ${quote cfg.stateDir} host ls --json > "$registry"
       jq -r --argjson want '${builtins.toJSON peerTargets}' -f ${staleHostsQuery} "$registry" \
         | while read -r stale; do
-          paseo --home ${quote cfg.stateDir} host rm "$stale"
+          timeout 60 paseo --home ${quote cfg.stateDir} host rm "$stale"
         done
       rm -f "$registry"
 
@@ -98,7 +98,7 @@ let
         if cfg.connectPeers then
           lib.concatMapStringsSep "\n" (
             peer:
-            "paseo --home ${quote cfg.stateDir} host add ${quote peerTargets.${peer}} --label ${quote peer}"
+            "timeout 60 paseo --home ${quote cfg.stateDir} host add ${quote peerTargets.${peer}} --label ${quote peer}"
           ) (lib.attrNames peerTargets)
         else
           ": peer registration disabled"
@@ -108,14 +108,14 @@ let
         # The key travels in the environment, not in argv: a command line is world-readable in
         # the process list.
         PASEO_HUB_API_KEY="$(< ${quote config.sops.secrets.${cfg.hub.apiKeySecret}.path})" \
-          paseo --home ${quote cfg.stateDir} hub connect ${quote cfg.hub.origin} \
+          timeout 60 paseo --home ${quote cfg.stateDir} hub connect ${quote cfg.hub.origin} \
           ${lib.concatMapStringsSep " " (
             permission: "--permission ${quote permission}"
           ) cfg.hub.permissions}
       ''}
 
       ${lib.concatMapStringsSep "\n" (
-        plugin: "paseo --home ${quote cfg.stateDir} plugin add ${quote plugin.source}"
+        plugin: "timeout 180 paseo --home ${quote cfg.stateDir} plugin add ${quote plugin.source}"
       ) plugins}
     '';
   };
@@ -282,6 +282,9 @@ in
         Group = cfg.group;
         StateDirectory = baseNameOf cfg.stateDir;
         ExecStart = "${configure}/bin/paseo-configure";
+        # Every request is bounded, and so is the unit: a peer that does not answer must not hold
+        # the activation open, which is exactly what a hanging `host add` did.
+        TimeoutStartSec = 300;
       };
     };
 
