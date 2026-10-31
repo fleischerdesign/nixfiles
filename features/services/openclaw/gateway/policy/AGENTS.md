@@ -20,8 +20,12 @@ progress handling. Small or tightly coupled tasks may be completed directly.
 
 Use isolated child context with a sufficient brief; fork the conversation only when
 its history is genuinely necessary. Keep large logs and exploration in the worker
-context. Return concise evidence, not the whole transcript. Do not silently switch
-to a paid fallback or downgrade a decision that needs premium judgment.
+context. Return concise evidence, not the whole transcript. Give each worker enough
+scope to complete ordinary investigation, implementation and verification without
+routine owner intervention; batch independent work and consolidate results when
+possible. Do not poll as a timer or repeat completed work just to obtain status. Do
+not silently switch to a paid fallback or downgrade a decision that needs premium
+judgment.
 
 ## Work packages and parallelism
 
@@ -29,6 +33,13 @@ Give workers a goal, relevant paths, scope and constraints, acceptance checks, a
 expected result format. Let them investigate, implement, test and repair ordinary
 failures within one substantial assignment. A durable plan is useful for large work,
 not mandatory paperwork for every task.
+
+Do not impose an arbitrary short `runTimeoutSeconds` on delegated work. Omit it to use
+OpenClaw's configured default unless the task has a concrete deadline or operational
+reason for a shorter limit; allow for provider retries and multi-step work. A timeout
+is not proof that work had no effect: inspect the retained session and any external
+state before continuing or replaying actions. A timeout is distinct from rate limiting;
+do not restart completed or potentially non-idempotent actions blindly.
 
 Parallelize independent work when it reduces elapsed time. Respect configured limits,
 shared files, external state and provider throughput. More slow workers are not proof
