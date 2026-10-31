@@ -224,7 +224,7 @@ proxied requests. This password and the OpenCode Go, OpenRouter and OpenAI API k
 runtime and never enter the Nix store. Shared Gateway tokens are incompatible with trusted-proxy mode
 and are not configured.
 
-The default interactive model is GPT-6.1 Terra through OpenAI; delegated work and background
+The default interactive model is GPT-6.1 Sol through OpenAI; delegated work and background
 maintenance use DeepSeek V4.1 Flash through OpenCode Go. Both use the native OpenClaw runtime.
 Model selection uses the dynamically discovered provider catalog with an unrestricted model policy;
 the default model does not impose a one-model restriction or an explicit per-model runtime binding.
@@ -293,7 +293,7 @@ model selection.
 The gateway module separates the interactive `model`, `subagentModel` (defaults to
 `model`), `backgroundModel` (defaults to `subagentModel`) and `utilityModel` (defaults to
 `backgroundModel`). The host chooses concrete provider references once. `cld-ops-01` uses
-Terra for interaction and DeepSeek for workers, background work and short internal utility
+Sol for interaction and DeepSeek for workers, background work and short internal utility
 tasks such as session titles, progress narration and activity recaps. Same-agent workers use
 their configured default even when the parent session overrides its model. Explicit spawn
 overrides remain possible.

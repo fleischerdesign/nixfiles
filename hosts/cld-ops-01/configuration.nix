@@ -33,7 +33,7 @@
 
   my.features.services.openclaw.gateway = {
     enable = true;
-    model = "openai/gpt-6.1-terra";
+    model = "openai/gpt-6.1-sol";
     subagentModel = "opencode-go/deepseek-v4.1-flash";
     adminSudo = true;
     opencodeSubscriptions = [
