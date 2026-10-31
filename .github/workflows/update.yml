@@ -1,9 +1,20 @@
 name: Flake Update
 
+# A run that finds main moving underneath it re-dispatches itself on current
+# main. The replacement starts a fresh prepare and all host builds, and carries
+# the retry count in this input, because a new run starts again at attempt 1.
+run-name: Flake Update${{ github.event_name == 'workflow_dispatch' && github.event.inputs.retry != '0' && format(' (retry {0})', github.event.inputs.retry) || '' }}
+
 on:
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
+    inputs:
+      retry:
+        description: Retry counter set by a re-dispatched run; do not set it by hand.
+        required: false
+        default: "0"
+        type: string
 
 permissions:
   contents: write
@@ -115,6 +126,11 @@ jobs:
     if: needs.prepare.outputs.has-updates == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # `actions: write` is required to re-dispatch the workflow on current main
+    # when the branch moved during validation.
+    permissions:
+      contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
 
@@ -123,11 +139,18 @@ jobs:
         with:
           name: update-patch
 
-      - name: Commit and push
+      # Purposely no force push and no rebase: a stale, validated tree is never
+      # written onto main. The script re-dispatches a full run on current main
+      # instead, and only treats a moved branch as a race.
+      - name: Commit and push the validated update
+        env:
+          BASE_SHA: ${{ github.sha }}
+          RETRY: ${{ github.event.inputs.retry || '0' }}
+          MAX_RETRIES: "3"
+          PATCH: update.patch
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          git switch -C flake-update "${{ github.sha }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git apply --index update.patch
-          git commit -m "chore(deps): update flake inputs and custom packages"
-          git push origin HEAD:main
+          ./.github/scripts/push-flake-update.sh
