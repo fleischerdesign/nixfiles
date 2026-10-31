@@ -278,18 +278,59 @@ cross-conversation recall are explicitly enabled with `memory` and `sessions` as
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;
 deeper model-based recall runs when recall intent lacks a strong deterministic memory match.
 Private transcript recall stays within the same agent. Indexing and nightly dreaming retain
-OpenClaw's maintained defaults. Workspace memory, personality and working instructions remain
-runtime-owned and are edited through OpenClaw.
+OpenClaw's maintained defaults. Workspace memory, personality and personal working instructions remain runtime-owned
+and are edited through OpenClaw. The delegation policy below is the managed exception.
 
 Automations are enabled. Heartbeats run hourly with lightweight context in isolated sessions;
 their delivery target is `none` because the installation has no external messaging channel.
 Heartbeat results remain internal; this does not establish browser push or mobile notifications.
 Recurring tasks and reminders are managed through OpenClaw's automations UI or CLI, not Nix.
-Dreaming and other built-in maintenance jobs use the same scheduler and the default agent model.
+Dreaming and other built-in maintenance jobs use the same scheduler with explicit background
+model selection.
+### Delegated work and model ownership
+
+The gateway module separates the interactive `model`, `subagentModel` (defaults to
+`model`) and `backgroundModel` (defaults to `subagentModel`). The host chooses concrete
+provider references once. `cld-ops-01` uses Sol for interaction and DeepSeek for workers
+and background work. Same-agent workers use their configured default even when the
+parent session overrides its model. Explicit spawn overrides remain possible.
+
+Native subagents start with medium thinking and a four-worker concurrency ceiling.
+The ceiling is not a target: independent scopes, provider throughput and integration
+cost decide actual parallelism. Native settings can be overridden through the existing
+`settings` option; there is no second routing engine or mandatory planner/reviewer team.
+No model fallback chain is configured.
+
+The [delegation policy](../features/services/openclaw/gateway/policy/AGENTS.md) is the
+canonical behavioral contract. The gateway materializes it before startup as a regular
+file at `<workspace>/.openclaw-policy/AGENTS.md`. The native `bootstrap-extra-files` hook
+loads it alongside personal instructions. A Nix-store symlink is not suitable because
+extra bootstrap files must resolve inside the configured workspace. Only that managed
+file is replaced; personal `AGENTS.md`, `USER.md`, memory and learned skills are not
+regenerated. Policy changes alter the service unit and therefore follow normal nod
+activation and rollback. They do not depend on a skill being selected for a turn.
+
+Skills supply task-specific procedures, not duplicate routing rules. Memory records
+preferences and decisions, not technical defaults. Existing sessions and auth profiles
+remain runtime state. Check actual bootstrap context for both main and isolated child
+runs, including execution in a project folder; lightweight contexts may filter files.
+
+Heartbeats and memory dreaming select `backgroundModel` explicitly. Ordinary runtime
+automations must set their agent-turn model to the generated `background` alias; a
+missing job override otherwise inherits the agent model. Existing jobs are inspected
+and updated through the native automations tool, not rewritten by Nix or a database
+script. Keep their schedule, ownership, delivery and task text unchanged.
+
+For verification, evaluate the flake gate and validate the rendered native config.
+After nod activates it, verify the managed regular file, retained personal files,
+actual child model and task result, automation model overrides, and native prompt
+injection. Subscription allowance and useful parallel throughput require measurement
+on real tasks; a schema check does not establish either.
+
 
 Browser and native-app Talk use OpenAI `gpt-live-1` with voice `marin` through the Gateway-owned
 realtime relay. The relay supports Android and the browser without exposing the Platform key to
-clients. GPT-Live delegates agent work to the default DeepSeek model through `agent-consult`.
+clients. GPT-Live delegates work to the interactive agent through `agent-consult`.
 The speech locale is German and speech interruption is enabled. Non-realtime speech playback retains
 OpenRouter `google/gemini-3.1-flash-tts-preview` with voice `Kore` as its configured provider.
 Client microphone permission, audio playback and billable voice sessions require an actual client

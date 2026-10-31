@@ -8,6 +8,8 @@
 let
   cfg = config.my.features.services.openclaw.gateway;
   stateDir = "/var/lib/openclaw";
+  workspaceDir = "${stateDir}/workspace";
+  workflowPolicy = ./policy/AGENTS.md;
   package = inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway;
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
@@ -161,6 +163,16 @@ in
       type = lib.types.str;
       default = "opencode-go/deepseek-v4.1-flash";
       description = "Default provider/model reference for the native OpenClaw runtime.";
+    };
+    subagentModel = lib.mkOption {
+      type = lib.types.str;
+      default = cfg.model;
+      description = "Default model for delegated work, independent of interactive session overrides.";
+    };
+    backgroundModel = lib.mkOption {
+      type = lib.types.str;
+      default = cfg.subagentModel;
+      description = "Model for heartbeats, memory maintenance and the background automation alias.";
     };
     opencodeSubscriptions = lib.mkOption {
       type = lib.types.listOf (
@@ -354,11 +366,21 @@ in
           profiles.openclaw.cdpPort = 18800;
         };
         agents.defaults = {
+          workspace = workspaceDir;
           model.primary = cfg.model;
+          model.fallbacks = [ ];
+          models.${cfg.backgroundModel}.alias = "background";
+          subagents = {
+            model = cfg.subagentModel;
+            thinking = "medium";
+            maxConcurrent = 4;
+            delegationMode = "prefer";
+          };
           # An explicit empty policy disables legacy restrictions inferred from
           # model settings and keeps the provider's discovered catalog selectable.
           modelPolicy = { };
           heartbeat = {
+            model = cfg.backgroundModel;
             every = "1h";
             lightContext = true;
             isolatedSession = true;
@@ -367,6 +389,13 @@ in
           };
         };
         cron.enabled = true;
+        hooks.internal = {
+          enabled = true;
+          entries.bootstrap-extra-files = {
+            enabled = true;
+            paths = [ ".openclaw-policy/AGENTS.md" ];
+          };
+        };
         # Widgets and MCP Apps share a public shell on a separate origin.
         # Documents themselves arrive over the authenticated gateway connection.
         mcp.apps = {
@@ -477,7 +506,10 @@ in
         };
         plugins.entries.memory-core = {
           enabled = true;
-          config.dreaming.enabled = true;
+          config.dreaming = {
+            enabled = true;
+            model = cfg.backgroundModel;
+          };
         };
         plugins.entries.device-pair.config.publicUrl = "https://${domain}";
         logging.file = "${stateDir}/logs/openclaw.log";
@@ -519,7 +551,12 @@ in
         UMask = "0077";
         StandardOutput = lib.mkForce "journal";
         StandardError = lib.mkForce "journal";
-        ExecStartPre = [ provisionAuth ];
+        ExecStartPre = [
+          provisionAuth
+          # Materialize inside the workspace: the bootstrap loader rejects
+          # symlinks that resolve outside it, including links into the Nix store.
+          "${pkgs.coreutils}/bin/install -D -m0444 ${workflowPolicy} ${workspaceDir}/.openclaw-policy/AGENTS.md"
+        ];
       };
       # Git identity for every process the agent starts, including exec.
       environment.GIT_CONFIG_GLOBAL = "/etc/openclaw/gitconfig";
