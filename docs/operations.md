@@ -305,9 +305,12 @@ The [delegation policy](../features/services/openclaw/gateway/policy/AGENTS.md) 
 canonical behavioral contract. The gateway materializes it before startup as a regular
 file at `<workspace>/.openclaw-policy/AGENTS.md`. The native `bootstrap-extra-files` hook
 loads it alongside personal instructions. A Nix-store symlink is not suitable because
-extra bootstrap files must resolve inside the configured workspace. Only that managed
-file is replaced; personal `AGENTS.md`, `USER.md`, memory and learned skills are not
-regenerated. Policy changes alter the service unit and therefore follow normal nod
+extra bootstrap files must resolve inside the configured workspace. Native hook discovery
+also rejects hardlinked metadata, which occurs in the optimized Nix store. The service
+therefore materializes the upstream `HOOK.md` and a one-line re-export of its unchanged
+handler under `.openclaw-policy/hooks`, registered through native `load.extraDirs`.
+Only these explicitly managed files are replaced; personal `AGENTS.md`, `USER.md`,
+memory and learned skills are not regenerated. Policy changes alter the service unit and therefore follow normal nod
 activation and rollback. They do not depend on a skill being selected for a turn.
 
 Skills supply task-specific procedures, not duplicate routing rules. Memory records

@@ -10,6 +10,10 @@ let
   stateDir = "/var/lib/openclaw";
   workspaceDir = "${stateDir}/workspace";
   workflowPolicy = ./policy/AGENTS.md;
+  bootstrapHookDir = "${package}/lib/node_modules/openclaw/dist/bundled/bootstrap-extra-files";
+  bootstrapHookHandler = pkgs.writeText "openclaw-bootstrap-extra-files-handler.js" ''
+    export { default } from "${bootstrapHookDir}/handler.js";
+  '';
   package = inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway;
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
@@ -391,6 +395,7 @@ in
         cron.enabled = true;
         hooks.internal = {
           enabled = true;
+          load.extraDirs = [ "${workspaceDir}/.openclaw-policy/hooks" ];
           entries.bootstrap-extra-files = {
             enabled = true;
             paths = [ ".openclaw-policy/AGENTS.md" ];
@@ -556,6 +561,10 @@ in
           # Materialize inside the workspace: the bootstrap loader rejects
           # symlinks that resolve outside it, including links into the Nix store.
           "${pkgs.coreutils}/bin/install -D -m0444 ${workflowPolicy} ${workspaceDir}/.openclaw-policy/AGENTS.md"
+          # Native discovery rejects hardlinked HOOK.md files in the Nix store.
+          # Copy metadata and a re-export only; keep hook behavior upstream-owned.
+          "${pkgs.coreutils}/bin/install -D -m0444 ${bootstrapHookDir}/HOOK.md ${workspaceDir}/.openclaw-policy/hooks/bootstrap-extra-files/HOOK.md"
+          "${pkgs.coreutils}/bin/install -D -m0444 ${bootstrapHookHandler} ${workspaceDir}/.openclaw-policy/hooks/bootstrap-extra-files/handler.js"
         ];
       };
       # Git identity for every process the agent starts, including exec.
