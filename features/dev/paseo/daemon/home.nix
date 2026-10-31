@@ -47,7 +47,15 @@ let
     "PATH=${lib.makeBinPath runtimePath}"
   ];
 
+  # Everything the reconcile script and the agents it starts need. The unit sets PATH itself, so
+  # this list replaces the environment rather than extending it: the daemon binary, its jq, and
+  # the shell tools the script calls (`mktemp`, `timeout`, `grep`) must all be named.
   runtimePath = [
+    daemon.package
+    pkgs.jq
+    pkgs.coreutils
+    pkgs.gnugrep
+    pkgs.gnused
     pkgs.procps
     pkgs.git
     pkgs.bashInteractive
