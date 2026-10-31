@@ -178,6 +178,11 @@ in
       default = cfg.subagentModel;
       description = "Model for heartbeats, memory maintenance and the background automation alias.";
     };
+    utilityModel = lib.mkOption {
+      type = lib.types.str;
+      default = cfg.backgroundModel;
+      description = "Model for short internal tasks such as session titles, progress narration and activity recaps.";
+    };
     opencodeSubscriptions = lib.mkOption {
       type = lib.types.listOf (
         lib.types.submodule {
@@ -373,6 +378,7 @@ in
           workspace = workspaceDir;
           model.primary = cfg.model;
           model.fallbacks = [ ];
+          utilityModel = cfg.utilityModel;
           models.${cfg.backgroundModel}.alias = "background";
           subagents = {
             model = cfg.subagentModel;

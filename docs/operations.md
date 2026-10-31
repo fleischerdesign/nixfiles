@@ -291,10 +291,12 @@ model selection.
 ### Delegated work and model ownership
 
 The gateway module separates the interactive `model`, `subagentModel` (defaults to
-`model`) and `backgroundModel` (defaults to `subagentModel`). The host chooses concrete
-provider references once. `cld-ops-01` uses Terra for interaction and DeepSeek for workers
-and background work. Same-agent workers use their configured default even when the
-parent session overrides its model. Explicit spawn overrides remain possible.
+`model`), `backgroundModel` (defaults to `subagentModel`) and `utilityModel` (defaults to
+`backgroundModel`). The host chooses concrete provider references once. `cld-ops-01` uses
+Terra for interaction and DeepSeek for workers, background work and short internal utility
+tasks such as session titles, progress narration and activity recaps. Same-agent workers use
+their configured default even when the parent session overrides its model. Explicit spawn
+overrides remain possible.
 
 Native subagents start with medium thinking and an eight-worker concurrency ceiling.
 The ceiling is not a target: independent scopes, provider throughput and integration
