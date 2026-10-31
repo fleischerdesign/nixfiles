@@ -295,7 +295,7 @@ provider references once. `cld-ops-01` uses Sol for interaction and DeepSeek for
 and background work. Same-agent workers use their configured default even when the
 parent session overrides its model. Explicit spawn overrides remain possible.
 
-Native subagents start with medium thinking and a four-worker concurrency ceiling.
+Native subagents start with medium thinking and an eight-worker concurrency ceiling.
 The ceiling is not a target: independent scopes, provider throughput and integration
 cost decide actual parallelism. Native settings can be overridden through the existing
 `settings` option; there is no second routing engine or mandatory planner/reviewer team.

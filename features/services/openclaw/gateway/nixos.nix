@@ -377,7 +377,7 @@ in
           subagents = {
             model = cfg.subagentModel;
             thinking = "medium";
-            maxConcurrent = 4;
+            maxConcurrent = 8;
             delegationMode = "prefer";
           };
           # An explicit empty policy disables legacy restrictions inferred from
