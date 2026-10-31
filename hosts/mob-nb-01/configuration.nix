@@ -23,7 +23,11 @@
   my.features.dev.android.enable = true;
 
   my.features.dev.pi.enable = true;
-  my.features.dev.paseo.daemon.enable = true;
+  my.features.dev.paseo.daemon = {
+    enable = true;
+    scope = "user";
+    port = 6767;
+  };
   my.features.dev.paseo.client.enable = true;
   my.features.services.openclaw.node = {
     enable = true;
