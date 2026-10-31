@@ -21,9 +21,15 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = inputs.paseo.packages.${system}.desktop;
+      # Upstream builds the desktop with `--ignore-scripts`, so `npm run postinstall` never runs and
+      # `patches/@gorhom+bottom-sheet+5.2.14.patch` is not applied; the renderer then has no
+      # `BottomSheetModalInternalProvider` and any chat crashes with React #130. The upstream issue
+      # names this override as the fix (getpaseo/paseo#7673).
+      default = inputs.paseo.packages.${system}.desktop.overrideAttrs (previous: {
+        preBuild = (previous.preBuild or "") + "\nnpm run postinstall";
+      });
       defaultText = lib.literalExpression "inputs.paseo.packages.${pkgs.stdenv.hostPlatform.system}.desktop";
-      description = "Paseo desktop package, from the upstream flake by default.";
+      description = "Paseo desktop package, with the postinstall patch upstream's Nix build skips.";
     };
   };
 
