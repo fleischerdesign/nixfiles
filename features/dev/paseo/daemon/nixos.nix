@@ -41,14 +41,21 @@ let
     name = "paseo-configure";
     runtimeInputs = [ cfg.package ];
     text = ''
-      # The unit starts after the daemon, not when it is ready to answer; wait for the socket
-      # instead of racing it.
+      # The unit starts after the daemon, not when it is ready to answer. `daemon status` only
+      # proves a PID exists; an RPC does, so the wait is a real request rather than a liveness
+      # check - a daemon still loading plugins accepts the process but refuses work.
+      ready=0
       for _ in {1..60}; do
-        if paseo --home ${quote cfg.stateDir} daemon status >/dev/null 2>&1; then
+        if paseo --home ${quote cfg.stateDir} host ls >/dev/null 2>&1; then
+          ready=1
           break
         fi
-        sleep 1
+        sleep 2
       done
+      if [ "$ready" -eq 0 ]; then
+        echo "paseo: daemon did not answer within 120s" >&2
+        exit 1
+      fi
 
       ${
         if cfg.connectPeers then
