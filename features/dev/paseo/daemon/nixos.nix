@@ -200,12 +200,18 @@ in
         pkgs.git
         pkgs.bashInteractive
         pkgs.nodejs_22
-      ];
+      ]
+      ++ lib.optional config.my.features.dev.pi.enable config.my.features.dev.pi.package;
       serviceConfig = {
         Type = "simple";
         ExecStart = "${paseo} daemon run --home ${cfg.stateDir}";
-        inherit (cfg) user group;
+        User = cfg.user;
+        Group = cfg.group;
         StateDirectory = baseNameOf cfg.stateDir;
+        # A state directory created before this unit carried User= is owned by root, and
+        # StateDirectory only fixes the top level. Reclaiming it on every start is idempotent and
+        # keeps a host that was deployed during the bug from failing on its own files.
+        ExecStartPre = [ "+${pkgs.coreutils}/bin/chown -R ${cfg.user}:${cfg.group} ${cfg.stateDir}" ];
         Restart = "always";
         RestartSec = 2;
         # The daemon spawns agent CLIs, so it needs a writable home and a normal PATH. Keep the
@@ -225,11 +231,13 @@ in
         pkgs.git
         pkgs.bashInteractive
         pkgs.nodejs_22
-      ];
+      ]
+      ++ lib.optional config.my.features.dev.pi.enable config.my.features.dev.pi.package;
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        inherit (cfg) user group;
+        User = cfg.user;
+        Group = cfg.group;
         StateDirectory = baseNameOf cfg.stateDir;
         ExecStart = "${configure}/bin/paseo-configure";
       };
