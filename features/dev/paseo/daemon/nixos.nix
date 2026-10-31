@@ -94,26 +94,28 @@ let
         exit 1
       fi
 
-      # A saved host is identified by its target, so a changed address appends a second entry with
-      # the same label instead of replacing the old one. Remove the stale ones first: the registry
-      # then converges on the inventory instead of accumulating every port move.
+      # A saved host is keyed by its target and owned by the identity that created it, so neither a
+      # changed address nor a restart replaces an entry: the registry accumulates. Reconcile it
+      # instead of appending to it - drop what the inventory does not describe, collapse exact
+      # duplicates, and add only the peers that are missing.
       registry="$(mktemp)"
       paseo --home ${quote cfg.stateDir} host ls --json > "$registry"
       jq -r --argjson want '${builtins.toJSON peerTargets}' -f ${staleHostsQuery} "$registry" \
         | while read -r stale; do
           timeout 60 paseo --home ${quote cfg.stateDir} host rm "$stale"
         done
+      present="$(jq -r --argjson want '${builtins.toJSON peerTargets}' '
+        [.[] | select(.label | in($want)) | select($want[.label] == .targetDescription) | .label]
+        | unique
+        | .[]
+      ' "$registry")"
       rm -f "$registry"
 
-      ${
-        if cfg.connectPeers then
-          lib.concatMapStringsSep "\n" (
-            peer:
-            "timeout 60 paseo --home ${quote cfg.stateDir} host add ${quote peerTargets.${peer}} --label ${quote peer}"
-          ) (lib.attrNames peerTargets)
-        else
-          ": peer registration disabled"
-      }
+      ${lib.concatMapStringsSep "\n" (peer: ''
+        if ! printf '%s\n' "$present" | grep -qx ${quote peer}; then
+          timeout 60 paseo --home ${quote cfg.stateDir} host add ${quote peerTargets.${peer}} --label ${quote peer}
+        fi
+      '') (if cfg.connectPeers then lib.attrNames peerTargets else [ ])}
 
       ${lib.optionalString cfg.hub.enable ''
         # The key travels in the environment, not in argv: a command line is world-readable in
