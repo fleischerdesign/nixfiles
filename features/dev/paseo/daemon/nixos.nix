@@ -192,6 +192,15 @@ in
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       environment = daemonEnv;
+      # A systemd service starts with a minimal PATH, and the daemon is not self-contained: its
+      # terminal worker reads its own process identity with `ps`, and the agents it spawns expect
+      # git, bash and node. Without these the bootstrap fails and the unit restart-loops.
+      path = [
+        pkgs.procps
+        pkgs.git
+        pkgs.bashInteractive
+        pkgs.nodejs_22
+      ];
       serviceConfig = {
         Type = "simple";
         ExecStart = "${paseo} daemon run --home ${cfg.stateDir}";
@@ -211,6 +220,12 @@ in
       after = [ "paseo.service" ];
       requires = [ "paseo.service" ];
       environment = daemonEnv;
+      path = [
+        pkgs.procps
+        pkgs.git
+        pkgs.bashInteractive
+        pkgs.nodejs_22
+      ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
