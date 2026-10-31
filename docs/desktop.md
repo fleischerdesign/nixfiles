@@ -112,8 +112,10 @@ loss does not guarantee completed uploads: keep the cache and restart the same m
 **Google Drive** is an interactive OAuth setup per PC, outside Git and the store, at
 `~/.config/rclone/gdrive.conf` - created with a restrictive umask and `chmod 600` afterwards. Use an own
 OAuth desktop client (the shared upstream client is being retired), and never paste credentials into a chat
-or into Nix. **Server mounts** derive from `my.topology.hosts` with `hostType = "server"`, using their mesh
-addresses. `inventory/ssh.nix` pins the Ed25519 host keys and rclone validates them against
+or into Nix. **Server mounts** derive from `my.topology.hosts` with `hostType = "server"`, addressing each
+one by its canonical node FQDN from `my.contracts.projections.hostFqdnOf`, so the fleet resolver selects the
+plane the client is on (LAN at home, mesh elsewhere). `inventory/ssh.nix` pins the Ed25519 host keys
+under both the node FQDN and the mesh address, and rclone validates them against
 `/etc/ssh/ssh_known_hosts`, failing closed on a mismatch and negotiating Ed25519 explicitly. The personal key
 is used through the GCR SSH agent of the session; the private key is never read, and the fleet deploy key is
 never used for browsing.

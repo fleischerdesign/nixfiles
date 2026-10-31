@@ -10,14 +10,17 @@ let
   enabled = osConfig.my.features.system.rclone.enable;
   servers = lib.filterAttrs (_: host: host.hostType == "server") osConfig.my.topology.hosts;
   fleet = (import ../../lib/fleet-configs.nix { inherit lib; }).systems osConfig;
+  # A node name, not an overlay address: the fleet resolver answers it with the
+  # address of the plane the client is on.
+  hostFqdnOf = osConfig.my.contracts.projections.hostFqdnOf;
   # key_use_agent selects this key's .pub identity from the existing agent;
   # rclone does not read the private key or fall back to the deploy identity.
   keyFile = "${config.home.homeDirectory}/.ssh/id_rsa";
   ini = pkgs.formats.ini { };
   serverConfig = ini.generate "rclone-sftp.conf" (
-    lib.mapAttrs (name: host: {
+    lib.mapAttrs (name: _: {
       type = "sftp";
-      host = host.wireguardIpv4;
+      host = hostFqdnOf.${name};
       user = config.home.username;
       port = fleet.${name}.config.my.contracts.provides.ssh.endpoints.ssh.port;
       key_file = keyFile;

@@ -14,6 +14,7 @@ in
     inherit publicKey;
     hostNames = [
       name
+      config.my.contracts.projections.hostFqdnOf.${name}
       hosts.${name}.wireguardIpv4
     ];
   }) hostKeys;
