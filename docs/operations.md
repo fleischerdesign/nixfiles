@@ -224,7 +224,8 @@ proxied requests. This password and the OpenCode Go, OpenRouter and OpenAI API k
 runtime and never enter the Nix store. Shared Gateway tokens are incompatible with trusted-proxy mode
 and are not configured.
 
-The default model is DeepSeek V4.1 Flash through OpenCode Go, using the native OpenClaw runtime.
+The default interactive model is GPT-6.1 Terra through OpenAI; delegated work and background
+maintenance use DeepSeek V4.1 Flash through OpenCode Go. Both use the native OpenClaw runtime.
 Model selection uses the dynamically discovered provider catalog with an unrestricted model policy;
 the default model does not impose a one-model restriction or an explicit per-model runtime binding.
 The gateway's ordered `opencodeSubscriptions` list provisions stable, named auth profiles through
@@ -234,7 +235,7 @@ upstream CLI invokes its config writer even for auth-store-only plans; the gatew
 remains immutable. `cld-ops-01` prefers `subscription-2` and falls back to
 `subscription-1`, using `ai/opencode_api_key_2` and `ai/opencode_api_key` respectively. OpenClaw owns
 session affinity and cooldowns, and rotates same-provider profiles on eligible quota, billing, auth
-and transient failures. Exhausting both subscriptions surfaces an error; the model stays DeepSeek.
+and transient failures. Exhausting both subscriptions surfaces an error; no fallback model is substituted.
 Automatic session affinity can keep a healthy fallback selected after the preferred account recovers.
 Provider-specific reset times are used only when OpenClaw recognizes them; no monthly reset date is
 invented. An explicit per-agent auth-order override takes precedence over the declarative default.
@@ -291,7 +292,7 @@ model selection.
 
 The gateway module separates the interactive `model`, `subagentModel` (defaults to
 `model`) and `backgroundModel` (defaults to `subagentModel`). The host chooses concrete
-provider references once. `cld-ops-01` uses Sol for interaction and DeepSeek for workers
+provider references once. `cld-ops-01` uses Terra for interaction and DeepSeek for workers
 and background work. Same-agent workers use their configured default even when the
 parent session overrides its model. Explicit spawn overrides remain possible.
 
