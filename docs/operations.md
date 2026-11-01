@@ -336,16 +336,6 @@ mutable roots keep the upstream rejection. The derived check builds the real pac
 reader against bundled, custodian and plugin trees, plus negative writability, ownership and path
 cases. Remove the overlay when upstream applies the same distinction to `readSkillBundleTree`.
 
-A repository session created from `repository: { url }` has its checkout only on the session
-runner; the Gateway holds the publication donor, which has no origin and no working tree. A
-same-agent `sessions_spawn` from such a session forces a managed child worktree, and inheriting
-that parent used to fall through to the agent workspace: base-ref discovery then ran
-`git ls-remote origin` in an unrelated repository. The same overlay refuses the inheritance
-before a workspace is resolved, with a message that names the paired-node checkout and the
-Gateway project route; project, managed-worktree and plain workspace parents are unchanged.
-The derived check builds the real package and asserts the refusal is wired before the inherited
-source is resolved, plus the decision table for the unchanged parents.
-
 Skills supply task-specific procedures, not duplicate routing rules. Memory records
 preferences and decisions, not technical defaults. Existing sessions and auth profiles
 remain runtime state. Check actual bootstrap context for both main and isolated child
