@@ -226,8 +226,11 @@ and are not configured.
 
 The default interactive model is GPT-6.1 Sol through OpenAI; delegated work and background
 maintenance use DeepSeek V4.1 Flash through OpenCode Go. Both use the native OpenClaw runtime.
-Model selection uses the dynamically discovered provider catalog with an unrestricted model policy;
-the default model does not impose a one-model restriction or an explicit per-model runtime binding.
+Model selection uses the dynamically discovered provider catalog with an unrestricted model policy.
+The interactive OpenAI model carries an explicit `agentRuntime.id = "openclaw"` binding because
+paired-node session creation has no Codex app-server owner, so an implicit runtime would fail.
+OpenAI provider auth is `oauth`: with the embedded runtime, an eligible Platform key otherwise wins
+over the ChatGPT Plus profile and bills API credits, while an expired subscription now fails closed.
 The gateway's ordered `opencodeSubscriptions` list provisions stable, named auth profiles through
 OpenClaw's supported secrets-plan CLI before startup. Profiles store environment SecretRefs; API keys
 remain in SOPS and the runtime environment. The importer uses a temporary config copy because the

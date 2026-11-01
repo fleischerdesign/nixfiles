@@ -374,12 +374,34 @@ in
           defaultProfile = "openclaw";
           profiles.openclaw.cdpPort = 18800;
         };
+        # Paired-node session creation has no Codex app-server owner, so an
+        # OpenAI model left on the implicit runtime fails with "No enabled
+        # plugin owns agent harness codex". Pin the interactive OpenAI model to
+        # the embedded runtime; other providers keep their implicit selection.
+        # The provider auth mode is subscription-only for the same reason: with
+        # the embedded runtime, an eligible ChatGPT profile and an eligible
+        # OPENAI_API_KEY both present make the API route win, billing Platform
+        # credits. Pinning oauth narrows route selection to the subscription
+        # credential, so an expired profile fails closed instead of falling
+        # back to the paid key.
+        models = lib.optionalAttrs (lib.hasPrefix "openai/" cfg.model) {
+          providers.openai.auth = "oauth";
+        };
         agents.defaults = {
           workspace = workspaceDir;
           model.primary = cfg.model;
           model.fallbacks = [ ];
           utilityModel = cfg.utilityModel;
-          models.${cfg.backgroundModel}.alias = "background";
+          models =
+            lib.recursiveUpdate
+              {
+                ${cfg.backgroundModel}.alias = "background";
+              }
+              (
+                lib.optionalAttrs (lib.hasPrefix "openai/" cfg.model) {
+                  ${cfg.model}.agentRuntime.id = "openclaw";
+                }
+              );
           subagents = {
             model = cfg.subagentModel;
             thinking = "medium";
