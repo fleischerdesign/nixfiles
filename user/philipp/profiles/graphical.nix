@@ -21,7 +21,6 @@
     resources
     moonlight-qt
     packet
-    yaak
     jellyfin-desktop
     inkscape
     evince
