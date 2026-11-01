@@ -131,10 +131,10 @@ let
     umask 077
     {
       printf 'github.com:\n'
-      printf '  user: %s\n' ${lib.escapeShellArg config.my.user.primary}
+      printf '  user: %s\n' ${lib.escapeShellArg config.my.features.dev.git.ghUser}
       printf '  oauth_token: "%s"\n' "$OPENCLAW_CONTROLUI_GITHUB_TOKEN"
       printf '  users:\n'
-      printf '    %s:\n' ${lib.escapeShellArg config.my.user.primary}
+      printf '    %s:\n' ${lib.escapeShellArg config.my.features.dev.git.ghUser}
       printf '      oauth_token: "%s"\n' "$OPENCLAW_CONTROLUI_GITHUB_TOKEN"
     } > "$staging/hosts.yml"
     printf 'version: "1"\n' > "$staging/config.yml"
