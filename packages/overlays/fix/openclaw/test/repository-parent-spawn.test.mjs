@@ -12,8 +12,15 @@
 //   - a failing publish discards the staged result and resumes quiescence;
 //   - visible preparation returns the child repository workspace, a stale child
 //     checkpoint is refused, and rollback does not depend on parent currency;
+//   - the capture is driven through the package's service method, not the
+//     exported helper;
 //   - a hidden caller cannot run the branch and gets an explicit error instead
-//     of the wrong repository;
+//     of the wrong repository, including when it passes a name or baseRef;
+//   - a visible spawn cannot bypass capture with an explicit worktree name or
+//     baseRef, and no child row or capture is created;
+//   - a post-publish failure removes an owned target (created or reused) so a
+//     retry is not blocked by an accepted orphan, while a pre-existing valid
+//     target is preserved;
 //   - valid managed-worktree and explicit-project routes are unchanged against
 //     the unpatched baseline package.
 //
@@ -121,12 +128,22 @@ const captureWorkspaceSnapshot = await importExport(dist, workspaceReconcileFile
 const serializeWorkspaceManifest = await importExport(dist, workspaceReconcileFile, "serializeWorkspaceManifest");
 const getSessionRepositoryWorkspaceStore = await importExport(dist, repositoryStoreFile, "getSessionRepositoryWorkspaceStore");
 const stageSessionRepositoryCheckpoint = await importExport(dist, checkpointFile, "stageSessionRepositoryCheckpoint");
-const captureRepositoryWorkspaceForFork = await importExport(
-  dist,
-  placementStartupFile,
-  "__ocCaptureRepositoryWorkspaceForFork",
-);
-if (typeof captureRepositoryWorkspaceForFork !== "function") fail("capture export is not a function");
+function serviceModule(root, file) {
+  const shim = fs.mkdtempSync(path.join(isolated, "service-shim-"));
+  const source = fs.readFileSync(path.join(root, file), "utf8");
+  const specs = [...new Set([...source.matchAll(/(?:from |import )"\.\/([^"]+)"/g)].map((m) => m[1]))];
+  for (const spec of specs) fs.symlinkSync(path.join(root, spec), path.join(shim, spec));
+  fs.writeFileSync(
+    path.join(shim, "placement-service.mjs"),
+    `${source}\nexport { createRepositoryWorkspaceMutationService };\n`,
+  );
+  return path.join(shim, "placement-service.mjs");
+}
+const createRepositoryWorkspaceMutationService = (await import(serviceModule(dist, placementStartupFile)))
+  .createRepositoryWorkspaceMutationService;
+if (typeof createRepositoryWorkspaceMutationService !== "function") fail("capture service is not a function");
+const captureViaService = (deps, params) =>
+  createRepositoryWorkspaceMutationService(deps).captureForFork(params);
 
 const store = getSessionRepositoryWorkspaceStore();
 
@@ -268,6 +285,7 @@ function fakeCoordinator(parentWorkspace, options = {}) {
                 calls.push("publish");
                 if (options.publishError) throw options.publishError;
                 await prepared.publish();
+                if (options.postPublishError) throw options.postPublishError;
               },
               async discardPreparedStagedResult() {
                 calls.push("discard");
@@ -378,7 +396,7 @@ const payload = {
 
 const child = await childWithBase(parent, "agent:main:dashboard:child");
 const controller = fakeCoordinator(parent.workspace, { payload });
-const captured = await captureRepositoryWorkspaceForFork(controller.deps, {
+const captured = await captureViaService(controller.deps, {
   sessionId: "parent-session-id",
   sessionKey: "agent:main:dashboard:parent",
   agentId: "main",
@@ -425,7 +443,7 @@ const blocked = fakeCoordinator(parent.workspace, { payload });
 blocked.setClaimCurrent(false);
 const blockedChild = await childWithBase(parent, "agent:main:dashboard:blocked-child");
 await assert.rejects(
-  captureRepositoryWorkspaceForFork(blocked.deps, {
+  captureViaService(blocked.deps, {
     sessionId: "parent-session-id",
     sessionKey: "agent:main:dashboard:parent",
     agentId: "main",
@@ -447,7 +465,7 @@ const failing = fakeCoordinator(parent.workspace, {
 });
 const failingChild = await childWithBase(parent, "agent:main:dashboard:failing-child");
 await assert.rejects(
-  captureRepositoryWorkspaceForFork(failing.deps, {
+  captureViaService(failing.deps, {
     sessionId: "parent-session-id",
     sessionKey: "agent:main:dashboard:parent",
     agentId: "main",
@@ -483,7 +501,7 @@ function captureService(recorder) {
       assert.equal(params.agentId, "main");
       assert.ok(params.target.workspaceId);
       assert.ok(Number.isSafeInteger(params.target.expectedRevision));
-      await captureRepositoryWorkspaceForFork(controller.deps, {
+      await captureViaService(controller.deps, {
         ...params,
         sourceWorkspaceId: parent.workspace.workspaceId,
       });
@@ -548,7 +566,7 @@ assert.notEqual(retryAfter.revision, retryChild.revision, "retry reused the stal
 
 runPrepare.calls.length = 0;
 const acceptedChild = await childWithBase(parent, "agent:main:dashboard:accepted-child");
-await captureRepositoryWorkspaceForFork(controller.deps, {
+await captureViaService(controller.deps, {
   sessionId: "parent-session-id",
   sessionKey: "agent:main:dashboard:parent",
   agentId: "main",
@@ -561,6 +579,11 @@ const stale = await runPrepare({ key: "agent:main:dashboard:accepted-child" });
 assert.equal(stale.ok, false, "an already accepted child checkpoint was reused");
 assert.match(stale.error.message, /already has an accepted checkpoint/);
 assert.equal(runPrepare.calls.length, 0, "stale child reached capture");
+const acceptedAfter = await store.get(acceptedChild.workspaceId);
+assert.ok(acceptedAfter, "stale refusal deleted the pre-existing accepted child");
+assert.equal(acceptedAfter.agentId, "main", "stale refusal changed the child owner agent");
+assert.equal(acceptedAfter.sessionKey, "agent:main:dashboard:accepted-child", "stale refusal changed the child owner session");
+assert.ok(acceptedAfter.checkpointRef, "stale refusal removed the pre-existing accepted checkpoint");
 console.log("ok 5: retry is revision-fresh and a stale child checkpoint is refused");
 
 // ---- 6. Hidden caller gets an explicit error, never the branch ----
@@ -579,7 +602,73 @@ assert.equal(cross.ok, false, "a different target agent captured the parent work
 assert.equal(runPrepare.calls.length, 0, "cross-agent target reached capture");
 console.log("ok 7: cross-agent authority unchanged");
 
-// ---- 8. Baseline A/B: managed worktree and explicit project routes ----
+// ---- 8. Explicit worktree name/baseRef cannot fall back to the Gateway default ----
+for (const [label, options] of [
+  ["hidden name", { inherited: false, key: "agent:main:dashboard:hidden-named-child", selectors: { name: "named-worktree" } }],
+  ["visible name", { key: "agent:main:dashboard:visible-named-child", selectors: { name: "named-worktree" } }],
+  ["visible baseRef", { key: "agent:main:dashboard:visible-baseref-child", selectors: { baseRef: "main" } }],
+]) {
+  runPrepare.calls.length = 0;
+  const refused = await runPrepare(options);
+  assert.equal(refused.ok, false, `${label} fell through to the Gateway default workspace`);
+  assert.match(refused.error.message, /repository workspace cannot use an explicit worktree name or baseRef/);
+  assert.equal(runPrepare.calls.length, 0, `${label} reached capture`);
+  assert.equal(
+    await store.find({ agentId: "main", sessionKey: options.key }),
+    undefined,
+    `${label} left a child workspace row`,
+  );
+}
+console.log("ok 8: explicit name/baseRef is refused before store or capture");
+
+// ---- 9. A post-publish failure cleans the target and does not block a retry ----
+const postPublishError = new Error("simulated post-publish source change");
+const postPublishExisting = await childWithBase(parent, "agent:main:dashboard:postpublish-existing");
+const failingAfterPublish = fakeCoordinator(parent.workspace, {
+  payload: { ...payload, stagingRoot: stagingCopy(parentRepo) },
+  postPublishError,
+});
+const existingFailed = await runPrepare({
+  key: "agent:main:dashboard:postpublish-existing",
+  selectors: {
+    repositoryCaptureService: {
+      async captureForFork(params) {
+        await captureViaService(failingAfterPublish.deps, params);
+      },
+    },
+  },
+});
+assert.equal(existingFailed.ok, false, "post-publish failure was reported as success");
+assert.equal(await store.get(postPublishExisting.workspaceId), undefined, "post-publish failure left an accepted orphan");
+assert.equal(fs.existsSync(store.artifactPath(postPublishExisting.workspaceId)), false, "post-publish failure left the child artifact");
+const retryAfterExisting = await runPrepare({ key: "agent:main:dashboard:postpublish-existing" });
+assert.equal(retryAfterExisting.ok, true, `retry after a post-publish failure was blocked: ${retryAfterExisting.error?.message}`);
+assert.ok((await store.get(retryAfterExisting.value.repositoryWorkspaceId)).checkpointRef, "retry after cleanup has no checkpoint");
+console.log("ok 9: post-publish existing-target failure cleans up and retries");
+
+// ---- 10. A created target that fails after publish is removed as well ----
+const createdKey = "agent:main:dashboard:postpublish-created";
+const failingCreated = fakeCoordinator(parent.workspace, {
+  payload: { ...payload, stagingRoot: stagingCopy(parentRepo) },
+  postPublishError,
+});
+const createdFailed = await runPrepare({
+  key: createdKey,
+  selectors: {
+    repositoryCaptureService: {
+      async captureForFork(params) {
+        await captureViaService(failingCreated.deps, params);
+      },
+    },
+  },
+});
+assert.equal(createdFailed.ok, false, "created post-publish failure was reported as success");
+assert.equal(await store.find({ agentId: "main", sessionKey: createdKey }), undefined, "created post-publish failure left an orphan");
+const retryAfterCreated = await runPrepare({ key: createdKey });
+assert.equal(retryAfterCreated.ok, true, `retry after a created-target failure was blocked: ${retryAfterCreated.error?.message}`);
+console.log("ok 10: post-publish created-target failure cleans up and retries");
+
+// ---- 11. Baseline A/B: managed worktree and explicit project routes ----
 const baselineRoot = process.env.OPENCLAW_BASELINE_ROOT;
 if (!baselineRoot) {
   fail("OPENCLAW_BASELINE_ROOT is required for the mandatory A/B fixtures");
@@ -637,7 +726,7 @@ for (const [label, targetEntry, extra] of routeFixtures) {
   assert.deepEqual(after, before, `repository-parent branch changed the ${label} route`);
   assert.equal(before.error, undefined, `${label} fixture did not succeed: ${before.error ?? before.thrown}`);
 }
-console.log("ok 8: baseline A/B unchanged for managed worktree and explicit project");
+console.log("ok 11: baseline A/B unchanged for managed worktree and explicit project");
 
 if (failures > 0) process.exit(1);
 console.log("repository-parent spawn test: all assertions passed");

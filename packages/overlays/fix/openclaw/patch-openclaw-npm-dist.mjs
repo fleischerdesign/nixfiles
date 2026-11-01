@@ -264,9 +264,9 @@ async function __ocCaptureRepositoryWorkspaceForFork(deps, params) {
 ${captureAnchor}`;
 placementSource = placementSource.replace(captureAnchor, captureFunction);
 
-const serviceReturnAnchor = "\treturn {\n\t\tdispatch,\n\t\tforceDestroyEnvironment:";
+const serviceReturnAnchor = "\treturn { async mutate(params) {";
 if (placementSource.split(serviceReturnAnchor).length - 1 !== 1) {
-  fail("repository capture: service return anchor moved");
+  fail("repository capture: mutation service return anchor moved");
 }
 placementSource = placementSource.replace(
   serviceReturnAnchor,
@@ -279,8 +279,7 @@ placementSource = placementSource.replace(
 \t\t\t\tresolveWorkspace: options.resolveWorkspace
 \t\t\t}, params);
 \t\t},
-\t\tdispatch,
-\t\tforceDestroyEnvironment:`,
+\t\tasync mutate(params) {`,
 );
 
 const exportAnchor = "export { createGatewayGitHubPublicationRuntime, createGatewayWorkerPlacementRuntime };";
@@ -318,7 +317,7 @@ if (worktreeSource.split(helperAnchor).length - 1 !== 1) {
 
 const helpers = `/** Resolve an inherited parent repository workspace as a spawn source. */
 async function __ocResolveSpawnParentRepositoryWorkspace(parentSessionKey, agentId, options = {}) {
-	const parent = loadGatewaySessionEntryReadOnly(parentSessionKey, { agentId });
+	const parent = options.parent ?? loadGatewaySessionEntryReadOnly(parentSessionKey, { agentId });
 	const repositoryWorkspaceId = normalizeOptionalString(parent.entry?.repositoryWorkspaceId);
 	if (!repositoryWorkspaceId || parent.entry?.worktree) return;
 	if (!parent.entry?.sessionId) return;
@@ -377,6 +376,22 @@ async function __ocPrepareSpawnChildRepositoryWorkspace(params) {
 			assertCurrent: () => {}
 		});
 	};
+	// A failed attempt may have published a checkpoint into an existing target.
+	// That accepted orphan would make every retry refuse, so remove it. A
+	// pre-existing target that this attempt did not mutate stays untouched.
+	const cleanupFailedTarget = async (workspaceId, created) => {
+		try {
+			const current = await repositories.get(workspaceId);
+			if (!current || current.agentId !== params.target.agentId || current.sessionKey !== params.target.key) return;
+			if (!created && !current.checkpointRef) return;
+			await repositories.delete({
+				workspaceId,
+				assertCurrent: () => {}
+			});
+		} catch {
+			// Never mask the failure that triggered cleanup.
+		}
+	};
 	let preparedSource;
 	let existing;
 	try {
@@ -408,6 +423,8 @@ async function __ocPrepareSpawnChildRepositoryWorkspace(params) {
 				sessionKey: params.target.key,
 				assertCurrent,
 				stage: async ({ target: child }) => {
+					created = true;
+					target = child;
 					await capture.captureForFork({
 						sessionId: source.sessionId,
 						sessionKey: source.parentKey,
@@ -424,6 +441,7 @@ async function __ocPrepareSpawnChildRepositoryWorkspace(params) {
 			});
 			created = true;
 		} catch (error) {
+			if (target) await cleanupFailedTarget(target.workspaceId, true);
 			if (collectNestedErrorCandidates(error).some((cause) => cause instanceof SessionWorktreeSourceChangedError)) throw error;
 			return err(errorShape(ErrorCodes.UNAVAILABLE, formatErrorMessage(error)));
 		}
@@ -445,7 +463,7 @@ async function __ocPrepareSpawnChildRepositoryWorkspace(params) {
 			});
 			target = await repositories.get(target.workspaceId) ?? target;
 		} catch (error) {
-			if (created) await deleteTarget(target.workspaceId).catch(() => void 0);
+			await cleanupFailedTarget(target.workspaceId, created);
 			if (collectNestedErrorCandidates(error).some((cause) => cause instanceof SessionWorktreeSourceChangedError)) throw error;
 			return err(errorShape(ErrorCodes.UNAVAILABLE, formatErrorMessage(error)));
 		}
@@ -453,7 +471,7 @@ async function __ocPrepareSpawnChildRepositoryWorkspace(params) {
 	try {
 		assertCurrent();
 	} catch (error) {
-		await deleteTarget(target.workspaceId).catch(() => void 0);
+		await cleanupFailedTarget(target.workspaceId, created);
 		throw error;
 	}
 	return ok({
@@ -470,11 +488,16 @@ const hiddenGuardAnchor =
 if (worktreeSource.split(hiddenGuardAnchor).length - 1 !== 1) {
   fail("repository-parent spawn branch: inherited branch anchor moved");
 }
-const hiddenGuard = `\tif (params.inheritParentKey && !params.repositoryParentInheritance && !acceptedWorktree && !acceptedPending && !params.workspace && !params.projectGitUrl && !params.name && !params.baseRef) {
-\t\tconst unsupportedParent = loadGatewaySessionEntryReadOnly(params.inheritParentKey, { agentId: lifecycleTarget.agentId });
-\t\tif (unsupportedParent.entry?.repositoryWorkspaceId) return err(errorShape(ErrorCodes.UNAVAILABLE, "Spawn from a repository workspace requires the visible placed session path; hidden subagents cannot inherit it. Spawn with visible=true and a placement profile."));
+const hiddenGuard = `\tconst inheritedRepositoryParent = params.inheritParentKey && !acceptedWorktree && !acceptedPending ? loadGatewaySessionEntryReadOnly(params.inheritParentKey, { agentId: lifecycleTarget.agentId }) : void 0;
+\tconst isRepositoryParent = Boolean(inheritedRepositoryParent?.entry?.repositoryWorkspaceId && inheritedRepositoryParent.entry.sessionId && !inheritedRepositoryParent.entry.worktree);
+\tif (isRepositoryParent && !params.workspace && !params.projectGitUrl) {
+\t\tif (params.name || params.baseRef) return err(errorShape(ErrorCodes.UNAVAILABLE, "Spawn from a repository workspace cannot use an explicit worktree name or baseRef; omit it to inherit the parent's live tree."));
+\t\tif (!params.repositoryParentInheritance) return err(errorShape(ErrorCodes.UNAVAILABLE, "Spawn from a repository workspace requires the visible placed session path; hidden subagents cannot inherit it. Spawn with visible=true and a placement profile."));
 \t}
-\tconst repositoryParentSource = params.repositoryParentInheritance && params.inheritParentKey && !acceptedWorktree && !acceptedPending && !params.workspace && !params.projectGitUrl && !params.name && !params.baseRef ? await __ocResolveSpawnParentRepositoryWorkspace(params.inheritParentKey, lifecycleTarget.agentId, { signal }) : void 0;
+\tconst repositoryParentSource = isRepositoryParent && params.repositoryParentInheritance && !params.workspace && !params.projectGitUrl ? await __ocResolveSpawnParentRepositoryWorkspace(params.inheritParentKey, lifecycleTarget.agentId, {
+\t\tsignal,
+\t\tparent: inheritedRepositoryParent
+\t}) : void 0;
 \tif (repositoryParentSource) {
 \t\tconst preparedRepository = await __ocPrepareSpawnChildRepositoryWorkspace({
 \t\t\tsource: repositoryParentSource,
@@ -523,10 +546,14 @@ const required = [
   [worktreeBuilt, `import { ${repositoryStoreAlias} as __ocGetSessionRepositoryWorkspaceStore } from "./${repositoryStoreFile}";`],
   [worktreeBuilt, "async function __ocResolveSpawnParentRepositoryWorkspace("],
   [worktreeBuilt, "async function __ocPrepareSpawnChildRepositoryWorkspace("],
-  [worktreeBuilt, "const repositoryParentSource = params.repositoryParentInheritance"],
+  [worktreeBuilt, "const isRepositoryParent = Boolean(inheritedRepositoryParent?.entry?.repositoryWorkspaceId"],
+  [worktreeBuilt, "Spawn from a repository workspace cannot use an explicit worktree name or baseRef"],
+  [worktreeBuilt, "const repositoryParentSource = isRepositoryParent && params.repositoryParentInheritance"],
   [worktreeBuilt, "capture: params.repositoryCaptureService"],
   [worktreeBuilt, "hidden subagents cannot inherit it"],
+  [worktreeBuilt, "const cleanupFailedTarget = async (workspaceId, created) => {"],
   [placementBuilt, "async function __ocCaptureRepositoryWorkspaceForFork(deps, params) {"],
+  [placementBuilt, "return {\n\t\tasync captureForFork(params) {"],
   [placementBuilt, "captureForFork(params) {"],
   [placementBuilt, "verifyReconciledWorkspaceFinal(reconciliation, quiescence);"],
   [placementBuilt, "validateTurnClaim(turnClaim)"],
