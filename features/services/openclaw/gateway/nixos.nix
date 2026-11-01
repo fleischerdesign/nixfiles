@@ -116,6 +116,34 @@ let
       }) subscriptions;
     }
   );
+  # One managed GitHub identity serves agent execution and the worker launch
+  # envelope. Only the profile id belongs in config; the credential stays in the
+  # service's private profile directory, rebuilt from SOPS before startup.
+  githubProfileId = "ghp_6f114fd642fe97ad115e763857406280";
+  githubProfileDir = "${stateDir}/credentials/github/system/${githubProfileId}";
+  provisionGitHubProfile = pkgs.writeShellScript "openclaw-github-profile" ''
+    set -euo pipefail
+    profile=${lib.escapeShellArg githubProfileDir}
+    parent="$(dirname "$profile")"
+    install -d -m 0700 "$parent"
+    staging="$(mktemp -d "$parent/.profile.XXXXXX")"
+    trap 'rm -rf "$staging"' EXIT
+    umask 077
+    {
+      printf 'github.com:\n'
+      printf '  user: %s\n' ${lib.escapeShellArg config.my.user.primary}
+      printf '  oauth_token: "%s"\n' "$OPENCLAW_CONTROLUI_GITHUB_TOKEN"
+      printf '  users:\n'
+      printf '    %s:\n' ${lib.escapeShellArg config.my.user.primary}
+      printf '      oauth_token: "%s"\n' "$OPENCLAW_CONTROLUI_GITHUB_TOKEN"
+    } > "$staging/hosts.yml"
+    printf 'version: "1"\n' > "$staging/config.yml"
+    chmod 0600 "$staging/hosts.yml" "$staging/config.yml"
+    chmod 0700 "$staging"
+    rm -rf "$profile"
+    mv "$staging" "$profile"
+    trap - EXIT
+  '';
   provisionAuth = pkgs.writeShellScript "openclaw-provision-auth" ''
     set -euo pipefail
     # The upstream secrets CLI always invokes its config writer, even for
@@ -282,6 +310,9 @@ in
       OPENCODE_API_KEY=${config.sops.placeholder.${(builtins.head subscriptions).apiKeySecret}}
       OPENROUTER_API_KEY=${config.sops.placeholder."ai/openrouter_api_key"}
       OPENAI_API_KEY=${config.sops.placeholder."ai/openai_api_key"}
+      OPENCLAW_CONTROLUI_GITHUB_TOKEN=${
+        config.sops.placeholder."users/${config.my.user.primary}/github_pat"
+      }
     '';
     sops.templates.openclaw-gateway-env.restartUnits = [ "openclaw-gateway.service" ];
 
@@ -341,6 +372,15 @@ in
           };
           controlUi.allowedOrigins = [ "https://${domain}" ];
           controlUi.experimental.customPlugins = true;
+          # Service credential for Control UI project discovery and private
+          # checkout. The project clone deliberately runs with an empty global
+          # Git config, so this credential is the only route; the dedicated
+          # variable is excluded from agent exec because this reference names it.
+          controlUi.github.token = {
+            source = "env";
+            provider = "default";
+            id = "OPENCLAW_CONTROLUI_GITHUB_TOKEN";
+          };
           portals.ingress = {
             domain = portalDomain;
             port = portalIngressPort;
@@ -365,6 +405,13 @@ in
               "camera.snap"
               "camera.clip"
             ];
+          };
+        };
+        tools.github = {
+          profileId = githubProfileId;
+          gitAuthor = {
+            name = "Möbius";
+            email = "moebius@vyrx.de";
           };
         };
         browser = {
@@ -561,12 +608,9 @@ in
     # this service through GIT_CONFIG_GLOBAL, so no other account on the host
     # inherits the identity and nothing depends on a remembered env prefix.
     #
-    # This is the authoritative author for what the agent commits. OpenClaw's
-    # own GitHub metadata (previews, worker repositories) still derives
-    # `moebius@openclaw.local`: aligning it needs a managed profile whose
-    # identifier belongs in sops and would move GitHub token custody into
-    # OpenClaw. That trade was declined deliberately, and it cannot affect a
-    # commit, because git reads this file.
+    # This is the authoritative author for every git invocation. OpenClaw's
+    # managed GitHub identity declares the same author, so previews and worker
+    # commits agree with it; the file stays the source git itself reads.
     # The global Git file is replaced, not extended, so the credential helpers
     # that lived in the account's ~/.gitconfig have to move here with it.
     # Without them a push fails with "could not read Username".
@@ -593,6 +637,7 @@ in
         StandardOutput = lib.mkForce "journal";
         StandardError = lib.mkForce "journal";
         ExecStartPre = [
+          provisionGitHubProfile
           provisionAuth
           # Materialize inside the workspace: the bootstrap loader rejects
           # symlinks that resolve outside it, including links into the Nix store.
@@ -697,6 +742,9 @@ in
         unauthenticatedPaths = [
           "/j/*"
           "/__openclaw__/worker"
+          "/__openclaw__/worker-bundle/*"
+          "/__openclaw__/worker-transfer/*"
+          "/__openclaw__/worker-bootstrap/*"
         ];
         machineClientsBypassAuth = true;
         stripRequestHeaders = [

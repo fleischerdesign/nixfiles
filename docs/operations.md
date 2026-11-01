@@ -217,9 +217,12 @@ allowlist and session administrator grant derive from the primary username. Auth
 devices are enrolled automatically with limited persistent grants. The administrator scope is granted
 only to the verified owner's session. Client identity headers are stripped before forward auth.
 
-Single-use `/j/*` enrollment links, credentialed `/__openclaw__/worker` connections and non-browser
-WebSocket upgrades bypass browser SSO; OpenClaw verifies their own bootstrap, worker or paired-device
-credentials. The direct-local administrative CLI uses a separate password fallback, unavailable to
+Single-use `/j/*` enrollment links, credentialed `/__openclaw__/worker` connections, the
+`/__openclaw__/worker-bundle/*`, `/__openclaw__/worker-transfer/*` and
+`/__openclaw__/worker-bootstrap/*` artifact routes, and non-browser WebSocket upgrades bypass
+browser SSO; OpenClaw verifies their own short-lived bootstrap, worker or paired-device credentials.
+The artifact routes are plain HTTP GETs, so they need their own exemptions; the WebSocket bypass
+does not cover them. The direct-local administrative CLI uses a separate password fallback, unavailable to
 proxied requests. This password and the OpenCode Go, OpenRouter and OpenAI API keys come from SOPS at
 runtime and never enter the Nix store. Shared Gateway tokens are incompatible with trusted-proxy mode
 and are not configured.
@@ -272,9 +275,14 @@ conversation-access grant is authored explicitly; the CLI is packaged from the o
 `@composio/cli` release and prepended to the exec PATH. CLI sign-in and connected
 accounts are runtime state in the service account's home, not Nix. Provenance diagnostics for
 Nix-loaded plugins are expected and informational.
-The GitHub CLI is installed for the gateway process and the exec path; the GitHub identity stays
-native (`gh` login as the service account), because a managed identity would write runtime config
-that Nix ownership forbids.
+The GitHub CLI is installed for the gateway process and the exec path. The gateway
+uses the sops `users/<primary>/github_pat` credential in two roles: an explicit
+`gateway.controlUi.github.token` SecretRef for project discovery and private
+checkout, and a managed `tools.github` identity whose private `gh` profile is
+rebuilt from the same SOPS value before the gateway starts. The profile id is
+the only identity value in Nix; the credential never enters the store. Worker
+turns receive the managed identity through their launch envelope, and the
+declared Git author matches the service's `GIT_CONFIG_GLOBAL` identity.
 The bundled Workboard plugin provides local Kanban boards for agent-owned cards and rule-based
 session views; its boards live in gateway state, not Nix.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
