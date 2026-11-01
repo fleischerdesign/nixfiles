@@ -7,12 +7,11 @@
   config,
   lib,
   pkgs,
-  inputs,
   osConfig,
   ...
 }:
 let
-  package = inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway;
+  package = pkgs.openclaw-gateway;
   stateDir = "${config.xdg.stateHome}/openclaw-node";
   hasDesktop = lib.elem "graphical" osConfig.my.user.profiles;
   nodeConfig = pkgs.writeText "openclaw-node.json" (
@@ -171,6 +170,9 @@ in
         UMask = "0077";
         Environment = [
           "PATH=${config.home.profileDirectory}/bin:/run/current-system/sw/bin"
+          # The package wrapper sets this too; the explicit unit value keeps the
+          # skill hardlink policy in force for every process the node starts.
+          "OPENCLAW_NIX_MODE=1"
         ];
       };
       Install.WantedBy = [ "default.target" ];

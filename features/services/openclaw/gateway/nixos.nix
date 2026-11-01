@@ -14,7 +14,7 @@ let
   bootstrapHookHandler = pkgs.writeText "openclaw-bootstrap-extra-files-handler.js" ''
     export { default } from "${bootstrapHookDir}/handler.js";
   '';
-  package = inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}.openclaw-gateway;
+  package = pkgs.openclaw-gateway;
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
   portals = config.my.contracts.provides.openclaw.publications.portals;
@@ -650,6 +650,10 @@ in
       };
       # Git identity for every process the agent starts, including exec.
       environment.GIT_CONFIG_GLOBAL = "/etc/openclaw/gitconfig";
+      # The package wrapper sets this too; naming it here keeps the skill hardlink
+      # policy (and the rest of Nix mode) identical in worker processes that may
+      # receive a narrower environment.
+      environment.OPENCLAW_NIX_MODE = "1";
     };
     environment.systemPackages = [ operator ];
 

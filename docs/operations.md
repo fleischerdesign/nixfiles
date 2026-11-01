@@ -327,6 +327,15 @@ Only these explicitly managed files are replaced; personal `AGENTS.md`, `USER.md
 memory and learned skills are not regenerated. Policy changes alter the service unit and therefore follow normal nod
 activation and rollback. They do not depend on a skill being selected for a turn.
 
+Worker skill delivery has a related boundary. The worker bundler rejects every hardlinked file, while
+`auto-optimise-store` hardlinks identical files across content-addressed Nix store outputs. Bundled,
+custodian and plugin skill trees are therefore unreadable on a worker turn unless the read is relaxed.
+`packages/overlays/fix/openclaw` composes with nix-openclaw's dist-patch phase and allows hardlinks
+only when the resolved root is an immutable, root-owned store output and `OPENCLAW_NIX_MODE=1`;
+mutable roots keep the upstream rejection. The derived check builds the real package and calls its
+reader against bundled, custodian and plugin trees, plus negative writability, ownership and path
+cases. Remove the overlay when upstream applies the same distinction to `readSkillBundleTree`.
+
 Skills supply task-specific procedures, not duplicate routing rules. Memory records
 preferences and decisions, not technical defaults. Existing sessions and auth profiles
 remain runtime state. Check actual bootstrap context for both main and isolated child
