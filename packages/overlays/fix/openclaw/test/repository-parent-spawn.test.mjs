@@ -728,5 +728,168 @@ for (const [label, targetEntry, extra] of routeFixtures) {
 }
 console.log("ok 11: baseline A/B unchanged for managed worktree and explicit project");
 
+// ---- 12. Worker-tool spawn inherits the authenticated parent node, never the cloud provider ----
+//
+// The reduced worker tool schema carries no placement selector. The request the
+// worker executor hands to sessions.dispatch must therefore derive the node id
+// from the parent environment record, and the child runtime requirement from the
+// child session itself. This drives the real exported builder from the patched
+// package and validates its serialized request against the package's own schema
+// and required-profile policy.
+const workerExecutorFile = moduleFile(
+  dist,
+  /^worker-session-tool-executor-.*\.mjs$/,
+  "function createWorkerSessionToolExecutor(params, definitions) {",
+);
+const buildWorkerChildDispatchRequest = await importExport(
+  dist,
+  workerExecutorFile,
+  "__ocBuildWorkerChildDispatchRequest",
+);
+const workerAdmissionFile = moduleFile(dist, /^worker-admission-.*\.mjs$/, "const PlacedSessionsSpawnSchema = closedObject({");
+const placedSpawnSchema = (await import(path.join(dist, workerAdmissionFile))).U;
+const requiredProfileFile = moduleFile(dist, /^required-worker-profile-.*\.mjs$/, "function assertRequiredWorkerDispatch(config, request) {");
+const assertRequiredWorkerDispatch = await importExport(dist, requiredProfileFile, "assertRequiredWorkerDispatch");
+const { Value } = await import(path.join(packageRoot, "..", "typebox", "build", "value", "index.mjs"));
+
+const nodeId = "2da43dde2b39c3d58ced5420f75d746bf8bc67f1e70e3b651f8b93bb50a12493";
+const nodeEnvironment = {
+  environmentId: "worker:parent",
+  nodeDeviceId: nodeId,
+  providerId: "device",
+  profileId: `device:${nodeId}`,
+  profileSnapshot: {
+    install: "bundle",
+    settings: { device: nodeId },
+    executionMode: "worker-turn",
+  },
+};
+const workerConfig = { agents: { list: [{ id: "main", model: "openai/gpt-6.1-sol" }] } };
+const builderParams = {
+  cfg: workerConfig,
+  sourceEnvironment: nodeEnvironment,
+  sessionId: "child-session-id",
+  sessionKey: "agent:main:dashboard:cloud-child",
+  agentId: "main",
+  entry: { sessionId: "child-session-id", agentRuntimeOverride: "openclaw" },
+};
+const nodeRequest = buildWorkerChildDispatchRequest(builderParams);
+assert.equal(nodeRequest.deviceId, nodeId, "child dispatch did not inherit the parent node id");
+assert.equal(nodeRequest.profileId, `device:${nodeId}`, "child dispatch did not use the parent node profile");
+assert.equal(nodeRequest.executionMode, "worker-turn");
+assert.deepEqual(nodeRequest.inheritedProfile, {
+  providerId: "device",
+  profileSnapshot: nodeEnvironment.profileSnapshot,
+}, "child dispatch changed the parent profile snapshot");
+assert.deepEqual(
+  nodeRequest.devicePlacement,
+  { requiredNodeCommands: [], consumesWorkerSlot: true },
+  "child dispatch did not carry the authoritative device placement requirement",
+);
+assert.equal(Object.hasOwn(nodeRequest, "task"), false, "the dispatch request must not carry the task");
+
+// A selector injected into the model arguments cannot move the child: the
+// builder reads only the authenticated environment record.
+const injected = buildWorkerChildDispatchRequest({
+  ...builderParams,
+  deviceId: "attacker-node",
+  placement: { kind: "profile", profileId: "attacker-profile" },
+  profileId: "attacker-profile",
+});
+assert.equal(injected.deviceId, nodeId, "a model-supplied device id moved the child");
+assert.equal(injected.profileId, `device:${nodeId}`, "a model-supplied profile moved the child");
+
+// The cloud provider path is unchanged: no node, no device requirement.
+const cloudEnvironment = {
+  environmentId: "worker:cloud",
+  nodeDeviceId: null,
+  providerId: "managed",
+  profileId: "cloud-profile",
+  profileSnapshot: { install: "bundle", settings: { region: "eu" } },
+};
+const cloudRequest = buildWorkerChildDispatchRequest({
+  ...builderParams,
+  sourceEnvironment: cloudEnvironment,
+  entry: {},
+});
+assert.equal(Object.hasOwn(cloudRequest, "deviceId"), false, "a cloud parent gained a device id");
+assert.equal(Object.hasOwn(cloudRequest, "devicePlacement"), false, "a cloud parent gained a device requirement");
+assert.equal(cloudRequest.profileId, "cloud-profile");
+assert.deepEqual(cloudRequest.inheritedProfile, {
+  providerId: "managed",
+  profileSnapshot: cloudEnvironment.profileSnapshot,
+});
+
+// A managed cloud provider environment can also carry nodeDeviceId (for a
+// provider that provisions on a paired node). It keeps the old cloud route:
+// only a `device` provider makes the child request a device placement.
+const managedNodeEnvironment = {
+  environmentId: "worker:managed-node",
+  nodeDeviceId: nodeId,
+  providerId: "managed",
+  profileId: "managed-node-profile",
+  profileSnapshot: { install: "bundle", settings: { region: "eu" } },
+};
+const managedNodeRequest = buildWorkerChildDispatchRequest({
+  ...builderParams,
+  sourceEnvironment: managedNodeEnvironment,
+  entry: {},
+});
+assert.equal(Object.hasOwn(managedNodeRequest, "deviceId"), false, "a managed-node parent gained a device id");
+assert.equal(Object.hasOwn(managedNodeRequest, "devicePlacement"), false, "a managed-node parent gained a device requirement");
+assert.equal(managedNodeRequest.profileId, "managed-node-profile");
+assert.deepEqual(managedNodeRequest.inheritedProfile, {
+  providerId: "managed",
+  profileSnapshot: managedNodeEnvironment.profileSnapshot,
+});
+
+// A child runtime without paired-device support fails loudly instead of
+// falling back to the cloud provider, and an inconsistent parent record is
+// refused before any dispatch.
+assert.throws(
+  () => buildWorkerChildDispatchRequest({ ...builderParams, entry: {} }),
+  /cannot run on the parent's paired node/,
+);
+assert.throws(
+  () => buildWorkerChildDispatchRequest({
+    ...builderParams,
+    sourceEnvironment: { ...nodeEnvironment, profileId: "device:other-node" },
+  }),
+  /identity is inconsistent/,
+);
+assert.throws(
+  () => buildWorkerChildDispatchRequest({
+    ...builderParams,
+    sourceEnvironment: { ...nodeEnvironment, profileSnapshot: { install: "bundle", settings: { device: "other-node" } } },
+  }),
+  /identity is inconsistent/,
+);
+
+// The reduced tool schema is closed: the model cannot supply a placement, a
+// device id, visible=true or worktree=true to escalate the child.
+assert.equal(Value.Check(placedSpawnSchema, { task: "inspect" }), true, "the placed spawn schema rejects a plain task");
+for (const injectedArgs of [
+  { task: "inspect", deviceId: "attacker-node" },
+  { task: "inspect", placement: { kind: "profile", profileId: "attacker-profile" } },
+  { task: "inspect", profileId: "attacker-profile" },
+  { task: "inspect", visible: true },
+  { task: "inspect", worktree: true },
+]) {
+  assert.equal(
+    Value.Check(placedSpawnSchema, injectedArgs),
+    false,
+    `the placed spawn schema accepted ${Object.keys(injectedArgs).filter((key) => key !== "task").join(",")}`,
+  );
+}
+
+// The required-worker-profile policy still outranks a node request; the fix
+// cannot be used to escape a mandatory cloud profile.
+assert.doesNotThrow(() => assertRequiredWorkerDispatch({}, nodeRequest));
+assert.throws(
+  () => assertRequiredWorkerDispatch({ cloudWorkers: { requiredProfile: "cloud-profile" } }, nodeRequest),
+  /requires worker profile/,
+);
+console.log("ok 12: worker spawn inherits the parent node and keeps policy/cloud routes intact");
+
 if (failures > 0) process.exit(1);
 console.log("repository-parent spawn test: all assertions passed");

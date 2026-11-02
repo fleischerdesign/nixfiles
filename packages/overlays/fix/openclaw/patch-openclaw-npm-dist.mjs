@@ -572,3 +572,176 @@ for (const target of [forkFile, repositoryStoreFile]) {
 console.log(
   `repository-parent spawn: patched ${worktreeFile}, ${placementFile}, ${createFile}; fork ${forkFile}; store ${repositoryStoreFile}`,
 );
+
+// ---------------------------------------------------------------------------
+// Worker-tool spawn on a paired node.
+//
+// The reduced `sessions_spawn` tool a placed worker sees has no placement
+// selector, by design: its closed schema accepts only task, label, agentId,
+// model and runTimeoutSeconds. The child must therefore run on the node that
+// already hosts the authenticated parent environment - the same node the
+// parent turn's placement was admitted for - never on the Gateway's default
+// cloud provider. The old dispatch call passed only the parent's profile id
+// and snapshot, so a repository child fell into the cloud path and failed with
+// "Repository cloud sessions require a managed-node cloud provider or paired
+// node".
+//
+// This branch derives the node id from the parent environment record (not from
+// model-supplied arguments), validates it against the normal device placement
+// destination, and takes the runtime requirement from the child session's own
+// capabilities. Only a `device` provider requests a device placement: a
+// managed cloud provider that also carries a nodeDeviceId keeps its old cloud
+// route. Dispatch failure handling is unchanged.
+
+const workerExecutorFile = findOne(
+  "worker session tool executor",
+  (source) => source.includes("function createWorkerSessionToolExecutor(params, definitions) {"),
+);
+const destinationFile = findOne(
+  "worker placement destination",
+  (source) => source.includes("function resolveWorkerPlacementDestination(params) {"),
+);
+const sessionRuntimeFile = findOne(
+  "worker placement session runtime",
+  (source) => source.includes("function resolveWorkerPlacementSessionRuntimeCapabilities(params) {"),
+);
+function exportAlias(file, exportedName) {
+  const alias = new RegExp(`export\\s*\\{[^}]*\\b${exportedName}\\s+as\\s+([A-Za-z0-9_$]+)`, "u").exec(
+    fs.readFileSync(path.join(dist, file), "utf8"),
+  )?.[1];
+  if (!alias) fail(`worker node spawn: export alias missing for ${exportedName} in ${file}`);
+  return alias;
+}
+const destinationAlias = exportAlias(destinationFile, "resolveWorkerPlacementDestination");
+const sessionRuntimeAlias = exportAlias(sessionRuntimeFile, "resolveWorkerPlacementSessionRuntimeCapabilities");
+
+const workerExecutorPath = path.join(dist, workerExecutorFile);
+let workerExecutorSource = fs.readFileSync(workerExecutorPath, "utf8");
+if (workerExecutorSource.includes("__ocBuildWorkerChildDispatchRequest")) {
+  fail("worker node spawn: child dispatch request builder is already patched");
+}
+
+const workerImportAnchor = 'import { Value } from "typebox/value";';
+if (workerExecutorSource.split(workerImportAnchor).length - 1 !== 1) {
+  fail("worker node spawn: import anchor moved");
+}
+workerExecutorSource = workerExecutorSource.replace(
+  workerImportAnchor,
+  `${workerImportAnchor}\nimport { ${destinationAlias} as __ocResolveWorkerPlacementDestination } from "./${destinationFile}";\nimport { ${sessionRuntimeAlias} as __ocResolveWorkerPlacementSessionRuntimeCapabilities } from "./${sessionRuntimeFile}";`,
+);
+
+const workerHelperAnchor = "function createWorkerSessionToolExecutor(params, definitions) {";
+if (workerExecutorSource.split(workerHelperAnchor).length - 1 !== 1) {
+  fail("worker node spawn: executor anchor moved");
+}
+const workerHelpers = `/** Build the child dispatch request from the authenticated parent environment. */
+function __ocBuildWorkerChildDispatchRequest(params) {
+	const { cfg, sourceEnvironment, sessionId, sessionKey, agentId, entry } = params;
+	if (sourceEnvironment.providerId !== "device") return {
+		sessionId,
+		sessionKey,
+		agentId,
+		profileId: sourceEnvironment.profileId,
+		executionMode: "worker-turn",
+		inheritedProfile: {
+			providerId: sourceEnvironment.providerId,
+			profileSnapshot: sourceEnvironment.profileSnapshot
+		}
+	};
+	const nodeDeviceId = normalizeOptionalString(sourceEnvironment.nodeDeviceId);
+	if (!nodeDeviceId) throw new Error("Parent device placement has no node id; refusing to spawn from it");
+	if (sourceEnvironment.providerId !== "device" || sourceEnvironment.profileId !== \`device:\${nodeDeviceId}\` || !isRecord(sourceEnvironment.profileSnapshot?.settings) || sourceEnvironment.profileSnapshot.settings.device !== nodeDeviceId) throw new Error("Parent node placement identity is inconsistent; refusing to spawn from it");
+	const destination = __ocResolveWorkerPlacementDestination({
+		cfg,
+		deviceId: nodeDeviceId
+	});
+	if (!destination.ok || !destination.value || destination.value.deviceId !== nodeDeviceId || destination.value.profileId !== \`device:\${nodeDeviceId}\`) throw new Error("Parent node placement cannot be resolved for the spawn child");
+	const capabilities = __ocResolveWorkerPlacementSessionRuntimeCapabilities({
+		cfg,
+		entry,
+		agentId,
+		sessionKey
+	});
+	if (capabilities.executionMode !== "worker-turn" || !capabilities.devicePlacement) throw new Error("Spawn child runtime cannot run on the parent's paired node");
+	return {
+		sessionId,
+		sessionKey,
+		agentId,
+		profileId: sourceEnvironment.profileId,
+		executionMode: "worker-turn",
+		inheritedProfile: {
+			providerId: sourceEnvironment.providerId,
+			profileSnapshot: sourceEnvironment.profileSnapshot
+		},
+		deviceId: nodeDeviceId,
+		devicePlacement: capabilities.devicePlacement
+	};
+}
+${workerHelperAnchor}`;
+workerExecutorSource = workerExecutorSource.replace(workerHelperAnchor, workerHelpers);
+
+const dispatchAnchor = `\t\t\t\t\t\tif (childPlacement?.state !== "active") try {
+\t\t\t\t\t\t\tawait params.dispatchChild({
+\t\t\t\t\t\t\t\tsessionId: childSessionId,
+\t\t\t\t\t\t\t\tsessionKey: operation.childSessionKey,
+\t\t\t\t\t\t\t\tagentId: targetAgentId,
+\t\t\t\t\t\t\t\tprofileId: sourceEnvironment.profileId,
+\t\t\t\t\t\t\t\texecutionMode: "worker-turn",
+\t\t\t\t\t\t\t\tinheritedProfile: {
+\t\t\t\t\t\t\t\t\tproviderId: sourceEnvironment.providerId,
+\t\t\t\t\t\t\t\t\tprofileSnapshot: sourceEnvironment.profileSnapshot
+\t\t\t\t\t\t\t\t}
+\t\t\t\t\t\t\t}, void 0, assertSource);
+\t\t\t\t\t\t} catch (error) {
+\t\t\t\t\t\t\ttry {
+\t\t\t\t\t\t\t\tassertActiveChildPlacement();
+\t\t\t\t\t\t\t} catch {
+\t\t\t\t\t\t\t\tthrow new WorkerSessionToolOutcomeUnknownError(error);
+\t\t\t\t\t\t\t}
+\t\t\t\t\t\t}`;
+if (workerExecutorSource.split(dispatchAnchor).length - 1 !== 1) {
+  fail("worker node spawn: dispatch call anchor moved");
+}
+const dispatchReplacement = `\t\t\t\t\t\tif (childPlacement?.state !== "active") try {
+\t\t\t\t\t\t\tawait params.dispatchChild(__ocBuildWorkerChildDispatchRequest({
+\t\t\t\t\t\t\t\tcfg: getRuntimeConfig(),
+\t\t\t\t\t\t\t\tsourceEnvironment,
+\t\t\t\t\t\t\t\tsessionId: childSessionId,
+\t\t\t\t\t\t\t\tsessionKey: operation.childSessionKey,
+\t\t\t\t\t\t\t\tagentId: targetAgentId,
+\t\t\t\t\t\t\t\tentry: loaded.entry
+\t\t\t\t\t\t\t}), void 0, assertSource);
+\t\t\t\t\t\t} catch (error) {
+\t\t\t\t\t\t\ttry {
+\t\t\t\t\t\t\t\tassertActiveChildPlacement();
+\t\t\t\t\t\t\t} catch {
+\t\t\t\t\t\t\t\tthrow new WorkerSessionToolOutcomeUnknownError(error);
+\t\t\t\t\t\t\t}
+\t\t\t\t\t\t}`;
+workerExecutorSource = workerExecutorSource.replace(dispatchAnchor, dispatchReplacement);
+
+const workerExportAnchor =
+  "export { createWorkerGatewayTools, createWorkerSessionToolExecutor, createWorkerWorkshopCallRetention };";
+if (workerExecutorSource.split(workerExportAnchor).length - 1 !== 1) {
+  fail("worker node spawn: export anchor moved");
+}
+workerExecutorSource = workerExecutorSource.replace(
+  workerExportAnchor,
+  "export { createWorkerGatewayTools, createWorkerSessionToolExecutor, createWorkerWorkshopCallRetention, __ocBuildWorkerChildDispatchRequest };",
+);
+fs.chmodSync(workerExecutorPath, 0o644);
+fs.writeFileSync(workerExecutorPath, workerExecutorSource);
+fs.chmodSync(workerExecutorPath, 0o444);
+
+const workerBuilt = fs.readFileSync(workerExecutorPath, "utf8");
+for (const line of [
+  'import { ' + destinationAlias + ' as __ocResolveWorkerPlacementDestination } from "./' + destinationFile + '";',
+  'import { ' + sessionRuntimeAlias + ' as __ocResolveWorkerPlacementSessionRuntimeCapabilities } from "./' + sessionRuntimeFile + '";',
+  "function __ocBuildWorkerChildDispatchRequest(params) {",
+  "devicePlacement: capabilities.devicePlacement",
+  "await params.dispatchChild(__ocBuildWorkerChildDispatchRequest({",
+  "__ocBuildWorkerChildDispatchRequest };",
+]) {
+  if (!workerBuilt.includes(line)) fail(`worker node spawn: built output lost ${line}`);
+}
+console.log(`worker node spawn: patched ${workerExecutorFile}`);
