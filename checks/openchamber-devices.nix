@@ -45,8 +45,11 @@ assert lib.all (
 ) clientHosts;
 assert lib.all (
   host:
-  systems.${host}.config.my.features.dev.openchamber.client.serverHost == "cld-ops-01"
-  && systems.${host}.config.my.features.dev.openchamber.client.serverUrl == expectedUrl
+  let
+    remoteHosts = systems.${host}.config.my.features.dev.openchamber.client.remoteHosts;
+    central = lib.findFirst (entry: entry.id == "cld-ops-01") null remoteHosts;
+  in
+  central != null && central.url == expectedUrl && central.sshAddress == serverAddress
 ) clientHosts;
 # A publication would create a name and an ingress hop; the user decided on a mesh-only service.
 assert server.my.contracts.provides.openchamber.publications == { };

@@ -16,13 +16,33 @@ let
   cfg = config.my.features.dev.openchamber.client;
   systems = fleetConfigs.systems config;
 
-  serverHost = fleetConfigs.uniqueHost {
-    inherit systems;
-    matches = host: host.my.features.dev.openchamber.server.enable or false;
-    role = "OpenChamber server";
-  };
+  # Every host that runs a server and already lists this device in its authoritative allowlist is a
+  # reachable remote instance. Placement is read from the evaluated inventory, so a host that only
+  # runs the client, or a future server that has not admitted this device yet, is not advertised as
+  # a broken entry. The local instance is upstream's built-in one and never appears here.
+  remoteHostNames = lib.attrNames (
+    lib.filterAttrs (
+      _: host:
+      let
+        serverCfg = host.config.my.features.dev.openchamber.server or { };
+      in
+      (serverCfg.enable or false) && builtins.hasAttr cfg.deviceId (serverCfg.devices or { })
+    ) systems
+  );
 
-  server = systems.${serverHost}.config;
+  remoteHost =
+    host:
+    let
+      system = systems.${host}.config;
+      endpoint = system.my.contracts.provides.openchamber.endpoints.web;
+      address = config.my.topology.hosts.${host}.wireguardIpv4;
+    in
+    {
+      id = host;
+      label = host;
+      url = "http://${address}:${toString endpoint.port}";
+      sshAddress = address;
+    };
 in
 {
   options.my.features.dev.openchamber.client = {
@@ -60,46 +80,39 @@ in
       description = "Rendered path of the private bootstrap key.";
     };
 
-    serverHost = lib.mkOption {
-      type = lib.types.str;
+    remoteHosts = lib.mkOption {
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            id = lib.mkOption { type = lib.types.str; };
+            label = lib.mkOption { type = lib.types.str; };
+            url = lib.mkOption { type = lib.types.str; };
+            sshAddress = lib.mkOption { type = lib.types.str; };
+          };
+        }
+      );
       readOnly = true;
-      default = serverHost;
-      description = "Inventory host that runs the OpenChamber server.";
-    };
-
-    serverUrl = lib.mkOption {
-      type = lib.types.str;
-      readOnly = true;
-      default =
-        if cfg.enable then
-          "http://${
-            config.my.topology.hosts.${serverHost}.wireguardIpv4
-          }:${toString server.my.contracts.provides.openchamber.endpoints.web.port}"
-        else
-          "";
+      default = if cfg.enable then map remoteHost remoteHostNames else [ ];
       description = ''
-        Mesh URL derived from the server host's WireGuard address and the endpoint's declared port.
-        The transport is WireGuard; there is no public name, so no DNS or ingress is involved.
+        Remote server instances derived from the evaluated inventory: a host is listed when it
+        enables the server and its authoritative `devices` allowlist already contains this device.
+        The mesh URL and bootstrap address come from the topology and the endpoint contract; no host
+        name or address is written twice. The local instance is not in this list.
       '';
-    };
-
-    serverSshAddress = lib.mkOption {
-      type = lib.types.str;
-      readOnly = true;
-      default = if cfg.enable then config.my.topology.hosts.${serverHost}.wireguardIpv4 else "";
-      description = "Mesh address the forced-command SSH bootstrap is pinned to.";
     };
   };
 
   config = lib.mkIf cfg.enable {
+    # A server host that has not admitted this device is simply absent from `remoteHosts`: configured
+    # and reachable are separate facts, and local work does not depend on any remote server.
     assertions = [
       {
-        assertion = builtins.hasAttr cfg.deviceId server.my.features.dev.openchamber.server.devices;
-        message = "openchamber: device '${cfg.deviceId}' is not in ${serverHost}'s server.devices allowlist";
-      }
-      {
-        assertion = server.my.features.dev.openchamber.server.enable;
-        message = "openchamber: the client is enabled but the derived server host does not enable the server";
+        # One OpenCode engine per execution host. The desktop already starts its embedded server in
+        # the user's session; a headless server beside it would own a second engine and a second
+        # project store on the same machine.
+        assertion =
+          !(systems.${config.networking.hostName}.config.my.features.dev.openchamber.server.enable or false);
+        message = "openchamber: a client host must not also enable the headless server";
       }
     ];
 

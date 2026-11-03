@@ -13,32 +13,28 @@
 let
   cfg = osConfig.my.features.dev.openchamber.client;
 
-  # The registry entry describes the remote server instance, so it is named after the server host.
-  # Naming it after the device made the one connected instance appear as a second local one: the
-  # desktop window title and host switcher rendered `hom-wrk-01` while the app was in fact talking
-  # to `cld-ops-01`.
+  # Every entry describes one remote server instance and is named after that server host. The local
+  # instance is upstream's built-in entry and is not written here: naming a remote entry after the
+  # client is what made it look like a second local instance.
   registry = pkgs.writeText "openchamber-registry.json" (
     builtins.toJSON {
-      hosts = [
-        {
-          id = cfg.serverHost;
-          label = cfg.serverHost;
-          url = cfg.serverUrl;
-          apiUrl = cfg.serverUrl;
-          mintCommand = ''
-            ${pkgs.openssh}/bin/ssh \
-              -i ${cfg.deviceKeyPath} \
-              -o IdentitiesOnly=yes \
-              -o BatchMode=yes \
-              -o PasswordAuthentication=no \
-              -o StrictHostKeyChecking=yes \
-              -o UserKnownHostsFile=/etc/ssh/ssh_known_hosts \
-              -o ConnectTimeout=10 \
-              openchamber-bootstrap@${cfg.serverSshAddress}
-          '';
-        }
-      ];
-      defaultHostId = cfg.serverHost;
+      hosts = map (host: {
+        id = host.id;
+        label = host.label;
+        url = host.url;
+        apiUrl = host.url;
+        mintCommand = ''
+          ${pkgs.openssh}/bin/ssh \
+            -i ${cfg.deviceKeyPath} \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o PasswordAuthentication=no \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=/etc/ssh/ssh_known_hosts \
+            -o ConnectTimeout=10 \
+            openchamber-bootstrap@${host.sshAddress}
+        '';
+      }) cfg.remoteHosts;
     }
   );
 
@@ -91,17 +87,22 @@ let
       pkgs.coreutils
     ];
     text = ''
-      export OPENCHAMBER_SKIP_LOCAL_SERVER=1
+      # Local work is the default substrate: the app always starts its in-process server on a
+      # loopback port. A login shell may still carry the old override from a previous generation.
+      unset OPENCHAMBER_SKIP_LOCAL_SERVER
       export OPENCHAMBER_DESKTOP_USER_DATA_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/OpenChamber"
       export OPENCHAMBER_DESKTOP_PROVISION=${hook}/bin/openchamber-provision-hook
 
       rc=0
       ${provisionLocked}/bin/openchamber-provision-locked || rc=$?
-      # 75 means another instance already owns the profile; the singleton check below ends this
-      # launch normally. Every other failure is shown, not traded for a broken window.
-      if [ "$rc" -ne 0 ] && [ "$rc" -ne 75 ]; then
-        exit "$rc"
-      fi
+      # 3/4/5 mean a remote instance is configured but not reachable or not allowed. That must never
+      # keep the local window shut: the app probes the remote host at boot and falls back to local.
+      # 75 means another instance owns the profile. Only a broken adapter or settings schema (64, 70)
+      # is fatal.
+      case "$rc" in
+        0|3|4|5|75) ;;
+        *) exit "$rc" ;;
+      esac
       exec ${cfg.desktopPackage}/bin/openchamber-desktop "$@"
     '';
   };
@@ -128,7 +129,6 @@ in
   # A terminal launch and the desktop launcher must reach the same hook. `app.relaunch()` inherits
   # the environment, which is what makes provisioning run again after an in-app relaunch.
   home.sessionVariables = {
-    OPENCHAMBER_SKIP_LOCAL_SERVER = "1";
     OPENCHAMBER_DESKTOP_USER_DATA_DIR = "${config.xdg.configHome}/OpenChamber";
     OPENCHAMBER_DESKTOP_PROVISION = "${hook}/bin/openchamber-provision-hook";
   };

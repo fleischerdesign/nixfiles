@@ -54,6 +54,7 @@ await fsp.writeFile(
   JSON.stringify({
     theme: 'dark',
     desktopHosts: [{ id: 'manual-host', label: 'manual', url: 'https://example.invalid' }],
+    desktopDefaultHostId: 'manual-host',
     desktopWindowState: { width: 1200 },
   }),
   { mode: 0o600 },
@@ -124,6 +125,11 @@ try {
     code: first.code,
   });
   record('preserves-unmanaged', Boolean(manual) && afterFirst.theme === 'dark' && afterFirst.desktopWindowState?.width === 1200);
+  record(
+    'preserves-user-default-not-registry-default',
+    afterFirst.desktopDefaultHostId === 'manual-host',
+    { defaultHostId: afterFirst.desktopDefaultHostId },
+  );
   record('atomic-mode-0600', mode === 0o600, { mode: mode.toString(8) });
 
   const token = managed.clientToken;

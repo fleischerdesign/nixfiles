@@ -94,7 +94,38 @@ narrow source patch: a provisioning hook immediately before `app.requestSingleIn
 `packages/electron/entry.mjs`. The patch is version-guarded to 2.6.0 and fails the build when upstream
 moves the insertion point.
 
-There is no local OpenCode server on the client: `OPENCHAMBER_SKIP_LOCAL_SERVER=1` is exported.
+The desktop starts its own in-process OpenChamber server on a loopback port, with the user's home as
+the OpenCode working directory. That local instance is the substrate: it needs no remote server, no
+token and no Gateway credential, and it is what makes local projects and repositories usable while
+the mesh is down. The launcher explicitly unsets `OPENCHAMBER_SKIP_LOCAL_SERVER`, because a login
+shell can still carry the old value from a previous generation.
+
+Remote entries are derived from the evaluated inventory: every host that enables the server *and*
+already lists this device in its `server.devices` allowlist becomes one entry, labelled with that
+server host and addressed through the topology's WireGuard address and the endpoint contract's port.
+The local instance is upstream's built-in entry and is never written into the registry. A server that
+is configured but offline stays in the host list; the desktop probes it at boot and reports it as
+unreachable instead of dropping it. The adapter does not write `desktopDefaultHostId`: the default
+instance is the user's choice, preserved across restarts, and an absent default opens Local.
+
+The provisioning hook is best-effort for remote reachability: exit codes 3, 4 and 5 (missing mint
+command, bootstrap denied, mint failed) do not stop the launch, and upstream's own startup probe
+falls back to Local when a stored default is unreachable. Only a broken adapter or settings schema
+(64, 70) stops the launch.
+
+On a desktop, the local instance starts with an empty OpenCode credential store. The three Go keys
+seeded on `cld-ops-01` are not copied: a local instance shows its providers empty until the user
+signs in on that machine, or until an explicit native credential path is configured there. Remote
+entries keep using the central server's credentials.
+
+### Remote desktops
+
+The two desktops do not serve each other today. Their embedded servers bind loopback and have no
+per-host UI password, pairing artifact or firewall admission, so there is no endpoint a peer could
+reach and no credential a peer could present. Upstream's native sharing option is "Desktop Network
+Access": it binds `0.0.0.0` and requires `desktopUiPassword`; the mesh firewall would then have to
+admit exactly the peer hosts. That needs a new per-desktop UI password (or a decision to reuse one)
+and a deliberate enablement per host, so it is not inferred here.
 
 ## Adding a device
 
@@ -195,7 +226,7 @@ configuration and the patch fixture.
 On the server, `systemctl cat openchamber` shows the mesh bind and `LoadCredential`; the built
 `/etc/ssh/authorized_keys.d/openchamber-bootstrap` shows one restricted line per allowed device. On a
 client, the token appears only in `~/.config/openchamber/settings.json`. The client's `serverUrl` is
-derived from the server host's WireGuard address and the endpoint port, never from a publication.
+derived from each server host's WireGuard address and the endpoint port, never from a publication.
 
 ### Live canary before the clients start
 

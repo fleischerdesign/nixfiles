@@ -183,6 +183,7 @@ try {
   const desiredIds = new Set(desired.map((host) => host.id));
   const removeIds = new Set(previous.filter((id) => !desiredIds.has(id)));
   const nextHosts = hosts.filter((host) => host && !removeIds.has(host.id));
+  const hostState = new Map();
 
   for (const host of desired) {
     const id = host.id;
@@ -201,36 +202,45 @@ try {
       log('probe', { id, state: status });
       if (status === 'invalid') needMint = true;
       else if (status === 'unreachable') {
+        hostState.set(id, 'unreachable');
         log('network-error-keep-token', { id });
       } else if (status !== 'valid') {
+        hostState.set(id, 'unreachable');
         log('probe-unexpected-keep-token', { id, state: status });
-      }
+      } else hostState.set(id, 'reachable');
     }
 
     if (needMint) {
       if (!host.mintCommand) {
         log('missing-mint-command', { id });
+        hostState.set(id, 'unreachable');
         process.exitCode = 3;
-        continue;
+        // A configured host without a token is still listed; the app probes it and shows its own
+        // unreachable state. Hiding it here would make an offline server look undeclared.
+        token = '';
       }
-      const result = await mint(host.mintCommand);
-      if (result.ok) {
-        token = result.token;
-        log('token-minted', { id });
-      } else {
-        const denied = result.code === 'exit-77';
-        log(denied ? 'bootstrap-denied-do-not-enroll' : 'mint-failed', {
-          id,
-          code: result.code,
-          detail: result.detail,
-        });
-        if (denied) {
-          if (existing) delete existing.clientToken;
-          process.exitCode = 4;
+      if (host.mintCommand) {
+        const result = await mint(host.mintCommand);
+        if (result.ok) {
+          token = result.token;
+          hostState.set(id, 'reachable');
+          log('token-minted', { id });
         } else {
-          process.exitCode = process.exitCode || 5;
+          token = '';
+          hostState.set(id, 'unreachable');
+          const denied = result.code === 'exit-77';
+          log(denied ? 'bootstrap-denied-do-not-enroll' : 'mint-failed', {
+            id,
+            code: result.code,
+            detail: result.detail,
+          });
+          if (denied) {
+            if (existing) delete existing.clientToken;
+            process.exitCode = 4;
+          } else {
+            process.exitCode = process.exitCode || 5;
+          }
         }
-        continue;
       }
     }
 
@@ -246,15 +256,24 @@ try {
   }
 
   settings.desktopHosts = nextHosts;
-  const defaultId = desired.length === 1 ? desired[0].id : registry.defaultHostId;
-  if (defaultId) settings.desktopDefaultHostId = defaultId;
-  if (desired.length > 0) settings.desktopInitialHostChoiceCompleted = true;
+  // The default instance is the user's choice, not the registry's. Writing it on every start made
+  // each restart select the remote server again. Only repair a default that points at a managed
+  // entry this run removed; an absent default stays absent and upstream then opens Local.
+  if (
+    typeof settings.desktopDefaultHostId === 'string'
+    && removeIds.has(settings.desktopDefaultHostId)
+  ) {
+    delete settings.desktopDefaultHostId;
+  }
 
   await atomicWrite(settingsPath, settings);
   await atomicWrite(statePath, { ...state, previousManaged: [...desiredIds] });
   log('settings-written', {
     hosts: nextHosts.length,
-    defaultHostId: settings.desktopDefaultHostId,
+    defaultHostId: settings.desktopDefaultHostId ?? null,
+    configured: nextHosts.map((host) => host.id),
+    reachable: [...hostState].filter(([, state]) => state === 'reachable').map(([id]) => id),
+    unreachable: [...hostState].filter(([, state]) => state === 'unreachable').map(([id]) => id),
   });
   process.exit(process.exitCode || 0);
 } catch (error) {

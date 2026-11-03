@@ -52,9 +52,12 @@ if (__openchamberProvisionHook) {
     timeout: 60_000,
     env: process.env,
   });
+  // 3/4/5: a remote instance is configured but unreachable, denied or missing its mint command.
+  // The local in-process server is the substrate, and the app falls back to it when the probe
+  // fails, so these must not keep the window shut. 75: another instance owns the profile.
   if (
     __openchamberProvision.error ||
-    (__openchamberProvision.status !== 0 && __openchamberProvision.status !== 75)
+    ![0, 3, 4, 5, 75].includes(__openchamberProvision.status)
   ) {
     process.exit(__openchamberProvision.status || 1);
   }
