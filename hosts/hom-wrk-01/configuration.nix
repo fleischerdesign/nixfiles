@@ -23,6 +23,8 @@
   # Features
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
+  # Desktop-only client: its device token is reconciled before every start.
+  my.features.dev.openchamber.client.enable = true;
   my.features.services.openclaw.node = {
     enable = true;
     camera.enable = true;

@@ -31,6 +31,20 @@
 
   my.features.services.attic.server.enable = true;
 
+  # OpenChamber owns its projects under a dedicated account. The desktop clients mint their device
+  # tokens over a forced-command SSH key, so this host admits those two mesh sources on port 22.
+  my.features.dev.openchamber.server = {
+    enable = true;
+    devices = {
+      hom-wrk-01.sshPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC2BUebcO3YBUkgG7ig7L6S4QgMZ4S/VdYg9W6s06i3v openchamber-bootstrap:hom-wrk-01";
+      mob-nb-01.sshPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ6VpZPY7sIbHGWQeinWtWAs+gsoxavKhOfCrmsekTUg openchamber-bootstrap:mob-nb-01";
+    };
+  };
+  my.features.system.networking.ssh.admitsHosts = [
+    "hom-wrk-01"
+    "mob-nb-01"
+  ];
+
   my.features.services.openclaw.gateway = {
     enable = true;
     model = "openai/gpt-6.1-sol";
