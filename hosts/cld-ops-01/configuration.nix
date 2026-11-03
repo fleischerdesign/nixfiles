@@ -63,6 +63,13 @@
     meshClientHosts = [ "mob-ph-01" ];
   };
 
+  # The neutral policy and skill tree is shared AI content. Only the OpenChamber-managed OpenCode
+  # child consumes it here; the Gateway keeps its own delegated policy and is not a consumer.
+  my.features.ai.resources = {
+    enable = true;
+    consumers.openchamber.enable = true;
+  };
+
   my.features.services.openclaw.gateway = {
     enable = true;
     model = "openai/gpt-6.1-sol";

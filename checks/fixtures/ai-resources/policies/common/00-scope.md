@@ -1,0 +1,3 @@
+# Scope
+
+Owner keeps intent.
