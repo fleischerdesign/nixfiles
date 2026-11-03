@@ -1,5 +1,6 @@
-# Two narrow source corrections on the pinned OpenChamber 2.6.0 package. Both fail the build when
-# the pinned sources move, rather than silently shipping an unpatched client.
+# Three narrow source corrections on the pinned OpenChamber 2.6.0 package: two on the desktop app,
+# one on the shared core. Each fails the build when the pinned sources move, rather than silently
+# shipping an unpatched client.
 #
 # 1. Desktop provisioning hook (patch-entry-provision-hook.mjs): OpenChamber Desktop has no pre-lock
 #    hook - `app.relaunch()` starts the Electron binary directly and therefore bypasses any launcher

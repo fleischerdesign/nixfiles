@@ -129,19 +129,27 @@ restarts. A default that points at a managed entry removed in the same run is de
 ### Desktop lifecycle
 
 The desktop is a background application from login, not a window that owns the engine. Home Manager
-installs `~/.config/autostart/openchamber.desktop` as a real file (the app rewrites it); systemd's
-XDG autostart generator turns it into a user unit at login. Its `Exec` is the launcher with
+installs `$XDG_CONFIG_HOME/autostart/openchamber.desktop` (`config.xdg.configHome`) as a real file
+(the app rewrites it); systemd's XDG autostart generator turns it into a user unit at login. Its
+`Exec` is the launcher with
 `--background`, so the window stays closed while the embedded engine, the tray icon and the
 provisioning hook start. Closing the window afterwards hides it to the tray: the provisioning adapter
 declares `desktopMinimizeToTrayEnabled` in the same settings root, which is upstream's close-to-tray
 gate. The tray's Quit action is the only normal way to stop the engine.
+
+The entry is Nix-owned. Upstream's "Launch at login" toggle writes the same file, but the declaration
+is the source of truth: the next Home Manager activation rewrites the entry, so turning the toggle
+off lasts only until that activation. There is exactly one entry; no second autostart file is
+created beside it.
 
 Upstream reconciles that entry on every start and through its "Launch at login" toggle, writing
 `Exec=<process.execPath> --background`. In this package `process.execPath` is the bare Electron
 binary, which bypasses the launcher and would start the next login without the provisioning
 environment. The overlay patch `patch-linux-autostart.mjs` therefore lets the launcher declare its own
 store path through `OPENCHAMBER_AUTOSTART_EXEC`; the reconcile then writes the same launcher the
-entry already names. The patch fails the build when the pinned version or the resolver shape moves.
+entry already names. The variable is also a session variable, so a raw `openchamber-desktop` started
+from a login shell cannot replace the entry either. The patch fails the build when the pinned version
+or the resolver shape moves.
 
 Exactly one engine runs per host: the autostart launch owns the embedded server, and any second
 launch (desktop icon, protocol link) loses Electron's single-instance lock and focuses the existing

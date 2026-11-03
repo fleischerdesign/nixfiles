@@ -159,7 +159,7 @@ in
   };
 
   home.activation.openchamberAutostart = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    entry="$HOME/.config/autostart/openchamber.desktop"
+    entry=${lib.escapeShellArg "${config.xdg.configHome}/autostart/openchamber.desktop"}
     ${pkgs.coreutils}/bin/mkdir -p "''${entry%/*}"
     ${pkgs.coreutils}/bin/install -m 0644 ${autostartEntry} "$entry"
   '';
@@ -169,5 +169,8 @@ in
   home.sessionVariables = {
     OPENCHAMBER_DESKTOP_USER_DATA_DIR = "${config.xdg.configHome}/OpenChamber";
     OPENCHAMBER_DESKTOP_PROVISION = "${hook}/bin/openchamber-provision-hook";
+    # A raw binary launched from a login shell reconciles the autostart entry too; naming the
+    # launcher here keeps that rewrite from replacing it with the bare Electron binary.
+    OPENCHAMBER_AUTOSTART_EXEC = "${launch}/bin/openchamber-launch";
   };
 }
