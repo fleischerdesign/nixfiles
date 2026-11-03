@@ -62,12 +62,6 @@
     openclaw = {
       url = "github:openclaw/nix-openclaw";
     };
-
-    # OpenChamber 2.6.0, pinned to the release commit. Its own lock supplies the bundled OpenCode
-    # 2.2.5 CLI; this fleet does not override it with a second pin.
-    openchamber = {
-      url = "github:openchamber/openchamber/v2.6.0";
-    };
   };
 
   outputs =
@@ -88,7 +82,6 @@
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
         (import ./packages/overlays/fix/openclaw { inherit inputs; })
-        (import ./packages/overlays/fix/openchamber { inherit inputs; })
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];
@@ -217,8 +210,8 @@
       checks.${system} = import ./checks checkArgs;
 
       # Heavy runtime acceptance is opt-in, not part of `nix flake check`: `checks/integration/<name>.nix`
-      # starts the real server and therefore pulls a 2.4 GB closure the host build already needs. The
-      # gate stays cheap and unconditional; this is selected when the changed paths make it relevant.
+      # starts a real service and therefore pulls the closure the host build already needs. The gate
+      # stays cheap and unconditional; this is selected when the changed paths make it relevant.
       integrationChecks.${system} =
         (import ./lib/checks.nix { inherit (checkArgs) lib; }).discover ./checks/integration
           checkArgs;
