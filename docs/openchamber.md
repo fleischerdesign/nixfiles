@@ -105,6 +105,75 @@ There is no local OpenCode server on the client: `OPENCHAMBER_SKIP_LOCAL_SERVER=
 3. Enable `my.features.dev.openchamber.client` on the client host.
 4. Deploy; the client provisions itself on first start.
 
+## OpenCode Go accounts
+
+`my.features.dev.openchamber.server.goAccounts` seeds the fleet's three OpenCode Go API keys into
+OpenCode's own credential store and enables OpenChamber's native account switch. The same SOPS keys
+the Gateway already uses for its auth profiles (`ai/opencode_api_key`, `_2`, `_3`) are the only
+source; OpenClaw's profiles stay untouched.
+
+- Integration `opencode-go`, model provider `opencode-go`. The provider id is what OpenCode reports
+  on a Go model (`opencode-go/<model>`), so `accountSwitchProviders = ["opencode-go"]` reads exactly
+  the credential list this module seeds. The shared `opencode` integration is the Console sign-in and
+  is not used here.
+- The seed unit (`openchamber-go-accounts.service`) runs after the server and reads the keys through
+  systemd `LoadCredential`; no key enters the Nix store, the unit environment, argv or a log. A
+  changed SOPS value restarts the unit, because each declared secret lists it under `restartUnits`.
+- Idempotent by construction: a managed account id is
+  `cred_nixfiles_go_<slot>_<hash12>` of a salted SHA-256 of that slot's key. The desired id already
+  present means no write at all. A rotation creates the replacement, moves the selection only when
+  the replaced row was the selected account, then removes the stale row. A dropped slot removes only
+  its own row. With `goAccountCleanup = true`, an empty `goAccounts` list keeps the unit running so
+  the same logic removes every managed row and retires the module's `accountSwitchProviders` entry;
+  other providers in that list stay. Every other credential, including a manually connected
+  ChatGPT/Console login, is never read, activated or removed.
+- Writes go through the running server's API (`POST /api/credential`, `POST /api/credential/<id>/activate`,
+  `DELETE /api/credential/<id>`, `PUT /api/config/settings`). OpenChamber owns its settings file and
+  OpenCode owns the credential store; the seed never writes either directly. The settings key is a
+  profile field in `preferences.json`, written through the server's own lock and merge, so UI
+  settings and concurrent changes are preserved. Active/selected state is read from OpenCode's
+  credential table as metadata (`id`, `active`) only, and only when a rotation needs it.
+- The first credential of an integration becomes active even when the create request asks for
+  `activate: false`; that is OpenCode's own rule and is why repeated runs never call `activate`.
+- Selected-account state is global to the integration, not per session: OpenChamber's switch calls
+  OpenCode's `credential.activate`, so every session uses the newly selected account from its next
+  request. The exhaustion map lives in the OpenChamber server process and is volatile; a restart
+  forgets which accounts ran out, and the next limit starts the rotation again. Nothing here adds a
+  second failover, cooldown or proxy.
+- A switch is decided on OpenCode's retry hook, after a request failed. Text or tool output already
+  streamed before the failure is not replayed by the switch, and a partially streamed turn has no
+  continuation guarantee beyond what OpenCode itself retries.
+
+The native switch reacts to `provider.go-limit`, which OpenChamber 2.6.0 omits from two independent
+boundaries: the server classifier in `packages/web/server/lib/limit-failover/policy.js` and the
+generated plugin source in `runtime.js` (`PLUGIN_SOURCE`). `patch-go-limit.mjs` adds the one type to
+both. It is pinned to OpenChamber `v2.6.0` (upstream commit `5731991`) with the bundled OpenCode
+2.2.5 and fails the build instead of guessing:
+
+- both boundaries already list `provider.go-limit`: exit 78 and a message naming the patch files to
+  remove - upstream fixed it, so the compatibility patch must not survive;
+- only one boundary lists it: exit 65 with a review instruction (never a second insertion);
+- the pinned version or the exact `LIMIT_ERROR_TYPES` shape moved: exit 65 with a review
+  instruction (never a blind replacement).
+
+When the failure appears, re-read the two files at the new revision; if both handle
+`provider.go-limit`, delete `packages/overlays/fix/openchamber/patch-go-limit.mjs` and its
+`installPhase` line in `packages/overlays/fix/openchamber/default.nix`. The fixture
+`nix build .#checks.x86_64-linux.openchamber-go-limit-patch` proves all four outcomes on a tiny
+tree; the host build proves the positive application on the real package.
+
+Verification on the server (metadata only, never a key):
+
+```bash
+systemctl status openchamber-go-accounts --no-pager
+journalctl -u openchamber-go-accounts -n 20 --no-pager   # slot names, counts, ids
+```
+
+The provider catalog is reachable only through the UI session; the running accounts can be listed
+without values through OpenChamber's Providers page. A key that appears as a connection is accepted
+by the auth catalog, which does not prove that the account has an active paid Go plan or quota -
+that is visible only in the provider's own usage view.
+
 ## Verifying
 
 ```bash

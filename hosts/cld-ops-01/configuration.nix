@@ -35,6 +35,26 @@
   # tokens over a forced-command SSH key; they are `corp` hosts, already admitted on the SSH endpoint.
   my.features.dev.openchamber.server = {
     enable = true;
+    # The same three Go keys the Gateway uses for its own auth profiles, seeded natively into
+    # OpenCode's credential store so OpenChamber's account switch can rotate through them. Order is
+    # the existing subscription preference (3, 2, 1); the keys stay SOPS-owned and are staged into
+    # the seed unit with LoadCredential.
+    goAccounts = [
+      {
+        slot = "go-1";
+        apiKeySecret = "ai/opencode_api_key_3";
+      }
+      {
+        slot = "go-2";
+        apiKeySecret = "ai/opencode_api_key_2";
+      }
+      {
+        slot = "go-3";
+        apiKeySecret = "ai/opencode_api_key";
+      }
+    ];
+    # Emptying `goAccounts` must remove the managed credentials rather than leave them behind.
+    goAccountCleanup = true;
     devices = {
       hom-wrk-01.sshPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC2BUebcO3YBUkgG7ig7L6S4QgMZ4S/VdYg9W6s06i3v openchamber-bootstrap:hom-wrk-01";
       mob-nb-01.sshPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ6VpZPY7sIbHGWQeinWtWAs+gsoxavKhOfCrmsekTUg openchamber-bootstrap:mob-nb-01";

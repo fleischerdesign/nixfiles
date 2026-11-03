@@ -64,6 +64,29 @@ let
       allowlistFile = allowlistFile;
     }
   );
+
+  goAccountsSeed = pkgs.writeShellApplication {
+    name = "openchamber-go-accounts";
+    runtimeInputs = [ pkgs.nodejs_24 ];
+    text = ''
+      exec ${pkgs.nodejs_24}/bin/node ${./go-accounts.mjs} "$@"
+    '';
+  };
+
+  goAccountsConfig = pkgs.writeText "openchamber-go-accounts.json" (
+    builtins.toJSON {
+      serverUrl = "http://${cfg.bindAddress}:${toString cfg.port}";
+      integrationID = cfg.goAccountIntegration;
+      switchProvider = cfg.goAccountSwitchProvider;
+      stateFile = "/var/lib/openchamber-nixfiles/go-accounts.json";
+      opencodeDatabase = "${cfg.stateDir}/.local/share/opencode/opencode.db";
+      slots = map (account: {
+        slot = account.slot;
+        secretId = account.slot;
+        secret = account.apiKeySecret;
+      }) cfg.goAccounts;
+    }
+  );
 in
 {
   imports = [ inputs.openchamber.nixosModules.default ];
@@ -115,6 +138,63 @@ in
       type = lib.types.path;
       default = ../../../secrets/openchamber-server.yaml;
       description = "SOPS document holding the server's UI password, scoped to this host and the operator.";
+    };
+
+    goAccounts = lib.mkOption {
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            slot = lib.mkOption {
+              type = lib.types.strMatching "[a-z0-9][a-z0-9-]{0,30}";
+              description = "Stable slot name; it appears in the owned credential id and label.";
+            };
+            apiKeySecret = lib.mkOption {
+              type = lib.types.str;
+              description = ''
+                SOPS secret holding this OpenCode Go API key. The key is staged into the seed unit with
+                `LoadCredential` and never enters the Nix store, the unit environment, argv or a log.
+              '';
+            };
+          };
+        }
+      );
+      default = [ ];
+      description = ''
+        OpenCode Go API keys seeded into OpenCode's own credential store, in failover order. Accounts
+        with the managed id shape are created, rotated when the declared key changes and removed when
+        the slot is dropped; every other credential, including a manual Console sign-in, is left
+        untouched. Empty by default, so a host without Go accounts runs no seed unit.
+      '';
+    };
+
+    goAccountIntegration = lib.mkOption {
+      type = lib.types.str;
+      default = "opencode-go";
+      description = ''
+        OpenCode integration that stores Go API keys. `opencode-go` is the dedicated Go integration;
+        the shared `opencode` integration also accepts a key, but mixing both would split the account
+        list the failover switches through.
+      '';
+    };
+
+    goAccountSwitchProvider = lib.mkOption {
+      type = lib.types.str;
+      default = "opencode-go";
+      description = ''
+        Model provider id given to `accountSwitchProviders`. OpenCode reports a Go model as
+        `opencode-go/<model>`, which is also the integration that owns the key, so the credential
+        list the plugin reads is the one this module seeds.
+      '';
+    };
+
+    goAccountCleanup = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Keep the seed unit running when `goAccounts` is empty, so emptying the list removes the
+        accounts this module created and retires its `accountSwitchProviders` entry. Without it an
+        empty list starts no unit and leaves the previous accounts in OpenCode's store.
+      '';
     };
 
     devices = lib.mkOption {
@@ -182,6 +262,12 @@ in
         assertion = lib.all (host: config.my.topology.hosts ? ${host}) cfg.meshClientHosts;
         message = "openchamber: every `server.meshClientHosts` entry must be an inventory host";
       }
+      {
+        assertion =
+          (lib.unique (map (account: account.slot) cfg.goAccounts))
+          == map (account: account.slot) cfg.goAccounts;
+        message = "openchamber: every `server.goAccounts.<slot>` must be unique";
+      }
     ];
 
     users.groups.${cfg.group} = { };
@@ -212,14 +298,21 @@ in
       ) cfg.devices;
     };
 
-    sops.secrets.${cfg.uiPasswordSecret} = {
-      sopsFile = cfg.uiPasswordSopsFile;
-      key = "ui_password";
-      owner = "root";
-      group = bootstrapGroup;
-      mode = "0440";
-      restartUnits = [ "openchamber.service" ];
-    };
+    sops.secrets = {
+      ${cfg.uiPasswordSecret} = {
+        sopsFile = cfg.uiPasswordSopsFile;
+        key = "ui_password";
+        owner = "root";
+        group = bootstrapGroup;
+        mode = "0440";
+        restartUnits = [ "openchamber.service" ];
+      };
+    }
+    # The seed is another reader of the same declared keys the Gateway already uses. Declaring the
+    # secrets here only adds the restart trigger; owner and mode stay whatever the owning feature set.
+    // lib.genAttrs (map (account: account.apiKeySecret) cfg.goAccounts) (_: {
+      restartUnits = [ "openchamber-go-accounts.service" ];
+    });
 
     # Upstream's own module owns the unit, credential loading and the process. The package and its
     # bundled OpenCode 2.2.5 stay exactly the pinned upstream artifacts; no second CLI is installed.
@@ -268,6 +361,48 @@ in
         OnUnitActiveSec = "15min";
       };
     };
+
+    # Native Go accounts: read the declared keys once per activation/boot, create only what is
+    # missing, rotate only the owned slot whose key changed and keep the selected account unless
+    # that account is the one being replaced. The program writes through the running server's API,
+    # so OpenChamber's own settings lock and OpenCode's credential store stay the single writers.
+    systemd.services.openchamber-go-accounts =
+      lib.mkIf (cfg.goAccounts != [ ] || cfg.goAccountCleanup)
+        {
+          description = "Seed OpenCode Go accounts into OpenCode's credential store";
+          after = [ "openchamber.service" ];
+          wants = [ "openchamber.service" ];
+          wantedBy = [ "multi-user.target" ];
+          restartTriggers = [ goAccountsConfig ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = "${goAccountsSeed}/bin/openchamber-go-accounts";
+            Environment = [ "OPENCHAMBER_GO_CONFIG=${goAccountsConfig}" ];
+            StateDirectory = "openchamber-nixfiles";
+            StateDirectoryMode = "0700";
+            UMask = "0077";
+            # Secrets arrive as files: systemd stages each declared SOPS file under /run/credentials and
+            # the program reads it there. Nothing secret is in the unit, the environment or argv.
+            LoadCredential = [
+              "ui_password:${config.sops.secrets.${cfg.uiPasswordSecret}.path}"
+            ]
+            ++ map (
+              account: "${account.slot}:${config.sops.secrets.${account.apiKeySecret}.path}"
+            ) cfg.goAccounts;
+            # The program reads OpenCode's SQLite metadata (id + active) to keep the selected account
+            # across a rotation. It never writes there; the API is the write path.
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateTmp = true;
+            NoNewPrivileges = true;
+            RestrictAddressFamilies = [
+              "AF_UNIX"
+              "AF_INET"
+              "AF_INET6"
+            ];
+          };
+        };
 
     my.contracts.provides.openchamber = {
       endpoints.web = {
