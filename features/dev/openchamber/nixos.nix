@@ -1,5 +1,5 @@
-# OpenChamber server: the OpenCode web UI, bound to the host's mesh address and reached through the
-# ingress.
+# OpenChamber server: the OpenCode web UI, bound to the host's mesh address and reached directly over
+# WireGuard.
 #
 # The server owns all project data under one account (`openchamber`), never the Gateway's. The UI
 # password is read from a SOPS secret through systemd's credential mechanism; a per-device SSH
@@ -10,6 +10,10 @@
 # activation; the revoke unit then invalidates its client token. A device that is only deleted from
 # the settings UI would come back on its next mint, which is why the grant and the token are
 # reconciled together here.
+#
+# Exposure is the mesh and nothing else: there is no publication, no public name and no ingress
+# hop. A desktop reaches `http://<server mesh address>:<port>` through WireGuard; a hand-paired
+# phone does the same and must therefore be a mesh member.
 {
   config,
   lib,
@@ -45,7 +49,9 @@ let
 
   mintConfig = pkgs.writeText "openchamber-mint.json" (
     builtins.toJSON {
-      serverUrl = "http://127.0.0.1:${toString cfg.port}";
+      # The unit binds the mesh address, not loopback; the local helper must dial the address the
+      # listener actually owns.
+      serverUrl = "http://${cfg.bindAddress}:${toString cfg.port}";
       passwordFile = config.sops.secrets.${cfg.uiPasswordSecret}.path;
       allowlistFile = allowlistFile;
     }
@@ -53,7 +59,7 @@ let
 
   revokeConfig = pkgs.writeText "openchamber-revoke.json" (
     builtins.toJSON {
-      serverUrl = "http://127.0.0.1:${toString cfg.port}";
+      serverUrl = "http://${cfg.bindAddress}:${toString cfg.port}";
       passwordFile = config.sops.secrets.${cfg.uiPasswordSecret}.path;
       allowlistFile = allowlistFile;
     }
@@ -68,7 +74,7 @@ in
     port = lib.mkOption {
       type = lib.types.port;
       default = 7337;
-      description = "Port for the OpenChamber server; the ingress proxies the public name to it.";
+      description = "Port for the OpenChamber server, reached over the mesh only.";
     };
 
     bindAddress = lib.mkOption {
@@ -76,16 +82,9 @@ in
       default = config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4;
       defaultText = lib.literalExpression "config.my.topology.hosts.<host>.wireguardIpv4";
       description = ''
-        Specific mesh address the server binds to. A public publication needs the ingress to reach
-        the endpoint over the mesh (Naming I10); binding the mesh address is narrower than 0.0.0.0
-        and the firewall admits only the ingress.
+        Specific mesh address the server binds to. It is narrower than 0.0.0.0 and the firewall
+        admits only the declared client hosts on the WireGuard interface.
       '';
-    };
-
-    subdomain = lib.mkOption {
-      type = lib.types.str;
-      default = "openchamber";
-      description = "Public subdomain under the site's apex domain.";
     };
 
     stateDir = lib.mkOption {
@@ -134,6 +133,15 @@ in
       '';
     };
 
+    meshClientHosts = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = ''
+        Additional inventory hosts admitted to the listener over the mesh, for a device that pairs
+        by hand (a phone) instead of through the bootstrap key. They receive no SSH grant.
+      '';
+    };
+
     mintPackage = lib.mkOption {
       type = lib.types.package;
       readOnly = true;
@@ -162,6 +170,18 @@ in
         );
         message = "openchamber: every `server.devices.<id>.sshPublicKey` must be an OpenSSH public key";
       }
+      {
+        # The id is interpolated into an authorized_keys `command=`; a shell metacharacter would
+        # become part of the forced command line.
+        assertion = lib.all (id: builtins.match "[a-z0-9][a-z0-9-]{1,62}" id != null) (
+          lib.attrNames cfg.devices
+        );
+        message = "openchamber: a `server.devices.<id>` name must match [a-z0-9][a-z0-9-]{1,62}";
+      }
+      {
+        assertion = lib.all (host: config.my.topology.hosts ? ${host}) cfg.meshClientHosts;
+        message = "openchamber: every `server.meshClientHosts` entry must be an inventory host";
+      }
     ];
 
     users.groups.${cfg.group} = { };
@@ -180,7 +200,9 @@ in
     users.users.${bootstrapUser} = {
       isSystemUser = true;
       group = bootstrapGroup;
-      home = "/var/lib/openchamber-bootstrap";
+      # No writable home: the forced command needs neither HOME nor a working directory, and a
+      # missing home makes sshd log a chdir warning on every mint.
+      home = "/";
       createHome = false;
       shell = "${pkgs.bash}/bin/bash";
       description = "OpenChamber device bootstrap";
@@ -251,25 +273,18 @@ in
       endpoints.web = {
         port = cfg.port;
         protocol = "tcp";
-        # The ingress proxies to the mesh address. The firewall admits only the ingress host, not
-        # every mesh member, and the listener is bound to the mesh address rather than 0.0.0.0.
+        # Direct over the mesh: the listener is bound to the WireGuard address and the firewall
+        # admits exactly the devices that may use it, not every mesh member and not the internet.
         directAccess = {
           enable = true;
           interface = "wireguard";
-          fromHosts = [ config.my.topology.ingressHost ];
+          fromHosts = lib.attrNames cfg.devices ++ cfg.meshClientHosts;
         };
       };
 
-      publications.web = {
-        scope = "public";
-        endpoint = "web";
-        subdomain = cfg.subdomain;
-        auth = "none";
-        publicExempt = "OpenChamber enforces its own UI password; the ingress only terminates TLS.";
-      };
-
-      telemetry.probes."web-http".endpoint = "web";
-      telemetry.probes."web-http".kind = "http";
+      # No probe: the prometheus contract's `localUrl` is loopback, while this listener is bound to
+      # the WireGuard address. A local blackbox probe would report the service down from a healthy
+      # host. A mesh-target probe belongs in the monitoring contract, not here as a false alarm.
 
       storage.dataDirs = [ cfg.stateDir ];
     };

@@ -11,14 +11,21 @@ the packaged CLI is what the server and the desktop ship.
 
 - Account: `openchamber` (system user, no login). State and projects: `/var/lib/openchamber`, declared
   in the storage contract and therefore in the backup.
-- Listener: the host's WireGuard address on port `7337`, never `0.0.0.0`. The firewall admits only the
-  ingress host, which terminates `https://openchamber.vyrx.de` and proxies to the mesh address.
+- Listener: the host's WireGuard address on port `7337`, never `0.0.0.0`. The firewall admits exactly
+  the desktop devices and the hand-paired phone over the `wireguard` interface. There is no
+  publication, no public name and no ingress hop: the service is reached directly at
+  `http://10.10.100.2:7337` over the mesh.
 - Password: `services/openchamber/ui_password` from `secrets/openchamber-server.yaml`, readable by
   root and the `openchamber-bootstrap` group. The upstream module loads it with
   `LoadCredential`; the local mint helper reads the same file. Clients never decrypt it.
 
-The public publication uses `auth = "none"` with an explicit exemption because OpenChamber enforces
-its own UI password; the ingress only terminates TLS.
+The endpoint declares `directAccess.interface = "wireguard"` with the device hosts as
+`fromHosts`, so the port is closed on every other interface. WireGuard provides transport
+confidentiality; authentication is OpenChamber's own UI password and device tokens.
+
+No telemetry probe is declared: the monitoring contract's local probe targets `127.0.0.1`, while
+this listener is bound to the WireGuard address. Adding one would report a healthy server as down;
+a mesh-target probe is a separate monitoring-contract change.
 
 ## Devices
 
@@ -30,7 +37,7 @@ Each device has a dedicated Ed25519 keypair:
 - private half in `secrets/openchamber-device-<id>.yaml`, encrypted to that host and the operator;
 - public half in the server's `devices` entry;
 - an `authorized_keys` line of the form
-  `restrict,command="/run/current-system/sw/bin/openchamber-mint <id>" ssh-ed25519 …`.
+  `restrict,command="<mint store path>/bin/openchamber-mint <id>" ssh-ed25519 …`.
 
 The device id comes from that literal argument, never from the client. `restrict` disables pty,
 forwarding and agent access; no `environment=` is used and `PermitUserEnvironment` stays off.
@@ -73,6 +80,12 @@ A re-added device can mint again; upstream's dedupe replacement then clears the 
 device that was never in the allowlist cannot mint at all. A manually paired phone is outside the
 managed namespace and is not affected by the reconciler.
 
+The phone is not in `devices` and receives no SSH grant. It is listed in
+`my.features.dev.openchamber.server.meshClientHosts` so the same listener is reachable from its
+mesh identity (`mob-ph-01`); pairing it by hand means opening `http://10.10.100.2:7337` while the
+phone is on the mesh and signing in with the UI password. A phone that is not a mesh member cannot
+reach the service.
+
 ## Desktop
 
 `my.features.dev.openchamber.client.enable` installs the patched desktop package, a token-free
@@ -103,4 +116,28 @@ nix build .#checks.x86_64-linux.openchamber-devices
 
 On the server, `systemctl cat openchamber` shows the mesh bind and `LoadCredential`; the built
 `/etc/ssh/authorized_keys.d/openchamber-bootstrap` shows one restricted line per allowed device. On a
-client, the token appears only in `~/.config/openchamber/settings.json`.
+client, the token appears only in `~/.config/openchamber/settings.json`. The client's `serverUrl` is
+derived from the server host's WireGuard address and the endpoint port, never from a publication.
+
+### Live canary before the clients start
+
+The checks above prove the rendered configuration and the HTTP routes, but they do not run `sshd`
+against the real bootstrap account. Before the two desktop clients are enabled, run this canary once
+from `hom-wrk-01` (the token is deliberately discarded):
+
+```bash
+ssh -i /run/secrets/services/openchamber/devices/hom-wrk-01/ssh_key \
+  -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+  openchamber-bootstrap@10.10.100.2 'touch /tmp/openchamber-forced-command-escaped' >/dev/null
+```
+
+Then on `cld-ops-01`:
+
+```bash
+test ! -e /tmp/openchamber-forced-command-escaped   # the client's command never runs
+ssh -tt -i <the same key> openchamber-bootstrap@10.10.100.2 true   # must fail to allocate a pty
+```
+
+An `exit 0` from the first command means the forced mint ran; a `mint:` message on stderr means the
+helper reached the configuration boundary. A shell prompt, or the escaped file, means the forced
+command is not in effect - stop and do not enable a client.

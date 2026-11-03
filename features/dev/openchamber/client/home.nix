@@ -60,7 +60,9 @@ let
       lock="''${XDG_RUNTIME_DIR:-$HOME/.run}/openchamber-provision.lock"
       mkdir -p "''${lock%/*}"
       (
-        flock -x 9
+        # Bounded: a stale holder must delay a start, never hang it forever. The outer hook allows
+        # 60 s, so a lock timeout still ends in a clean, fail-closed exit.
+        flock -w 30 -x 9
         ${provision}/bin/openchamber-provision
       ) 9>"$lock"
     '';

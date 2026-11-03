@@ -71,8 +71,16 @@ in
       type = lib.types.str;
       readOnly = true;
       default =
-        if cfg.enable then server.my.contracts.provides.openchamber.publications.web.publicUrl else "";
-      description = "Public URL derived from the server host's publication contract.";
+        if cfg.enable then
+          "http://${
+            config.my.topology.hosts.${serverHost}.wireguardIpv4
+          }:${toString server.my.contracts.provides.openchamber.endpoints.web.port}"
+        else
+          "";
+      description = ''
+        Mesh URL derived from the server host's WireGuard address and the endpoint's declared port.
+        The transport is WireGuard; there is no public name, so no DNS or ingress is involved.
+      '';
     };
 
     serverSshAddress = lib.mkOption {
