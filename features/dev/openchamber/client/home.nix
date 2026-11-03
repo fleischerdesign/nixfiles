@@ -13,12 +13,16 @@
 let
   cfg = osConfig.my.features.dev.openchamber.client;
 
+  # The registry entry describes the remote server instance, so it is named after the server host.
+  # Naming it after the device made the one connected instance appear as a second local one: the
+  # desktop window title and host switcher rendered `hom-wrk-01` while the app was in fact talking
+  # to `cld-ops-01`.
   registry = pkgs.writeText "openchamber-registry.json" (
     builtins.toJSON {
       hosts = [
         {
-          id = cfg.deviceId;
-          label = cfg.deviceId;
+          id = cfg.serverHost;
+          label = cfg.serverHost;
           url = cfg.serverUrl;
           apiUrl = cfg.serverUrl;
           mintCommand = ''
@@ -34,7 +38,7 @@ let
           '';
         }
       ];
-      defaultHostId = cfg.deviceId;
+      defaultHostId = cfg.serverHost;
     }
   );
 
