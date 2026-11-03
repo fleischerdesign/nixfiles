@@ -1,21 +1,35 @@
-# The desktop provisioning hook must be present before the single-instance lock in the pinned
-# upstream source, and the patch must fail instead of silently accepting a moved version or insertion
-# point. Without the first property `app.relaunch()` starts the app without reconciling its token;
-# without the second a bump could ship an unpatched desktop while every gate stays green.
+# The provisioning patch must fail loudly instead of silently accepting a moved version or insertion
+# point. The positive case - that it applies exactly once to the pinned upstream entry - belongs to
+# the desktop derivation's postPatch and is decided by that build; this fixture proves only the
+# script's fail-closed behaviour, on a tiny two-file tree instead of a 103 MB source copy.
 {
   pkgs,
-  inputs,
   ...
 }:
+let
+  fixture = pkgs.runCommandLocal "openchamber-provision-hook-fixture" { } ''
+    mkdir -p $out/packages/electron
+    cat > $out/packages/electron/package.json <<'EOF'
+    {"name":"fixture","version":"2.6.0"}
+    EOF
+    cat > $out/packages/electron/entry.mjs <<'EOF'
+    import { app, protocol } from 'electron';
+
+    if (!app.requestSingleInstanceLock()) {
+      app.quit();
+    }
+    EOF
+  '';
+in
 pkgs.runCommandLocal "openchamber-provision-hook-check"
   {
     nativeBuildInputs = [ pkgs.nodejs_22 ];
   }
   ''
-    cp -r ${inputs.openchamber.outPath} source
-    chmod -R u+w source
+    cp -r ${fixture} patched
+    chmod -R u+w patched
     (
-      cd source
+      cd patched
       node ${../packages/overlays/fix/openchamber/patch-entry-provision-hook.mjs}
       node --check packages/electron/entry.mjs
       node -e '
@@ -33,7 +47,7 @@ pkgs.runCommandLocal "openchamber-provision-hook-check"
     )
 
     # A version bump must fail loudly, not apply an unverified patch.
-    cp -r ${inputs.openchamber.outPath} changed
+    cp -r ${fixture} changed
     chmod -R u+w changed
     (
       cd changed
@@ -51,7 +65,7 @@ pkgs.runCommandLocal "openchamber-provision-hook-check"
     )
 
     # A moved lock line must fail loudly as well.
-    cp -r ${inputs.openchamber.outPath} moved
+    cp -r ${fixture} moved
     chmod -R u+w moved
     (
       cd moved

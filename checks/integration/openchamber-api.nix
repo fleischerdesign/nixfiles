@@ -2,6 +2,10 @@
 # prove the session cookie is accepted, the dedupe mint replaces the old token, or that removing the
 # grant blocks re-enrollment; this runs the built server, the shipped mint helper and the shipped
 # revoke helper over real HTTP.
+#
+# Opt-in integration check (`nix build .#integrationChecks.<system>.openchamber-api`), not part of
+# `nix flake check`: it pulls the server's 2.4 GB runtime closure and starts a process, which the
+# host build already pays for once and the unconditional gate should not pay twice.
 {
   pkgs,
   self,

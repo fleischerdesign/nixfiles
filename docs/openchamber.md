@@ -108,11 +108,20 @@ There is no local OpenCode server on the client: `OPENCHAMBER_SKIP_LOCAL_SERVER=
 ## Verifying
 
 ```bash
-nix build .#checks.x86_64-linux.openchamber-api
-nix build .#checks.x86_64-linux.openchamber-provision
 nix build .#checks.x86_64-linux.openchamber-provision-hook
 nix build .#checks.x86_64-linux.openchamber-devices
 ```
+
+The HTTP acceptance tests start the real server and pull its 2.4 GB runtime closure, so they are
+opt-in and not part of `nix flake check`:
+
+```bash
+nix build .#integrationChecks.x86_64-linux.openchamber-api
+nix build .#integrationChecks.x86_64-linux.openchamber-provision
+```
+
+Run them when the mint, revoke or adapter code changes; the unconditional gate keeps the rendered
+configuration and the patch fixture.
 
 On the server, `systemctl cat openchamber` shows the mesh bind and `LoadCredential`; the built
 `/etc/ssh/authorized_keys.d/openchamber-bootstrap` shows one restricted line per allowed device. On a

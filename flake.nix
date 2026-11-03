@@ -216,6 +216,13 @@
       # is the output name (lib/checks.nix).
       checks.${system} = import ./checks checkArgs;
 
+      # Heavy runtime acceptance is opt-in, not part of `nix flake check`: `checks/integration/<name>.nix`
+      # starts the real server and therefore pulls a 2.4 GB closure the host build already needs. The
+      # gate stays cheap and unconditional; this is selected when the changed paths make it relevant.
+      integrationChecks.${system} =
+        (import ./lib/checks.nix { inherit (checkArgs) lib; }).discover ./checks/integration
+          checkArgs;
+
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
           nixfmt
