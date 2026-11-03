@@ -55,10 +55,8 @@
     ];
     # Emptying `goAccounts` must remove the managed credentials rather than leave them behind.
     goAccountCleanup = true;
-    devices = {
-      hom-wrk-01.sshPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC2BUebcO3YBUkgG7ig7L6S4QgMZ4S/VdYg9W6s06i3v openchamber-bootstrap:hom-wrk-01";
-      mob-nb-01.sshPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ6VpZPY7sIbHGWQeinWtWAs+gsoxavKhOfCrmsekTUg openchamber-bootstrap:mob-nb-01";
-    };
+    # Both desktop bootstrap keys are declared once on the server feature and projected from the
+    # evaluated inventory; no host repeats the key material.
     # The phone pairs by hand and is never auto-provisioned, but it still needs the mesh door.
     meshClientHosts = [ "mob-ph-01" ];
   };

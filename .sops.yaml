@@ -80,6 +80,22 @@ creation_rules:
           - *philipp
           - *mob-nb-01
 
+  # The native desktop listener's UI password: scoped to the desktop that serves it and the
+  # operator. A peer only ever receives a minted client token, never this document.
+  - path_regex: secrets/openchamber-desktop-hom-wrk-01\.yaml$
+    key_groups:
+      - pgp: []
+        age:
+          - *philipp
+          - *hom-wrk-01
+
+  - path_regex: secrets/openchamber-desktop-mob-nb-01\.yaml$
+    key_groups:
+      - pgp: []
+        age:
+          - *philipp
+          - *mob-nb-01
+
   - path_regex: secrets/.*\.yaml$
     key_groups:
       - pgp: []

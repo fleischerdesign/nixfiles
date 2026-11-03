@@ -35,6 +35,17 @@ let
             openchamber-bootstrap@${host.sshAddress}
         '';
       }) cfg.remoteHosts;
+      # The native listener's declared settings. Only the password path is written here; the
+      # adapter reads the secret file and merges the value into the user's 0600 settings file.
+      localNetwork =
+        if cfg.networkAccess.enable then
+          {
+            enable = true;
+            port = cfg.networkAccess.port;
+            uiPasswordFile = osConfig.sops.secrets.${cfg.networkAccess.uiPasswordSecret}.path;
+          }
+        else
+          null;
     }
   );
 
@@ -87,8 +98,8 @@ let
       pkgs.coreutils
     ];
     text = ''
-      # Local work is the default substrate: the app always starts its in-process server on a
-      # loopback port. A login shell may still carry the old override from a previous generation.
+      # Local work is the default substrate: the app starts its in-process server on the declared
+      # port. A login shell may still carry the old override from a previous generation.
       unset OPENCHAMBER_SKIP_LOCAL_SERVER
       export OPENCHAMBER_DESKTOP_USER_DATA_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/OpenChamber"
       export OPENCHAMBER_DESKTOP_PROVISION=${hook}/bin/openchamber-provision-hook

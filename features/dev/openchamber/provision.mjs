@@ -179,6 +179,29 @@ try {
     process.exit(70);
   }
 
+  // The native listener is configured through the same settings root upstream reads at spawn.
+  // `desktopLanAccessEnabled` makes it bind 0.0.0.0, which upstream refuses without a password.
+  // The password is read from a declared secret file, never taken from argv or the environment.
+  const localNetwork = registry.localNetwork;
+  if (localNetwork && typeof localNetwork === 'object') {
+    const port = Number(localNetwork.port);
+    let uiPassword = '';
+    try {
+      uiPassword = (await fsp.readFile(localNetwork.uiPasswordFile, 'utf8')).trim();
+    } catch (error) {
+      log('ui-password-unavailable', { code: error?.code || null });
+      process.exit(70);
+    }
+    if (!uiPassword || !Number.isInteger(port) || port < 1 || port > 65535) {
+      log('ui-network-config-invalid', { hasPassword: Boolean(uiPassword), port });
+      process.exit(70);
+    }
+    settings.desktopLanAccessEnabled = true;
+    settings.desktopUiPassword = uiPassword;
+    settings.desktopLocalPort = port;
+    log('native-network-configured', { port });
+  }
+
   const hosts = Array.isArray(settings.desktopHosts) ? settings.desktopHosts.slice() : [];
   const desiredIds = new Set(desired.map((host) => host.id));
   const removeIds = new Set(previous.filter((id) => !desiredIds.has(id)));
@@ -257,13 +280,16 @@ try {
 
   settings.desktopHosts = nextHosts;
   // The default instance is the user's choice, not the registry's. Writing it on every start made
-  // each restart select the remote server again. Only repair a default that points at a managed
-  // entry this run removed; an absent default stays absent and upstream then opens Local.
+  // each restart select the remote server again. A first run may seed this machine's own entry;
+  // an existing default is preserved, and one that points at a removed managed entry is repaired.
   if (
     typeof settings.desktopDefaultHostId === 'string'
     && removeIds.has(settings.desktopDefaultHostId)
   ) {
     delete settings.desktopDefaultHostId;
+  }
+  if (!settings.desktopDefaultHostId && registry.defaultHostId) {
+    settings.desktopDefaultHostId = registry.defaultHostId;
   }
 
   await atomicWrite(settingsPath, settings);

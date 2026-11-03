@@ -1,13 +1,16 @@
 # OpenChamber
 
-OpenChamber is the browser and desktop client for the OpenCode sessions on `cld-ops-01`. The server
-owns the projects and the agent state under one account; a desktop only holds a device-scoped token.
+OpenChamber is the browser and desktop client for OpenCode sessions. `cld-ops-01` and both desktops
+run a server; each server owns its own projects and agent state, and a desktop holds only
+device-scoped tokens for the instances it may use.
 
 ## Server
 
 `my.features.dev.openchamber.server.enable` runs the pinned upstream OpenChamber 2.6.0 package and
 its bundled OpenCode 2.2.5 CLI. There is no second OpenCode pin and no fleet process service for it:
-the packaged CLI is what the server and the desktop ship.
+the packaged CLI is what the server and the desktop ship. The central server runs as the isolated
+`openchamber` account; a desktop's server runs as its human user so it sees that machine's real home
+and repository.
 
 - Account: `openchamber` (system user, no login). State and projects: `/var/lib/openchamber`, declared
   in the storage contract and therefore in the backup.
@@ -94,45 +97,54 @@ narrow source patch: a provisioning hook immediately before `app.requestSingleIn
 `packages/electron/entry.mjs`. The patch is version-guarded to 2.6.0 and fails the build when upstream
 moves the insertion point.
 
-The desktop starts its own in-process OpenChamber server on a loopback port, with the user's home as
-the OpenCode working directory. That local instance is the substrate: it needs no remote server, no
-token and no Gateway credential, and it is what makes local projects and repositories usable while
-the mesh is down. The launcher explicitly unsets `OPENCHAMBER_SKIP_LOCAL_SERVER`, because a login
-shell can still carry the old value from a previous generation.
+The desktop starts its own in-process OpenChamber server on a loopback port by default; that is the
+machine's one OpenCode engine and it sees the real home and repository. With
+`my.features.dev.openchamber.client.networkAccess.enable` the same engine is exposed to the other
+desktop: upstream's "Desktop Network Access" binds `0.0.0.0` only when `desktopUiPassword` is set.
+The adapter writes that flag, the password and the stable port (7337) into the user's settings file
+(mode 0600) before every start. The password comes from a per-host SOPS document
+(`secrets/openchamber-desktop-<id>.yaml`); it never enters the Nix store and never reaches a peer.
 
-Remote entries are derived from the evaluated inventory: every host that enables the server *and*
-already lists this device in its `server.devices` allowlist becomes one entry, labelled with that
-server host and addressed through the topology's WireGuard address and the endpoint contract's port.
-The local instance is upstream's built-in entry and is never written into the registry. A server that
-is configured but offline stays in the host list; the desktop probes it at boot and reports it as
-unreachable instead of dropping it. The adapter does not write `desktopDefaultHostId`: the default
-instance is the user's choice, preserved across restarts, and an absent default opens Local.
+The listener is a declared endpoint, so the firewall rule is derived: it admits exactly the peer
+desktop's WireGuard address on the WireGuard interface and nothing else. Neither the LAN interface
+nor the internet has a rule for the port, and no publication or relay is created. The forced-command
+bootstrap account on each desktop authorizes the peer's device key, so the peer mints its own token
+over SSH and reads the password only on the host that owns it.
+
+The client registry is derived from the evaluated inventory. On `hom-wrk-01` it contains
+`cld-ops-01` and `mob-nb-01`; on `mob-nb-01` it contains `cld-ops-01` and `hom-wrk-01`. Together
+with upstream's built-in Local entry (the running machine's own embedded engine) each chooser has
+three entries. Each remote entry is labelled with the execution host and addressed through the
+topology's WireGuard address and that host's endpoint contract port; no host name or address is
+written twice, and no entry is created for a host that has not admitted this device.
+
+The adapter never overwrites `desktopDefaultHostId`; an existing choice is preserved across
+restarts. A default that points at a managed entry removed in the same run is deleted.
 
 The provisioning hook is best-effort for remote reachability: exit codes 3, 4 and 5 (missing mint
-command, bootstrap denied, mint failed) do not stop the launch, and upstream's own startup probe
-falls back to Local when a stored default is unreachable. Only a broken adapter or settings schema
-(64, 70) stops the launch.
+command, bootstrap denied, mint failed) do not stop the launch; the remote entry stays listed and
+its native probe reports the state. Only a broken adapter or settings schema (64, 70) stops the
+launch.
 
-On a desktop, the local instance starts with an empty OpenCode credential store. The three Go keys
-seeded on `cld-ops-01` are not copied: a local instance shows its providers empty until the user
-signs in on that machine, or until an explicit native credential path is configured there. Remote
-entries keep using the central server's credentials.
+On a desktop, the local instance starts with the user's own OpenCode credential store. The three Go
+keys seeded on `cld-ops-01` are not copied: a desktop shows its providers as configured on that
+machine, and the user can sign in there. Remote entries keep using the central server's credentials.
 
 ### Remote desktops
 
-The two desktops do not serve each other today. Their embedded servers bind loopback and have no
-per-host UI password, pairing artifact or firewall admission, so there is no endpoint a peer could
-reach and no credential a peer could present. Upstream's native sharing option is "Desktop Network
-Access": it binds `0.0.0.0` and requires `desktopUiPassword`; the mesh firewall would then have to
-admit exactly the peer hosts. That needs a new per-desktop UI password (or a decision to reuse one)
-and a deliberate enablement per host, so it is not inferred here.
+The native listener exists while that desktop's app is open: the embedded engine is the listener.
+Closing the app makes that peer temporarily unreachable, but the entry stays in the other chooser and
+the desktop's own probe reports the state; opening the app restores the endpoint without a second
+engine or a second project store. Each chooser therefore has Local (the running machine), the other
+desktop, and `cld-ops-01` once both desktops run with network access enabled.
 
 ## Adding a device
 
 1. Generate a keypair and encrypt the private half to the new host and the operator:
    `sops --encrypt --filename-override secrets/openchamber-device-<id>.yaml …` after adding the
    matching `creation_rules` entry.
-2. Add the public half to `my.features.dev.openchamber.server.devices.<id>`.
+2. Add the public half to `my.features.dev.openchamber.server.deviceKeys.<id>`; every server's
+   `devices` allowlist defaults to that set.
 3. Enable `my.features.dev.openchamber.client` on the client host.
 4. Deploy; the client provisions itself on first start.
 

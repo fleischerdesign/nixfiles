@@ -29,6 +29,15 @@ let
 
   allowlistFile = "/etc/openchamber/bootstrap-devices";
 
+  # The password is either a SOPS secret (the central server) or a per-host file generated on first
+  # boot (a desktop's mesh server). It never leaves the host: clients mint tokens over SSH and the
+  # helper reads the file as the bootstrap group.
+  passwordFile =
+    if cfg.uiPasswordFile != null then
+      cfg.uiPasswordFile
+    else
+      config.sops.secrets.${cfg.uiPasswordSecret}.path;
+
   mint = pkgs.writeShellApplication {
     name = "openchamber-mint";
     runtimeInputs = [ pkgs.nodejs_22 ];
@@ -52,7 +61,7 @@ let
       # The unit binds the mesh address, not loopback; the local helper must dial the address the
       # listener actually owns.
       serverUrl = "http://${cfg.bindAddress}:${toString cfg.port}";
-      passwordFile = config.sops.secrets.${cfg.uiPasswordSecret}.path;
+      passwordFile = passwordFile;
       allowlistFile = allowlistFile;
     }
   );
@@ -60,7 +69,7 @@ let
   revokeConfig = pkgs.writeText "openchamber-revoke.json" (
     builtins.toJSON {
       serverUrl = "http://${cfg.bindAddress}:${toString cfg.port}";
-      passwordFile = config.sops.secrets.${cfg.uiPasswordSecret}.path;
+      passwordFile = passwordFile;
       allowlistFile = allowlistFile;
     }
   );
@@ -140,6 +149,45 @@ in
       description = "SOPS document holding the server's UI password, scoped to this host and the operator.";
     };
 
+    uiPasswordFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        Password file to use instead of the SOPS secret. A desktop's mesh server generates this file
+        on first boot, so each desktop has a distinct password that never leaves that host.
+      '';
+    };
+
+    uiPasswordRuntimeGenerate = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Generate `uiPasswordFile` with a random per-host value before the server starts. Enables the
+        bootstrap group to read it; no client ever receives it.
+      '';
+    };
+
+    manageUser = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Declare the service account and its state directory. Set false when `user` is an existing
+        human account (a desktop's local server runs as that user so it sees the real home and repo).
+      '';
+    };
+
+    deviceKeys = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = {
+        hom-wrk-01 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC2BUebcO3YBUkgG7ig7L6S4QgMZ4S/VdYg9W6s06i3v openchamber-bootstrap:hom-wrk-01";
+        mob-nb-01 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ6VpZPY7sIbHGWQeinWtWAs+gsoxavKhOfCrmsekTUg openchamber-bootstrap:mob-nb-01";
+      };
+      description = ''
+        Public halves of the fleet's device bootstrap keys, declared once. A server's `devices`
+        allowlist defaults to this set; the private halves stay SOPS-scoped to their own host.
+      '';
+    };
+
     goAccounts = lib.mkOption {
       type = lib.types.listOf (
         lib.types.submodule {
@@ -206,7 +254,7 @@ in
           };
         }
       );
-      default = { };
+      default = lib.mapAttrs (_: key: { sshPublicKey = key; }) cfg.deviceKeys;
       description = ''
         Authoritative device allowlist. The attribute name is the device id and must equal the
         client host name. Removing an entry removes the SSH grant and revokes the client token.
@@ -270,10 +318,10 @@ in
       }
     ];
 
-    users.groups.${cfg.group} = { };
+    users.groups.${cfg.group} = lib.mkIf cfg.manageUser { };
     users.groups.${bootstrapGroup} = { };
 
-    users.users.${cfg.user} = {
+    users.users.${cfg.user} = lib.mkIf cfg.manageUser {
       isSystemUser = true;
       inherit (cfg) group;
       home = cfg.stateDir;
@@ -298,21 +346,23 @@ in
       ) cfg.devices;
     };
 
-    sops.secrets = {
-      ${cfg.uiPasswordSecret} = {
-        sopsFile = cfg.uiPasswordSopsFile;
-        key = "ui_password";
-        owner = "root";
-        group = bootstrapGroup;
-        mode = "0440";
-        restartUnits = [ "openchamber.service" ];
-      };
-    }
-    # The seed is another reader of the same declared keys the Gateway already uses. Declaring the
-    # secrets here only adds the restart trigger; owner and mode stay whatever the owning feature set.
-    // lib.genAttrs (map (account: account.apiKeySecret) cfg.goAccounts) (_: {
-      restartUnits = [ "openchamber-go-accounts.service" ];
-    });
+    sops.secrets = lib.mkMerge [
+      (lib.mkIf (cfg.uiPasswordFile == null) {
+        ${cfg.uiPasswordSecret} = {
+          sopsFile = cfg.uiPasswordSopsFile;
+          key = "ui_password";
+          owner = "root";
+          group = bootstrapGroup;
+          mode = "0440";
+          restartUnits = [ "openchamber.service" ];
+        };
+      })
+      # The seed is another reader of the same declared keys the Gateway already uses. Declaring the
+      # secrets here only adds the restart trigger; owner and mode stay whatever the owning feature set.
+      (lib.genAttrs (map (account: account.apiKeySecret) cfg.goAccounts) (_: {
+        restartUnits = [ "openchamber-go-accounts.service" ];
+      }))
+    ];
 
     # Upstream's own module owns the unit, credential loading and the process. The package and its
     # bundled OpenCode 2.2.5 stay exactly the pinned upstream artifacts; no second CLI is installed.
@@ -323,21 +373,50 @@ in
       package = pkgs.openchamber;
       inherit (cfg) port user;
       host = cfg.bindAddress;
-      uiPasswordFile = config.sops.secrets.${cfg.uiPasswordSecret}.path;
+      uiPasswordFile = passwordFile;
     };
 
-    systemd.tmpfiles.rules = [
+    systemd.tmpfiles.rules = lib.mkIf cfg.manageUser [
       "d ${cfg.stateDir} 0700 ${cfg.user} ${cfg.group} -"
     ];
 
+    # A desktop's mesh server runs as the human account and must see the real home. The isolated
+    # system account keeps the narrower view.
     systemd.services.openchamber.serviceConfig = {
-      # The account is dedicated: it does not read any home directory, and its own state is the one
-      # writable tree it needs.
-      ProtectHome = true;
+      ProtectHome = lib.mkIf cfg.manageUser true;
       InaccessiblePaths = [ "-/var/lib/openclaw" ];
-      ReadWritePaths = [ cfg.stateDir ];
-      UMask = "0077";
+      ReadWritePaths = lib.mkIf cfg.manageUser [ cfg.stateDir ];
+      UMask = lib.mkIf cfg.manageUser "0077";
     };
+
+    # A per-host password for the desktop mesh server: generated once, readable by root and the
+    # bootstrap group, never by a client. The central server keeps its operator-scoped SOPS secret.
+    systemd.services.openchamber-password = lib.mkIf cfg.uiPasswordRuntimeGenerate {
+      description = "Generate the local OpenChamber UI password";
+      wantedBy = [ "multi-user.target" ];
+      before = [ "openchamber.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = pkgs.writeShellScript "openchamber-password" ''
+          set -eu
+          file=${lib.escapeShellArg cfg.uiPasswordFile}
+          install -d -m 0750 -o root -g ${bootstrapGroup} "$(dirname "$file")"
+          if [ ! -s "$file" ]; then
+            umask 077
+            ${pkgs.coreutils}/bin/head -c 32 /dev/urandom | ${pkgs.coreutils}/bin/base64 | ${pkgs.coreutils}/bin/tr -d '\n' > "$file"
+          fi
+          chown root:${bootstrapGroup} "$file"
+          chmod 0440 "$file"
+        '';
+      };
+    };
+    systemd.services.openchamber.after = lib.mkIf cfg.uiPasswordRuntimeGenerate [
+      "openchamber-password.service"
+    ];
+    systemd.services.openchamber.requires = lib.mkIf cfg.uiPasswordRuntimeGenerate [
+      "openchamber-password.service"
+    ];
 
     environment.etc."openchamber/bootstrap-devices".text =
       lib.concatStringsSep "\n" (lib.attrNames cfg.devices) + "\n";
@@ -424,7 +503,9 @@ in
       # the WireGuard address. A local blackbox probe would report the service down from a healthy
       # host. A mesh-target probe belongs in the monitoring contract, not here as a false alarm.
 
-      storage.dataDirs = [ cfg.stateDir ];
+      # A user-owned local server keeps its data in the human home, which the home backup already
+      # covers; only the isolated system account needs a declared data directory.
+      storage.dataDirs = lib.optional cfg.manageUser cfg.stateDir;
     };
   };
 }
