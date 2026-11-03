@@ -19,13 +19,6 @@
 
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
-  # Desktop-only client: its device token is reconciled before every start.
-  my.features.dev.openchamber.client.enable = true;
-  my.features.dev.openchamber.client.goAccounts = (import ../../inventory/ai-accounts.nix).opencodeGo;
-  my.features.dev.openchamber.client.goAccountCleanup = true;
-  # Same native listener as the workstation: one embedded engine, reachable from the other desktop
-  # over WireGuard with this host's own UI password.
-  my.features.dev.openchamber.client.networkAccess.enable = true;
   my.features.services.openclaw.node = {
     enable = true;
     camera.enable = true;

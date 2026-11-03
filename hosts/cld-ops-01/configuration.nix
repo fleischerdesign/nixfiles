@@ -31,30 +31,6 @@
 
   my.features.services.attic.server.enable = true;
 
-  # OpenChamber owns its projects under a dedicated account. The desktop clients mint their device
-  # tokens over a forced-command SSH key; they are `corp` hosts, already admitted on the SSH endpoint.
-  my.features.dev.openchamber.server = {
-    enable = true;
-    # The same three Go keys the Gateway uses for its own auth profiles, seeded natively into
-    # OpenCode's credential store so OpenChamber's account switch can rotate through them. Order is
-    # the existing subscription preference (3, 2, 1); the keys stay SOPS-owned and are staged into
-    # the seed unit with LoadCredential.
-    goAccounts = (import ../../inventory/ai-accounts.nix).opencodeGo;
-    # Emptying `goAccounts` must remove the managed credentials rather than leave them behind.
-    goAccountCleanup = true;
-    # Both desktop bootstrap keys are declared once on the server feature and projected from the
-    # evaluated inventory; no host repeats the key material.
-    # The phone pairs by hand and is never auto-provisioned, but it still needs the mesh door.
-    meshClientHosts = [ "mob-ph-01" ];
-  };
-
-  # The neutral policy and skill tree is shared AI content. Only the OpenChamber-managed OpenCode
-  # child consumes it here; the Gateway keeps its own delegated policy and is not a consumer.
-  my.features.ai.resources = {
-    enable = true;
-    consumers.openchamber.enable = true;
-  };
-
   my.features.services.openclaw.gateway = {
     enable = true;
     model = "openai/gpt-6.1-sol";

@@ -33,11 +33,6 @@ host has 15 GB. A builder killed by the kernel is reported as a failed check, so
 `--max-jobs 1` is the difference between a green gate and a lie. CI already builds
 serially for the same reason.
 
-`checks/integration/<name>.nix` is a heavy runtime acceptance check, exposed as
-`integrationChecks.<system>.<name>` and never run by `nix flake check`: it starts
-the real service and pulls a closure the host build already needs. Select it when
-the changed paths make it relevant; the unconditional gate stays cheap.
-
 The shell is **fish**, locally and on the hosts: `VAR=value cmd`, `$?`, `${PIPESTATUS[0]}` and
 `for … do … done` all fail. Wrap anything non-trivial in `bash -c '…'` or `bash -s` with a heredoc,
 and prefer a script file over nested quoting.
@@ -160,8 +155,7 @@ removed when they are touched, not maintained in parallel to a lower layer.
 
 A check is a file, not an entry in a list. `checks/<name>.nix` is a check, the file name is the output
 name, and `lib/checks.nix` discovers them: `flake.nix` imports the directory once, so adding a check
-is adding a file and no manifest can drift. A heavy runtime check lives under `checks/integration/`
-and is discovered into `integrationChecks` instead.
+is adding a file and no manifest can drift.
 
 - `lib/` is the one reserved directory: it holds a value a check computes before wrapping it in a
   derivation. A fixture tree is a directory without `.nix` files; a directory that holds a
