@@ -316,8 +316,11 @@ in
 
     # Upstream's own module owns the unit, credential loading and the process. The package and its
     # bundled OpenCode 2.2.5 stay exactly the pinned upstream artifacts; no second CLI is installed.
+    # The package is named explicitly: upstream's default resolves through its own flake `self`,
+    # which bypasses this fleet's overlay and would ship the unpatched limit-failover sources.
     services.openchamber = {
       enable = true;
+      package = pkgs.openchamber;
       inherit (cfg) port user;
       host = cfg.bindAddress;
       uiPasswordFile = config.sops.secrets.${cfg.uiPasswordSecret}.path;
