@@ -7,6 +7,7 @@ let
     cld-ops-01 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPb3axFfetVr/Lyu5irXU0/Pyj92XkmqPjRkcV/EBR3b";
     hom-srv-01 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGJTV3C3jnAqCdoSDF8rVGYX42EXW8M9Ib3S+1mu+mrN";
     hom-wrk-01 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBQts1L7CTNCldjzhlhszDFxIpeYXrnW7ixul5QicHEF";
+    mob-nb-01 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGlZp997n/5TodwFvSkDSPIVpGKToXw6hA9IO6vKoFz/";
   };
 in
 {
