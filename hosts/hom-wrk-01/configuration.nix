@@ -23,6 +23,8 @@
   my.features.dev.android.enable = true;
   # Desktop-only client: its device token is reconciled before every start.
   my.features.dev.openchamber.client.enable = true;
+  my.features.dev.openchamber.client.goAccounts = (import ../../inventory/ai-accounts.nix).opencodeGo;
+  my.features.dev.openchamber.client.goAccountCleanup = true;
   # The embedded engine stays the only OpenCode instance on this host. It is exposed to the other
   # desktop over WireGuard with a per-host UI password; the firewall admits only that peer.
   my.features.dev.openchamber.client.networkAccess.enable = true;

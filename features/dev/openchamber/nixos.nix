@@ -74,28 +74,6 @@ let
     }
   );
 
-  goAccountsSeed = pkgs.writeShellApplication {
-    name = "openchamber-go-accounts";
-    runtimeInputs = [ pkgs.nodejs_24 ];
-    text = ''
-      exec ${pkgs.nodejs_24}/bin/node ${./go-accounts.mjs} "$@"
-    '';
-  };
-
-  goAccountsConfig = pkgs.writeText "openchamber-go-accounts.json" (
-    builtins.toJSON {
-      serverUrl = "http://${cfg.bindAddress}:${toString cfg.port}";
-      integrationID = cfg.goAccountIntegration;
-      switchProvider = cfg.goAccountSwitchProvider;
-      stateFile = "/var/lib/openchamber-nixfiles/go-accounts.json";
-      opencodeDatabase = "${cfg.stateDir}/.local/share/opencode/opencode.db";
-      slots = map (account: {
-        slot = account.slot;
-        secretId = account.slot;
-        secret = account.apiKeySecret;
-      }) cfg.goAccounts;
-    }
-  );
 in
 {
   imports = [ inputs.openchamber.nixosModules.default ];
@@ -189,23 +167,7 @@ in
     };
 
     goAccounts = lib.mkOption {
-      type = lib.types.listOf (
-        lib.types.submodule {
-          options = {
-            slot = lib.mkOption {
-              type = lib.types.strMatching "[a-z0-9][a-z0-9-]{0,30}";
-              description = "Stable slot name; it appears in the owned credential id and label.";
-            };
-            apiKeySecret = lib.mkOption {
-              type = lib.types.str;
-              description = ''
-                SOPS secret holding this OpenCode Go API key. The key is staged into the seed unit with
-                `LoadCredential` and never enters the Nix store, the unit environment, argv or a log.
-              '';
-            };
-          };
-        }
-      );
+      type = import ./go-account-type.nix lib;
       default = [ ];
       description = ''
         OpenCode Go API keys seeded into OpenCode's own credential store, in failover order. Accounts
@@ -450,41 +412,17 @@ in
     # so OpenChamber's own settings lock and OpenCode's credential store stay the single writers.
     systemd.services.openchamber-go-accounts =
       lib.mkIf (cfg.goAccounts != [ ] || cfg.goAccountCleanup)
-        {
-          description = "Seed OpenCode Go accounts into OpenCode's credential store";
-          after = [ "openchamber.service" ];
-          wants = [ "openchamber.service" ];
-          wantedBy = [ "multi-user.target" ];
-          restartTriggers = [ goAccountsConfig ];
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = true;
-            ExecStart = "${goAccountsSeed}/bin/openchamber-go-accounts";
-            Environment = [ "OPENCHAMBER_GO_CONFIG=${goAccountsConfig}" ];
-            StateDirectory = "openchamber-nixfiles";
-            StateDirectoryMode = "0700";
-            UMask = "0077";
-            # Secrets arrive as files: systemd stages each declared SOPS file under /run/credentials and
-            # the program reads it there. Nothing secret is in the unit, the environment or argv.
-            LoadCredential = [
-              "ui_password:${config.sops.secrets.${cfg.uiPasswordSecret}.path}"
-            ]
-            ++ map (
-              account: "${account.slot}:${config.sops.secrets.${account.apiKeySecret}.path}"
-            ) cfg.goAccounts;
-            # The program reads OpenCode's SQLite metadata (id + active) to keep the selected account
-            # across a rotation. It never writes there; the API is the write path.
-            ProtectSystem = "strict";
-            ProtectHome = true;
-            PrivateTmp = true;
-            NoNewPrivileges = true;
-            RestrictAddressFamilies = [
-              "AF_UNIX"
-              "AF_INET"
-              "AF_INET6"
-            ];
-          };
-        };
+        (
+          import ./go-accounts-unit.nix {
+            inherit config lib pkgs;
+            accounts = cfg.goAccounts;
+            uiPasswordSecret = cfg.uiPasswordSecret;
+            serverUrl = "http://${cfg.bindAddress}:${toString cfg.port}";
+            opencodeDatabase = "${cfg.stateDir}/.local/share/opencode/opencode.db";
+            integrationID = cfg.goAccountIntegration;
+            switchProvider = cfg.goAccountSwitchProvider;
+          }
+        );
 
     my.contracts.provides.openchamber = {
       endpoints.web = {

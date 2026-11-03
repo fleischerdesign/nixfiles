@@ -141,6 +141,22 @@ in
       description = "Rendered path of the private bootstrap key.";
     };
 
+    goAccounts = lib.mkOption {
+      type = import ../go-account-type.nix lib;
+      default = [ ];
+      description = "Managed native Go accounts for this desktop's own OpenCode store.";
+    };
+    goAccountCleanup = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Retire the owned Go accounts when their declaration becomes empty.";
+    };
+    goAccountsSopsFile = lib.mkOption {
+      type = lib.types.path;
+      default = cfg.networkAccess.uiPasswordSopsFile;
+      description = "This desktop's encrypted Go account values; never the central server document.";
+    };
+
     networkAccess = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -206,6 +222,16 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
+        assertion = cfg.goAccounts == [ ] || cfg.networkAccess.enable;
+        message = "openchamber: desktop Go provisioning requires the authenticated native network listener";
+      }
+      {
+        assertion =
+          builtins.length (lib.unique (map (account: account.slot) cfg.goAccounts))
+          == builtins.length cfg.goAccounts;
+        message = "openchamber: duplicate desktop Go account slot";
+      }
+      {
         # One OpenCode engine per execution host. The desktop already starts its embedded server in
         # the user's session; a headless server beside it would own a second engine and a second
         # project store on the same machine.
@@ -215,6 +241,16 @@ in
     ];
 
     sops.secrets = lib.mkMerge [
+      (lib.listToAttrs (
+        map (
+          account:
+          lib.nameValuePair account.apiKeySecret {
+            sopsFile = cfg.goAccountsSopsFile;
+            key = account.apiKeySecret;
+            restartUnits = [ "openchamber-go-accounts.service" ];
+          }
+        ) cfg.goAccounts
+      ))
       {
         ${cfg.deviceKeySecret} = {
           sopsFile = cfg.deviceKeySopsFile;
@@ -239,6 +275,34 @@ in
         };
       })
     ];
+
+    # The Electron singleton socket is the native lifecycle signal. No extra server and no
+    # recurring polling: start after the app opens; retain the reconciled store between launches.
+    systemd.paths.openchamber-go-accounts = lib.mkIf (cfg.goAccounts != [ ] || cfg.goAccountCleanup) {
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathExists = "${
+        config.users.users.${config.my.user.primary}.home
+      }/.config/OpenChamber/SingletonSocket";
+    };
+    systemd.services.openchamber-go-accounts =
+      lib.mkIf (cfg.goAccounts != [ ] || cfg.goAccountCleanup)
+        (
+          import ../go-accounts-unit.nix {
+            inherit config lib pkgs;
+            accounts = cfg.goAccounts;
+            uiPasswordSecret = cfg.networkAccess.uiPasswordSecret;
+            serverUrl = "http://127.0.0.1:${toString cfg.networkAccess.port}";
+            opencodeDatabase = "${
+              config.users.users.${config.my.user.primary}.home
+            }/.local/share/opencode/opencode.db";
+            after = [ ];
+            wantedBy = [ ];
+            protectHome = "read-only";
+            conditionPath = "${
+              config.users.users.${config.my.user.primary}.home
+            }/.config/OpenChamber/SingletonSocket";
+          }
+        );
 
     # The native desktop listener's password. Upstream reads it from the desktop settings file; the
     # provisioning adapter merges it into that file as the primary user (mode 0600). The bootstrap

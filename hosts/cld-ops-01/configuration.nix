@@ -39,20 +39,7 @@
     # OpenCode's credential store so OpenChamber's account switch can rotate through them. Order is
     # the existing subscription preference (3, 2, 1); the keys stay SOPS-owned and are staged into
     # the seed unit with LoadCredential.
-    goAccounts = [
-      {
-        slot = "go-1";
-        apiKeySecret = "ai/opencode_api_key_3";
-      }
-      {
-        slot = "go-2";
-        apiKeySecret = "ai/opencode_api_key_2";
-      }
-      {
-        slot = "go-3";
-        apiKeySecret = "ai/opencode_api_key";
-      }
-    ];
+    goAccounts = (import ../../inventory/ai-accounts.nix).opencodeGo;
     # Emptying `goAccounts` must remove the managed credentials rather than leave them behind.
     goAccountCleanup = true;
     # Both desktop bootstrap keys are declared once on the server feature and projected from the

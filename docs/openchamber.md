@@ -130,9 +130,19 @@ command, bootstrap denied, mint failed) do not stop the launch; the remote entry
 its native probe reports the state. Only a broken adapter or settings schema (64, 70) stops the
 launch.
 
-On a desktop, the local instance starts with the user's own OpenCode credential store. The three Go
-keys seeded on `cld-ops-01` are not copied: a desktop shows its providers as configured on that
-machine, and the user can sign in there. Remote entries keep using the central server's credentials.
+Each execution host has its own OpenCode credential store. All three instances receive the same
+managed Go account identities from `inventory/ai-accounts.nix`, with the key values encrypted in the
+authorized host's own SOPS document. Credentials and native exhaustion state are local to each
+instance; provider quotas still belong to the same three accounts, not three additional allowances.
+ChatGPT OAuth and other manually added accounts remain local and are not copied.
+
+On a desktop, `openchamber-go-accounts.path` watches Electron's singleton socket and starts the same
+credential-only systemd seed used by the headless server. No second coding server or polling timer
+is created. The seed waits for the native API, uses `LoadCredential`, and enables native Go account
+failover. The completed unit stays active; persistent account state survives app restarts. Secret
+rotation restarts the unit, while the singleton-path condition defers provisioning if the app is
+closed. The next application start then triggers it. The desktop home is mounted read-only in the
+seed sandbox solely for OpenCode's account-selection metadata; all writes use the native API.
 
 ### Remote desktops
 
@@ -154,10 +164,13 @@ desktop, and `cld-ops-01` once both desktops run with network access enabled.
 
 ## OpenCode Go accounts
 
-`my.features.dev.openchamber.server.goAccounts` seeds the fleet's three OpenCode Go API keys into
-OpenCode's own credential store and enables OpenChamber's native account switch. The same SOPS keys
-the Gateway already uses for its auth profiles (`ai/opencode_api_key`, `_2`, `_3`) are the only
-source; OpenClaw's profiles stay untouched.
+`my.features.dev.openchamber.server.goAccounts` and `client.goAccounts` consume the shared account
+identities in `inventory/ai-accounts.nix`. One native-API seed implementation provisions each
+instance and enables OpenChamber's native account switch. The existing Go values
+(`ai/opencode_api_key`, `_2`, `_3`) are encrypted separately for each authorized desktop, without
+expanding the recipients of the central secrets document. Rotate the corresponding encrypted
+values on every consumer when replacing a shared key; `restartUnits` then reconciles each store.
+OpenClaw's profiles and the central seed's executable remain unchanged.
 
 - Integration `opencode-go`, model provider `opencode-go`. The provider id is what OpenCode reports
   on a Go model (`opencode-go/<model>`), so `accountSwitchProviders = ["opencode-go"]` reads exactly
