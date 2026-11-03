@@ -17,8 +17,15 @@
 // Idempotency: when the desired id already exists, the slot makes no write at all. A rotation
 // happens only when the key changed (desired id absent while an owned id for the slot exists):
 // create the replacement, keep the previous selection if it was active, then remove the stale rows.
+// A retirement moves the selection to a declared replacement before the active row is deleted, so a
+// failed activation leaves the old selection intact and the next run can finish the work. At the
+// end of a run an integration with no active credential at all is healed from the declaration; an
+// active foreign or manually chosen credential is never replaced.
+//
 // Active state is read from OpenCode's credential table as metadata only (id + active), because the
-// client API intentionally refuses a credential list; keys are never selected or copied.
+// client API intentionally refuses a credential list; keys are never selected or copied. The table
+// is read exactly where a decision depends on it: the selected row during rotation and retirement,
+// and whether the integration is left without any selection.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -247,18 +254,35 @@ for (const account of declared) {
 }
 
 // Retire owned slots that are no longer declared. If the retired row was the selected account,
-// select the first declared replacement so the provider does not lose its active credential.
+// select a declared replacement before deleting it; a failed activation aborts with the old row
+// still active. A foreign or manual selection is left untouched, and an empty declaration removes
+// the owned rows without activating anything else.
 const declaredSlots = new Set(declared.map((account) => account.slot));
 for (const connection of owned()) {
   const match = ID_PATTERN.exec(connection.id);
   if (declaredSlots.has(match[1])) continue;
   const wasActive = isActive(connection.id);
+  if (wasActive) {
+    const replacement = declared.find((account) => connections.some((entry) => entry.id === account.id));
+    if (replacement) {
+      if (!isActive(replacement.id)) await activate(replacement.id);
+    } else if (declared.length > 0) {
+      // Every declared account was created above, so this is an inconsistency. Active is a
+      // preference the user can set: never delete the selected row and leave the integration
+      // without one.
+      fail(65, `no declared replacement is present for active ${connection.id}; refusing to retire it`);
+    }
+  }
   await remove(connection.id);
   connections = await readIntegrations();
-  if (wasActive) {
-    const first = declared.find((account) => connections.some((entry) => entry.id === account.id));
-    if (first && !isActive(first.id)) await activate(first.id);
-  }
+}
+
+// Self-heal only the crash state this program can create: the integration has no active credential
+// although a declared account exists. An active foreign or manually selected credential is a user
+// preference, so it is never replaced.
+if (declared.length > 0 && !activeCredentialForIntegration()) {
+  const first = declared.find((account) => connections.some((entry) => entry.id === account.id));
+  if (first) await activate(first.id);
 }
 
 // Enable the native account switch. Read the current profile value and add this provider instead of
