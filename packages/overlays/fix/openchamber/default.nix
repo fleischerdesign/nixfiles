@@ -8,7 +8,13 @@
 #    every real start. Status 75 means "another instance owns the profile" and continues into the
 #    singleton check; any other non-zero status stops the launch.
 #
-# 2. OpenCode Go limit failover (patch-go-limit.mjs): OpenChamber 2.6.0 omits OpenCode's
+# 2. Linux login autostart (patch-linux-autostart.mjs): the desktop belongs in the tray from
+#    login. Upstream's autostart reconcile writes `Exec=<process.execPath> --background`, which is
+#    the packaged binary and bypasses the launcher that exports the provisioning hook. The patch
+#    lets the launcher declare its own path through OPENCHAMBER_AUTOSTART_EXEC, so the entry keeps
+#    naming the launcher. See docs/openchamber.md, "Desktop lifecycle".
+#
+# 3. OpenCode Go limit failover (patch-go-limit.mjs): OpenChamber 2.6.0 omits OpenCode's
 #    `provider.go-limit` from both limit-failover boundaries (policy.js and the generated plugin
 #    source in runtime.js). The patch adds the one error type to both, so the native account
 #    switching upstream already implements reacts to a spent Go plan. It is obsolete as soon as
@@ -52,6 +58,7 @@ in
       replaceCore previous.buildPhase;
     postPatch = (previous.postPatch or "") + ''
       node ${./patch-entry-provision-hook.mjs}
+      node ${./patch-linux-autostart.mjs}
     '';
     passthru = previous.passthru // {
       openchamberCore = patchedCore;

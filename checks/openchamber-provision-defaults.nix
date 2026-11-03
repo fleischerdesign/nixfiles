@@ -1,7 +1,8 @@
-# A restart must not overwrite the user's selected instance, and an offline remote server must stay
-# listed. The failure this catches is the old adapter behaviour: every start wrote the registry's
-# default into `desktopDefaultHostId` and skipped a host that could not be reached, so the user was
-# forced back to the remote server and an offline server looked undeclared.
+# A restart must not overwrite the user's selected instance, an offline remote server must stay
+# listed, and the desktop must declare its tray lifecycle. The failures this catches: the old adapter
+# wrote the registry's default into `desktopDefaultHostId` on every start and skipped an unreachable
+# host, and an adapter that forgets `desktopMinimizeToTrayEnabled` makes closing the window quit the
+# only engine instead of hiding it to the tray.
 {
   pkgs,
   ...
@@ -43,6 +44,10 @@ pkgs.runCommandLocal "openchamber-provision-defaults-check"
     if (settings.desktopInitialHostChoiceCompleted !== true) {
       fail('initial host choice flag was rewritten');
     }
+    if (settings.desktopMinimizeToTrayEnabled !== true) {
+      fail('close-to-tray lifecycle is not declared');
+    }
+    if (settings.theme !== 'dark') fail('unmanaged settings key was dropped');
     const ids = (settings.desktopHosts || []).map((host) => host.id);
     if (!ids.includes('manual')) fail('unmanaged host was dropped');
     const central = (settings.desktopHosts || []).find((host) => host.id === 'cld-ops-01');

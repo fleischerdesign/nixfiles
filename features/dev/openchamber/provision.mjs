@@ -181,6 +181,11 @@ try {
     process.exit(70);
   }
 
+  // The desktop is a background application: its window close path hides to the tray while the
+  // embedded engine keeps running (upstream reads this key before the window is created). Without
+  // it, closing the window quits the process and its engine.
+  settings.desktopMinimizeToTrayEnabled = true;
+
   // The native listener is configured through the same settings root upstream reads at spawn.
   // `desktopLanAccessEnabled` makes it bind 0.0.0.0, which upstream refuses without a password.
   // The password is read from a declared secret file, never taken from argv or the environment.

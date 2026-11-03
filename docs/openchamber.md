@@ -92,10 +92,11 @@ reach the service.
 ## Desktop
 
 `my.features.dev.openchamber.client.enable` installs the patched desktop package, a token-free
-registry, the launcher wrapper and the session environment hook. The desktop package carries one
-narrow source patch: a provisioning hook immediately before `app.requestSingleInstanceLock()` in
-`packages/electron/entry.mjs`. The patch is version-guarded to 2.6.0 and fails the build when upstream
-moves the insertion point.
+registry, the launcher wrapper, the login autostart entry and the session environment hook. The
+desktop package carries two narrow source patches: a provisioning hook immediately before
+`app.requestSingleInstanceLock()` in `packages/electron/entry.mjs`, and the autostart launcher path in
+`packages/electron/linux-autostart.mjs`. Both are version-guarded to 2.6.0 and fail the build when
+upstream moves the insertion point.
 
 The desktop starts its own in-process OpenChamber server on a loopback port by default; that is the
 machine's one OpenCode engine and it sees the real home and repository. With
@@ -124,6 +125,27 @@ written twice, and no entry is created for a host that has not admitted this dev
 
 The adapter never overwrites `desktopDefaultHostId`; an existing choice is preserved across
 restarts. A default that points at a managed entry removed in the same run is deleted.
+
+### Desktop lifecycle
+
+The desktop is a background application from login, not a window that owns the engine. Home Manager
+installs `~/.config/autostart/openchamber.desktop` as a real file (the app rewrites it); systemd's
+XDG autostart generator turns it into a user unit at login. Its `Exec` is the launcher with
+`--background`, so the window stays closed while the embedded engine, the tray icon and the
+provisioning hook start. Closing the window afterwards hides it to the tray: the provisioning adapter
+declares `desktopMinimizeToTrayEnabled` in the same settings root, which is upstream's close-to-tray
+gate. The tray's Quit action is the only normal way to stop the engine.
+
+Upstream reconciles that entry on every start and through its "Launch at login" toggle, writing
+`Exec=<process.execPath> --background`. In this package `process.execPath` is the bare Electron
+binary, which bypasses the launcher and would start the next login without the provisioning
+environment. The overlay patch `patch-linux-autostart.mjs` therefore lets the launcher declare its own
+store path through `OPENCHAMBER_AUTOSTART_EXEC`; the reconcile then writes the same launcher the
+entry already names. The patch fails the build when the pinned version or the resolver shape moves.
+
+Exactly one engine runs per host: the autostart launch owns the embedded server, and any second
+launch (desktop icon, protocol link) loses Electron's single-instance lock and focuses the existing
+window instead of spawning another server. There is no headless server beside the desktop.
 
 The provisioning hook is best-effort for remote reachability: exit codes 3, 4 and 5 (missing mint
 command, bootstrap denied, mint failed) do not stop the launch; the remote entry stays listed and
@@ -239,6 +261,7 @@ that is visible only in the provider's own usage view.
 ```bash
 nix build .#checks.x86_64-linux.openchamber-provision-hook
 nix build .#checks.x86_64-linux.openchamber-devices
+nix build .#checks.x86_64-linux.openchamber-linux-autostart
 ```
 
 The HTTP acceptance tests start the real server and pull its 2.4 GB runtime closure, so they are

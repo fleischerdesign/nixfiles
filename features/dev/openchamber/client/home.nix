@@ -1,10 +1,12 @@
-# The per-user half of the OpenChamber client: wrapper, registry, desktop entry and session hook.
+# The per-user half of the OpenChamber client: wrapper, registry, desktop entry, login autostart and
+# session hook.
 #
 # The registry is token-free and rendered by Nix. The token lives only in OpenChamber's own
 # settings.json, which is the only place upstream reads it from. The adapter preserves every key and
 # every unmanaged host it did not write.
 {
   config,
+  lib,
   pkgs,
   osConfig,
   ...
@@ -104,6 +106,10 @@ let
       unset OPENCHAMBER_SKIP_LOCAL_SERVER
       export OPENCHAMBER_DESKTOP_USER_DATA_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/OpenChamber"
       export OPENCHAMBER_DESKTOP_PROVISION=${hook}/bin/openchamber-provision-hook
+      # Upstream rewrites the autostart entry on every start; name this launcher there so the next
+      # login carries the provisioning environment instead of the bare Electron binary.
+      autostart_exec="$(readlink -f "$0")"
+      export OPENCHAMBER_AUTOSTART_EXEC="$autostart_exec"
 
       rc=0
       ${provisionLocked}/bin/openchamber-provision-locked || rc=$?
@@ -118,6 +124,20 @@ let
       exec ${cfg.desktopPackage}/bin/openchamber-desktop "$@"
     '';
   };
+
+  # The entry upstream's `desktop_set_launch_at_login` toggle and its startup reconcile write. It is
+  # installed as a real file (not a store symlink) because the app rewrites it; `--background` keeps
+  # the window closed at login while the embedded engine and the tray start. Closing the window then
+  # hides it to the tray (`desktopMinimizeToTrayEnabled`), so a login session owns exactly one engine.
+  autostartEntry = pkgs.writeText "openchamber-autostart.desktop" ''
+    [Desktop Entry]
+    Type=Application
+    Name=OpenChamber
+    Exec=${launch}/bin/openchamber-launch --background
+    Terminal=false
+    X-GNOME-Autostart-enabled=true
+    StartupWMClass=openchamber
+  '';
 in
 {
   home.packages = [
@@ -137,6 +157,12 @@ in
     mimeType = [ "x-scheme-handler/openchamber" ];
     startupNotify = true;
   };
+
+  home.activation.openchamberAutostart = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    entry="$HOME/.config/autostart/openchamber.desktop"
+    ${pkgs.coreutils}/bin/mkdir -p "''${entry%/*}"
+    ${pkgs.coreutils}/bin/install -m 0644 ${autostartEntry} "$entry"
+  '';
 
   # A terminal launch and the desktop launcher must reach the same hook. `app.relaunch()` inherits
   # the environment, which is what makes provisioning run again after an in-app relaunch.
