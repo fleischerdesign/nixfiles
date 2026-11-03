@@ -49,15 +49,18 @@ const __openchamberProvisionHook = String(process.env.OPENCHAMBER_DESKTOP_PROVIS
 if (__openchamberProvisionHook) {
   const __openchamberProvision = __openchamberSpawnSync(__openchamberProvisionHook, [], {
     stdio: 'inherit',
-    timeout: 60_000,
+    // Generous enough for the bounded lock plus one worst-case host reconciliation, still a hard
+    // stop: an unavailable peer may delay the launch, never hold it.
+    timeout: 90_000,
     env: process.env,
   });
   // 3/4/5: a remote instance is configured but unreachable, denied or missing its mint command.
+  // 6: the protected local listener could not get its native token, so this run stays on loopback.
   // The local in-process server is the substrate, and the app falls back to it when the probe
   // fails, so these must not keep the window shut. 75: another instance owns the profile.
   if (
     __openchamberProvision.error ||
-    ![0, 3, 4, 5, 75].includes(__openchamberProvision.status)
+    ![0, 3, 4, 5, 6, 75].includes(__openchamberProvision.status)
   ) {
     process.exit(__openchamberProvision.status || 1);
   }

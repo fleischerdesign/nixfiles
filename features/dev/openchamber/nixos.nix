@@ -29,6 +29,17 @@ let
 
   allowlistFile = "/etc/openchamber/bootstrap-devices";
 
+  # Upstream stores a client label with a hard 80-character ceiling
+  # (packages/web/server/lib/client-auth/remote-clients.js). The managed identity is the label
+  # prefix, and the revoke reconciler reads the device id back out of it, so a device id that does
+  # not fit would be truncated into a different id and its token would be revoked. The namespace
+  # `openchamber-bootstrap:` is reserved for this module; a hand-created client must not use it.
+  managedLabelPrefix = "openchamber-bootstrap:";
+  maxLabelLength = 80;
+  maxDeviceIdLength = maxLabelLength - builtins.stringLength managedLabelPrefix;
+  # First character plus at least one more: `{1,max-1}` permits 2..max characters.
+  deviceIdPattern = "[a-z0-9][a-z0-9-]{1,${toString (maxDeviceIdLength - 1)}}";
+
   # The password is either a SOPS secret (the central server) or a per-host file generated on first
   # boot (a desktop's mesh server). It never leaves the host: clients mint tokens over SSH and the
   # helper reads the file as the bootstrap group.
@@ -262,11 +273,13 @@ in
       }
       {
         # The id is interpolated into an authorized_keys `command=`; a shell metacharacter would
-        # become part of the forced command line.
-        assertion = lib.all (id: builtins.match "[a-z0-9][a-z0-9-]{1,62}" id != null) (
-          lib.attrNames cfg.devices
-        );
-        message = "openchamber: a `server.devices.<id>` name must match [a-z0-9][a-z0-9-]{1,62}";
+        # become part of the forced command line. It must also fit the managed label without
+        # truncation, or revocation would compare a truncated id against the allowlist.
+        assertion = lib.all (id: builtins.match deviceIdPattern id != null) (lib.attrNames cfg.devices);
+        message = ''
+          openchamber: a `server.devices.<id>` name must match ${deviceIdPattern} and be at most
+          ${toString maxDeviceIdLength} characters, so `openchamber-bootstrap:<id>` stays within
+          upstream's ${toString maxLabelLength}-character label limit'';
       }
       {
         assertion = lib.all (host: config.my.topology.hosts ? ${host}) cfg.meshClientHosts;

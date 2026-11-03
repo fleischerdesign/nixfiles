@@ -247,7 +247,11 @@ in
           lib.nameValuePair account.apiKeySecret {
             sopsFile = cfg.goAccountsSopsFile;
             key = account.apiKeySecret;
-            restartUnits = [ "openchamber-go-accounts.service" ];
+            # The seed runs as the primary user in that user's systemd manager, so it reads the
+            # per-desktop document directly. The keys already live in the user's OpenCode store;
+            # no other account can read this file.
+            owner = config.my.user.primary;
+            mode = "0400";
           }
         ) cfg.goAccounts
       ))
@@ -276,15 +280,14 @@ in
       })
     ];
 
-    # The Electron singleton socket is the native lifecycle signal. No extra server and no
-    # recurring polling: start after the app opens; retain the reconciled store between launches.
-    systemd.paths.openchamber-go-accounts = lib.mkIf (cfg.goAccounts != [ ] || cfg.goAccountCleanup) {
-      wantedBy = [ "multi-user.target" ];
-      pathConfig.PathExists = "${
-        config.users.users.${config.my.user.primary}.home
-      }/.config/OpenChamber/SingletonSocket";
-    };
-    systemd.services.openchamber-go-accounts =
+    # The seed is a user service in the same manager as the app, started/restarted by the launcher
+    # at every real start. That is the native lifecycle: no PathExists watch (a persistent path
+    # with a finished oneshot can retrigger), no polling timer, and no dependence on an Electron
+    # singleton artifact. It retries the loopback API itself, so the app may still be starting.
+    #
+    # The unit is not wanted by anything else: the declaration exists even while the app is closed,
+    # and only a launch (login autostart, icon or protocol link) reconciles credentials.
+    systemd.user.services.openchamber-go-accounts =
       lib.mkIf (cfg.goAccounts != [ ] || cfg.goAccountCleanup)
         (
           import ../go-accounts-unit.nix {
@@ -295,12 +298,12 @@ in
             opencodeDatabase = "${
               config.users.users.${config.my.user.primary}.home
             }/.local/share/opencode/opencode.db";
+            stateFile = "${
+              config.users.users.${config.my.user.primary}.home
+            }/.local/state/openchamber-nixfiles/go-accounts.json";
+            userScope = true;
             after = [ ];
             wantedBy = [ ];
-            protectHome = "read-only";
-            conditionPath = "${
-              config.users.users.${config.my.user.primary}.home
-            }/.config/OpenChamber/SingletonSocket";
           }
         );
 

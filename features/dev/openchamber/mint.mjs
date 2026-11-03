@@ -10,8 +10,14 @@
 // or logs.
 import fs from 'node:fs';
 
+// Upstream truncates a client label at 80 characters. The label is the managed identity the revoke
+// helper reads back, so an id that does not fit would be stored as a different id and revoked.
+const LABEL_PREFIX = 'openchamber-bootstrap:';
+const MAX_LABEL_LENGTH = 80;
+const MAX_DEVICE_ID_LENGTH = MAX_LABEL_LENGTH - LABEL_PREFIX.length;
+
 const deviceId = process.argv[2];
-if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(deviceId || '')) {
+if (!/^[a-z0-9][a-z0-9-]{1,57}$/.test(deviceId || '') || deviceId.length > MAX_DEVICE_ID_LENGTH) {
   process.stderr.write('mint: invalid device id\n');
   process.exit(64);
 }
@@ -82,6 +88,11 @@ if (!login.ok || !cookie.startsWith('oc_ui_session')) {
 
 // This route creates a persistent record. The login route's `issueClientToken` attaches the UI
 // session's expiry, which would silently invalidate a device after the session TTL.
+const label = `${LABEL_PREFIX}${deviceId}`;
+if (label.length > MAX_LABEL_LENGTH) {
+  process.stderr.write('mint: device id does not fit the managed label\n');
+  process.exit(64);
+}
 let created;
 try {
   created = await fetch(`${server}/api/client-auth/clients`, {
@@ -92,7 +103,7 @@ try {
       accept: 'application/json',
     },
     body: JSON.stringify({
-      label: `openchamber-bootstrap:${deviceId}`,
+      label,
       clientKind: 'desktop',
       dedupeKey: `device:${deviceId}`,
     }),

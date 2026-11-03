@@ -74,10 +74,15 @@ let
       lock="''${XDG_RUNTIME_DIR:-$HOME/.run}/openchamber-provision.lock"
       mkdir -p "''${lock%/*}"
       (
-        # Bounded: a stale holder must delay a start, never hang it forever. The outer hook allows
-        # 60 s, so a lock timeout still ends in a clean, fail-closed exit.
-        flock -w 30 -x 9
-        ${provision}/bin/openchamber-provision
+        # Bounded: a stale holder must delay a start, never hang it. The entry hook allows 90 s,
+        # which leaves room for this wait plus one worst-case host reconciliation. A timeout is
+        # deferred (75) rather than fatal: the other holder is either reconciling already or stuck,
+        # and neither is a reason to keep the local window shut.
+        if flock -w 20 -x 9; then
+          exec ${provision}/bin/openchamber-provision
+        fi
+        echo '{"event":"provision-lock-timeout"}' >&2
+        exit 75
       ) 9>"$lock"
     '';
   };
@@ -99,6 +104,7 @@ let
     runtimeInputs = [
       pkgs.util-linux
       pkgs.coreutils
+      pkgs.systemd
     ];
     text = ''
       # Local work is the default substrate: the app starts its in-process server on the declared
@@ -111,16 +117,18 @@ let
       autostart_exec="$(readlink -f "$0")"
       export OPENCHAMBER_AUTOSTART_EXEC="$autostart_exec"
 
-      rc=0
-      ${provisionLocked}/bin/openchamber-provision-locked || rc=$?
-      # 3/4/5 mean a remote instance is configured but not reachable or not allowed. That must never
-      # keep the local window shut: the app probes the remote host at boot and falls back to local.
-      # 75 means another instance owns the profile. Only a broken adapter or settings schema (64, 70)
-      # is fatal.
-      case "$rc" in
-        0|3|4|5|75) ;;
-        *) exit "$rc" ;;
-      esac
+      # Provisioning itself runs exactly once, from the package's entry hook (the same hook that
+      # covers app.relaunch()). Running it here as well reconciled every host twice per start.
+      # The hook needs OPENCHAMBER_DESKTOP_PROVISION, exported above.
+
+      # Reconcile the managed Go accounts at every real start. This is the native user-unit
+      # lifecycle of the app, not a filesystem watch: restart is a no-op when nothing changed,
+      # retries a previously failed seed now, and picks up a rotated SOPS value. --no-block keeps
+      # the launch independent of the seed, which retries the API itself.
+      ${pkgs.coreutils}/bin/timeout --signal=KILL 10 \
+        ${pkgs.systemd}/bin/systemctl --user restart --no-block openchamber-go-accounts.service \
+        || true
+
       exec ${cfg.desktopPackage}/bin/openchamber-desktop "$@"
     '';
   };

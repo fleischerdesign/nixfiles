@@ -98,6 +98,9 @@ if (!listed.ok) {
 
 const body = await listed.json();
 const clients = Array.isArray(body?.clients) ? body.clients : [];
+// Reserved namespace: every label beginning with this prefix belongs to the declared device
+// allowlist. A hand-created client must not use it; ids are bounded so the label is never
+// truncated by upstream and the suffix is exactly the device id.
 const prefix = 'openchamber-bootstrap:';
 
 let revoked = 0;

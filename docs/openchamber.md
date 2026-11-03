@@ -35,6 +35,13 @@ a mesh-target probe is a separate monitoring-contract change.
 The authoritative allowlist is `my.features.dev.openchamber.server.devices`. Its attribute names are
 device ids and must equal the client host names.
 
+A device id is at most 58 characters (`[a-z0-9][a-z0-9-]{1,57}`). Upstream truncates a client label
+at 80 characters, and this module identifies a managed client by the label
+`openchamber-bootstrap:<id>`. A longer id would be stored truncated under a different identity, so
+the revoke reconciler would treat the device as unmanaged and revoke its token. The label prefix is
+therefore a reserved namespace: a client created by hand must not use it, because the reconciler
+owns every matching label.
+
 Each device has a dedicated Ed25519 keypair:
 
 - private half in `secrets/openchamber-device-<id>.yaml`, encrypted to that host and the operator;
@@ -47,8 +54,10 @@ forwarding and agent access; no `environment=` is used and `PermitUserEnvironmen
 
 ### Bootstrap path
 
-The client wrapper runs before the app and the patched `entry.mjs` runs again before the
-single-instance lock on every start, including `app.relaunch()`. The adapter:
+Provisioning runs exactly once per real start, from the patched `entry.mjs` immediately before the
+single-instance lock. That hook also covers `app.relaunch()`, which starts the binary directly, so
+the launcher wrapper does not run the adapter itself any more; the two invocations reconciled every
+host twice on each start. The adapter:
 
 1. probes the stored token with `GET /auth/session`;
 2. if missing or `401`, runs the Nix-declared SSH command over `StrictHostKeyChecking=yes` and the
@@ -63,6 +72,11 @@ The token is a bearer credential in a `0600` file. Upstream passes the configure
 its renderer process for the connection, so a compromised renderer can read it; that is upstream's
 trust boundary, unchanged by this repository. The adapter never writes the token to argv, a log, the
 Nix store or the registry.
+
+Every external operation is bounded: the probe has 4 s per host, a mint child is killed after 30 s,
+the inter-process lock waits at most 20 s, and the entry hook stops the whole adapter after 90 s.
+Hosts are reconciled concurrently, so one unreachable peer does not add its whole budget to the
+next; an offline server delays a start by at most about one host's worst case and never hangs it.
 
 The client-management route is used instead of the login route's `issueClientToken` because the latter
 attaches the UI session's expiry. `deviceName` is not accepted by the client-management route; the
@@ -106,6 +120,15 @@ The pre-start adapter also provisions `desktopLocalClientToken` through the ship
 runtime, so Local authenticates without an unlock prompt. Valid local tokens are retained; revoked
 tokens are repaired without changing peer tokens. This runs only while the desktop profile is idle,
 before its server opens the shared token store.
+
+The local-token write is retried three times. If the store stays unusable, the adapter does not
+start a password-protected listener without a Local token: it removes `desktopLanAccessEnabled`,
+the UI password and the fixed port for that run, so the embedded engine starts on loopback with
+Local still usable, reports `local-auth-unavailable-lan-disabled` and exits 6. It never leaves a
+half-configured protected listener and never silently treats the broken store as configured; the
+next start retries and re-enables peer access when the store is healthy again. The last valid token
+is preserved.
+
 The adapter writes that flag, the password and the stable port (7337) into the user's settings file
 (mode 0600) before every start. The password comes from a per-host SOPS document
 (`secrets/openchamber-desktop-<id>.yaml`); it never enters the Nix store and never reaches a peer.
@@ -160,19 +183,29 @@ command, bootstrap denied, mint failed) do not stop the launch; the remote entry
 its native probe reports the state. Only a broken adapter or settings schema (64, 70) stops the
 launch.
 
+Exit code 6 is also best-effort: it means the protected local listener was disabled for this run
+because its native token could not be prepared (see above). The app starts on loopback.
+
 Each execution host has its own OpenCode credential store. All three instances receive the same
 managed Go account identities from `inventory/ai-accounts.nix`, with the key values encrypted in the
 authorized host's own SOPS document. Credentials and native exhaustion state are local to each
 instance; provider quotas still belong to the same three accounts, not three additional allowances.
 ChatGPT OAuth and other manually added accounts remain local and are not copied.
 
-On a desktop, `openchamber-go-accounts.path` watches Electron's singleton socket and starts the same
-credential-only systemd seed used by the headless server. No second coding server or polling timer
-is created. The seed waits for the native API, uses `LoadCredential`, and enables native Go account
-failover. The completed unit stays active; persistent account state survives app restarts. Secret
-rotation restarts the unit, while the singleton-path condition defers provisioning if the app is
-closed. The next application start then triggers it. The desktop home is mounted read-only in the
-seed sandbox solely for OpenCode's account-selection metadata; all writes use the native API.
+On a desktop, the seed is a user unit in the same systemd manager as the app, started with
+`systemctl --user restart --no-block` by the launcher at every real start. That is the native
+lifecycle: there is no `PathExists` watch on Electron's singleton socket (a persistent path plus a
+finished oneshot can retrigger, and the socket is an Electron artifact rather than a supervision
+interface) and no polling timer. `restart` re-runs an idempotent seed after a previous failure,
+picks up a rotated SOPS value at the next launch, and does no write when the declared state already
+matches. The seed retries the loopback API itself, so the app may still be starting; a launch never
+waits for it. No second coding server is created.
+
+The user unit reads the per-desktop Go values and the UI password directly (mode `0400`, owner is
+the primary user); the keys already live in that user's OpenCode store, and no other account can
+read the files. The headless server keeps the isolated system unit with `ProtectHome` and
+`LoadCredential`. Both use the same `go-accounts.mjs`; all writes still go through the native API,
+and only the credential table's `id`/`active` metadata is read.
 
 ### Remote desktops
 
@@ -264,12 +297,40 @@ without values through OpenChamber's Providers page. A key that appears as a con
 by the auth catalog, which does not prove that the account has an active paid Go plan or quota -
 that is visible only in the provider's own usage view.
 
+## Local patches and version updates
+
+The pinned package carries three downstream patches in
+`packages/overlays/fix/openchamber/`. They belong to this repository; OpenChamber does not know
+about them, and nothing here assumes upstream will absorb them.
+
+| Patch | What it changes | Fails closed when |
+|---|---|---|
+| `patch-entry-provision-hook.mjs` | inserts the provisioning hook before `app.requestSingleInstanceLock()` in `packages/electron/entry.mjs` | the version is not 2.6.0, the electron import or lock line is absent/duplicated, or the hook is already present |
+| `patch-linux-autostart.mjs` | prefers `OPENCHAMBER_AUTOSTART_EXEC` in `resolveLinuxLaunchExecutable` | the version or the exact resolver shape moves, or the override is already present |
+| `patch-go-limit.mjs` | adds `provider.go-limit` to both limit-failover boundaries (`policy.js`, `runtime.js`) | the version/shape moves, only one boundary is patched (65), or both already list the type (78, remove the patch) |
+
+Updating the pinned release is a contract change, not a version bump:
+
+1. Read the new `packages/electron/entry.mjs`, `linux-autostart.mjs` and the two failover files at
+   the new revision. A patch is only re-applied when the same insertion point still exists and still
+   means the same thing.
+2. A patch that no longer applies must be removed with its `installPhase`/`postPatch` line in
+   `packages/overlays/fix/openchamber/default.nix`; the build failing is the intended signal, not a
+   reason to loosen the guard.
+3. `patch-go-limit.mjs` is deleted when both boundaries already list `provider.go-limit`; the
+   script reports exactly that case (exit 78) and names the files.
+4. Keep each patch's positive application proved by the real package build and its fail-closed
+   behaviour proved by the small fixtures. A fixture is not a substitute for re-reading upstream.
+
+No upstream issue, pull request or patch proposal is part of this contract.
+
 ## Verifying
 
 ```bash
 nix build .#checks.x86_64-linux.openchamber-provision-hook
 nix build .#checks.x86_64-linux.openchamber-devices
 nix build .#checks.x86_64-linux.openchamber-linux-autostart
+nix build .#checks.x86_64-linux.openchamber-device-labels
 ```
 
 The HTTP acceptance tests start the real server and pull its 2.4 GB runtime closure, so they are

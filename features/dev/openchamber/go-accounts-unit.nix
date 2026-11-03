@@ -11,8 +11,9 @@
   switchProvider ? integrationID,
   after ? [ "openchamber.service" ],
   wantedBy ? [ "multi-user.target" ],
+  stateFile ? "/var/lib/openchamber-nixfiles/go-accounts.json",
+  userScope ? false,
   protectHome ? true,
-  conditionPath ? null,
 }:
 let
   seed = pkgs.writeShellApplication {
@@ -29,8 +30,8 @@ let
         integrationID
         switchProvider
         opencodeDatabase
+        stateFile
         ;
-      stateFile = "/var/lib/openchamber-nixfiles/go-accounts.json";
       slots = map (account: {
         slot = account.slot;
         secretId = account.slot;
@@ -42,20 +43,24 @@ in
 {
   description = "Seed OpenCode Go accounts into OpenCode's credential store";
   inherit after wantedBy;
-  restartTriggers = [ seedConfig ];
-  unitConfig = lib.optionalAttrs (conditionPath != null) { ConditionPathExists = conditionPath; };
+  # A user unit is not restarted by the system switch; the launcher restarts it at every start.
+  restartTriggers = lib.optional (!userScope) seedConfig;
   serviceConfig = {
     Type = "oneshot";
     RemainAfterExit = true;
     ExecStart = "${seed}/bin/openchamber-go-accounts";
     Environment = [ "OPENCHAMBER_GO_CONFIG=${seedConfig}" ];
-    StateDirectory = "openchamber-nixfiles";
-    StateDirectoryMode = "0700";
     UMask = "0077";
     LoadCredential = [
       "ui_password:${config.sops.secrets.${uiPasswordSecret}.path}"
     ]
     ++ map (account: "${account.slot}:${config.sops.secrets.${account.apiKeySecret}.path}") accounts;
+  }
+  // lib.optionalAttrs (!userScope) {
+    # The system service runs as an isolated account, so it declares its own state directory and
+    # sandbox. A user unit already runs as the owner of the home and the OpenCode store.
+    StateDirectory = "openchamber-nixfiles";
+    StateDirectoryMode = "0700";
     ProtectSystem = "strict";
     ProtectHome = protectHome;
     PrivateTmp = true;

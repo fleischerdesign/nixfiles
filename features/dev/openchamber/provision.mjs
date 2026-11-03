@@ -6,8 +6,9 @@
 // token is missing or the server says 401. Every unmanaged key and host in the settings root is
 // preserved; the write is atomic and mode 0600.
 //
-// Exit codes: 0 written, 4 bootstrap denied (no token), 5 mint failed, 64 usage, 70 adapter error,
-// 75 the app already owns the profile.
+// Exit codes: 0 written, 3 mint command missing, 4 bootstrap denied (no token), 5 mint failed,
+// 6 local network access disabled because the native Local token could not be prepared (the app
+// still starts on loopback), 64 usage, 70 adapter error, 75 the app already owns the profile.
 import fsp from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
@@ -31,6 +32,26 @@ if (!registryPath || !statePath || !settingsPath || !appUserData) {
 }
 
 const log = (event, detail = {}) => process.stderr.write(`${JSON.stringify({ event, ...detail })}\n`);
+
+// Every external operation has a hard bound: an unreachable peer may delay a start, never hang it.
+const PROBE_TIMEOUT_MS = 4_000;
+const MINT_TIMEOUT_MS = 30_000;
+const LOCAL_AUTH_ATTEMPTS = 3;
+const LOCAL_AUTH_RETRY_MS = 250;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const withRetry = async (operation, attempts, delayMs) => {
+  let last;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      last = error;
+      if (attempt + 1 < attempts) await sleep(delayMs);
+    }
+  }
+  throw last;
+};
 
 // Electron's real ProcessSingleton artifacts live in userData. A stale symlink (dead pid) is not a
 // running app; a live pid plus an accepting SingletonSocket is.
@@ -120,7 +141,7 @@ const probe = async (base, token) => {
   try {
     const response = await fetch(`${base.replace(/\/$/, '')}/auth/session`, {
       headers: { accept: 'application/json', authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
     if (response.status === 200) return 'valid';
     if (response.status === 401) return 'invalid';
@@ -134,7 +155,18 @@ const probe = async (base, token) => {
 // only the token is accepted, and it is never printed.
 const mint = (command) =>
   new Promise((resolve) => {
-    const child = spawn('/bin/sh', ['-c', command], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let settled = false;
+    const finish = (value) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+    const child = spawn('/bin/sh', ['-c', command], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: MINT_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
+    });
     let out = '';
     let err = '';
     child.stdout.on('data', (chunk) => {
@@ -143,14 +175,18 @@ const mint = (command) =>
     child.stderr.on('data', (chunk) => {
       if (err.length < 4096) err += chunk.toString();
     });
-    child.once('error', () => resolve({ ok: false, code: 'spawn' }));
-    child.once('exit', (code) => {
+    child.once('error', () => finish({ ok: false, code: 'spawn' }));
+    child.once('exit', (code, signal) => {
       const token = out.trim();
       if (code === 0 && /^oc_client_[A-Za-z0-9_-]{40,}$/.test(token)) {
-        resolve({ ok: true, token });
+        finish({ ok: true, token });
         return;
       }
-      resolve({ ok: false, code: `exit-${code}`, detail: err.trim().slice(0, 200) });
+      finish({
+        ok: false,
+        code: signal ? `signal-${signal}` : `exit-${code}`,
+        detail: err.trim().slice(0, 200),
+      });
     });
   });
 
@@ -181,6 +217,9 @@ try {
     process.exit(70);
   }
 
+  // Non-fatal outcomes are collected and only decide the exit code after every host is tried.
+  const codes = new Set();
+
   // The desktop is a background application: its window close path hides to the tray while the
   // embedded engine keeps running (upstream reads this key before the window is created). Without
   // it, closing the window quits the process and its engine.
@@ -203,30 +242,58 @@ try {
       log('ui-network-config-invalid', { hasPassword: Boolean(uiPassword), port });
       process.exit(70);
     }
-    settings.desktopLanAccessEnabled = true;
-    settings.desktopUiPassword = uiPassword;
-    settings.desktopLocalPort = port;
 
     // The native desktop reads this token when opening Local. Enabling its network password
     // without a local token locks the owning user out as well. Use the shipped auth runtime
     // before the server starts (appRunning above refuses concurrent store writers), not a
     // second token format or an unauthenticated loopback exemption.
-    const { createRemoteClientAuthRuntime } = await import(
-      pathToFileURL(localNetwork.clientAuthModule).href
-    );
-    const localAuth = createRemoteClientAuthRuntime({
-      fsPromises: fsp, path, crypto,
-      storePath: path.join(path.dirname(settingsPath), 'remote-clients.json'),
-    });
-    if (!await localAuth.authenticateBearerToken(settings.desktopLocalClientToken)) {
-      const issued = await localAuth.createClient({
-        label: 'OpenChamber Desktop',
-        clientKind: 'desktop-local',
-        dedupeKey: 'desktop-local',
+    let localToken = '';
+    let localAuthError = null;
+    try {
+      const { createRemoteClientAuthRuntime } = await import(
+        pathToFileURL(localNetwork.clientAuthModule).href
+      );
+      const localAuth = createRemoteClientAuthRuntime({
+        fsPromises: fsp, path, crypto,
+        storePath: path.join(path.dirname(settingsPath), 'remote-clients.json'),
       });
-      settings.desktopLocalClientToken = issued.token;
+      localToken = await withRetry(async () => {
+        if (await localAuth.authenticateBearerToken(settings.desktopLocalClientToken)) {
+          return settings.desktopLocalClientToken;
+        }
+        const issued = await localAuth.createClient({
+          label: 'OpenChamber Desktop',
+          clientKind: 'desktop-local',
+          dedupeKey: 'desktop-local',
+        });
+        if (!issued?.token || !(await localAuth.authenticateBearerToken(issued.token))) {
+          throw new Error('the issued local token is not accepted by the native store');
+        }
+        return issued.token;
+      }, LOCAL_AUTH_ATTEMPTS, LOCAL_AUTH_RETRY_MS);
+    } catch (error) {
+      localAuthError = error;
     }
-    log('native-network-configured', { port, localClientToken: true });
+
+    if (localAuthError) {
+      // Fail safe, not fatal: a password-protected listener without a working Local token locks
+      // the owner out. Remove the LAN declaration for this run so the embedded engine starts on
+      // loopback without a password, keep the user's other settings, and let the next start retry.
+      // The log line is the evidence; this is not silently treated as configured.
+      log('local-auth-unavailable-lan-disabled', {
+        message: String(localAuthError?.message || localAuthError),
+      });
+      delete settings.desktopLanAccessEnabled;
+      delete settings.desktopUiPassword;
+      delete settings.desktopLocalPort;
+      codes.add(6);
+    } else {
+      settings.desktopLanAccessEnabled = true;
+      settings.desktopUiPassword = uiPassword;
+      settings.desktopLocalPort = port;
+      settings.desktopLocalClientToken = localToken;
+      log('native-network-configured', { port, localClientToken: true });
+    }
   }
 
   const hosts = Array.isArray(settings.desktopHosts) ? settings.desktopHosts.slice() : [];
@@ -235,12 +302,14 @@ try {
   const nextHosts = hosts.filter((host) => host && !removeIds.has(host.id));
   const hostState = new Map();
 
-  for (const host of desired) {
+  // Hosts are reconciled concurrently so one unreachable peer cannot add its whole budget to the
+  // next. Every operation is bounded, so the stage finishes in about one host's worst case.
+  const reconcileHost = async (host) => {
     const id = host.id;
     const url = normalizeUrl(host.url);
     if (!id || !url) {
       log('skip-invalid-host', { id });
-      continue;
+      return null;
     }
     const index = nextHosts.findIndex((entry) => entry.id === id);
     const existing = index >= 0 ? nextHosts[index] : null;
@@ -264,7 +333,7 @@ try {
       if (!host.mintCommand) {
         log('missing-mint-command', { id });
         hostState.set(id, 'unreachable');
-        process.exitCode = 3;
+        codes.add(3);
         // A configured host without a token is still listed; the app probes it and shows its own
         // unreachable state. Hiding it here would make an offline server look undeclared.
         token = '';
@@ -286,26 +355,35 @@ try {
           });
           if (denied) {
             if (existing) delete existing.clientToken;
-            process.exitCode = 4;
+            codes.add(4);
           } else {
-            process.exitCode = process.exitCode || 5;
+            codes.add(5);
           }
         }
       }
     }
 
-    const entry = storedEntry({
+    return storedEntry({
       id,
       label: host.label || id,
       url: host.url,
       apiUrl: host.apiUrl,
       clientToken: token,
     });
-    if (index >= 0) nextHosts[index] = { ...nextHosts[index], ...entry };
-    else nextHosts.push(entry);
+  };
+
+  const reconciled = await Promise.all(desired.map(reconcileHost));
+  const reconciledById = new Map(
+    reconciled.filter(Boolean).map((entry) => [entry.id, entry]),
+  );
+  const mergedHosts = nextHosts.map((entry) => (
+    reconciledById.has(entry.id) ? { ...entry, ...reconciledById.get(entry.id) } : entry
+  ));
+  for (const entry of reconciled) {
+    if (entry && !nextHosts.some((host) => host.id === entry.id)) mergedHosts.push(entry);
   }
 
-  settings.desktopHosts = nextHosts;
+  settings.desktopHosts = mergedHosts;
   // The default instance is the user's choice, not the registry's. Writing it on every start made
   // each restart select the remote server again. A first run may seed this machine's own entry;
   // an existing default is preserved, and one that points at a removed managed entry is repaired.
@@ -322,13 +400,14 @@ try {
   await atomicWrite(settingsPath, settings);
   await atomicWrite(statePath, { ...state, previousManaged: [...desiredIds] });
   log('settings-written', {
-    hosts: nextHosts.length,
+    hosts: mergedHosts.length,
     defaultHostId: settings.desktopDefaultHostId ?? null,
-    configured: nextHosts.map((host) => host.id),
+    configured: mergedHosts.map((host) => host.id),
     reachable: [...hostState].filter(([, state]) => state === 'reachable').map(([id]) => id),
     unreachable: [...hostState].filter(([, state]) => state === 'unreachable').map(([id]) => id),
   });
-  process.exit(process.exitCode || 0);
+  const exitCode = [4, 3, 5, 6].find((code) => codes.has(code)) ?? 0;
+  process.exit(exitCode);
 } catch (error) {
   log('adapter-error', { message: String(error?.message || error) });
   process.exit(70);

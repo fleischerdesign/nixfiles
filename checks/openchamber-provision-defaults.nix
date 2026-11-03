@@ -55,6 +55,29 @@ pkgs.runCommandLocal "openchamber-provision-defaults-check"
     if (central.clientToken) fail('unreachable server received a token');
     EOF
 
+    # An existing token survives an offline peer: reachability is not a reason to rotate or drop a
+    # credential, and the local app must start without waiting for the peer.
+    cat > "$work/reg-token.json" <<'EOF'
+    {"hosts":[{"id":"cld-ops-01","label":"cld-ops-01","url":"http://127.0.0.1:1","apiUrl":"http://127.0.0.1:1","mintCommand":"exit 9"}]}
+    EOF
+    cat > "$work/cfg/openchamber/settings.json" <<'EOF'
+    {"desktopHosts":[{"id":"cld-ops-01","label":"cld-ops-01","url":"http://127.0.0.1:1","clientToken":"oc_client_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}
+    EOF
+    node ${../features/dev/openchamber/provision.mjs} \
+      --registry "$work/reg-token.json" \
+      --state "$work/state/state.json" \
+      --settings "$work/cfg/openchamber/settings.json" \
+      --app-user-data "$work/ud"
+    node - "$work/cfg/openchamber/settings.json" <<'EOF'
+    const fs = require('node:fs');
+    const settings = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+    const host = (settings.desktopHosts || []).find((entry) => entry.id === 'cld-ops-01');
+    if (!host) { console.error('offline host disappeared'); process.exit(1); }
+    if (host.clientToken !== 'oc_client_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') {
+      console.error('offline peer lost its token'); process.exit(1);
+    }
+    EOF
+
     # A default that points at a managed entry removed by this run is repaired; an absent default
     # stays absent so upstream opens Local.
     printf '%s' '{"hosts":[]}' > "$work/reg-empty.json"
