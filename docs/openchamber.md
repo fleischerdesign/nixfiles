@@ -101,6 +101,10 @@ The desktop starts its own in-process OpenChamber server on a loopback port by d
 machine's one OpenCode engine and it sees the real home and repository. With
 `my.features.dev.openchamber.client.networkAccess.enable` the same engine is exposed to the other
 desktop: upstream's "Desktop Network Access" binds `0.0.0.0` only when `desktopUiPassword` is set.
+The pre-start adapter also provisions `desktopLocalClientToken` through the shipped native client-auth
+runtime, so Local authenticates without an unlock prompt. Valid local tokens are retained; revoked
+tokens are repaired without changing peer tokens. This runs only while the desktop profile is idle,
+before its server opens the shared token store.
 The adapter writes that flag, the password and the stable port (7337) into the user's settings file
 (mode 0600) before every start. The password comes from a per-host SOPS document
 (`secrets/openchamber-desktop-<id>.yaml`); it never enters the Nix store and never reaches a peer.

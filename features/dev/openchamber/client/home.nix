@@ -43,6 +43,7 @@ let
             enable = true;
             port = cfg.networkAccess.port;
             uiPasswordFile = osConfig.sops.secrets.${cfg.networkAccess.uiPasswordSecret}.path;
+            clientAuthModule = "${pkgs.openchamber.passthru.core}/lib/openchamber/packages/web/server/lib/client-auth/remote-clients.js";
           }
         else
           null;

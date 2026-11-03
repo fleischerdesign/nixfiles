@@ -11,6 +11,8 @@
 import fsp from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
+import crypto from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 
 const args = new Map();
@@ -199,7 +201,27 @@ try {
     settings.desktopLanAccessEnabled = true;
     settings.desktopUiPassword = uiPassword;
     settings.desktopLocalPort = port;
-    log('native-network-configured', { port });
+
+    // The native desktop reads this token when opening Local. Enabling its network password
+    // without a local token locks the owning user out as well. Use the shipped auth runtime
+    // before the server starts (appRunning above refuses concurrent store writers), not a
+    // second token format or an unauthenticated loopback exemption.
+    const { createRemoteClientAuthRuntime } = await import(
+      pathToFileURL(localNetwork.clientAuthModule).href
+    );
+    const localAuth = createRemoteClientAuthRuntime({
+      fsPromises: fsp, path, crypto,
+      storePath: path.join(path.dirname(settingsPath), 'remote-clients.json'),
+    });
+    if (!await localAuth.authenticateBearerToken(settings.desktopLocalClientToken)) {
+      const issued = await localAuth.createClient({
+        label: 'OpenChamber Desktop',
+        clientKind: 'desktop-local',
+        dedupeKey: 'desktop-local',
+      });
+      settings.desktopLocalClientToken = issued.token;
+    }
+    log('native-network-configured', { port, localClientToken: true });
   }
 
   const hosts = Array.isArray(settings.desktopHosts) ? settings.desktopHosts.slice() : [];
