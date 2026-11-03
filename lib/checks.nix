@@ -14,27 +14,24 @@ let
 
   discover =
     dir: checkArgs:
-    if !(builtins.pathExists dir) then
-      { }
+    let
+      entries = builtins.readDir dir;
+      directories = lib.filterAttrs (_: type: type == "directory") entries;
+      # A fixture tree carries no Nix, so it cannot be a check by accident. Anything else that
+      # holds a `.nix` file is a check the discovery did not find, and that is a defect.
+      unknown = lib.filter (
+        name: !(builtins.elem name reserved) && builtins.pathExists (dir + "/${name}/default.nix")
+      ) (builtins.attrNames directories);
+      files = lib.filterAttrs (
+        name: type: type == "regular" && lib.hasSuffix ".nix" name && name != "default.nix"
+      ) entries;
+    in
+    if unknown != [ ] then
+      throw "check discovery: ${toString dir} contains ${lib.concatStringsSep ", " unknown}; a check is a file, and lib/ is the only directory"
     else
-      let
-        entries = builtins.readDir dir;
-        directories = lib.filterAttrs (_: type: type == "directory") entries;
-        # A fixture tree carries no Nix, so it cannot be a check by accident. Anything else that
-        # holds a `.nix` file is a check the discovery did not find, and that is a defect.
-        unknown = lib.filter (
-          name: !(builtins.elem name reserved) && builtins.pathExists (dir + "/${name}/default.nix")
-        ) (builtins.attrNames directories);
-        files = lib.filterAttrs (
-          name: type: type == "regular" && lib.hasSuffix ".nix" name && name != "default.nix"
-        ) entries;
-      in
-      if unknown != [ ] then
-        throw "check discovery: ${toString dir} contains ${lib.concatStringsSep ", " unknown}; a check is a file, and lib/ is the only directory"
-      else
-        lib.mapAttrs' (
-          file: _: lib.nameValuePair (lib.removeSuffix ".nix" file) (import (dir + "/${file}") checkArgs)
-        ) files;
+      lib.mapAttrs' (
+        file: _: lib.nameValuePair (lib.removeSuffix ".nix" file) (import (dir + "/${file}") checkArgs)
+      ) files;
 in
 {
   inherit discover;

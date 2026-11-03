@@ -15,6 +15,7 @@ agentic contributors). The repository layout is documented in `AGENTS.md`, once.
 | What is this system - hosts, zones, planes, the mesh, DNS, contracts? | [architecture.md](architecture.md) |
 | Who is a user, what is a service account, how do access, secrets and the security model work? | [identity.md](identity.md) |
 | How do I deploy, reach a host, verify a change, recover a host I locked myself out of? | [operations.md](operations.md) |
+| How does a desktop get and lose its OpenChamber device token? | [openchamber.md](openchamber.md) |
 | Which desktop runs, who owns the session, where do user settings and remote mounts live? | [desktop.md](desktop.md) |
 | What are the microcontrollers, the access point, the router? | [embedded.md](embedded.md) |
 | What do the interfaces look like, which tokens and typography? | [design.md](design.md) |
