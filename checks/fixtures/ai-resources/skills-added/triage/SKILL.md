@@ -1,5 +1,5 @@
 ---
-name: Triage
+name: triage
 description: A second skill added without a manifest.
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: Left release
+name: release
 description: One of two skills with the same path-derived ID.
 ---
 

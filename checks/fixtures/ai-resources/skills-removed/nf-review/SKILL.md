@@ -1,5 +1,5 @@
 ---
-name: Review
+name: nf-review
 description: The same tree with one skill removed.
 ---
 

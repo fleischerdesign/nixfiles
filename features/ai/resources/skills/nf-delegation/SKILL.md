@@ -1,5 +1,5 @@
 ---
-name: Delegated work
+name: nf-delegation
 description: Run a substantial, self-contained assignment in a child session and return evidence to the parent.
 ---
 

@@ -8,12 +8,13 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 
 let
   cfg = config.my.features.ai.resources;
-  resources = import ./lib { inherit lib; };
+  resources = import ./lib { inherit lib pkgs; };
 
   # Content-addressed inputs: a change to a document outside these trees does not move the store
   # path, and a change to a policy or skill does. The whole tree is copied, so relative references,
@@ -22,13 +23,17 @@ let
     path = ./policies;
     name = "ai-resources-policies";
   };
-  skillsRoot = builtins.path {
+  skillsSource = builtins.path {
     path = ./skills;
-    name = "ai-resources-skills";
+    name = "ai-resources-skills-source";
   };
 
   policies = resources.discoverPolicies policiesRoot;
-  skills = resources.discoverSkills skillsRoot;
+  skills = resources.discoverSkills skillsSource;
+
+  # The consumer gets this validated copy, not the source tree. An invalid frontmatter therefore
+  # fails the build of the service that would load it, and no path around the check is rendered.
+  skillsRoot = resources.validateSkillsTree { root = skillsSource; };
 
   opencodeConfig = resources.render {
     namespaces = [

@@ -1,5 +1,5 @@
 ---
-name: Delegation
+name: nf-delegation
 description: Fixture skill.
 ---
 

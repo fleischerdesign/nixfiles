@@ -1,5 +1,5 @@
 ---
-name: Review
+name: nf-review
 description: Fixture review skill.
 ---
 

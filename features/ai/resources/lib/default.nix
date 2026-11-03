@@ -4,10 +4,11 @@
 #   policies/<namespace>/<name>.md  -> one instruction fragment with the ID `<namespace>/<name>`
 #   skills/<name>/SKILL.md          -> one native skill with the ID `<name>`
 #
-# A consumer binds the rendered paths. This file only decides which files are resources, keeps their
-# order stable, and refuses two resources that would resolve to the same ID. It deliberately does not
-# know any runtime's config shape; the module that binds a runtime selects the namespaces it needs.
-{ lib }:
+# A consumer binds the rendered paths. This file decides which files are resources, keeps their
+# order stable, refuses two resources that would resolve to the same ID, and builds the validated
+# skill tree. It deliberately does not know any runtime's config shape; the module that binds a
+# runtime selects the namespaces it needs.
+{ lib, pkgs }:
 
 let
   policyExtensions = [
@@ -21,7 +22,8 @@ let
   isSkippedDirectory = name: isHidden name || name == "node_modules";
 
   # A portable ID segment: the numeric prefixes used for policy order are allowed, a leading digit is
-  # not a special case. The pattern is the one OpenCode recommends for skill IDs.
+  # not a special case. Discovery is the cheap path guard; the skill tree is validated against the
+  # stricter AgentSkills rule when it is built.
   validSegment = segment: builtins.match "[a-z0-9][a-z0-9-]*" segment != null;
 
   duplicateIds =
@@ -86,13 +88,14 @@ let
       "${namespace}/${lib.concatStringsSep "/" segments}";
 
   # A directory containing SKILL.md is one skill and is not searched further, matching OpenCode's
-  # native discovery. Root-level `<name>.md` files are flat skills. Supporting files stay in the tree;
-  # they are not resources of their own.
+  # native discovery. A skill is always a directory: the leaf directory name is the ID, so a
+  # root-level `<name>.md` is not a skill. Supporting files stay in the tree; they are not resources
+  # of their own.
   skillFiles =
     root:
     let
       walk =
-        depth: relative: directory:
+        depth: directory:
         let
           entries = builtins.readDir directory;
           hasSkill = entries ? "SKILL.md" && isRegular entries."SKILL.md";
@@ -116,23 +119,12 @@ let
               type = entries.${name};
               path = directory + "/${name}";
             in
-            if isDirectory type && !(isSkippedDirectory name) then
-              walk (depth + 1) (relative ++ [ name ]) path
-            else if relative == [ ] && isRegular type && !(isHidden name) && lib.hasSuffix ".md" name then
-              [
-                {
-                  id = lib.removeSuffix ".md" name;
-                  inherit path;
-                  root = directory;
-                }
-              ]
-            else
-              [ ]
+            if isDirectory type && !(isSkippedDirectory name) then walk (depth + 1) path else [ ]
           ) (builtins.attrNames entries);
     in
-    walk 0 [ ] root;
+    walk 0 root;
 
-  validateSkillIds =
+  validateSkills =
     skills:
     let
       invalid = lib.filter (skill: !(validSegment skill.id)) skills;
@@ -146,8 +138,18 @@ let
       throw "ai-resources: duplicate skill IDs: ${lib.concatStringsSep ", " duplicates}"
     else
       skills;
+
+  # PyYAML parses the frontmatter and the produced tree is validated as a whole. A hand-written
+  # subset would reject standard YAML and vendor metadata; the maintained parser keeps the check
+  # aligned with the AgentSkills format instead.
+  python = pkgs.python3.withPackages (ps: [ ps.pyyaml ]);
+  validator = pkgs.writeText "ai-resources-validate-skills.py" (
+    builtins.readFile ./validate-skills.py
+  );
 in
 {
+  inherit python validator;
+
   # `policies` is sorted by ID and therefore stable across readDir order and machines. The ID keeps
   # the namespace, so `common/00-scope` and `opencode/00-scope` are distinct resources rather than a
   # collision to be forbidden.
@@ -183,7 +185,19 @@ in
     if !(builtins.pathExists root) then
       throw "ai-resources: skills directory ${toString root} does not exist"
     else
-      validateSkillIds (sortById (skillFiles root));
+      validateSkills (sortById (skillFiles root));
+
+  # Copy the whole source tree to a content-addressed output and validate that produced tree. The
+  # module renders this path, so an invalid skill fails the build of the consumer that receives it;
+  # validation cannot be skipped while the unvalidated source path is still delivered.
+  validateSkillsTree =
+    {
+      root,
+      name ? "ai-resources-skills",
+    }:
+    pkgs.runCommandLocal name { } ''
+      ${python}/bin/python ${validator} ${root} $out
+    '';
 
   # Select the fragments one runtime consumes. `common` is the neutral policy every consumer gets;
   # an adapter adds its own namespace (for OpenCode, `opencode`).

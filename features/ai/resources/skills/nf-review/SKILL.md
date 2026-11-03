@@ -1,5 +1,5 @@
 ---
-name: Independent review
+name: nf-review
 description: Review a change in a clean context for correctness, scope and missing evidence.
 ---
 

@@ -23,16 +23,35 @@ The two trees are the source. There is no manifest to keep in step:
   Its ID is `<namespace>/<path without extension>`; `common/00-scope` and `opencode/00-scope` are
   therefore distinct resources. Two files that resolve to the same ID fail the evaluation instead of
   being silently resolved by the consumer's precedence.
-- A directory containing `SKILL.md` is one skill; it is not searched for more skills. A root-level
-  `<id>.md` is a flat skill. Supporting `references/`, `scripts/` and assets stay in the tree and are
-  referenced relative to the directory containing `SKILL.md`. Skill IDs are path-derived, sorted and
-  rejected on duplicates, matching OpenCode's own discovery rule.
+- A directory containing `SKILL.md` is one skill; it is not searched for more skills. Supporting
+  `references/`, `scripts/` and assets stay in the tree and are referenced relative to the directory
+  containing `SKILL.md`. Skill IDs are the directory names, sorted and rejected on duplicates. The
+  frontmatter `name` must equal the directory ID: OpenCode derives the ID from the path, while a
+  frontmatter-name consumer reads `name`, and a tree that disagrees is not portable between them.
+  The managed skills use an `nf-` prefix so a future project or runtime skill cannot silently take
+  the same ID.
 - A directory without `SKILL.md` is a grouping directory, not an empty skill. No empty directory is
-  required anywhere.
+  required anywhere. `skills/` must exist and contain at least one skill; a tree without a resource
+  is retired by disabling the feature, not by shipping an empty directory or a placeholder
+  `SKILL.md`.
 
 Discovery runs on content-addressed copies (`builtins.path`), so a document outside these trees does
-not move the store path, and a changed policy or skill does. The whole tree is copied, so relative
-references inside a skill keep working.
+not move the store path, and a changed policy or skill does. The whole tree is copied and validated
+as a build artifact before a consumer can receive its path; an invalid frontmatter fails that build,
+not a later runtime load.
+
+The skill build copies the complete tree (including `references/`, `scripts/` and assets) to its
+output and validates that copy with a maintained YAML parser, PyYAML:
+
+- `name` is required, is a string of 1-64 lower-case letters, digits and single hyphens, and equals
+  the leaf directory name;
+- `description` is required and is a non-empty string of at most 1024 characters;
+- unknown keys and standard YAML constructs are preserved, not rejected, so vendor metadata stays
+  usable.
+
+The rendered `skills` path is the validated output, not the source tree, so no consumer path
+bypasses the check. Invalid metadata fails the build rather than being dropped from the catalog, and
+the skill is never loaded under a name other than its directory ID.
 
 ## OpenCode binding
 
@@ -57,9 +76,9 @@ independent of the session's cwd.
 skills. This module does not set `OPENCODE_CONFIG`, does not write a user config file, and does not
 write `/etc/opencode`.
 
-The managed paths are in the Nix store and are read-only. A UI may list them as native skills;
-editing one must fail rather than write to the store. User-created skills and settings stay outside
-this namespace.
+The managed paths are in the Nix store and are read-only. OpenChamber reads its config layers from
+files rather than from an inline skill body, so a managed path is listed as a file source and is not
+edited in place. User-created skills and settings stay outside this namespace.
 
 ## Lifecycle
 
