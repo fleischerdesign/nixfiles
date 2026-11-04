@@ -578,20 +578,33 @@ console.log(
 //
 // The reduced `sessions_spawn` tool a placed worker sees has no placement
 // selector, by design: its closed schema accepts only task, label, agentId,
-// model and runTimeoutSeconds. The child must therefore run on the node that
-// already hosts the authenticated parent environment - the same node the
-// parent turn's placement was admitted for - never on the Gateway's default
-// cloud provider. The old dispatch call passed only the parent's profile id
-// and snapshot, so a repository child fell into the cloud path and failed with
-// "Repository cloud sessions require a managed-node cloud provider or paired
-// node".
+// model and runTimeoutSeconds. A child is therefore dispatched with the
+// parent's profile id and snapshot, and must land on the node that already
+// hosts the authenticated parent environment.
 //
-// This branch derives the node id from the parent environment record (not from
-// model-supplied arguments), validates it against the normal device placement
-// destination, and takes the runtime requirement from the child session's own
-// capabilities. Only a `device` provider requests a device placement: a
-// managed cloud provider that also carries a nodeDeviceId keeps its old cloud
-// route. Dispatch failure handling is unchanged.
+// That dispatch is rejected for a repository workspace:
+//
+//   workspace.kind === "repository" && !request.deviceId &&
+//   requiresNodeEnrollment(profileId, inheritedProfile.providerId) !== true
+//     -> "Repository cloud sessions require a managed-node cloud provider or
+//         paired node. Choose one and retry dispatch."
+//
+// `requiresNodeEnrollment` is deliberately reserved for the managed-node cloud
+// provider (extensions/crabbox sets it; the device provider does not). A paired
+// node is addressed by `deviceId` instead - the same selector Control UI New
+// Session and sessions.dispatch use. The worker never sent one, so a repository
+// child could not be placed even though the parent already ran on that node.
+//
+// This branch derives the node id from the authenticated parent environment
+// record (never from model-supplied arguments), validates it against the normal
+// device placement destination, and takes the runtime requirement from the
+// child session's own capabilities. Only a `device` provider requests a device
+// placement: a managed cloud provider that also carries a nodeDeviceId keeps
+// its old cloud route. Dispatch failure handling is unchanged.
+//
+// Verified against the pristine v2026.10.7 sources: the gate, the missing
+// provider flag and the device-id addressing are all upstream behaviour, not a
+// packaging difference.
 
 const workerExecutorFile = findOne(
   "worker session tool executor",
