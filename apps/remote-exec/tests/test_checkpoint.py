@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 
 from remote_exec import checkpoint, manifest, source
@@ -87,10 +88,17 @@ class CheckpointTest(RepoFixture):
 
     def test_default_callers_get_independent_pins(self):
         first = checkpoint.create(self.repo, self.capture_dir)
+        # Cross a real wall-clock boundary: commit metadata must not move.
+        time.sleep(2.1)
         second = checkpoint.create(self.repo, self.capture_dir)
         self.assertNotEqual(first["checkpoint"]["ref"], second["checkpoint"]["ref"])
         self.assertEqual(first["inputId"], second["inputId"])
         self.assertEqual(first["checkpoint"]["tree"], second["checkpoint"]["tree"])
+        self.assertEqual(
+            first["checkpoint"]["commit"],
+            second["checkpoint"]["commit"],
+            "identical provenance, parent and identity must yield the same commit object",
+        )
 
         checkpoint.release(self.repo, first["checkpoint"]["ref"], first["checkpoint"]["commit"])
         self.assertEqual(

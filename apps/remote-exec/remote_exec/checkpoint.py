@@ -10,6 +10,11 @@ A default checkpoint id is a fresh UUID: two consumers of the same input get
 independent refs. An explicit id is a logical consumer/retry id; replay is
 accepted only when the existing commit's tree, parents and input-id metadata
 all match this capture.
+
+Commit metadata is deterministic: author and committer dates inherit the
+captured parent commit's committer timestamp, and an unborn repository uses the
+Unix epoch. Identical captured provenance, parent and identity therefore yield
+the same commit object; wall-clock time is never part of the checkpoint.
 """
 
 from __future__ import annotations
@@ -144,6 +149,13 @@ def _commit_message(parent: str | None, input_id: str) -> bytes:
     return ("\n".join(lines) + "\n").encode()
 
 
+def _commit_timestamp(repo: str, parent: str | None) -> str:
+    """Inherit the parent's committer timestamp; epoch for an unborn repo."""
+    if not parent:
+        return "1970-01-01T00:00:00+0000"
+    return _git(repo, ["show", "-s", "--format=%cI", parent]).decode().strip()
+
+
 def _ref_for(checkpoint_id: str) -> str:
     if not ID_PATTERN.match(checkpoint_id or "") or ".." in checkpoint_id:
         raise CheckpointError(f"checkpoint id {checkpoint_id!r} is not a safe ref component")
@@ -236,6 +248,10 @@ def create(
         "GIT_AUTHOR_EMAIL": email,
         "GIT_COMMITTER_NAME": name,
         "GIT_COMMITTER_EMAIL": email,
+        # Deterministic metadata, not wall clock. Both dates are the captured
+        # parent's committer timestamp (or the epoch when there is no parent).
+        "GIT_AUTHOR_DATE": _commit_timestamp(repo, parent),
+        "GIT_COMMITTER_DATE": _commit_timestamp(repo, parent),
     }
     arguments = ["commit-tree", tree]
     if parent:

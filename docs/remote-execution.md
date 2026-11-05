@@ -146,6 +146,9 @@ standard-Git commit under the private namespace `refs/remote-exec/checkpoints/`,
 The commit is built with `hash-object --no-filters`, `mktree -z` and `commit-tree`, so clean,
 smudge, eol and attribute conversion and hooks do not run. The caller's HEAD, index, branches and
 working bytes are untouched; the original commit is kept as the checkpoint's parent for provenance.
+Commit metadata is deterministic: author and committer dates inherit the captured parent's
+committer timestamp, or the Unix epoch for an unborn repository. Wall-clock time is not part of the
+checkpoint, so identical captured provenance, parent and identity produce the same commit object.
 The ref is the retention record. A default checkpoint call generates an independent UUID pin, so two
 consumers of the same input never share a releasable ref. An explicit `--id` is a logical consumer
 or retry id: replay returns the existing commit only when its tree, parent and input id all match
