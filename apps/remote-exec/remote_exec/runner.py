@@ -12,7 +12,7 @@ outside `work/`, then writes an output manifest.
 """
 
 RUNNER = r'''
-import json, os, platform, signal, subprocess, sys, time
+import base64, fcntl, json, os, platform, signal, subprocess, sys, time
 
 CONFIG = json.loads(open(sys.argv[1], "r", encoding="utf-8").read())
 
@@ -60,7 +60,14 @@ def digest(path):
 def main():
     attempt = os.path.realpath(CONFIG["attemptDir"])
     work = os.path.realpath(CONFIG["workDir"])
-    if work != attempt and not work.startswith(attempt + os.sep):
+    workspace = CONFIG.get("workspaceDir")
+    if workspace:
+        workspace = os.path.realpath(workspace)
+        if work != os.path.join(workspace, "work"):
+            raise SystemExit("work directory is not the workspace work directory")
+        if attempt != CONFIG["attemptDir"] or not attempt.startswith(os.path.join(workspace, "attempts") + os.sep):
+            raise SystemExit("attempt directory escapes the workspace")
+    elif work != attempt and not work.startswith(attempt + os.sep):
         raise SystemExit("work directory escapes the attempt directory")
     cwd = os.path.realpath(os.path.join(work, CONFIG.get("cwd") or "."))
     if cwd != work and not cwd.startswith(work + os.sep):
@@ -80,10 +87,35 @@ def main():
     if claim.get("attemptId") != CONFIG["attemptId"] or claim.get("inputId") != CONFIG["inputId"]:
         raise SystemExit("dispatch claim does not match this attempt's identity")
 
+    lease_handle = None
+    if CONFIG.get("leaseFile"):
+        lease_handle = open(CONFIG["leaseFile"] + ".lock", "a+b")
+        fcntl.flock(lease_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            with open(CONFIG["leaseFile"], "r", encoding="utf-8") as handle:
+                lease = json.load(handle)
+        except (OSError, ValueError):
+            raise SystemExit("workspace lease is missing; refusing to run")
+        if lease.get("attemptId") != CONFIG["attemptId"]:
+            raise SystemExit("workspace lease is not owned by this attempt; refusing to run")
+        if lease.get("phase") not in ("updating", "prepared"):
+            raise SystemExit("workspace lease is in phase %r; refusing to run" % lease.get("phase"))
+        lease.update({
+            "phase": "running",
+            "runnerPid": os.getpid(),
+            "bootId": boot_id(),
+            "unit": CONFIG.get("unit"),
+            "childPid": None,
+        })
+        atomic_json(CONFIG["leaseFile"], lease)
+        fcntl.flock(lease_handle.fileno(), fcntl.LOCK_UN)
+        lease_handle.close()
+        lease_handle = None
+
     logs = os.path.join(attempt, "logs")
     os.makedirs(logs, exist_ok=True)
     os.makedirs(os.path.join(attempt, "artifacts"), exist_ok=True)
-    home = os.path.join(attempt, "home")
+    home = CONFIG.get("homeDir") or os.path.join(attempt, "home")
     os.makedirs(home, exist_ok=True)
 
     env = dict(CONFIG.get("env") or {})
@@ -93,6 +125,8 @@ def main():
     env.setdefault("TMPDIR", os.path.join(attempt, "tmp"))
     env.setdefault("REMOTE_EXEC_ATTEMPT", attempt)
     env.setdefault("REMOTE_EXEC_ARTIFACTS", os.path.join(attempt, "artifacts"))
+    if workspace:
+        env.setdefault("REMOTE_EXEC_WORKSPACE", workspace)
     os.makedirs(env["TMPDIR"], exist_ok=True)
 
     started = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -140,6 +174,21 @@ def main():
         state["childPid"] = child.pid
         state["childStart"] = start_time(child.pid)
         atomic_json(os.path.join(attempt, "state.json"), state)
+        if CONFIG.get("leaseFile"):
+            lease_handle = open(CONFIG["leaseFile"] + ".lock", "a+b")
+            fcntl.flock(lease_handle.fileno(), fcntl.LOCK_EX)
+            try:
+                try:
+                    with open(CONFIG["leaseFile"], "r", encoding="utf-8") as lease_file:
+                        lease = json.load(lease_file)
+                except (OSError, ValueError):
+                    lease = None
+                if lease and lease.get("attemptId") == CONFIG["attemptId"]:
+                    lease["childPid"] = child.pid
+                    atomic_json(CONFIG["leaseFile"], lease)
+            finally:
+                fcntl.flock(lease_handle.fileno(), fcntl.LOCK_UN)
+                lease_handle.close()
         try:
             code = child.wait(timeout=CONFIG.get("timeoutSecs"))
             if stop["requested"]:
@@ -185,6 +234,31 @@ def main():
             reason = "process group survived cancellation; outcome unknown"
             code = None
 
+    output = None
+    if CONFIG.get("finalizeScript"):
+        try:
+            with open(CONFIG["finalizeConfig"], "r", encoding="utf-8") as handle:
+                finalize_args = base64.b64encode(handle.read().encode("utf-8")).decode("ascii")
+            process = subprocess.run(
+                [sys.executable, CONFIG["finalizeScript"], finalize_args],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=CONFIG.get("finalizeTimeoutSecs", 600),
+                check=False,
+            )
+            if process.returncode != 0:
+                output = {
+                    "status": "failed",
+                    "error": (
+                        process.stderr.decode("utf-8", "replace").strip()
+                        or "source snapshot failed"
+                    )[:4096],
+                }
+            else:
+                output = json.loads(process.stdout.decode("utf-8"))
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            output = {"status": "failed", "error": str(error)}
+
     finished = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     result = {
         "schemaVersion": 2,
@@ -204,9 +278,32 @@ def main():
     }
     if reason:
         result["reason"] = reason
+    if output is not None:
+        result["output"] = output
     atomic_json(result_path, result)
     state["phase"] = phase
     atomic_json(os.path.join(attempt, "state.json"), state)
+
+    if CONFIG.get("leaseFile"):
+        lease_handle = open(CONFIG["leaseFile"] + ".lock", "a+b")
+        fcntl.flock(lease_handle.fileno(), fcntl.LOCK_EX)
+        try:
+            try:
+                with open(CONFIG["leaseFile"], "r", encoding="utf-8") as handle:
+                    lease = json.load(handle)
+            except (OSError, ValueError):
+                lease = None
+            if lease and lease.get("attemptId") == CONFIG["attemptId"]:
+                lease.update({
+                    "phase": "terminal" if phase in ("succeeded", "failed", "cancelled") else "unknown",
+                    "resultPhase": phase,
+                    "finishedAt": finished,
+                    "childPid": None,
+                })
+                atomic_json(CONFIG["leaseFile"], lease)
+        finally:
+            fcntl.flock(lease_handle.fileno(), fcntl.LOCK_UN)
+            lease_handle.close()
     return 0 if phase != "unknown" else 3
 
 

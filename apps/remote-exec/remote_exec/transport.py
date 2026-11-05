@@ -69,7 +69,9 @@ class Transport:
     def preflight(self, root: str) -> dict:
         raise NotImplementedError
 
-    def supervise(self, attempt_dir: str, timeout: int, unit: str | None = None) -> None:
+    def supervise(
+        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None
+    ) -> None:
         raise NotImplementedError
 
     def cancel(self, unit: str) -> dict:
@@ -154,7 +156,9 @@ class LocalTransport(Transport):
             "path": os.environ.get("PATH", ""),
         }
 
-    def supervise(self, attempt_dir: str, timeout: int, unit: str | None = None) -> None:
+    def supervise(
+        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None
+    ) -> None:
         process = subprocess.run(
             ["python3", os.path.join(attempt_dir, "runner.py"), os.path.join(attempt_dir, "runner-config.json")],
             stdout=subprocess.PIPE,
@@ -271,7 +275,9 @@ class SshTransport(Transport):
             )
         return json.loads(process.stdout.decode("utf-8"))
 
-    def supervise(self, attempt_dir: str, timeout: int, unit: str | None = None) -> None:
+    def supervise(
+        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None
+    ) -> None:
         process = self.run_py(
             "import base64,json,os,subprocess,sys\n"
             "c=json.loads(base64.b64decode(sys.argv[1]).decode('utf-8'))\n"
@@ -281,7 +287,7 @@ class SshTransport(Transport):
             "env['DBUS_SESSION_BUS_ADDRESS']='unix:path=/run/user/%d/bus' % uid\n"
             "cfg=json.load(open(os.path.join(c['attempt'],'runner-config.json'),'r',encoding='utf-8'))\n"
             "cmd=['systemd-run','--user','--quiet','--collect','--unit='+c['unit'],\n"
-            "     '--property=WorkingDirectory='+os.path.join(c['attempt'],'work'),\n"
+            "     '--property=WorkingDirectory='+c['workDir'],\n"
             "     '--property=RuntimeMaxSec=%d' % c['timeout'],\n"
             "     '--property=KillMode=control-group',\n"
             "     '--property=TimeoutStopSec=30',\n"
@@ -305,7 +311,12 @@ class SshTransport(Transport):
             "    import time; time.sleep(0.25)\n"
             "sys.stderr.write('unit did not become active')\n"
             "sys.exit(2)\n",
-            {"attempt": attempt_dir, "unit": unit, "timeout": timeout},
+            {
+                "attempt": attempt_dir,
+                "unit": unit,
+                "timeout": timeout,
+                "workDir": work_dir or os.path.join(attempt_dir, "work"),
+            },
             timeout=60,
         )
         if process.returncode != 0:

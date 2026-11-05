@@ -57,6 +57,60 @@ module.
 `REMOTE_EXEC_ARTIFACTS` keep caches and outputs out of the source tree. An attempt directory is never
 reused.
 
+### Reusable task workspaces
+
+A fresh attempt is the default and stays the isolation boundary for verification. Iterative work can
+opt into a persistent task workspace with `--workspace-id`:
+
+    <root>/workspaces/<key>/
+      workspace.json           identity and binding metadata
+      state/lease.json         exclusive ownership and phase
+      state/managed.json       expected state of managed source paths
+      state/synced.json        last verified input
+      state/update-incomplete.json   present while a sync may be partial
+      state/lock               flock serialising workspace transitions
+      work/                    source plus retained tool output
+      home/                    stable HOME for tool-native state
+      staging/<attempt-id>/    incoming capture, never inside work/
+      attempts/<attempt-id>/   receipts, logs, artifacts and source snapshot
+
+`<key>` is hashed from the executor root/target/account, the repository identity (the canonical Git
+common directory, never `.git` contents), the repo id and the workspace label. Two repositories
+cannot share a workspace by reusing a label, and changing the label starts a different workspace.
+
+Sequential attempts in one workspace are mutually exclusive: a lease covers sync, execution and
+cancellation, and a second attempt is refused while it is not terminal. Parallel tasks use different
+workspace ids. A lease that cannot be proven terminal is never taken over; reconcile with
+`workspace-status`, `cancel`, or an explicit `workspace-reset`.
+
+Reconciliation starts from the previous managed manifest. Unchanged files are not written, so their
+mtimes survive and mtime-based incremental tools see a hit. Changed files get a current mtime.
+Deleted and renamed source is removed; ignored output directories, generated results and other
+unmanaged files stay. Modes, symlinks and file/directory type changes are applied. A symlinked or
+non-directory ancestor, an unexpected remote edit of a managed source, or a new source path that
+collides with retained output fails closed instead of deleting it. `rsync --delete` is never used
+across retained output.
+
+Sync writes an incomplete marker before mutating the work tree and publishes the verified manifest
+only after success. A crash leaves the workspace marked and the next attempt refuses until the
+partial sync is resolved. `--clean` is the explicit fresh mode inside a workspace: it discards
+`work/` and `home/` and clears the managed manifest before the new attempt. A warm workspace is not a
+hermetic build; retained output is valid only to the build tool that produced it.
+
+Each workspace attempt freezes its selected source into `attempts/<id>/snapshot/` and writes
+`output-files.json` at terminal time. `collect`, `--delta`, status, logs and artifacts for that
+attempt therefore remain attempt-immutable even after later attempts mutate `work/`. If the snapshot
+could not be produced, source collection is refused explicitly rather than reading later workspace
+state.
+
+`workspace-status` reports the workspace, lease, managed input, attempts and disk use, and reconciles
+a lease whose attempt already has a terminal result. `workspace-reset` discards `work/` (and `home/`
+with `--clean-home`) only when no dispatch, unit or live process can still be running; `--force` is
+required for an unknown outcome after those checks. `workspace-prune` is a dry run by default: it
+deletes only terminal attempts older than `--max-age-days` beyond `--keep`, skips a workspace with a
+non-terminal lease, and `--apply` performs the deletion. `--remove-workspaces` additionally deletes
+eligible, unused workspaces of this repository; no automated prune is scheduled.
+
 ## Source selection
 
 Git decides source. Tracked paths are exported from the working tree even when dirty, staged or
@@ -115,6 +169,17 @@ remote-exec cancel  --target hom-wrk-01 --identity <key> --repo-id nixfiles \
   --run-id <id> --attempt-id <id>
 remote-exec collect --target hom-wrk-01 --identity <key> --repo-id nixfiles \
   --run-id <id> --attempt-id <id> --out ./result --logs --delta
+
+# Iterative work reuses one task workspace; verification uses a fresh attempt
+# or an explicit clean reset.
+remote-exec run --target hom-wrk-01 --identity <key> --repo-id nixfiles \
+  --workspace-id nixfiles-iter --repo /path/to/worktree -- nix build .#checks
+remote-exec workspace-status --target hom-wrk-01 --identity <key> \
+  --repo-id nixfiles --workspace-id nixfiles-iter --repo /path/to/worktree
+remote-exec workspace-reset  --target hom-wrk-01 --identity <key> \
+  --repo-id nixfiles --workspace-id nixfiles-iter --repo /path/to/worktree
+remote-exec workspace-prune  --target hom-wrk-01 --identity <key> \
+  --repo-id nixfiles --repo /path/to/worktree --keep 10 --max-age-days 14
 ```
 
 `capture` and `verify` are the pieces `run` composes; `status` and `collect` are required for
@@ -173,6 +238,9 @@ Exit codes: `0` command succeeded, `1` command ran and failed, `2` blocked or in
 * a capture target that is not empty, and an attempt id that already exists;
 * an executor whose host key, account, uid, root or toolchain does not match its declaration;
 * credential and agent-state paths, including explicit `--extra-path` inputs.
+* reusing one workspace from two concurrent attempts, overwriting a managed source that changed on
+  the executor, removing retained output to make room for new source, symlinked workspace state, and
+  pruning an attempt or workspace whose lease is not terminal.
 
 Generated inputs that a project's build does not reproduce can be named with `--extra-path`; they
 are explicit, not a second ignore policy.
@@ -190,6 +258,15 @@ A native managed-worktree child inheriting its parent's dirty, untracked, delete
 state is not an accepted source handoff. Until a verified checkpoint or explicit source protocol
 exists, that path is unproven and must not be described as carrying the parent's live input;
 capture the intended source through `remote-exec` instead.
+
+## Observed warm-workspace timing
+
+`apps/remote-exec/tests/bench_workspace.py` runs a generic 80-file fixture whose build step is a
+mtime comparison with a 0.4 s simulated compile. On `cld-ops-01` with the local fixture transport it
+measured cold 2.76 s, unchanged repeat 2.18 s, and one-source-change 2.65 s; the repeat build was the
+only HIT. These are local measurements of capture, transfer, reconciliation and supervision, not a
+claim about a particular toolchain or a live SSH executor; re-run the script on the executor class
+that matters.
 
 ## Declared prerequisites
 

@@ -75,6 +75,20 @@ class Attempt:
         identity = "\0".join([self.root, self.repo_id, self.run_id, self.attempt_id])
         self.unit = "remote-exec-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
 
+    @property
+    def work_dir(self) -> str:
+        return f"{self.path}/work"
+
+    @property
+    def home_dir(self) -> str | None:
+        return None
+
+    def runner_extra(self) -> dict:
+        return {}
+
+    def dispatch_files(self) -> dict[str, str]:
+        return {}
+
     # -- remote primitives -------------------------------------------------
     def _py(self, code: str, args: object, timeout: float | None = 120):
         process = self.transport.run_py(code, args, timeout=timeout)
@@ -179,24 +193,23 @@ class Attempt:
         self.write(f"{self.path}/runner.py", runner.RUNNER)
         with open(os.path.join(os.path.dirname(os.path.abspath(boundary.__file__)), "boundary.py"), encoding="utf-8") as handle:
             self.write(f"{self.path}/boundary.py", handle.read())
+        for name, text in self.dispatch_files().items():
+            self.write(f"{self.path}/{name}", text)
+        configuration = {
+            "attemptDir": self.path,
+            "workDir": self.work_dir,
+            "cwd": cwd,
+            "argv": argv,
+            "env": env,
+            "timeoutSecs": timeout_secs,
+            "attemptId": self.attempt_id,
+            "inputId": input_id,
+            "unit": unit,
+        }
+        configuration.update(self.runner_extra())
         self.write(
             f"{self.path}/runner-config.json",
-            json.dumps(
-                {
-                    "attemptDir": self.path,
-                    "workDir": f"{self.path}/work",
-                    "cwd": cwd,
-                    "argv": argv,
-                    "env": env,
-                    "timeoutSecs": timeout_secs,
-                    "attemptId": self.attempt_id,
-                    "inputId": input_id,
-                    "unit": unit,
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
+            json.dumps(configuration, indent=2, sort_keys=True) + "\n",
         )
         try:
             self.claim_dispatch(input_id, unit)
@@ -208,7 +221,7 @@ class Attempt:
                 self._unknown_state(input_id, f"dispatch claim outcome unknown: {error}"),
             ) from error
         try:
-            self.transport.supervise(self.path, timeout_secs, unit)
+            self.transport.supervise(self.path, timeout_secs, unit, self.work_dir)
         except (transport.TransportError, subprocess.TimeoutExpired):
             # The unit may still be running. Never replay: the terminal state is
             # whatever `status` can observe.

@@ -78,6 +78,22 @@ def _index_signature(repo: str) -> tuple[int, int, int]:
     return (info.st_ino, info.st_size, info.st_mtime_ns)
 
 
+def repo_identity(repo: str) -> str:
+    """Identity of the real repository, not of a caller-supplied label.
+
+    The canonical Git common directory distinguishes repositories and is shared
+    by linked worktrees of one repository. It is hashed and never shipped: the
+    executor receives only the key, never Git metadata or credentials.
+    """
+    common = git(repo, "rev-parse", "--git-common-dir").decode("utf-8").strip()
+    if not os.path.isabs(common):
+        common = os.path.join(repo, common)
+    common = os.path.realpath(common)
+    if not os.path.isdir(common):
+        raise SourceError(f"repository common directory {common!r} is not a directory")
+    return hashlib.sha256(common.encode("utf-8", "surrogateescape")).hexdigest()
+
+
 def _gitlinks(repo: str) -> list[str]:
     output = git(repo, "ls-files", "-s", "-z")
     links = []

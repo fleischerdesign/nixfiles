@@ -326,3 +326,57 @@ class CliTest(RepoFixture):
         self.assertEqual(printed["diagnostics"]["status"], "unavailable")
         self.assertIn("error", printed["diagnostics"])
         self.assertNotIn("logsDir", printed["diagnostics"])
+
+    def test_workspace_cli_reuse_status_collect_reset_and_prune(self):
+        common = [
+            "--transport", "local",
+            "--remote-root", self.executor,
+            "--repo-id", "nixfiles",
+            "--workspace-id", "task",
+            "--repo", self.repo,
+        ]
+        first = self.cli(
+            "run", *common, "--run-id", "run-a",
+            "--", "sh", "-c", 'echo first > generated.txt; echo cache > "$HOME/state"',
+        )
+        self.assertEqual(first.returncode, 0, first.stderr)
+        first_result = json.loads(first.stdout)
+        second = self.cli(
+            "run", *common, "--run-id", "run-b",
+            "--", "sh", "-c", 'echo second > generated.txt; cat "$HOME/state"',
+        )
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(second.stdout and json.loads(second.stdout)["output"]["status"], "ok")
+
+        status = self.cli("workspace-status", *common)
+        self.assertEqual(status.returncode, 0, status.stderr)
+        report = json.loads(status.stdout)
+        self.assertTrue(report["exists"])
+        self.assertEqual(report["lease"]["phase"], "terminal")
+
+        out = os.path.join(self.tmp, "workspace-collected")
+        collected = self.cli(
+            "collect", *common, "--run-id", "run-a",
+            "--attempt-id", first_result["attemptId"], "--out", out,
+        )
+        self.assertEqual(collected.returncode, 0, collected.stderr)
+        with open(os.path.join(out, "source", "generated.txt"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "first\n")
+
+        pruned = self.cli(
+            "workspace-prune", *common, "--keep", "0", "--max-age-days", "0"
+        )
+        self.assertEqual(pruned.returncode, 0, pruned.stderr)
+        self.assertIn("dryRun", pruned.stdout)
+
+        reset = self.cli("workspace-reset", *common)
+        self.assertEqual(reset.returncode, 0, reset.stderr)
+        self.assertTrue(json.loads(reset.stdout)["reset"])
+
+    def test_clean_requires_a_workspace(self):
+        refused = self.cli(
+            "run", *self.local_common("run-clean"), "--clean",
+            "--repo", self.repo, "--", "true",
+        )
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("--clean", refused.stderr)

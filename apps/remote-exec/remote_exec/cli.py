@@ -20,6 +20,7 @@ import tempfile
 from . import attempt as attempt_module
 from . import checkpoint
 from . import manifest, source, transport
+from . import workspace as workspace_module
 
 DEFAULT_INVENTORY = "/etc/openclaw/remote-exec-inventory.json"
 INVENTORY_SCHEMA = 2
@@ -177,12 +178,28 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     run = sub.add_parser("run", help="capture, transfer, verify, execute and observe one attempt")
     add_attempt_arguments(run)
-    run.add_argument("--repo", required=True)
     run.add_argument("--cwd", default=".")
     run.add_argument("--timeout", type=int, default=1800)
     run.add_argument("--env", action="append", default=[])
     run.add_argument("--extra-path", action="append", default=[])
+    run.add_argument("--clean", action="store_true", help="reset the workspace work and HOME before this attempt")
     run.add_argument("argv", nargs=argparse.REMAINDER, metavar="command")
+
+    workspace_status = sub.add_parser("workspace-status", help="inspect and reconcile a task workspace")
+    add_workspace_arguments(workspace_status)
+    workspace_status.add_argument("--json", action="store_true")
+
+    workspace_reset = sub.add_parser("workspace-reset", help="discard a workspace's work tree after a failed run")
+    add_workspace_arguments(workspace_reset)
+    workspace_reset.add_argument("--clean-home", action="store_true")
+    workspace_reset.add_argument("--force", action="store_true")
+
+    workspace_prune = sub.add_parser("workspace-prune", help="retain or delete terminal workspace attempts")
+    add_workspace_arguments(workspace_prune)
+    workspace_prune.add_argument("--keep", type=int, default=10)
+    workspace_prune.add_argument("--max-age-days", type=float, default=14)
+    workspace_prune.add_argument("--apply", action="store_true")
+    workspace_prune.add_argument("--remove-workspaces", action="store_true")
 
     sub.add_parser("inventory", help="print the resolved executor table")
     return parser.parse_args(argv)
@@ -193,12 +210,24 @@ def add_attempt_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--target", help="inventory host name")
     parser.add_argument("--identity", help="explicit SSH private key for the executor account")
     parser.add_argument("--remote-root", help="must equal the executor's declared root (ssh), or the test root (local)")
+    parser.add_argument("--repo", help="local source repository (required to bind a workspace)")
+    parser.add_argument("--workspace-id", help="reuse this named task workspace instead of a fresh attempt")
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--attempt-id")
 
 
-def attempt_from(args) -> tuple[attempt_module.Attempt, dict | None, dict | None]:
+def add_workspace_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--transport", choices=("ssh", "local"), default="ssh")
+    parser.add_argument("--target", help="inventory host name")
+    parser.add_argument("--identity", help="explicit SSH private key for the executor account")
+    parser.add_argument("--remote-root", help="must equal the executor's declared root (ssh), or the test root (local)")
+    parser.add_argument("--repo", required=True)
+    parser.add_argument("--workspace-id", help="workspace label; omit to address all workspaces of this repo")
+    parser.add_argument("--repo-id", required=True)
+
+
+def runtime_from(args) -> tuple[transport.Transport, dict | None, dict | None, str]:
     host = executor = None
     if args.transport == "ssh":
         if not args.target:
@@ -218,6 +247,45 @@ def attempt_from(args) -> tuple[attempt_module.Attempt, dict | None, dict | None
     # The path is closed over the client object; make_transport needs it.
     args._root = root
     transport_ = make_transport(args, host, executor)
+    return transport_, host, executor, root
+
+
+def workspace_from(args) -> workspace_module.Workspace:
+    if not args.repo:
+        raise attempt_module.Blocked("--repo is required to bind a reusable workspace")
+    transport_, host, executor, root = runtime_from(args)
+    repo_identity = source.repo_identity(args.repo)
+    return workspace_module.Workspace(
+        transport_,
+        root,
+        args.target or "local",
+        (executor or {}).get("user"),
+        args.repo_id,
+        args.workspace_id or "scan",
+        repo_identity,
+    )
+
+
+def attempt_from(args) -> tuple[attempt_module.Attempt, dict | None, dict | None]:
+    transport_, host, executor, root = runtime_from(args)
+    if getattr(args, "workspace_id", None):
+        if not args.repo:
+            raise attempt_module.Blocked(
+                "--repo is required to bind a reusable workspace"
+            )
+        workspace = workspace_module.Workspace(
+            transport_,
+            root,
+            args.target or "local",
+            (executor or {}).get("user"),
+            args.repo_id,
+            args.workspace_id,
+            source.repo_identity(args.repo),
+        )
+        attempt = workspace_module.WorkspaceAttempt(
+            transport_, workspace, args.attempt_id or attempt_module.new_attempt_id()
+        )
+        return attempt, host, executor
     attempt_id = args.attempt_id or attempt_module.new_attempt_id()
     attempt = attempt_module.Attempt(transport_, root, args.repo_id, args.run_id, attempt_id)
     return attempt, host, executor
@@ -284,6 +352,19 @@ def command_cancel(args) -> int:
         raise attempt_module.Blocked("--attempt-id is required to cancel an existing attempt")
     attempt, _, _ = attempt_from(args)
     state = attempt.cancel()
+    if isinstance(attempt, workspace_module.WorkspaceAttempt) and state.get("terminal"):
+        try:
+            attempt.workspace.complete_lease(
+                attempt.attempt_id, "terminal", (state.get("result") or {}).get("phase")
+            )
+        except (
+            attempt_module.Blocked,
+            transport.TransportError,
+            subprocess.TimeoutExpired,
+        ):
+            # The runner normally records this; workspace-status reconciles a
+            # missing update without replaying anything.
+            pass
     print(json.dumps(state, indent=2, sort_keys=True))
     if state.get("terminal"):
         return 0 if state.get("phase") == "cancelled" else 1
@@ -309,6 +390,10 @@ def command_run(args) -> int:
         argv = argv[1:]
     if not argv:
         raise attempt_module.Blocked("no command given after --")
+    if not args.repo:
+        raise attempt_module.Blocked("--repo is required")
+    if args.clean and not args.workspace_id:
+        raise attempt_module.Blocked("--clean applies to a reusable workspace; a fresh attempt is already clean")
 
     attempt, host, executor = attempt_from(args)
     observed = check_executor(attempt.transport, args.target, host, executor, args._root)
@@ -321,9 +406,27 @@ def command_run(args) -> int:
         with open(os.path.join(capture_dir, "input-files.json"), "r", encoding="utf-8") as handle:
             captured = json.load(handle)
 
-        attempt.prepare()
-        attempt.transport.push_tree(capture_dir, attempt.staging)
-        attempt.verify_input(captured["inputId"])
+        workspace_mode = isinstance(attempt, workspace_module.WorkspaceAttempt)
+        try:
+            if workspace_mode:
+                attempt.prepare(clean=args.clean)
+            else:
+                attempt.prepare()
+            attempt.transport.push_tree(capture_dir, attempt.staging)
+            attempt.verify_input(captured["inputId"])
+            if workspace_mode:
+                attempt.workspace.sync(
+                    attempt.attempt_id,
+                    captured["inputId"],
+                    f"{attempt.staging}/input-files.json",
+                    f"{attempt.staging}/manifest.py",
+                )
+        except (attempt_module.Blocked, transport.TransportError, subprocess.TimeoutExpired):
+            # Nothing was dispatched: a partial staging directory is discarded,
+            # and an incomplete workspace sync stays marked for an explicit reset.
+            if workspace_mode:
+                attempt.publish_failed()
+            raise
 
         env = env_pairs(args.env)
         if "PATH" not in env:
@@ -398,6 +501,101 @@ def command_inventory(args) -> int:
     return 0
 
 
+def command_workspace_status(args) -> int:
+    if not args.workspace_id:
+        raise attempt_module.Blocked("--workspace-id is required")
+    workspace = workspace_from(args)
+    info = workspace.snoop()
+    lease = info.get("lease") or {}
+    attempt_id = lease.get("attemptId")
+    phase = lease.get("phase")
+    if info.get("exists") and attempt_id and phase in ("updating", "prepared", "running", "unknown"):
+        attempt = workspace_module.WorkspaceAttempt(workspace.transport, workspace, attempt_id)
+        try:
+            state = attempt.status()
+        except (
+            attempt_module.Blocked,
+            transport.TransportError,
+            subprocess.TimeoutExpired,
+        ) as error:
+            info["reconcile"] = {"error": str(error)}
+        else:
+            if state.get("terminal"):
+                value = workspace.complete_lease(
+                    attempt_id, "terminal", (state.get("result") or {}).get("phase")
+                )
+                info["reconcile"] = {"lease": value, "attemptPhase": state.get("result", {}).get("phase")}
+                info = workspace.snoop()
+            elif phase in ("updating", "prepared"):
+                # A preparation can be alive right now; only an explicit reset
+                # may clear it. Never take over a lease from another client.
+                info["reconcile"] = {
+                    "action": "reset-available",
+                    "reason": "preparation has no terminal result; reset only if the caller is gone",
+                }
+            else:
+                info["reconcile"] = {
+                    "action": "cancel-or-reset",
+                    "reason": "lease is not terminal",
+                }
+    print(json.dumps(info, indent=2, sort_keys=True) if args.json else json.dumps(info))
+    return 0
+
+
+def command_workspace_reset(args) -> int:
+    if not args.workspace_id:
+        raise attempt_module.Blocked("--workspace-id is required")
+    workspace = workspace_from(args)
+    value = workspace.reset(clean_home=args.clean_home, force=args.force)
+    print(json.dumps(value, indent=2, sort_keys=True))
+    return 0
+
+
+def command_workspace_prune(args) -> int:
+    if args.keep < 0:
+        raise attempt_module.Blocked("--keep must not be negative")
+    if args.max_age_days < 0:
+        raise attempt_module.Blocked("--max-age-days must not be negative")
+    workspace = workspace_from(args)
+    identity = workspace.repo_identity
+    targets: list[workspace_module.Workspace] = []
+    if args.workspace_id:
+        targets = [workspace]
+    else:
+        for entry in workspace.list_workspaces():
+            metadata = entry.get("metadata") or {}
+            if (
+                metadata.get("repoIdentity") != identity
+                or metadata.get("repoId") != workspace.repo_id
+                or metadata.get("target") != workspace.target
+                or metadata.get("user") != workspace.user
+            ):
+                continue
+            targets.append(
+                workspace_module.Workspace(
+                    workspace.transport,
+                    workspace.root,
+                    metadata.get("target") or workspace.target,
+                    metadata.get("user"),
+                    metadata.get("repoId") or workspace.repo_id,
+                    metadata.get("label") or workspace.label,
+                    identity,
+                )
+            )
+    report = []
+    for target in targets:
+        value = target.prune(
+            apply=args.apply, keep=args.keep, max_age_days=args.max_age_days
+        )
+        if args.remove_workspaces:
+            value["workspaceRemoval"] = target.remove(
+                apply=args.apply, max_age_days=args.max_age_days
+            )
+        report.append(value)
+    print(json.dumps({"apply": args.apply, "workspaces": report}, indent=2, sort_keys=True))
+    return 0
+
+
 COMMANDS = {
     "capture": command_capture,
     "verify": command_verify,
@@ -408,6 +606,9 @@ COMMANDS = {
     "cancel": command_cancel,
     "collect": command_collect,
     "run": command_run,
+    "workspace-status": command_workspace_status,
+    "workspace-reset": command_workspace_reset,
+    "workspace-prune": command_workspace_prune,
     "inventory": command_inventory,
 }
 

@@ -200,5 +200,105 @@ pkgs.testers.nixosTest {
         timeout=120,
     )
     executor.succeed("! pgrep -u remote-exec -f 'sleep 300'")
+
+    # 7. A reusable workspace keeps retained output, HOME and source mtimes
+    #    across sequential attempts, and binds to the real repository.
+    workspace = (
+        "--target executor --identity /root/.ssh/remote-exec --repo-id test "
+        "--workspace-id task --repo /root/repo"
+    )
+    warm = (
+        "sh -c " + shlex.quote(
+            'mkdir -p target; echo run >> target/count; echo home > "$HOME/state"; '
+            'stat -c %Y tracked.txt > "$HOME/mtime.txt"; echo generated > generated.txt'
+        )
+    )
+    gateway.succeed(
+        "remote-exec run " + workspace + " --run-id warm-1 -- " + warm
+        + " > /tmp/warm1.json"
+    )
+    gateway.succeed(
+        "remote-exec run " + workspace + " --run-id warm-2 -- "
+        + "sh -c " + shlex.quote(
+            'test "$(cat target/count | wc -l)" = "2"; test "$(cat "$HOME/state")" = "home"; '
+            'test "$(stat -c %Y tracked.txt)" = "$(cat "$HOME/mtime.txt")"'
+        )
+    )
+    gateway.succeed(
+        "remote-exec run " + workspace + " --run-id warm-3 -- "
+        + "sh -c " + shlex.quote('test -f target/count && echo still-here > target/kept')
+    )
+    warm1_attempt = json.loads(
+        gateway.succeed("cat /tmp/warm1.json")
+    )["attemptId"]
+
+    # One source change rebuilds against the existing work tree.
+    gateway.succeed("echo changed > /root/repo/tracked.txt")
+    gateway.succeed(
+        "remote-exec run " + workspace + " --run-id warm-4 -- "
+        + "sh -c " + shlex.quote('grep -q changed tracked.txt && echo rebuilt > generated.txt')
+    )
+    gateway.succeed("test -f /root/repo/tracked.txt")
+
+    # An older attempt still collects its immutable snapshot after the
+    # workspace has moved on.
+    gateway.succeed(
+        "remote-exec collect " + workspace + " --run-id warm-1 --attempt-id "
+        + warm1_attempt + " --out /root/warm-out --delta"
+    )
+    gateway.succeed("grep -q 'generated' /root/warm-out/source/generated.txt")
+    gateway.succeed("grep -q one /root/warm-out/source/tracked.txt")
+    gateway.succeed("test -f /root/warm-out/delta.json")
+
+    # 8. Exclusivity: a second attempt for the same workspace is refused while
+    #    the first is live; cancel releases it through the lease.
+    gateway.execute(
+        "setsid remote-exec run " + workspace + " --run-id ws-live --timeout 300 "
+        "-- sh -c 'sleep 300 & wait' > /tmp/ws-live.log 2>&1 & echo $! > /tmp/ws-live.pid"
+    )
+    gateway.wait_until_succeeds(
+        "remote-exec workspace-status " + workspace + " | grep -q '\"phase\": \"running\"'",
+        timeout=120,
+    )
+    # Killing the client session must not release the workspace lease or stop
+    # the unit; a reconnect still observes the same attempt.
+    gateway.succeed("kill -- -$(cat /tmp/ws-live.pid) || true")
+    gateway.wait_until_succeeds(
+        "remote-exec workspace-status " + workspace + " | grep -q '\"phase\": \"running\"'",
+        timeout=120,
+    )
+    gateway.fail(
+        "remote-exec run " + workspace + " --run-id ws-second -- true"
+    )
+    live_attempt = json.loads(
+        gateway.succeed("remote-exec workspace-status " + workspace)
+    )["lease"]["attemptId"]
+    gateway.succeed(
+        "remote-exec cancel " + workspace + " --run-id ws-live --attempt-id " + live_attempt
+    )
+    gateway.wait_until_succeeds(
+        "remote-exec workspace-status " + workspace + " | grep -q '\"phase\": \"terminal\"'",
+        timeout=120,
+    )
+    executor.succeed("! pgrep -u remote-exec -f 'sleep 300'")
+
+    # 9. Explicit clean discards work and HOME, then a run succeeds.
+    gateway.succeed(
+        "remote-exec run " + workspace + " --run-id clean-1 --clean -- "
+        + "sh -c " + shlex.quote('test ! -e target/count && test ! -e "$HOME/state"')
+    )
+
+    # 10. Prune is a dry run by default, keeps live attempts, and reset works.
+    gateway.succeed(
+        "remote-exec workspace-prune " + workspace + " --keep 1 --max-age-days 0 "
+        "> /tmp/prune.json"
+    )
+    gateway.succeed("grep -q '\"dryRun\": true' /tmp/prune.json")
+    gateway.succeed("remote-exec workspace-prune " + workspace + " --keep 1 --max-age-days 0 --apply")
+    gateway.succeed("remote-exec workspace-status " + workspace)
+    gateway.succeed("remote-exec workspace-reset " + workspace)
+    gateway.succeed(
+        "remote-exec run " + workspace + " --run-id after-reset -- true"
+    )
   '';
 }

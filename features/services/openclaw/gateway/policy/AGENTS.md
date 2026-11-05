@@ -122,6 +122,36 @@ terminal result. A failed diagnostic transfer is reported as a diagnostic error 
 command's phase and remote exit code stay authoritative; it is not an unknown execution and
 must not be replayed.
 
+### Reusable task workspace
+
+For iterative work on one task, pass a stable `--workspace-id` and keep the same repository and
+executor. The workspace keeps `work/`, a stable `HOME`, retained build output and managed source
+between attempts, so a compiler's own incremental state works without language-specific cache
+configuration. Do not add tool-specific cache directories, environment files or configuration to
+the repository for this purpose.
+
+Attempts in one workspace are sequential. Wait for `run` to return (or reconcile it with
+`workspace-status`) before the next attempt. Parallel tasks must use different workspace ids, and
+different repositories never share a workspace even with the same label. Two attempts racing for
+one workspace are refused; that refusal is not an invitation to retry in a loop or delete the
+workspace. Reconcile with `workspace-status`, `cancel` the owning attempt, or use
+`workspace-reset`; never remove workspace directories by hand.
+
+Only one attempt at a time mutates a workspace. A sync that fails leaves an incomplete marker, and a
+lease that is not terminal is never taken over. A managed source changed outside remote-exec, a new
+source path colliding with retained output, or a symlinked workspace path is a fail-closed
+condition: collect what is needed, then reset explicitly. `--clean` discards the workspace work tree
+and HOME before the attempt and is the explicit fresh mode.
+
+A warm workspace is not a hermetic or clean proof. Verification and acceptance runs must use a fresh
+attempt (omit `--workspace-id`) or `--clean`; never report a warm repeat as evidence that a build
+works from scratch. Retained output validity belongs to the build tool that produced it.
+
+Each attempt freezes its selected source and receipts. Collecting an older attempt reads that
+snapshot and stays safe after later attempts changed the workspace; if no snapshot exists, source
+collection is refused instead of reading newer workspace state. `workspace-prune` is dry-run by
+default and only deletes terminal attempts beyond retention; automated pruning is not scheduled.
+
 `capture`, `verify`, `status` and `collect` exist for inspection, recovery and delta
 integration. `exec` with `host=<node>` is raw execution: it does not export or verify
 repository source, and it must not be used as a substitute for `remote-exec run`.
