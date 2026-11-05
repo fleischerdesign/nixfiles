@@ -81,7 +81,7 @@
         (import ./packages/overlays/fix/authentik)
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
-        (import ./packages/overlays/fix/openclaw { inherit inputs; })
+        inputs.openclaw.overlays.default
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];
