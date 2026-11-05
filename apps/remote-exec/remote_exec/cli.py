@@ -5,8 +5,7 @@ Exit codes are part of the contract:
     0  the command ran and exited 0
     1  the command ran and failed
     2  blocked before dispatch, or the input did not verify
-    3  outcome unknown; reconcile the same attempt
-    4  a delta conflicts with the current target
+    3  outcome unknown; reconcile (or cancel) the same attempt
 """
 
 from __future__ import annotations
@@ -21,20 +20,17 @@ from . import attempt as attempt_module
 from . import manifest, source, transport
 
 DEFAULT_INVENTORY = "/etc/openclaw/remote-exec-inventory.json"
-
-
-def inventory_path(value: str | None) -> str:
-    return value or os.environ.get("REMOTE_EXEC_INVENTORY") or DEFAULT_INVENTORY
+INVENTORY_SCHEMA = 2
 
 
 def load_inventory(value: str | None) -> dict:
-    path = inventory_path(value)
+    path = value or os.environ.get("REMOTE_EXEC_INVENTORY") or DEFAULT_INVENTORY
     try:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
     except OSError as error:
         raise attempt_module.Blocked(f"cannot read the host inventory at {path}: {error}") from error
-    if data.get("schemaVersion") != 1 or not isinstance(data.get("hosts"), dict):
+    if data.get("schemaVersion") != INVENTORY_SCHEMA or not isinstance(data.get("hosts"), dict):
         raise attempt_module.Blocked(f"unsupported inventory at {path}")
     return data
 
@@ -43,25 +39,44 @@ def resolve_target(value: str | None, name: str) -> tuple[dict, dict]:
     inventory = load_inventory(value)
     host = inventory["hosts"].get(name)
     if host is None:
-        raise attempt_module.Blocked(f"target {name!r} is not a declared host")
-    if host.get("hostType") not in ("server", "workstation"):
-        raise attempt_module.Blocked(f"target {name!r} is a {host.get('hostType')}, not an executor")
+        raise attempt_module.Blocked(f"target {name!r} is not a declared executor")
+    executor = host.get("executor")
+    if not executor:
+        raise attempt_module.Blocked(
+            f"target {name!r} has no declared executor account; enable the remote-exec feature there"
+        )
     if not host.get("sshAddress"):
         raise attempt_module.Blocked(f"target {name!r} has no SSH-reachable address")
-    return host, inventory
+    for field in ("user", "root", "hostKey", "runtimePath"):
+        if not executor.get(field):
+            raise attempt_module.Blocked(f"target {name!r} declares no executor {field}")
+    return host, executor
 
 
-def make_transport(args) -> transport.Transport:
+def make_transport(args, host: dict | None, executor: dict | None) -> transport.Transport:
     if args.transport == "local":
-        return transport.LocalTransport(root=args.remote_root)
-    if not args.ssh_user:
-        raise attempt_module.Blocked("--ssh-user is required for the ssh transport")
-    host, _ = resolve_target(args.inventory, args.target)
-    return transport.SshTransport(user=args.ssh_user, host=host["sshAddress"], identity=args.identity)
+        return transport.LocalTransport()
+    if not args.identity:
+        raise attempt_module.Blocked("--identity is required: no implicit SSH credential discovery")
+    identity = os.path.abspath(os.path.expanduser(args.identity))
+    if not os.path.isfile(identity):
+        raise attempt_module.Blocked(f"identity file {identity} does not exist")
+    return transport.SshTransport(
+        user=executor["user"],
+        address=host["sshAddress"],
+        host_key=executor["hostKey"],
+        identity=identity,
+    )
 
 
-def check_executor(transport_: transport.Transport, target: str | None, host: dict | None) -> dict:
-    observed = transport_.preflight()
+def check_executor(
+    transport_: transport.Transport,
+    target: str | None,
+    host: dict | None,
+    executor: dict | None,
+    root: str,
+) -> dict:
+    observed = transport_.preflight(root)
     if target is not None:
         if observed.get("hostname") != target:
             raise attempt_module.Blocked(
@@ -71,6 +86,28 @@ def check_executor(transport_: transport.Transport, target: str | None, host: di
         if expected and observed.get("machine") != expected:
             raise attempt_module.Blocked(
                 f"executor architecture mismatch: expected {expected}, measured {observed.get('machine')}"
+            )
+        if observed.get("user") != executor["user"]:
+            raise attempt_module.Blocked(
+                f"executor account mismatch: inventory says {executor['user']!r}, login is {observed.get('user')!r}"
+            )
+        if observed.get("uid") == 0:
+            raise attempt_module.Blocked("refusing to run as uid 0; the executor account must be non-root")
+        if observed.get("root") != executor["root"]:
+            raise attempt_module.Blocked(
+                f"remote root mismatch: inventory says {executor['root']!r}, resolved {observed.get('root')!r}"
+            )
+        if observed.get("rootOwner") not in (None, observed.get("uid")):
+            raise attempt_module.Blocked("the declared remote root is not owned by the executor account")
+        if observed.get("rootWritable") is False:
+            raise attempt_module.Blocked("the declared remote root is not writable by the executor account")
+        if observed.get("userManager") is False:
+            raise attempt_module.Blocked(
+                "the executor account has no reachable user systemd manager (linger declared?)"
+            )
+        if observed.get("missing"):
+            raise attempt_module.Blocked(
+                "executor lacks required tools: " + ", ".join(observed["missing"])
             )
     return observed
 
@@ -101,55 +138,65 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     verify.add_argument("--expect-input-id")
 
     status = sub.add_parser("status", help="observe an attempt without dispatching anything")
-    add_attempt_arguments(status, transport_required=True)
+    add_attempt_arguments(status)
     status.add_argument("--json", action="store_true")
 
-    collect = sub.add_parser("collect", help="fetch a terminal result and its artifacts")
-    add_attempt_arguments(collect, transport_required=True)
+    cancel = sub.add_parser("cancel", help="stop the attempt's unit and report its state")
+    add_attempt_arguments(cancel)
+
+    collect = sub.add_parser("collect", help="fetch the selected output of a terminal attempt")
+    add_attempt_arguments(collect)
     collect.add_argument("--out", required=True)
     collect.add_argument("--logs", action="store_true")
+    collect.add_argument("--artifacts", action="store_true")
     collect.add_argument("--delta", action="store_true")
 
-    run = sub.add_parser("run", help="capture, transfer, execute and collect one attempt")
-    add_attempt_arguments(run, transport_required=True)
+    run = sub.add_parser("run", help="capture, transfer, verify, execute and observe one attempt")
+    add_attempt_arguments(run)
     run.add_argument("--repo", required=True)
-    run.add_argument("--node-id", required=True, help="pinned native node identity for this attempt")
     run.add_argument("--cwd", default=".")
     run.add_argument("--timeout", type=int, default=1800)
     run.add_argument("--env", action="append", default=[])
     run.add_argument("--extra-path", action="append", default=[])
     run.add_argument("argv", nargs=argparse.REMAINDER, metavar="command")
 
-    apply_delta = sub.add_parser("apply-delta", help="apply a collected delta to the exact base input")
-    apply_delta.add_argument("--delta", required=True)
-    apply_delta.add_argument("--source", required=True)
-    apply_delta.add_argument("--target", required=True)
-
-    inventory = sub.add_parser("inventory", help="print the resolved executor table")
+    sub.add_parser("inventory", help="print the resolved executor table")
     return parser.parse_args(argv)
 
 
-def add_attempt_arguments(parser: argparse.ArgumentParser, transport_required: bool) -> None:
+def add_attempt_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--transport", choices=("ssh", "local"), default="ssh")
     parser.add_argument("--target", help="inventory host name")
-    parser.add_argument("--ssh-user")
-    parser.add_argument("--identity")
-    parser.add_argument("--remote-root", required=True)
+    parser.add_argument("--identity", help="explicit SSH private key for the executor account")
+    parser.add_argument("--remote-root", help="must equal the executor's declared root (ssh), or the test root (local)")
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--attempt-id")
 
 
-def attempt_from(args) -> attempt_module.Attempt:
-    if not args.target and args.transport == "ssh":
-        raise attempt_module.Blocked("--target is required for the ssh transport")
-    if args.transport == "local" and args.target is not None:
-        raise attempt_module.Blocked("--target is not used by the local transport")
-    transport_ = make_transport(args)
+def attempt_from(args) -> tuple[attempt_module.Attempt, dict | None, dict | None]:
+    host = executor = None
+    if args.transport == "ssh":
+        if not args.target:
+            raise attempt_module.Blocked("--target is required for the ssh transport")
+        host, executor = resolve_target(args.inventory, args.target)
+        if args.remote_root and args.remote_root != executor["root"]:
+            raise attempt_module.Blocked(
+                f"--remote-root must equal the declared executor root {executor['root']!r}"
+            )
+        root = executor["root"]
+    else:
+        if args.target is not None:
+            raise attempt_module.Blocked("--target is not used by the local transport")
+        if not args.remote_root:
+            raise attempt_module.Blocked("--remote-root is required")
+        root = args.remote_root
+    # The path is closed over the client object; make_transport needs it.
+    args._root = root
+    transport_ = make_transport(args, host, executor)
     attempt_id = args.attempt_id or attempt_module.new_attempt_id()
-    return attempt_module.Attempt(
-        transport_, args.remote_root, args.repo_id, args.run_id, attempt_id
-    )
+    attempt = attempt_module.Attempt(transport_, root, args.repo_id, args.run_id, attempt_id)
+    return attempt, host, executor
 
 
 def command_capture(args) -> int:
@@ -168,96 +215,97 @@ def command_verify(args) -> int:
 def command_status(args) -> int:
     if not args.attempt_id:
         raise attempt_module.Blocked("--attempt-id is required to observe an existing attempt")
-    attempt = attempt_from(args)
+    attempt, _, _ = attempt_from(args)
     state = attempt.status()
     print(json.dumps(state, indent=2, sort_keys=True) if args.json else json.dumps(state))
     return 0
 
 
+def command_cancel(args) -> int:
+    if not args.attempt_id:
+        raise attempt_module.Blocked("--attempt-id is required to cancel an existing attempt")
+    attempt, _, _ = attempt_from(args)
+    state = attempt.cancel()
+    print(json.dumps(state, indent=2, sort_keys=True))
+    if state.get("terminal"):
+        return 0 if state.get("phase") == "cancelled" else 1
+    return 3
+
+
 def command_collect(args) -> int:
     if not args.attempt_id:
         raise attempt_module.Blocked("--attempt-id is required to collect an existing attempt")
-    attempt = attempt_from(args)
+    attempt, _, _ = attempt_from(args)
     if os.path.exists(args.out) and os.listdir(args.out):
         raise attempt_module.Blocked(f"collect target {args.out} is not empty")
-    result = attempt.collect(args.out, with_logs=args.logs, with_delta=args.delta)
+    result = attempt.collect(
+        args.out, with_logs=args.logs, with_artifacts=args.artifacts, with_delta=args.delta
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result.get("phase") == "succeeded" else 1
 
 
 def command_run(args) -> int:
-    if not args.argv:
-        raise attempt_module.Blocked("no command given after --")
     argv = list(args.argv)
     if argv and argv[0] == "--":
         argv = argv[1:]
     if not argv:
         raise attempt_module.Blocked("no command given after --")
 
-    host, _ = resolve_target(args.inventory, args.target) if args.transport == "ssh" else ({}, {})
-    attempt = attempt_from(args)
-    observed = check_executor(attempt.transport, args.target, host)
+    attempt, host, executor = attempt_from(args)
+    observed = check_executor(attempt.transport, args.target, host, executor, args._root)
+    if args.transport == "local" and observed.get("uid") == 0:
+        raise attempt_module.Blocked("refusing to run the local fixture transport as root")
 
     capture_dir = attempt_module.capture_to(args.repo, tuple(args.extra_path))
     try:
-        attempt_module.add_verifier(capture_dir)
+        attempt_module.add_runtime_files(capture_dir)
         with open(os.path.join(capture_dir, "input-files.json"), "r", encoding="utf-8") as handle:
             captured = json.load(handle)
 
         attempt.prepare()
         attempt.transport.push_tree(capture_dir, attempt.staging)
-        try:
-            attempt.verify(captured["inputId"])
-        except attempt_module.Blocked as error:
-            raise attempt_module.Blocked(f"input verification failed, attempt not published: {error}") from error
+        attempt.verify_input(captured["inputId"])
 
         env = env_pairs(args.env)
         if "PATH" not in env:
-            env["PATH"] = observed.get("path") or ""
+            env["PATH"] = (executor or {}).get("runtimePath") or observed.get("path") or ""
 
-        attempt.write(
-            f"{attempt.staging}/input.json",
-            json.dumps(
-                {
-                    "schemaVersion": 1,
-                    "repoId": attempt.repo_id,
-                    "runId": attempt.run_id,
-                    "attemptId": attempt.attempt_id,
-                    "nodeId": args.node_id,
-                    "target": args.target or "local",
-                    "baseRevision": captured["baseRevision"],
-                    "inputId": captured["inputId"],
-                    "command": argv,
-                    "cwd": args.cwd,
-                    "environment": env,
-                    "architecture": observed.get("machine"),
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-        )
-        attempt.publish()
+        input_meta = {
+            "schemaVersion": 2,
+            "repoId": attempt.repo_id,
+            "runId": attempt.run_id,
+            "attemptId": attempt.attempt_id,
+            "target": args.target or "local",
+            "executor": {
+                "host": args.target or "local",
+                "address": (host or {}).get("sshAddress"),
+                "user": (executor or {}).get("user") or observed.get("user"),
+                "uid": observed.get("uid"),
+                "root": args._root,
+                "architecture": observed.get("machine"),
+            },
+            "baseRevision": captured["baseRevision"],
+            "inputId": captured["inputId"],
+            "command": argv,
+            "cwd": args.cwd,
+            "environment": env,
+        }
+        attempt.publish(input_meta)
 
         try:
-            result = attempt.run(
-                argv=argv,
-                cwd=args.cwd,
-                timeout_secs=args.timeout,
-                env=env,
-                node_id=args.node_id,
-                input_id=captured["inputId"],
+            result = attempt.dispatch(
+                argv=argv, cwd=args.cwd, timeout_secs=args.timeout, env=env, input_id=captured["inputId"]
             )
-        except subprocess.TimeoutExpired:
-            # The transport gave up before the executor did. The attempt is
-            # published and may still be running; this is not a failure.
+        except attempt_module.UnknownOutcome as unknown:
             print(
                 json.dumps(
                     {
-                        "attemptId": attempt.attempt_id,
+                        "attemptId": unknown.attempt_id,
                         "inputId": captured["inputId"],
-                        "phase": "unknown",
-                        "reason": "transport timed out; reconcile the same attempt with `status`",
+                        "phase": unknown.state.get("phase", "unknown"),
+                        "reason": unknown.state.get("reason")
+                        or "no terminal observation; reconcile the same attempt",
                     },
                     indent=2,
                     sort_keys=True,
@@ -275,15 +323,8 @@ def command_run(args) -> int:
         transport.cleanup(capture_dir)
 
 
-def command_apply_delta(args) -> int:
-    applied = attempt_module.apply_delta(args.delta, args.source, args.target)
-    print(json.dumps(applied, sort_keys=True))
-    return 0
-
-
 def command_inventory(args) -> int:
-    data = load_inventory(args.inventory)
-    print(json.dumps(data, indent=2, sort_keys=True))
+    print(json.dumps(load_inventory(args.inventory), indent=2, sort_keys=True))
     return 0
 
 
@@ -291,9 +332,9 @@ COMMANDS = {
     "capture": command_capture,
     "verify": command_verify,
     "status": command_status,
+    "cancel": command_cancel,
     "collect": command_collect,
     "run": command_run,
-    "apply-delta": command_apply_delta,
     "inventory": command_inventory,
 }
 
@@ -304,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
         return COMMANDS[args.command](args)
     except attempt_module.Blocked as error:
         print(f"remote-exec: {error}", file=sys.stderr)
-        return 4 if args.command == "apply-delta" else 2
+        return 2
     except (source.SourceError, manifest.ManifestError, transport.TransportError) as error:
         print(f"remote-exec: {error}", file=sys.stderr)
         return 2

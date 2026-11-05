@@ -15,12 +15,12 @@ let
     export { default } from "${bootstrapHookDir}/handler.js";
   '';
   package = pkgs.openclaw-gateway;
-  # One executor inventory, derived from the topology that already declares
-  # every host and its addresses. The CLI refuses a host this file does not
-  # name, so no second host table exists in a task or in policy.
+  # One executor inventory, derived from the topology and from the executor
+  # module each host enabled. A host without that declaration is not eligible:
+  # selection is a configuration fact, not a name in a task.
   remoteExec = pkgs.callPackage ../../../../apps/remote-exec { };
   remoteExecInventory = {
-    schemaVersion = 1;
+    schemaVersion = 2;
     hosts = lib.mapAttrs (name: host: {
       hostType = host.hostType or null;
       sshAddress = if (host.wireguardIpv4 or null) != null then host.wireguardIpv4 else host.ipv4 or null;
@@ -32,6 +32,18 @@ let
           pkgs.stdenv.hostPlatform.parsed.cpu.name
         else
           null;
+      executor =
+        let
+          declared =
+            if lib.hasAttr name systems then
+              systems.${name}.config.my.features.services.remote-exec or null
+            else
+              null;
+        in
+        lib.optionalAttrs (declared != null && declared.enable) {
+          inherit (declared) user root runtimePath;
+          hostKey = systems.${name}.config.programs.ssh.knownHosts.${name}.publicKey;
+        };
     }) config.my.topology.hosts;
   };
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
@@ -311,15 +323,25 @@ in
       }
     ];
 
-    sops.secrets = lib.genAttrs (
-      [
-        "openclaw/gateway_password"
-        "ai/openrouter_api_key"
-        "ai/openai_api_key"
-        "services/home/hass_mcp_token"
-      ]
-      ++ map (subscription: subscription.apiKeySecret) subscriptions
-    ) (_: { });
+    sops.secrets =
+      lib.genAttrs (
+        [
+          "openclaw/gateway_password"
+          "ai/openrouter_api_key"
+          "ai/openai_api_key"
+          "services/home/hass_mcp_token"
+        ]
+        ++ map (subscription: subscription.apiKeySecret) subscriptions
+      ) (_: { })
+      // {
+        # Dedicated least-privilege executor key. It is readable only by the
+        # gateway account and never by the executor; the root deploy key is a
+        # different credential and is not used for builds.
+        "services/remote_exec/ssh_private_key" = {
+          owner = "openclaw";
+          mode = "0400";
+        };
+      };
     sops.templates.openclaw-gateway-env.content = ''
       OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder."openclaw/gateway_password"}
       HASS_MCP_TOKEN=${config.sops.placeholder."services/home/hass_mcp_token"}

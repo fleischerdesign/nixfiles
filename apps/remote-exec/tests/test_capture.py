@@ -13,7 +13,7 @@ class CaptureTest(RepoFixture):
         super().setUp()
         self.write(
             ".gitignore",
-            "ignored/\n*.log\ntracked-but-ignored.txt\n",
+            "ignored/\n*.log\ntracked-but-ignored.txt\ntarget/\n",
         )
         self.write("nested/.gitignore", "*.tmp\n!keep.tmp\n")
         self.write("tracked.txt", "committed\n")
@@ -25,6 +25,7 @@ class CaptureTest(RepoFixture):
         self.write("nested/keep.tmp", "keep me\n")
         os.symlink("tracked.txt", os.path.join(self.repo, "link"))
         self.write("a b.txt", "space in the name\n")
+        self.write(".env.example", "PLACEHOLDER=\n")
         self.commit("base")
 
         # dirty, staged and untracked input
@@ -75,6 +76,7 @@ class CaptureTest(RepoFixture):
         self.assertEqual(entries["link"]["type"], "symlink")
         self.assertEqual(entries["link"]["target"], "tracked.txt")
         self.assertIn("a b.txt", entries)
+        self.assertIn(".env.example", entries, "a template carries no credential value")
 
         work = os.path.join(out, "work")
         self.assertFalse(os.path.exists(os.path.join(work, ".git")))
@@ -143,6 +145,34 @@ class CaptureTest(RepoFixture):
             stored = json.load(handle)
         self.assertEqual(stored["inputId"], value["inputId"])
 
+    # -- credential and agent-state boundary ---------------------------------
+    def test_tracked_dotenv_is_refused(self):
+        self.write(".env", "TOKEN=secret\n")
+        self.git("add", "-f", ".env")
+        with self.assertRaises(source.SourceError) as raised:
+            self.capture("capture-dotenv")
+        self.assertIn("dotenv", str(raised.exception))
+
+    def test_agent_and_ssh_state_is_refused(self):
+        os.makedirs(os.path.join(self.repo, ".openclaw"))
+        self.write(".openclaw/state.json", "{}\n")
+        with self.assertRaises(source.SourceError):
+            self.capture("capture-agent")
+        os.makedirs(os.path.join(self.repo, ".ssh"))
+        self.write(".ssh/id_ed25519", "private\n")
+        with self.assertRaises(source.SourceError):
+            self.capture("capture-ssh")
+
+    def test_private_key_suffix_is_refused(self):
+        self.write("deploy.pem", "private\n")
+        with self.assertRaises(source.SourceError):
+            self.capture("capture-pem")
+
+    def test_explicit_extra_path_cannot_smuggle_a_credential(self):
+        with self.assertRaises(source.SourceError):
+            self.capture("capture-extra-credential", extra=(".env",))
+
+    # -- capture coherency ----------------------------------------------------
     def test_a_file_changing_during_capture_fails_closed(self):
         def mutate(rel):
             if rel == "tracked.txt":
@@ -153,9 +183,42 @@ class CaptureTest(RepoFixture):
             source.capture(self.repo, self.out("capture-race"), _after_read=mutate)
         self.assertIn("changed while it was captured", str(raised.exception))
 
+    def test_an_earlier_file_changed_after_copy_fails_closed(self):
+        mutated = {"done": False}
+
+        def mutate_later(rel):
+            if rel == "nested/keep.tmp" and not mutated["done"]:
+                mutated["done"] = True
+                with open(os.path.join(self.repo, "a b.txt"), "a", encoding="utf-8") as handle:
+                    handle.write("late change\n")
+
+        with self.assertRaises(source.SourceError) as raised:
+            source.capture(self.repo, self.out("capture-late"), _after_copy=mutate_later)
+        self.assertIn("changed after it was copied", str(raised.exception))
+
+    def test_a_new_untracked_path_during_capture_fails_closed(self):
+        def add_file(_rel):
+            if not os.path.exists(os.path.join(self.repo, "late-untracked")):
+                with open(os.path.join(self.repo, "late-untracked"), "w", encoding="utf-8") as handle:
+                    handle.write("new\n")
+
+        with self.assertRaises(source.SourceError):
+            source.capture(self.repo, self.out("capture-new"), _after_copy=add_file)
+
+    def test_a_removed_untracked_path_during_capture_fails_closed(self):
+        def remove_file(_rel):
+            path = os.path.join(self.repo, "untracked.txt")
+            if os.path.exists(path):
+                os.unlink(path)
+
+        with self.assertRaises(source.SourceError):
+            source.capture(self.repo, self.out("capture-removed"), _after_copy=remove_file)
+
     def test_an_index_change_during_capture_fails_closed(self):
         def stage(_rel):
-            self.git("add", "-A")
+            # Stage identical tracked content: the selected set is unchanged,
+            # only the index signature moves.
+            self.git("add", "tracked.txt")
 
         with self.assertRaises(source.SourceError) as raised:
             source.capture(self.repo, self.out("capture-index"), _after_copy=stage)

@@ -73,43 +73,54 @@ explicitly requests another session-placement mode. Native child completion is t
 handoff; `sessions_yield` announces children, and a collector follows its own accepted
 contract. Never replace a completion contract with a model-driven status loop.
 
-Give each writing child an isolated managed worktree and one explicit execution target.
-Verify the parent-to-child source binding and inherited bytes before editing; never
-accept a default-workspace fallback for repository work. Session placement and execution
-target are separate facts. Resolve the target through the inventory and the native node
-registry, pin it for the attempt, and never substitute another host.
+Give each writing child an isolated managed worktree. Verify the parent-to-child source
+binding and inherited bytes before editing; never accept a default-workspace fallback for
+repository work. Session placement and SSH execution are separate facts: a device chosen
+in a client UI does not select a build executor, and a native pairing id is not an SSH
+identity.
 
 Edit canonical source on the Gateway. For a selected-node build or test, run
-`remote-exec run` with an explicit inventory host, non-root SSH user, remote root,
-attempt ids and command. That is the whole operation: it captures the current working
-tree with Git's own project rules, transfers it to a fresh attempt directory, verifies
-target identity, input and cwd on the executor, and only then executes and owns the
-terminal result. Do not split it into manually coordinated prepare/sync/verify steps, and
-do not assume a node already holds the source. Edits made after one invocation are
-captured by the next; a running attempt keeps the input it started with.
+`remote-exec run` with a declared inventory host, an explicit identity file, repository
+and run ids, and the command. That is the whole operation: it captures the current
+working tree with Git's own project rules, transfers it to a fresh attempt directory,
+verifies the pinned host key, non-root account, root ownership, input and cwd, and only
+then executes and observes the terminal result. Do not split it into manually coordinated
+prepare/sync/verify steps, and do not assume a node already holds the source. Edits made
+after one invocation are captured by the next; a running attempt keeps its input.
 
 `capture`, `verify`, `status` and `collect` exist for inspection, recovery and delta
 integration. `exec` with `host=<node>` is raw execution: it does not export or verify
 repository source, and it must not be used as a substitute for `remote-exec run`.
 Do not hand-roll an rsync/ssh upload or a second ignore list.
 
-Treat an attempt as owned until it is terminal. A successful tool call, an elapsed
-timeout or a Stop request is not proof of command success or termination. Reconcile the
-same attempt with `remote-exec status` before retrying, and preserve unknown outcomes.
+Execution identity comes from the inventory and the executor module: the account, root
+and pinned host key are declared there. The executor key is a dedicated non-root
+credential; never use a root deploy key, never run a build as root, and never accept an
+arbitrary account or root path from a task.
+
+An attempt runs under the executor account's systemd manager, so it survives an SSH
+disconnect. An attempt id is dispatched at most once: a duplicate or concurrent request
+observes the original and never reruns or overwrites its result. A successful tool call,
+an elapsed timeout or a Stop request is not proof of success or termination. Use
+`remote-exec status` to reconcile and `remote-exec cancel` to stop the unit; cancellation
+is reported only after the unit and its process tree are gone. Unknown stays unknown.
 Do not replay an uncertain write through another transport.
 
-Prefer build/test-only attempts. Source changes produced remotely return as a
-`remote-exec collect --delta` result and are applied with `remote-exec apply-delta`,
-which refuses unless the target still holds the recorded base input. Never overwrite the
-live parent, never run `rsync --delete` into it, and never edit both copies concurrently.
+Prefer build/test-only attempts. Collection returns the recorded input paths plus new
+source that the project's own `.gitignore` rules admit; ignored build trees, dependency
+directories and the rest of the work tree stay on the executor. Artifacts are requested
+separately. `collect --delta` returns a verified export for the integrator's normal Git
+workflow; this tool never applies a delta to the live parent. Never overwrite the parent,
+never run `rsync --delete` into it, and never edit both copies concurrently.
 
 Do not transfer credentials, agent state, credential-bearing Git configuration, `.git`
-metadata or unrelated caches. An ignore file, a scanner or the manifest does not prove
-the absence of semantic secrets: the executor account and its authorization remain the
-trust boundary. Build-time secrets need separately authorized injection and must not
-enter source or results.
+metadata or unrelated caches. The tool refuses `.env`, private-key, SSH and agent-state
+paths independently of Git ignore rules, but that is a name boundary: a semantic secret
+under an ordinary name still leaves the executor account as the trust boundary. Build-time
+secrets need separately authorized injection and must not enter source or results.
 
-The tool enforces path containment, input identity, attempt-directory freshness and
-process-group ownership. It does not enforce that the caller is the only writer, that a
-command is safe to run on shared state, or that cancellation completed after a
-disconnect. Those remain the caller's decisions.
+The caller is the sole writer for the duration of a capture; the tool detects selection,
+index, HEAD and content changes instead of claiming an atomic snapshot of a multiwriter
+tree. The tool enforces path containment, input identity, attempt ownership, single
+dispatch and unit/process-tree cancellation. It does not enforce that a command is safe
+to run on shared external state, nor that the caller actually stopped writing.
