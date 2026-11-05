@@ -329,12 +329,10 @@ activation and rollback. They do not depend on a skill being selected for a turn
 
 Worker skill delivery has a related boundary. The worker bundler rejects every hardlinked file, while
 `auto-optimise-store` hardlinks identical files across content-addressed Nix store outputs. Bundled,
-custodian and plugin skill trees are therefore unreadable on a worker turn unless the read is relaxed.
-`packages/overlays/fix/openclaw` composes with nix-openclaw's dist-patch phase and allows hardlinks
-only when the resolved root is an immutable, root-owned store output and `OPENCLAW_NIX_MODE=1`;
-mutable roots keep the upstream rejection. The derived check builds the real package and calls its
-reader against bundled, custodian and plugin trees, plus negative writability, ownership and path
-cases. Remove the overlay when upstream applies the same distinction to `readSkillBundleTree`.
+custodian and plugin skill trees are therefore unreadable on a worker turn that bundles skills, and the
+turn fails with `INVALID_BUNDLE`. The package is used as upstream ships it: there is no local patch for
+this read, and the limitation stays until upstream distinguishes immutable store outputs from mutable
+skill roots.
 
 Skills supply task-specific procedures, not duplicate routing rules. Memory records
 preferences and decisions, not technical defaults. Existing sessions and auth profiles
