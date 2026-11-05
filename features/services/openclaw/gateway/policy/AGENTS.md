@@ -65,3 +65,51 @@ Create routine automation agent turns with an explicit `background` model alias.
 Heartbeats and memory maintenance have their own configured model. Explicitly discuss
 any exception that needs premium reasoning. Runtime jobs, auth and memory remain
 runtime-owned; do not edit Nix-owned configuration to make temporary changes permanent.
+
+## Remote execution
+
+Keep parent conversations and orchestrating subagents on the Gateway unless the user
+explicitly requests another session-placement mode. Native child completion is the
+handoff; `sessions_yield` announces children, and a collector follows its own accepted
+contract. Never replace a completion contract with a model-driven status loop.
+
+Give each writing child an isolated managed worktree and one explicit execution target.
+Verify the parent-to-child source binding and inherited bytes before editing; never
+accept a default-workspace fallback for repository work. Session placement and execution
+target are separate facts. Resolve the target through the inventory and the native node
+registry, pin it for the attempt, and never substitute another host.
+
+Edit canonical source on the Gateway. For a selected-node build or test, run
+`remote-exec run` with an explicit inventory host, non-root SSH user, remote root,
+attempt ids and command. That is the whole operation: it captures the current working
+tree with Git's own project rules, transfers it to a fresh attempt directory, verifies
+target identity, input and cwd on the executor, and only then executes and owns the
+terminal result. Do not split it into manually coordinated prepare/sync/verify steps, and
+do not assume a node already holds the source. Edits made after one invocation are
+captured by the next; a running attempt keeps the input it started with.
+
+`capture`, `verify`, `status` and `collect` exist for inspection, recovery and delta
+integration. `exec` with `host=<node>` is raw execution: it does not export or verify
+repository source, and it must not be used as a substitute for `remote-exec run`.
+Do not hand-roll an rsync/ssh upload or a second ignore list.
+
+Treat an attempt as owned until it is terminal. A successful tool call, an elapsed
+timeout or a Stop request is not proof of command success or termination. Reconcile the
+same attempt with `remote-exec status` before retrying, and preserve unknown outcomes.
+Do not replay an uncertain write through another transport.
+
+Prefer build/test-only attempts. Source changes produced remotely return as a
+`remote-exec collect --delta` result and are applied with `remote-exec apply-delta`,
+which refuses unless the target still holds the recorded base input. Never overwrite the
+live parent, never run `rsync --delete` into it, and never edit both copies concurrently.
+
+Do not transfer credentials, agent state, credential-bearing Git configuration, `.git`
+metadata or unrelated caches. An ignore file, a scanner or the manifest does not prove
+the absence of semantic secrets: the executor account and its authorization remain the
+trust boundary. Build-time secrets need separately authorized injection and must not
+enter source or results.
+
+The tool enforces path containment, input identity, attempt-directory freshness and
+process-group ownership. It does not enforce that the caller is the only writer, that a
+command is safe to run on shared state, or that cancellation completed after a
+disconnect. Those remain the caller's decisions.

@@ -15,6 +15,25 @@ let
     export { default } from "${bootstrapHookDir}/handler.js";
   '';
   package = pkgs.openclaw-gateway;
+  # One executor inventory, derived from the topology that already declares
+  # every host and its addresses. The CLI refuses a host this file does not
+  # name, so no second host table exists in a task or in policy.
+  remoteExec = pkgs.callPackage ../../../../apps/remote-exec { };
+  remoteExecInventory = {
+    schemaVersion = 1;
+    hosts = lib.mapAttrs (name: host: {
+      hostType = host.hostType or null;
+      sshAddress = if (host.wireguardIpv4 or null) != null then host.wireguardIpv4 else host.ipv4 or null;
+      fqdn = config.my.contracts.projections.hostFqdnOf.${name};
+      # Only a server or workstation is an executor; embedded and client
+      # entries stay addressable but carry no architecture claim.
+      architecture =
+        if (host.hostType or null) == "server" || (host.hostType or null) == "workstation" then
+          pkgs.stdenv.hostPlatform.parsed.cpu.name
+        else
+          null;
+    }) config.my.topology.hosts;
+  };
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
   portals = config.my.contracts.provides.openclaw.publications.portals;
@@ -626,6 +645,9 @@ in
           email = moebius@vyrx.de
     '';
 
+    # Read by `remote-exec` through $REMOTE_EXEC_INVENTORY's default path.
+    environment.etc."openclaw/remote-exec-inventory.json".text = builtins.toJSON remoteExecInventory;
+
     systemd.services.openclaw-gateway = {
       after = [ "wireguard-wg0.service" ];
       restartTriggers = [
@@ -655,7 +677,10 @@ in
       # receive a narrower environment.
       environment.OPENCLAW_NIX_MODE = "1";
     };
-    environment.systemPackages = [ operator ];
+    environment.systemPackages = [
+      operator
+      remoteExec
+    ];
 
     # OpenClaw keeps portal ingress on loopback. Expose only a mesh socket to
     # the contract-admitted ingress, preserving the original HTTP Host header.

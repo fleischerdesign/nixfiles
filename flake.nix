@@ -144,6 +144,7 @@
         authentik-desired =
           self.nixosConfigurations.cld-edge-01.config.my.features.services.authentik.server.nodDesiredStatePackage;
         nod-provider-authentik = self.inputs.nod.packages.${system}.nod-provider-authentik;
+        remote-exec = pkgs.callPackage ./apps/remote-exec { };
       };
 
       apps.${system} = {
@@ -201,6 +202,17 @@
           }/bin/exposure-audit";
           meta = {
             description = "List every listening socket and whether it was declared";
+          };
+        };
+
+        # One Gateway-authored source snapshot, one executor attempt. The tool
+        # reads its host table from the generated inventory, never from a second
+        # list in the task or in this file.
+        remote-exec = {
+          type = "app";
+          program = "${(import ./apps/remote-exec { inherit pkgs; })}/bin/remote-exec";
+          meta = {
+            description = "Build and test one isolated source snapshot on a selected node";
           };
         };
       };
