@@ -1008,7 +1008,12 @@ try:
     phase = lease.get("phase")
     attempt_dir = lease.get("attemptDir")
     dispatched = bool(attempt_dir) and os.path.exists(os.path.join(attempt_dir, "dispatch.json"))
-    has_result = bool(attempt_dir) and os.path.exists(os.path.join(attempt_dir, "result.json"))
+    result_exists = bool(attempt_dir) and os.path.exists(os.path.join(attempt_dir, "result.json"))
+    result = read_json(os.path.join(attempt_dir, "result.json")) if result_exists else None
+    result_phase = (result or {}).get("phase")
+    known_terminal = result_phase in ("succeeded", "failed", "cancelled")
+    unknown_outcome = result_exists and not known_terminal
+
     unit_active = False
     if lease.get("unit"):
         env = dict(os.environ, XDG_RUNTIME_DIR="/run/user/%d" % os.getuid())
@@ -1016,60 +1021,47 @@ try:
             ["systemctl", "--user", "show", "-p", "ActiveState", lease["unit"]],
             env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
         )
-        unit_active = b"ActiveState=active" in probe.stdout or b"ActiveState=activating" in probe.stdout
-    if phase in ("updating", "prepared") and not dispatched:
-        # No dispatch claim exists, so no runner can start. The state lock is
-        # held, so no sync is still mutating the tree: this preparation is dead.
-        pass
-    elif phase in ("updating", "prepared"):
-        if unit_active:
-            fail(
-                "workspace unit %s is still active; cancel that attempt before reset"
-                % lease.get("unit")
-            )
-        if not has_result and not CONFIG.get("force"):
-            fail(
-                "a dispatched attempt has no terminal result; reconcile with workspace-status, "
-                "cancel it, and use --force only when no process can be running"
-            )
-    elif phase == "running" and has_result:
-        pass
-    elif phase == "running" and CONFIG.get("force") and not unit_active:
-        pass
-    elif phase in ("updating", "prepared", "running"):
-        fail(
-            "workspace is active (phase=%s attempt=%s); cancel that attempt or wait, "
-            "then reset" % (phase, lease.get("attemptId"))
+        unit_active = (
+            b"ActiveState=active" in probe.stdout
+            or b"ActiveState=activating" in probe.stdout
+            or b"ActiveState=reloading" in probe.stdout
         )
-    if phase not in ("terminal", "abandoned", None, "unknown", "updating", "prepared", "running"):
-        fail("workspace lease is in an unrecognised phase %r; refusing to reset" % phase)
-    if phase == "unknown" and not CONFIG.get("force"):
-        fail("workspace outcome is unknown; reconcile with workspace-status and use --force only when no process can be running")
-    if phase == "unknown" and CONFIG.get("force"):
-        unit = lease.get("unit")
-        if unit:
-            env = dict(os.environ, XDG_RUNTIME_DIR="/run/user/%d" % os.getuid())
-            probe = subprocess.run(
-                ["systemctl", "--user", "show", "-p", "ActiveState", unit],
-                env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+    child_alive = False
+    pid = lease.get("childPid")
+    if pid:
+        try:
+            os.kill(pid, 0)
+            child_alive = True
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            child_alive = True
+    if unit_active or child_alive:
+        fail(
+            "workspace still has a live unit or process (unit=%s child=%s); cancel it before reset"
+            % (lease.get("unit"), pid)
+        )
+
+    if phase in ("updating", "prepared"):
+        if dispatched and not known_terminal and not CONFIG.get("force"):
+            fail(
+                "a dispatched attempt has no known terminal result; reconcile with workspace-status, "
+                "cancel it, and use --force only after verifying no process can be running"
             )
-            if b"ActiveState=active" in probe.stdout or b"ActiveState=activating" in probe.stdout:
-                fail("unit %s is still active; cancel it before reset" % unit)
-        pid = lease.get("childPid")
-        if pid:
-            try:
-                os.kill(pid, 0)
-                fail("process %d may still be running; cancel before reset" % pid)
-            except ProcessLookupError:
-                pass
-    if phase == "running" and CONFIG.get("force"):
-        pid = lease.get("childPid")
-        if pid:
-            try:
-                os.kill(pid, 0)
-                fail("process %d may still be running; cancel before reset" % pid)
-            except ProcessLookupError:
-                pass
+    elif phase == "running":
+        if not known_terminal and not CONFIG.get("force"):
+            fail(
+                "workspace outcome is unknown; reconcile with workspace-status and use --force only "
+                "after verifying no process can be running"
+            )
+    elif phase == "unknown":
+        if not CONFIG.get("force"):
+            fail("workspace outcome is unknown; use --force only after verifying no process can be running")
+    elif phase in ("terminal", "abandoned", None):
+        if unknown_outcome and not CONFIG.get("force"):
+            fail("workspace has an unknown or invalid result; use --force only after verifying no process can be running")
+    else:
+        fail("workspace lease is in an unrecognised phase %r; refusing to reset" % phase)
     for name in ("work", "home") if CONFIG.get("cleanHome") else ("work",):
         path = os.path.join(workspace, name)
         remove_tree(path, workspace)

@@ -757,3 +757,72 @@ class WorkspaceReviewRegressionTest(WorkspaceFixture):
             report,
         )
         self.assertTrue(os.path.isdir(attempt.path))
+
+    def _running_workspace(self, result_phase=None, child_pid=None, unit=None):
+        ws = self.workspace()
+        attempt = workspace_module.WorkspaceAttempt(self.transport, ws, str(uuid.uuid4()))
+        attempt.prepare()
+        with open(os.path.join(ws.path, "work", "retained.txt"), "w", encoding="utf-8") as handle:
+            handle.write("keep\n")
+        lease_path = os.path.join(ws.path, "state", "lease.json")
+        with open(lease_path, "r", encoding="utf-8") as handle:
+            lease = json.load(handle)
+        lease.update({
+            "phase": "running",
+            "attemptId": attempt.attempt_id,
+            "attemptDir": attempt.path,
+            "unit": unit,
+            "childPid": child_pid,
+        })
+        with open(lease_path, "w", encoding="utf-8") as handle:
+            json.dump(lease, handle)
+        if result_phase is not None:
+            with open(os.path.join(attempt.path, "result.json"), "w", encoding="utf-8") as handle:
+                json.dump({
+                    "schemaVersion": 2,
+                    "attemptId": attempt.attempt_id,
+                    "inputId": "input",
+                    "phase": result_phase,
+                }, handle)
+        return ws, attempt
+
+    def _retained(self, ws):
+        with open(os.path.join(ws.path, "work", "retained.txt"), encoding="utf-8") as handle:
+            return handle.read()
+
+    def test_reset_refuses_live_process_with_unknown_result_even_with_force(self):
+        ws, _ = self._running_workspace(result_phase="unknown", child_pid=os.getpid())
+        for force in (False, True):
+            with self.assertRaises(attempt_module.Blocked):
+                ws.reset(force=force)
+            self.assertEqual(self._retained(ws), "keep\n")
+
+    def test_reset_refuses_live_process_with_known_terminal_result(self):
+        ws, _ = self._running_workspace(result_phase="succeeded", child_pid=os.getpid())
+        with self.assertRaises(attempt_module.Blocked):
+            ws.reset(force=True)
+        self.assertEqual(self._retained(ws), "keep\n")
+
+    def test_reset_unknown_dead_requires_force_then_succeeds(self):
+        ws, _ = self._running_workspace(result_phase="unknown")
+        with self.assertRaises(attempt_module.Blocked):
+            ws.reset()
+        self.assertEqual(self._retained(ws), "keep\n")
+        value = ws.reset(force=True)
+        self.assertTrue(value["reset"])
+        self.assertFalse(os.path.exists(os.path.join(ws.path, "work", "retained.txt")))
+
+    def test_reset_refuses_active_unit_when_forced(self):
+        import unittest.mock as mock
+
+        fake_bin = os.path.join(self.tmp, "fake-bin")
+        os.makedirs(fake_bin)
+        fake = os.path.join(fake_bin, "systemctl")
+        with open(fake, "w", encoding="utf-8") as handle:
+            handle.write("#!/bin/sh\necho ActiveState=active\n")
+        os.chmod(fake, 0o755)
+        ws, _ = self._running_workspace(result_phase="unknown", unit="fake.service")
+        with mock.patch.dict(os.environ, {"PATH": fake_bin + ":" + os.environ.get("PATH", "")}):
+            with self.assertRaises(attempt_module.Blocked):
+                ws.reset(force=True)
+        self.assertEqual(self._retained(ws), "keep\n")
