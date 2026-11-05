@@ -146,8 +146,11 @@ standard-Git commit under the private namespace `refs/remote-exec/checkpoints/`,
 The commit is built with `hash-object --no-filters`, `mktree -z` and `commit-tree`, so clean,
 smudge, eol and attribute conversion and hooks do not run. The caller's HEAD, index, branches and
 working bytes are untouched; the original commit is kept as the checkpoint's parent for provenance.
-The ref is the retention record: same-id replay returns the same commit only for the same input,
-and a different input under the same id is refused. Keep it until the consumer is bound and settled.
+The ref is the retention record. A default checkpoint call generates an independent UUID pin, so two
+consumers of the same input never share a releasable ref. An explicit `--id` is a logical consumer
+or retry id: replay returns the existing commit only when its tree, parent and input id all match
+the current capture; a different input, parent or tree under the same id is refused. Keep a pin
+until the consumer is bound and settled.
 `checkpoint-release --expect-commit` deletes only an owned ref, with CAS, and is idempotent when the
 ref is already absent.
 

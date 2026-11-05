@@ -3,12 +3,13 @@
 The checkpoint is built from the capture's `work/` tree, not from the caller's
 working tree: blobs are written with `hash-object --no-filters`, trees with
 `mktree -z`, and one commit with `commit-tree`. Nothing touches HEAD, the
-index, user branches or working bytes. The only durable state is an owned ref
-under `refs/remote-exec/checkpoints/`, which is also the retention record.
+index, user branches or working bytes. Every Git invocation disables hooks and
+commit signing, so no reference-transaction hook or external gpg program runs.
 
-Plumbing bypasses clean/smudge, eol and attribute conversion and hooks. A
-consumer's checkout can still apply its own attributes; `verify-source` is the
-check that a consumer's capture matches the recorded input id before use.
+A default checkpoint id is a fresh UUID: two consumers of the same input get
+independent refs. An explicit id is a logical consumer/retry id; replay is
+accepted only when the existing commit's tree, parents and input-id metadata
+all match this capture.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import uuid
 
 from . import manifest
 
@@ -39,8 +41,21 @@ def _git(repo: str, args: list[str], stdin: bytes | None = None, env: dict | Non
         }
     )
     environment.update(env or {})
+    # Hooks and signing are disabled on every mutation, not only blob writing.
+    command = [
+        "git",
+        "-C",
+        repo,
+        "-c",
+        "core.hooksPath=/nonexistent",
+        "-c",
+        "commit.gpgSign=false",
+        "-c",
+        "tag.gpgSign=false",
+        *args,
+    ]
     process = subprocess.run(
-        ["git", "-C", repo, *args],
+        command,
         input=stdin,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -86,7 +101,6 @@ def _tree(repo: str, root: str, entries: list[dict]) -> str:
         rel = entry["path"]
         parent = os.path.dirname(rel)
         directories.setdefault(parent, {})[os.path.basename(rel)] = entry
-        # Ensure every ancestor exists.
         while parent:
             parent = os.path.dirname(parent)
             directories.setdefault(parent, {})
@@ -157,6 +171,22 @@ def _commit_input_id(repo: str, commit: str) -> str | None:
     return None
 
 
+def _commit_parents(repo: str, commit: str) -> list[str]:
+    fields = _git(repo, ["rev-list", "--parents", "-n", "1", commit]).decode().strip().split()
+    return fields[1:]
+
+
+def _matches(repo: str, commit: str, tree: str, parent: str | None, input_id: str) -> bool:
+    actual_tree = _git(repo, ["rev-parse", commit + "^{tree}"]).decode().strip()
+    parents = _commit_parents(repo, commit)
+    expected_parents = [parent] if parent else []
+    return (
+        actual_tree == tree
+        and parents == expected_parents
+        and _commit_input_id(repo, commit) == input_id
+    )
+
+
 def create(
     repo: str,
     capture_dir: str,
@@ -171,14 +201,18 @@ def create(
     manifest.verify(work, input_files, value["inputId"])
 
     repo = os.path.realpath(repo)
-    parent = _git(repo, ["rev-parse", "HEAD"]).decode().strip()
-    checkpoint_id = checkpoint_id or value["inputId"]
+    # The captured base is provenance. Never use the repository's current HEAD,
+    # which may have advanced since capture.
+    parent = value.get("baseRevision")
+    if parent:
+        _git(repo, ["cat-file", "-e", parent + "^{commit}"])
+    checkpoint_id = checkpoint_id or str(uuid.uuid4())
     ref = _ref_for(checkpoint_id)
+    tree = _tree(repo, work, value["files"])
 
     existing = _ref_commit(repo, ref)
     if existing is not None:
-        if _commit_input_id(repo, existing) == value["inputId"]:
-            tree = _git(repo, ["rev-parse", existing + "^{tree}"]).decode().strip()
+        if _matches(repo, existing, tree, parent, value["inputId"]):
             return {
                 "sourceRoot": repo,
                 "parentRevision": parent,
@@ -192,10 +226,10 @@ def create(
                 "replayed": True,
             }
         raise CheckpointError(
-            f"checkpoint {checkpoint_id!r} already names a different input; choose another id"
+            f"checkpoint {checkpoint_id!r} already names a different tree, parent or input; "
+            "choose another id"
         )
 
-    tree = _tree(repo, work, value["files"])
     name, email = _identity(repo, author_name, author_email)
     env = {
         "GIT_AUTHOR_NAME": name,
@@ -212,12 +246,11 @@ def create(
     try:
         _git(repo, ["update-ref", ref, commit, zero])
     except CheckpointError:
-        # A concurrent creator may have won; accept only the same input.
+        # A concurrent creator may have won; accept only a fully matching receipt.
         winner = _ref_commit(repo, ref)
-        if winner is None or _commit_input_id(repo, winner) != value["inputId"]:
+        if winner is None or not _matches(repo, winner, tree, parent, value["inputId"]):
             raise
         commit = winner
-        tree = _git(repo, ["rev-parse", commit + "^{tree}"]).decode().strip()
     return {
         "sourceRoot": repo,
         "parentRevision": parent,

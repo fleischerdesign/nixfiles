@@ -372,6 +372,7 @@ in
         pkgs.git
         pkgs.ripgrep
         pkgs.nix
+        remoteExec
       ];
       config = lib.recursiveUpdate {
         auth = {

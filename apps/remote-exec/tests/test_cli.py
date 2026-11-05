@@ -295,3 +295,34 @@ class CliTest(RepoFixture):
         )
         self.assertEqual(mismatch.returncode, 2)
         self.assertIn("does not match", mismatch.stderr)
+
+    def test_diagnostic_timeout_keeps_terminal_exit_code_with_json_receipt(self):
+        terminal = {
+            "schemaVersion": 2,
+            "phase": "failed",
+            "exitCode": 7,
+            "inputId": "input-x",
+            "attemptId": "attempt-x",
+        }
+        timeout = subprocess.TimeoutExpired(cmd="ssh", timeout=5)
+        buffer = StringIO()
+        with mock.patch.object(
+            attempt.Attempt, "dispatch", return_value=terminal
+        ), mock.patch.object(
+            attempt.Attempt, "diagnostics", side_effect=timeout
+        ), redirect_stdout(buffer):
+            code = cli.main(
+                [
+                    "run",
+                    *self.local_common("run-diag-timeout"),
+                    "--repo", self.repo,
+                    "--", "sh", "-c", "exit 7",
+                ]
+            )
+        self.assertEqual(code, 1)
+        printed = json.loads(buffer.getvalue())
+        self.assertEqual(printed["phase"], "failed")
+        self.assertEqual(printed["exitCode"], 7)
+        self.assertEqual(printed["diagnostics"]["status"], "unavailable")
+        self.assertIn("error", printed["diagnostics"])
+        self.assertNotIn("logsDir", printed["diagnostics"])

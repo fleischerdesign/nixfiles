@@ -373,10 +373,15 @@ def command_run(args) -> int:
         log_dir = default_log_dir(attempt)
         try:
             result["diagnostics"] = attempt.diagnostics(log_dir)
-        except (attempt_module.Blocked, transport.TransportError, OSError) as error:
+        except (
+            attempt_module.Blocked,
+            transport.TransportError,
+            OSError,
+            subprocess.TimeoutExpired,
+        ) as error:
             # The command is terminal; only its diagnostics failed. This is not
             # an unknown execution and must never trigger a replay.
-            result["diagnostics"] = {"error": str(error), "logsDir": log_dir}
+            result["diagnostics"] = {"error": str(error), "status": "unavailable"}
         print(json.dumps(result, indent=2, sort_keys=True))
         phase = result.get("phase")
         if phase == "succeeded":

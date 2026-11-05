@@ -148,7 +148,8 @@ class AttemptTest(RepoFixture):
 
     def test_runner_refuses_a_second_execution(self):
         attempt, _, _ = self.dispatch(["true"])
-        result_before = open(os.path.join(attempt.path, "result.json"), "rb").read()
+        with open(os.path.join(attempt.path, "result.json"), "rb") as handle:
+            result_before = handle.read()
         second = subprocess.run(
             ["python3", os.path.join(attempt.path, "runner.py"), os.path.join(attempt.path, "runner-config.json")],
             stdout=subprocess.PIPE,
@@ -157,7 +158,8 @@ class AttemptTest(RepoFixture):
         )
         self.assertNotEqual(second.returncode, 0)
         self.assertIn(b"terminal result already exists", second.stderr)
-        self.assertEqual(result_before, open(os.path.join(attempt.path, "result.json"), "rb").read())
+        with open(os.path.join(attempt.path, "result.json"), "rb") as handle:
+            self.assertEqual(result_before, handle.read())
 
     def test_timeout_reports_cancelled_after_process_group_exit(self):
         _, _, result = self.dispatch(["sh", "-c", "sleep 30 & wait"], timeout=1)

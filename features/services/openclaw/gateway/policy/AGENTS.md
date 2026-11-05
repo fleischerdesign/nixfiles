@@ -103,6 +103,10 @@ application.
 Checkpoint refs are retention: keep a ref until its consumer is bound and settled. Release
 only an owned ref with `checkpoint-release --expect-commit`, which is CAS and idempotent
 when already absent; never delete a user ref or prune unknown/inflight checkpoints.
+By default every checkpoint call generates an independent UUID pin, so two consumers of
+the same input never share a releasable ref. An explicit `--id` is a logical consumer or
+retry id: a replay with the same id is accepted only when the commit's tree, parent and
+input id all match the current capture; otherwise it is refused.
 
 Edit canonical source on the Gateway. For a selected-node build or test, run
 `remote-exec run` with a declared inventory host, an explicit identity file, repository

@@ -72,8 +72,8 @@ class CheckpointTest(RepoFixture):
             self.git("worktree", "remove", "--force", worktree)
 
     def test_checkpoint_is_idempotent_and_rejects_a_different_input(self):
-        first = checkpoint.create(self.repo, self.capture_dir)
-        again = checkpoint.create(self.repo, self.capture_dir)
+        first = checkpoint.create(self.repo, self.capture_dir, "consumer-a")
+        again = checkpoint.create(self.repo, self.capture_dir, "consumer-a")
         self.assertTrue(again["replayed"])
         self.assertEqual(again["checkpoint"]["commit"], first["checkpoint"]["commit"])
 
@@ -84,6 +84,65 @@ class CheckpointTest(RepoFixture):
         with self.assertRaises(checkpoint.CheckpointError):
             checkpoint.create(self.repo, changed, first["checkpoint"]["id"])
         self.assertNotEqual(value["inputId"], first["inputId"])
+
+    def test_default_callers_get_independent_pins(self):
+        first = checkpoint.create(self.repo, self.capture_dir)
+        second = checkpoint.create(self.repo, self.capture_dir)
+        self.assertNotEqual(first["checkpoint"]["ref"], second["checkpoint"]["ref"])
+        self.assertEqual(first["inputId"], second["inputId"])
+        self.assertEqual(first["checkpoint"]["tree"], second["checkpoint"]["tree"])
+
+        checkpoint.release(self.repo, first["checkpoint"]["ref"], first["checkpoint"]["commit"])
+        self.assertEqual(
+            self.git("rev-parse", second["checkpoint"]["ref"]).decode().strip(),
+            second["checkpoint"]["commit"],
+            "releasing one consumer's pin must not remove another",
+        )
+        checkpoint.release(self.repo, second["checkpoint"]["ref"], second["checkpoint"]["commit"])
+
+    def test_same_content_after_a_new_parent_is_rejected_for_an_explicit_id(self):
+        first = checkpoint.create(self.repo, self.capture_dir, "consumer-a")
+        self.git("-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "later")
+        later = tempfile.mkdtemp(prefix="remote-exec-later-")
+        self.addCleanup(lambda: shutil.rmtree(later, ignore_errors=True))
+        value = source.capture(self.repo, later)
+        self.assertEqual(value["inputId"], first["inputId"])
+        with self.assertRaises(checkpoint.CheckpointError):
+            checkpoint.create(self.repo, later, "consumer-a")
+
+    def test_a_forged_input_trailer_on_the_wrong_tree_is_rejected(self):
+        receipt = checkpoint.create(self.repo, self.capture_dir, "consumer-a")
+        empty_tree = subprocess.run(
+            ["git", "-C", self.repo, "hash-object", "-t", "tree", "--stdin"],
+            input=b"",
+            stdout=subprocess.PIPE,
+            env=self.env,
+            check=True,
+        ).stdout.decode().strip()
+        forged_message = (
+            "forged\n\nRemote-Exec-Input-Id: " + receipt["inputId"] + "\n"
+        )
+        forged = subprocess.run(
+            ["git", "-C", self.repo, "commit-tree", empty_tree, "-F", "-"],
+            input=forged_message.encode(),
+            stdout=subprocess.PIPE,
+            env=self.env,
+            check=True,
+        ).stdout.decode().strip()
+        self.git("update-ref", receipt["checkpoint"]["ref"], forged)
+        with self.assertRaises(checkpoint.CheckpointError):
+            checkpoint.create(self.repo, self.capture_dir, "consumer-a")
+
+    def test_reference_transaction_hook_is_not_executed(self):
+        marker = os.path.join(self.tmp, "hook-ran")
+        hook = os.path.join(self.repo, ".git", "hooks", "reference-transaction")
+        os.makedirs(os.path.dirname(hook), exist_ok=True)
+        with open(hook, "w", encoding="utf-8") as handle:
+            handle.write(f"#!/bin/sh\ntouch {marker}\n")
+        os.chmod(hook, 0o755)
+        receipt = checkpoint.create(self.repo, self.capture_dir, "consumer-a")
+        checkpoint.release(self.repo, receipt["checkpoint"]["ref"], receipt["checkpoint"]["commit"])
+        self.assertFalse(os.path.exists(marker), "checkpoint Git mutations must disable hooks")
 
     def test_release_requires_the_expected_commit_and_owned_namespace(self):
         receipt = checkpoint.create(self.repo, self.capture_dir)
