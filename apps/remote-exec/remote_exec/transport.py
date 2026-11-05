@@ -69,7 +69,7 @@ class Transport:
     def preflight(self, root: str) -> dict:
         raise NotImplementedError
 
-    def supervise(self, attempt_dir: str, timeout: int) -> None:
+    def supervise(self, attempt_dir: str, timeout: int, unit: str | None = None) -> None:
         raise NotImplementedError
 
     def cancel(self, unit: str) -> dict:
@@ -154,7 +154,7 @@ class LocalTransport(Transport):
             "path": os.environ.get("PATH", ""),
         }
 
-    def supervise(self, attempt_dir: str, timeout: int) -> None:
+    def supervise(self, attempt_dir: str, timeout: int, unit: str | None = None) -> None:
         process = subprocess.run(
             ["python3", os.path.join(attempt_dir, "runner.py"), os.path.join(attempt_dir, "runner-config.json")],
             stdout=subprocess.PIPE,
@@ -271,7 +271,7 @@ class SshTransport(Transport):
             )
         return json.loads(process.stdout.decode("utf-8"))
 
-    def supervise(self, attempt_dir: str, timeout: int) -> None:
+    def supervise(self, attempt_dir: str, timeout: int, unit: str | None = None) -> None:
         process = self.run_py(
             "import base64,json,os,subprocess,sys\n"
             "c=json.loads(base64.b64decode(sys.argv[1]).decode('utf-8'))\n"
@@ -289,15 +289,26 @@ class SshTransport(Transport):
             "     '--setenv=TMPDIR='+os.path.join(c['attempt'],'tmp'),\n"
             "     '--setenv=PATH='+cfg['env'].get('PATH','/run/current-system/sw/bin'),\n"
             "     '--setenv=LANG=C.UTF-8',\n"
-            "     '--wait', sys.executable, os.path.join(c['attempt'],'runner.py'),\n"
+            "     '--no-block', sys.executable, os.path.join(c['attempt'],'runner.py'),\n"
             "     os.path.join(c['attempt'],'runner-config.json')]\n"
             "p=subprocess.run(cmd,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)\n"
-            "sys.stderr.write(p.stderr.decode('utf-8','replace'))\n"
-            "sys.exit(0 if p.returncode == 0 else 3)\n",
-            {"attempt": attempt_dir, "unit": f"remote-exec-{os.path.basename(attempt_dir)}", "timeout": timeout},
-            timeout=timeout + 120,
+            "if p.returncode != 0:\n"
+            "    sys.stderr.write(p.stderr.decode('utf-8','replace'))\n"
+            "    sys.exit(2)\n"
+            "for _ in range(40):\n"
+            "    q=subprocess.run(['systemctl','--user','is-active',c['unit']],env=env,\n"
+            "                     stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)\n"
+            "    if q.returncode != 0:\n"
+            "        sys.exit(0)\n"
+            "    if q.stdout.decode().strip() in ('active','activating','reloading'):\n"
+            "        sys.exit(0)\n"
+            "    import time; time.sleep(0.25)\n"
+            "sys.stderr.write('unit did not become active')\n"
+            "sys.exit(2)\n",
+            {"attempt": attempt_dir, "unit": unit, "timeout": timeout},
+            timeout=60,
         )
-        if process.returncode not in (0, 3):
+        if process.returncode != 0:
             raise TransportError(
                 "attempt supervision did not start: "
                 + process.stderr.decode("utf-8", "replace").strip()

@@ -152,5 +152,51 @@ pkgs.testers.nixosTest {
     gateway.fail(
         "remote-exec run " + common + " --attempt-id live-1 --repo /root/repo -- true"
     )
+
+    # 5. The same explicit attempt id in two runs must not share a unit.
+    gateway.execute(
+        "setsid remote-exec run --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-a --attempt-id shared --timeout 300 --repo /root/repo "
+        "-- sh -c 'sleep 300 & wait' > /tmp/a.log 2>&1 &"
+    )
+    gateway.wait_until_succeeds(
+        "remote-exec status --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-a --attempt-id shared | grep -q '\"phase\": \"running\"'",
+        timeout=120,
+    )
+    gateway.execute(
+        "setsid remote-exec run --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-b --attempt-id shared --timeout 300 --repo /root/repo "
+        "-- sh -c 'sleep 300 & wait' > /tmp/b.log 2>&1 &"
+    )
+    gateway.wait_until_succeeds(
+        "remote-exec status --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-b --attempt-id shared | grep -q '\"phase\": \"running\"'",
+        timeout=120,
+    )
+    gateway.succeed(
+        "remote-exec cancel --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-b --attempt-id shared"
+    )
+    gateway.wait_until_succeeds(
+        "remote-exec status --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-b --attempt-id shared | grep -q '\"phase\": \"cancelled\"'",
+        timeout=120,
+    )
+    # Cancelling B must not touch A's unit.
+    gateway.succeed(
+        "remote-exec status --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-a --attempt-id shared | grep -q '\"phase\": \"running\"'"
+    )
+    gateway.succeed(
+        "remote-exec cancel --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-a --attempt-id shared"
+    )
+    gateway.wait_until_succeeds(
+        "remote-exec status --target executor --identity /root/.ssh/remote-exec "
+        "--repo-id test --run-id run-a --attempt-id shared | grep -q '\"phase\": \"cancelled\"'",
+        timeout=120,
+    )
+    executor.succeed("! pgrep -u remote-exec -f 'sleep 300'")
   '';
 }

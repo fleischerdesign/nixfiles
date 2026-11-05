@@ -4,6 +4,7 @@ import subprocess
 import threading
 import unittest
 import uuid
+from unittest import mock
 
 from remote_exec import attempt as attempt_module
 from remote_exec import transport
@@ -221,3 +222,121 @@ class AttemptTest(RepoFixture):
             child.wait(timeout=10)
         # The unit is gone without a result: unknown, not prepared.
         self.assertEqual(attempt.status()["phase"], "unknown")
+
+    # -- correction batch: unknown dispatch and collision-free units ---------
+    def test_unit_is_unique_across_the_whole_attempt_identity(self):
+        a = attempt_module.Attempt(self.transport, "/root-a", "repo", "run", "same-id")
+        b = attempt_module.Attempt(self.transport, "/root-b", "repo", "run", "same-id")
+        c = attempt_module.Attempt(self.transport, "/root-a", "other", "run", "same-id")
+        d = attempt_module.Attempt(self.transport, "/root-a", "repo", "other", "same-id")
+        self.assertEqual(len({a.unit, b.unit, c.unit, d.unit}), 4)
+
+    def test_cancel_routes_to_the_attempts_own_unit(self):
+        class Recorder(transport.Transport):
+            supervised = True
+
+            def __init__(self):
+                self.units = []
+
+            def cancel(self, unit):
+                self.units.append(unit)
+                return {}
+
+        recorder = Recorder()
+        attempt = attempt_module.Attempt(recorder, "/r", "repo", "run", "same-id")
+        other = attempt_module.Attempt(recorder, "/r", "repo", "other", "same-id")
+        attempt.status = lambda: {"terminal": False, "phase": "running"}
+        attempt.read_json = lambda name: {"unit": attempt.unit}
+        attempt.cancel()
+        self.assertEqual(recorder.units, [attempt.unit])
+        self.assertNotEqual(attempt.unit, other.unit)
+
+    def test_dispatch_timeout_and_persistent_loss_are_unknown(self):
+        attempt = self.new_attempt()
+        captured = self.stage(attempt)
+        self.publish(attempt, captured)
+
+        class Offline(transport.Transport):
+            supervised = True
+
+            def supervise(self, attempt_dir, timeout, unit=None):
+                raise subprocess.TimeoutExpired(cmd="ssh", timeout=1)
+
+        attempt.transport = Offline()
+        attempt.write = lambda *args, **kwargs: None
+        attempt.claim_dispatch = lambda *args, **kwargs: None
+
+        def offline_status():
+            raise attempt_module.Blocked("connection refused")
+
+        attempt.status = offline_status
+        with self.assertRaises(attempt_module.UnknownOutcome) as raised:
+            attempt.dispatch(["true"], ".", 10, {}, captured["inputId"])
+        state = raised.exception.state
+        self.assertEqual(state["phase"], "unknown")
+        self.assertEqual(state["attemptId"], attempt.attempt_id)
+        self.assertEqual(state["inputId"], captured["inputId"])
+        self.assertIn("status", state["recovery"])
+
+    def test_ambiguous_dispatch_claim_is_unknown(self):
+        attempt = self.new_attempt()
+        captured = self.stage(attempt)
+        self.publish(attempt, captured)
+
+        class ClaimLost(transport.Transport):
+            supervised = True
+
+            def run_py(self, code, args, timeout=None):
+                raise subprocess.TimeoutExpired(cmd="ssh", timeout=1)
+
+        attempt.transport = ClaimLost()
+        attempt.write = lambda *args, **kwargs: None
+        with self.assertRaises(attempt_module.UnknownOutcome) as raised:
+            attempt.dispatch(["true"], ".", 10, {}, captured["inputId"])
+        self.assertIn("claim outcome unknown", raised.exception.state["reason"])
+
+    # -- correction batch: collection freshness and artifact boundary -------
+    def test_collect_requires_a_fresh_destination(self):
+        attempt, _, _ = self.dispatch(["true"])
+        out = os.path.join(self.tmp, "collected-fresh")
+        attempt.collect(out)
+        marker = os.path.join(out, "keep-me")
+        with open(marker, "w", encoding="utf-8") as handle:
+            handle.write("user data\n")
+        second, _, _ = self.dispatch(["sh", "-c", "rm tracked.txt"], attempt_id=None)
+        with self.assertRaises(attempt_module.Blocked):
+            second.collect(out)
+        self.assertTrue(os.path.exists(marker), "a refused collect must not delete existing content")
+
+    def test_collect_rejects_a_symlink_destination(self):
+        attempt, _, _ = self.dispatch(["true"])
+        real = os.path.join(self.tmp, "real-out")
+        os.makedirs(real)
+        link = os.path.join(self.tmp, "link-out")
+        os.symlink(real, link)
+        with self.assertRaises(attempt_module.Blocked):
+            attempt.collect(link)
+        self.assertEqual(os.listdir(real), [])
+
+    def test_artifact_credentials_are_refused_before_transfer(self):
+        for name in (".env", ".ssh/id_ed25519"):
+            with self.subTest(name=name):
+                argv = [
+                    "sh",
+                    "-c",
+                    'mkdir -p "$(dirname "$REMOTE_EXEC_ARTIFACTS/{0}")"; '
+                    'printf secret > "$REMOTE_EXEC_ARTIFACTS/{0}"'.format(name),
+                ]
+                attempt, _, _ = self.dispatch(argv)
+                out = os.path.join(self.tmp, "collected-artifact-" + name.replace("/", "-"))
+                with self.assertRaises(attempt_module.Blocked):
+                    attempt.collect(out, with_artifacts=True)
+                self.assertFalse(os.path.exists(os.path.join(out, "artifacts")))
+
+    def test_artifact_symlink_to_a_credential_is_refused(self):
+        attempt, _, _ = self.dispatch(
+            ["sh", "-c", 'ln -s .env "$REMOTE_EXEC_ARTIFACTS/bypass"']
+        )
+        out = os.path.join(self.tmp, "collected-artifact-symlink")
+        with self.assertRaises(attempt_module.Blocked):
+            attempt.collect(out, with_artifacts=True)

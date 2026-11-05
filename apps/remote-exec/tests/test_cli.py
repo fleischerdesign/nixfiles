@@ -5,9 +5,12 @@ import sys
 import threading
 import unittest
 import uuid
+from contextlib import redirect_stdout
+from io import StringIO
 
 from support import RepoFixture
 from remote_exec import attempt, cli, transport
+from unittest import mock
 
 
 def command() -> list[str]:
@@ -232,3 +235,31 @@ class CliTest(RepoFixture):
         )
         self.assertEqual(refused.returncode, 2)
         self.assertIn("identity file", refused.stderr)
+
+    def test_unknown_outcome_is_exit_three(self):
+        unknown = attempt.UnknownOutcome(
+            "attempt-x",
+            {
+                "terminal": False,
+                "phase": "unknown",
+                "attemptId": "attempt-x",
+                "inputId": "input-x",
+                "unit": "remote-exec-x",
+                "reason": "connection lost after dispatch",
+                "recovery": "remote-exec status ...",
+            },
+        )
+        buffer = StringIO()
+        with mock.patch.object(attempt.Attempt, "dispatch", side_effect=unknown), redirect_stdout(buffer):
+            code = cli.main(
+                [
+                    "run",
+                    *self.local_common("run-unknown"),
+                    "--repo", self.repo,
+                    "--", "true",
+                ]
+            )
+        self.assertEqual(code, 3)
+        printed = json.loads(buffer.getvalue())
+        self.assertEqual(printed["phase"], "unknown")
+        self.assertEqual(printed["attemptId"], "attempt-x")

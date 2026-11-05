@@ -23,10 +23,13 @@ the attempt id, so the same attempt cannot be dispatched twice.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
+import subprocess
 import tempfile
+import time
 import uuid
 
 from . import boundary, manifest, runner, source, transport
@@ -66,7 +69,11 @@ class Attempt:
         self.attempt_id = valid_id(attempt_id, "attempt id")
         self.path = f"{self.root}/{self.repo_id}/{self.run_id}/{self.attempt_id}"
         self.staging = f"{self.path}/.staging"
-        self.unit = f"remote-exec-{self.attempt_id}"
+        # The unit must be unique across the whole attempt identity, not just
+        # the attempt id: two runs in different repositories may deliberately
+        # reuse an explicit id. Hash the canonical identity to a bounded name.
+        identity = "\0".join([self.root, self.repo_id, self.run_id, self.attempt_id])
+        self.unit = "remote-exec-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
 
     # -- remote primitives -------------------------------------------------
     def _py(self, code: str, args: object, timeout: float | None = 120):
@@ -138,21 +145,30 @@ class Attempt:
         )
 
     def claim_dispatch(self, input_id: str, unit: str | None = None) -> None:
-        self._py(
+        process = self.transport.run_py(
             "import base64,json,os,sys,time\n"
             "c=json.loads(base64.b64decode(sys.argv[1]).decode('utf-8'))\n"
             "path=os.path.join(c['attempt'],'dispatch.json')\n"
             "try:\n"
             "    fd=os.open(path, os.O_CREAT|os.O_EXCL|os.O_WRONLY, 0o600)\n"
             "except FileExistsError:\n"
-            "    print('this attempt was already dispatched; reconcile it with status', file=sys.stderr)\n"
+            "    print('already-dispatched: reconcile it with status', file=sys.stderr)\n"
             "    raise SystemExit(1)\n"
             "with os.fdopen(fd,'w',encoding='utf-8') as h:\n"
             "    json.dump({'schemaVersion':2,'attemptId':c['id'],'inputId':c['input'],\n"
             "               'unit':c['unit'],'claimedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())},h)\n"
             "    h.flush(); os.fsync(h.fileno())\n",
             {"attempt": self.path, "id": self.attempt_id, "input": input_id, "unit": unit or ""},
+            timeout=60,
         )
+        if process.returncode == 0:
+            return
+        message = process.stderr.decode("utf-8", "replace").strip()
+        if "already-dispatched" in message:
+            raise Blocked("this attempt was already dispatched; reconcile it with status")
+        # The claim is a remote write: a lost acknowledgement may still have
+        # created it. Unknown, not a pre-dispatch rejection.
+        raise transport.TransportError(message or "dispatch claim outcome unknown")
 
     def status(self, timeout: float = 60) -> dict:
         process = self._py(runner.STATUS, {"attemptDir": self.path}, timeout=timeout)
@@ -182,28 +198,81 @@ class Attempt:
             )
             + "\n",
         )
-        self.claim_dispatch(input_id, unit)
         try:
-            self.transport.supervise(self.path, timeout_secs)
-        except transport.TransportError:
+            self.claim_dispatch(input_id, unit)
+        except Blocked:
+            raise
+        except (transport.TransportError, subprocess.TimeoutExpired) as error:
+            raise UnknownOutcome(
+                self.attempt_id,
+                self._unknown_state(input_id, f"dispatch claim outcome unknown: {error}"),
+            ) from error
+        try:
+            self.transport.supervise(self.path, timeout_secs, unit)
+        except (transport.TransportError, subprocess.TimeoutExpired):
             # The unit may still be running. Never replay: the terminal state is
             # whatever `status` can observe.
             pass
-        state = self.status()
-        if state.get("terminal"):
-            return state["result"]
-        raise UnknownOutcome(self.attempt_id, state)
+        # The unit is owned by systemd, not by this SSH session. Observation is
+        # a bounded series of independent reads; losing one does not restart or
+        # cancel anything.
+        deadline = time.monotonic() + timeout_secs + 120
+        last_state: dict | None = None
+        while True:
+            try:
+                state = self.status()
+            except (Blocked, transport.TransportError, subprocess.TimeoutExpired) as error:
+                raise UnknownOutcome(
+                    self.attempt_id,
+                    self._unknown_state(input_id, f"attempt was dispatched; reconciliation failed: {error}"),
+                ) from error
+            if state.get("terminal"):
+                return state["result"]
+            last_state = state
+            # `unknown`, `interrupted` and `missing` will not become terminal by
+            # waiting: the unit is gone or never became runnable. Report it now.
+            if state.get("phase") in ("unknown", "interrupted", "missing"):
+                raise UnknownOutcome(self.attempt_id, state)
+            if time.monotonic() >= deadline:
+                raise UnknownOutcome(
+                    self.attempt_id,
+                    self._unknown_state(
+                        input_id,
+                        "attempt was dispatched; no terminal observation before the deadline",
+                    ),
+                )
+            time.sleep(5)
+
+    def _unknown_state(self, input_id: str | None, reason: str) -> dict:
+        return {
+            "terminal": False,
+            "phase": "unknown",
+            "attemptId": self.attempt_id,
+            "inputId": input_id,
+            "unit": self.unit,
+            "reason": reason,
+            "recovery": (
+                f"remote-exec status --repo-id {self.repo_id} --run-id {self.run_id} "
+                f"--attempt-id {self.attempt_id} ..."
+            ),
+        }
 
     def cancel(self) -> dict:
-        state = self.status()
+        try:
+            state = self.status()
+        except (Blocked, transport.TransportError, subprocess.TimeoutExpired) as error:
+            return self._unknown_state(None, f"cannot observe the attempt: {error}")
         if state.get("terminal"):
             return state
         dispatch = self.read_json("dispatch.json") or {}
         if not self.transport.supervised:
             return state
         unit = dispatch.get("unit") or self.unit
-        self.transport.cancel(unit)
-        return self.status()
+        try:
+            self.transport.cancel(unit)
+            return self.status()
+        except (Blocked, transport.TransportError, subprocess.TimeoutExpired) as error:
+            return self._unknown_state(None, f"cancel was requested but could not be confirmed: {error}")
 
     def read_json(self, name: str, timeout: float | None = 60) -> dict | None:
         process = self._py(
@@ -240,6 +309,16 @@ class Attempt:
         with_artifacts: bool = False,
         with_delta: bool = False,
     ) -> dict:
+        local_out = os.path.abspath(local_out)
+        if os.path.islink(local_out):
+            raise Blocked("collect target is a symlink; refusing to publish into it")
+        if os.path.exists(local_out):
+            if not os.path.isdir(local_out):
+                raise Blocked(f"collect target {local_out} is not a directory")
+            if os.listdir(local_out):
+                raise Blocked(
+                    f"collect target {local_out} is not empty; a fresh destination prevents stale results"
+                )
         info = self.read_json("input.json")
         input_files = self.read_json("input-files.json")
         if info is None or input_files is None:
@@ -267,6 +346,14 @@ class Attempt:
         os.makedirs(source_dir, exist_ok=True)
         self.transport.pull_paths(f"{self.path}/work", source_dir, selection["files"])
         manifest.write_manifest(output_manifest, os.path.join(local_out, "output-files.json"))
+        observed = sorted(manifest.tree_entries(source_dir))
+        expected = sorted(entry["path"] for entry in output_manifest["files"])
+        if observed != expected:
+            raise Blocked(
+                "collected selected tree does not match its manifest: "
+                f"missing={sorted(set(expected) - set(observed))[:5]} "
+                f"unexpected={sorted(set(observed) - set(expected))[:5]}"
+            )
         manifest.verify_selection(
             source_dir,
             os.path.join(local_out, "output-files.json"),
@@ -286,7 +373,29 @@ class Attempt:
                     raise Blocked(f"collected {name} log does not match the result digest")
 
         if with_artifacts:
-            self.transport.pull_tree(f"{self.path}/artifacts", os.path.join(local_out, "artifacts"))
+            # Scan and manifest on the executor *before* transferring bytes.
+            self._py(
+                runner.ARTIFACT_SCAN,
+                {
+                    "artifacts": f"{self.path}/artifacts",
+                    "manifestModule": f"{self.path}/manifest.py",
+                    "boundaryModule": f"{self.path}/boundary.py",
+                    "outputManifest": f"{self.path}/artifacts-files.json",
+                },
+                timeout=600,
+            )
+            artifact_manifest_text = self._py(
+                "import base64,json,os,sys\n"
+                "c=json.loads(base64.b64decode(sys.argv[1]).decode('utf-8'))\n"
+                "print(open(os.path.join(c['attempt'],'artifacts-files.json'),encoding='utf-8').read())\n",
+                {"attempt": self.path},
+            ).stdout.decode("utf-8")
+            artifacts_dir = os.path.join(local_out, "artifacts")
+            self.transport.pull_tree(f"{self.path}/artifacts", artifacts_dir)
+            artifact_manifest = os.path.join(local_out, "artifacts-files.json")
+            with open(artifact_manifest, "w", encoding="utf-8") as handle:
+                handle.write(artifact_manifest_text)
+            manifest.verify(artifacts_dir, artifact_manifest)
 
         with open(os.path.join(local_out, "result.json"), "w", encoding="utf-8") as handle:
             json.dump(result, handle, indent=2, sort_keys=True)

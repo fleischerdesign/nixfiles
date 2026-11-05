@@ -79,6 +79,11 @@ repository work. Session placement and SSH execution are separate facts: a devic
 in a client UI does not select a build executor, and a native pairing id is not an SSH
 identity.
 
+A native managed-worktree child inheriting a parent's dirty, untracked, deleted or
+executable state is not established. Do not assume it and do not describe it as working:
+until a verified checkpoint or explicit source protocol is accepted, treat that path as an
+unproven source handoff and capture the intended input through `remote-exec`.
+
 Edit canonical source on the Gateway. For a selected-node build or test, run
 `remote-exec run` with a declared inventory host, an explicit identity file, repository
 and run ids, and the command. That is the whole operation: it captures the current

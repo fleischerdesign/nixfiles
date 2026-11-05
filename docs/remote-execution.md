@@ -136,6 +136,11 @@ the only writer; it detects changes during the capture window. A duplicate id pr
 dispatch of the same attempt, not two attempts with different ids performing the same external
 effect.
 
+A native managed-worktree child inheriting its parent's dirty, untracked, deleted or executable
+state is not an accepted source handoff. Until a verified checkpoint or explicit source protocol
+exists, that path is unproven and must not be described as carrying the parent's live input;
+capture the intended source through `remote-exec` instead.
+
 ## Declared prerequisites
 
 The gateway installs the dedicated private key from SOPS and the generated inventory. The executor

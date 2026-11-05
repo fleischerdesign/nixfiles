@@ -321,6 +321,46 @@ except manifest.ManifestError as error:
 print(json.dumps({"inputId": value}))
 '''
 
+ARTIFACT_SCAN = r'''
+# Explicit artifacts are not blanket consent to export credentials or agent
+# state. Scan before any byte leaves the executor.
+import base64, importlib.util, json, os, sys
+
+CONFIG = json.loads(base64.b64decode(sys.argv[1]).decode("utf-8"))
+
+
+def load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+manifest = load("remote_exec_manifest", CONFIG["manifestModule"])
+boundary = load("remote_exec_boundary", CONFIG["boundaryModule"])
+root = CONFIG["artifacts"]
+try:
+    entries = manifest.tree_entries(root)
+except manifest.ManifestError as error:
+    print(str(error), file=sys.stderr)
+    sys.exit(2)
+for rel in sorted(entries):
+    reason = boundary.forbidden_reason(rel)
+    if reason:
+        print("%r is a %s; refusing to export it as an artifact" % (rel, reason), file=sys.stderr)
+        sys.exit(2)
+    entry = entries[rel]
+    if entry["type"] == "symlink":
+        resolved = os.path.normpath(os.path.join(os.path.dirname(rel), entry["target"]))
+        reason = boundary.forbidden_reason(resolved)
+        if reason:
+            print("artifact symlink %r targets a %s; refusing" % (rel, reason), file=sys.stderr)
+            sys.exit(2)
+value = manifest.build_manifest(root, None)
+manifest.write_manifest(value, CONFIG["outputManifest"])
+print(json.dumps({"files": sorted(entries), "inputId": value["inputId"]}))
+'''
+
 SELECT = r'''
 # Compute the selected output: the baseline input plus new source that the
 # project's own .gitignore rules admit. `selection.git` is private, empty and
