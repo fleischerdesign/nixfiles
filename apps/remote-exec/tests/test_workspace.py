@@ -468,6 +468,42 @@ class WorkspaceLeaseTest(WorkspaceFixture):
 
 
 class WorkspaceCollectTest(WorkspaceFixture):
+    def test_corrupt_uploaded_payload_is_refused(self):
+        ws = self.workspace()
+        attempt = workspace_module.WorkspaceAttempt(self.transport, ws, str(uuid.uuid4()))
+        attempt.prepare()
+        capture_dir = attempt_module.capture_to(self.repo)
+        self._capture_dirs.append(capture_dir)
+        attempt_module.add_runtime_files(capture_dir)
+        with open(os.path.join(capture_dir, "input-files.json"), encoding="utf-8") as handle:
+            captured = json.load(handle)
+        metadata = ("input-files.json", "manifest.py", "boundary.py", "verify.py")
+        self.transport.push_paths(capture_dir, attempt.staging, list(metadata))
+        plan = ws.plan(
+            attempt.attempt_id,
+            captured["inputId"],
+            f"{attempt.staging}/input-files.json",
+            f"{attempt.staging}/manifest.py",
+        )
+        self.assertIn("tracked.txt", plan["payload"])
+        self.transport.push_paths(
+            os.path.join(capture_dir, "work"),
+            f"{attempt.staging}/work",
+            plan["payload"],
+        )
+        with open(os.path.join(attempt.staging, "work", "tracked.txt"), "w", encoding="utf-8") as handle:
+            handle.write("tampered payload\n")
+        with self.assertRaises(attempt_module.Blocked) as raised:
+            ws.sync(
+                attempt.attempt_id,
+                captured["inputId"],
+                f"{attempt.staging}/input-files.json",
+                f"{attempt.staging}/manifest.py",
+                payload_file=plan["payloadFile"],
+            )
+        self.assertIn("does not match the captured digest", str(raised.exception))
+        self.assertFalse(os.path.exists(os.path.join(ws.path, "work", "tracked.txt")))
+
     def test_old_attempt_collects_its_immutable_snapshot(self):
         attempt1, captured1, _ = self.run_workspace(
             ["sh", "-c", "printf first > generated.txt"]

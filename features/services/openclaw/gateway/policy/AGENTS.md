@@ -130,6 +130,11 @@ between attempts, so a compiler's own incremental state works without language-s
 configuration. Do not add tool-specific cache directories, environment files or configuration to
 the repository for this purpose.
 
+Warm attempts upload changed-only file data: the client plans against the last managed manifest
+under the workspace lease, transfers new or modified files, applies mode-only changes remotely and
+still verifies the complete managed tree on the executor. Do not bypass this with a manual rsync;
+`run` reports the plan and measured payload under `upload`.
+
 Attempts in one workspace are sequential. Wait for `run` to return (or reconcile it with
 `workspace-status`) before the next attempt. Parallel tasks must use different workspace ids, and
 different repositories never share a workspace even with the same label. Two attempts racing for

@@ -380,3 +380,126 @@ class CliTest(RepoFixture):
         )
         self.assertEqual(refused.returncode, 2)
         self.assertIn("--clean", refused.stderr)
+
+    def test_workspace_upload_is_changed_only(self):
+        big = os.urandom(128 * 1024)
+        self.write("big.bin", big)
+        common = [
+            "--transport", "local",
+            "--remote-root", self.executor,
+            "--repo-id", "nixfiles",
+            "--workspace-id", "incremental",
+            "--repo", self.repo,
+        ]
+
+        first = self.cli("run", *common, "--run-id", "up-1", "--", "true")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        first_result = json.loads(first.stdout)
+        first_payload = first_result["upload"]["payload"]
+        self.assertGreaterEqual(first_payload["files"], 2)
+        self.assertEqual(first_payload["bytes"], first_result["upload"]["plan"]["payloadBytes"])
+        self.assertGreaterEqual(first_payload["bytes"], len(big))
+
+        second = self.cli("run", *common, "--run-id", "up-2", "--", "true")
+        self.assertEqual(second.returncode, 0, second.stderr)
+        second_result = json.loads(second.stdout)
+        self.assertEqual(second_result["upload"]["plan"]["payloadFiles"], 0)
+        self.assertEqual(second_result["upload"]["payload"], {"paths": 0, "files": 0, "bytes": 0})
+        self.assertGreaterEqual(second_result["upload"]["plan"]["unchanged"], 2)
+
+        self.write("tracked.txt", "changed\n")
+        third = self.cli("run", *common, "--run-id", "up-3", "--", "true")
+        self.assertEqual(third.returncode, 0, third.stderr)
+        third_result = json.loads(third.stdout)
+        self.assertEqual(third_result["upload"]["plan"]["payloadFiles"], 1)
+        self.assertEqual(third_result["upload"]["payload"]["files"], 1)
+        self.assertEqual(third_result["upload"]["payload"]["bytes"], len("changed\n"))
+
+        os.chmod(os.path.join(self.repo, "tracked.txt"), 0o755)
+        fourth = self.cli(
+            "run", *common, "--run-id", "up-4", "--",
+            "sh", "-c", "test -x tracked.txt",
+        )
+        self.assertEqual(fourth.returncode, 0, fourth.stderr)
+        fourth_result = json.loads(fourth.stdout)
+        self.assertEqual(fourth_result["upload"]["plan"]["modeOnly"], 1)
+        self.assertEqual(fourth_result["upload"]["payload"], {"paths": 0, "files": 0, "bytes": 0})
+
+        os.rename(os.path.join(self.repo, "big.bin"), os.path.join(self.repo, "renamed.bin"))
+        fifth = self.cli(
+            "run", *common, "--run-id", "up-5", "--",
+            "sh", "-c", "test ! -e big.bin && test -f renamed.bin",
+        )
+        self.assertEqual(fifth.returncode, 0, fifth.stderr)
+        fifth_result = json.loads(fifth.stdout)
+        self.assertEqual(fifth_result["upload"]["plan"]["deleted"], 1)
+        self.assertEqual(fifth_result["upload"]["plan"]["payloadFiles"], 1)
+        self.assertEqual(fifth_result["upload"]["payload"]["bytes"], len(big))
+
+        os.unlink(os.path.join(self.repo, "renamed.bin"))
+        self.write("renamed.bin/inside.txt", "inside\n")
+        self.commit("type change")
+        sixth = self.cli(
+            "run", *common, "--run-id", "up-6", "--",
+            "sh", "-c", "test -f renamed.bin/inside.txt",
+        )
+        self.assertEqual(sixth.returncode, 0, sixth.stderr)
+        self.assertEqual(json.loads(sixth.stdout)["upload"]["plan"]["payloadFiles"], 1)
+
+        os.symlink("renamed.bin/inside.txt", os.path.join(self.repo, "link.txt"))
+        seventh = self.cli(
+            "run", *common, "--run-id", "up-7", "--",
+            "sh", "-c", "test -L link.txt && test -f link.txt",
+        )
+        self.assertEqual(seventh.returncode, 0, seventh.stderr)
+        seventh_result = json.loads(seventh.stdout)
+        self.assertEqual(seventh_result["upload"]["plan"]["symlinkChanges"], 1)
+        self.assertEqual(seventh_result["upload"]["payload"], {"paths": 0, "files": 0, "bytes": 0})
+
+        # The first attempt's terminal snapshot still has the original bytes
+        # after every later incremental upload mutated the workspace.
+        out = os.path.join(self.tmp, "incremental-old")
+        collected = self.cli(
+            "collect", *common, "--run-id", "up-1",
+            "--attempt-id", first_result["attemptId"], "--out", out,
+        )
+        self.assertEqual(collected.returncode, 0, collected.stderr)
+        with open(os.path.join(out, "source", "big.bin"), "rb") as handle:
+            self.assertEqual(handle.read(), big)
+
+    def test_workspace_resumes_after_a_mid_transfer_failure(self):
+        common = [
+            "--transport", "local",
+            "--remote-root", self.executor,
+            "--repo-id", "nixfiles",
+            "--workspace-id", "mid-transfer",
+            "--repo", self.repo,
+            "--run-id", "mid",
+            "--attempt-id", "mid-1",
+        ]
+        original = transport.LocalTransport.push_paths
+        state = {"fail": True}
+
+        def flaky(self_, source, destination, paths):
+            if state["fail"] and destination.endswith("/work"):
+                state["fail"] = False
+                if paths:
+                    original(self_, source, destination, paths[:1])
+                raise transport.TransportError("network gone after a partial payload")
+            return original(self_, source, destination, paths)
+
+        buffer = StringIO()
+        with mock.patch.object(transport.LocalTransport, "push_paths", flaky), redirect_stdout(buffer):
+            self.assertEqual(
+                cli.main(["run", *common, "--", "true"]),
+                2,
+                buffer.getvalue(),
+            )
+        buffer = StringIO()
+        with redirect_stdout(buffer):
+            self.assertEqual(
+                cli.main(["run", *common, "--", "true"]),
+                0,
+                buffer.getvalue(),
+            )
+        self.assertEqual(json.loads(buffer.getvalue())["phase"], "succeeded")

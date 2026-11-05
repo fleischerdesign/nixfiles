@@ -24,7 +24,7 @@ import uuid
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from remote_exec import attempt as attempt_module
-from remote_exec import source, transport, workspace as workspace_module
+from remote_exec import cli, source, transport, workspace as workspace_module
 
 BUILD = """
 set -e
@@ -79,13 +79,13 @@ def one_run(workspace, repo, run_id, local_transport):
         attempt_module.add_runtime_files(capture_dir)
         with open(os.path.join(capture_dir, "input-files.json"), encoding="utf-8") as handle:
             captured = json.load(handle)
-        local_transport.push_tree(capture_dir, attempt.staging)
-        attempt.verify_input(captured["inputId"])
+        upload = cli.transfer_workspace(attempt, capture_dir, captured)
         workspace.sync(
             attempt.attempt_id,
             captured["inputId"],
             f"{attempt.staging}/input-files.json",
             f"{attempt.staging}/manifest.py",
+            payload_file=upload["plan"]["payloadFile"],
         )
         attempt.publish(
             {
@@ -104,7 +104,7 @@ def one_run(workspace, repo, run_id, local_transport):
     count_path = os.path.join(workspace.path, "work", "target", "count")
     with open(count_path, encoding="utf-8") as handle:
         decision = handle.read().strip().splitlines()[-1]
-    return elapsed, decision, result["phase"]
+    return elapsed, decision, result["phase"], upload
 
 
 def main():
@@ -123,13 +123,15 @@ def main():
             "timing",
             source.repo_identity(repo),
         )
-        cold, cold_decision, cold_phase = one_run(workspace, repo, "cold", local_transport)
-        warm, warm_decision, warm_phase = one_run(workspace, repo, "warm", local_transport)
+        cold, cold_decision, cold_phase, cold_upload = one_run(workspace, repo, "cold", local_transport)
+        warm, warm_decision, warm_phase, warm_upload = one_run(workspace, repo, "warm", local_transport)
         with open(os.path.join(repo, "src", "file-000.txt"), "w", encoding="utf-8") as handle:
             handle.write("changed source\n")
         git(repo, "add", "-A")
         git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "change")
-        changed, changed_decision, changed_phase = one_run(workspace, repo, "changed", local_transport)
+        changed, changed_decision, changed_phase, changed_upload = one_run(
+            workspace, repo, "changed", local_transport
+        )
         print(json.dumps({
             "fixture": {"sourceFiles": 80, "buildSleepSeconds": 0.4},
             "coldSeconds": round(cold, 3),
@@ -144,6 +146,11 @@ def main():
                 "cold": cold_phase,
                 "repeat": warm_phase,
                 "oneSourceChange": changed_phase,
+            },
+            "payload": {
+                "cold": cold_upload["payload"],
+                "repeat": warm_upload["payload"],
+                "oneSourceChange": changed_upload["payload"],
             },
         }, indent=2, sort_keys=True))
     finally:

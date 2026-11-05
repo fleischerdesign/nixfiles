@@ -407,20 +407,24 @@ def command_run(args) -> int:
             captured = json.load(handle)
 
         workspace_mode = isinstance(attempt, workspace_module.WorkspaceAttempt)
+        upload = None
         try:
             if workspace_mode:
                 attempt.prepare(clean=args.clean)
             else:
                 attempt.prepare()
-            attempt.transport.push_tree(capture_dir, attempt.staging)
-            attempt.verify_input(captured["inputId"])
             if workspace_mode:
+                upload = transfer_workspace(attempt, capture_dir, captured)
                 attempt.workspace.sync(
                     attempt.attempt_id,
                     captured["inputId"],
                     f"{attempt.staging}/input-files.json",
                     f"{attempt.staging}/manifest.py",
+                    payload_file=upload["plan"]["payloadFile"],
                 )
+            else:
+                attempt.transport.push_tree(capture_dir, attempt.staging)
+                attempt.verify_input(captured["inputId"])
         except (attempt_module.Blocked, transport.TransportError, subprocess.TimeoutExpired):
             # Nothing was dispatched: a partial staging directory is discarded,
             # and an incomplete workspace sync stays marked for an explicit reset.
@@ -458,6 +462,8 @@ def command_run(args) -> int:
             result = attempt.dispatch(
                 argv=argv, cwd=args.cwd, timeout_secs=args.timeout, env=env, input_id=captured["inputId"]
             )
+            if upload is not None:
+                result["upload"] = upload
         except attempt_module.UnknownOutcome as unknown:
             print(
                 json.dumps(
@@ -494,6 +500,38 @@ def command_run(args) -> int:
         return 3
     finally:
         transport.cleanup(capture_dir)
+
+
+WORKSPACE_METADATA = ("input-files.json", "manifest.py", "boundary.py", "verify.py")
+
+
+def transfer_workspace(attempt, capture_dir: str, captured: dict) -> dict:
+    """Upload control metadata, plan against the managed remote state, then send
+    only new or changed file data. SYNC still verifies the whole work tree."""
+    staging = attempt.staging
+    metadata = attempt.transport.push_paths(
+        capture_dir, staging, list(WORKSPACE_METADATA)
+    )
+    plan = attempt.workspace.plan(
+        attempt.attempt_id,
+        captured["inputId"],
+        f"{staging}/input-files.json",
+        f"{staging}/manifest.py",
+    )
+    payload = attempt.transport.push_paths(
+        os.path.join(capture_dir, "work"),
+        os.path.join(staging, "work"),
+        plan["payload"],
+    )
+    summary = {key: plan[key] for key in (
+        "files", "payloadFiles", "payloadBytes", "modeOnly", "symlinkChanges",
+        "unchanged", "deleted",
+    )}
+    return {
+        "plan": {**summary, "payloadFile": plan["payloadFile"]},
+        "metadata": metadata,
+        "payload": payload,
+    }
 
 
 def command_inventory(args) -> int:

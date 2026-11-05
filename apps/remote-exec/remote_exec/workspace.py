@@ -113,6 +113,7 @@ class Workspace:
         input_manifest: str,
         manifest_module: str,
         version: str | None = None,
+        payload_file: str | None = None,
     ) -> dict:
         staging = self.staging_path(attempt_id)
         process = self._py(
@@ -126,10 +127,37 @@ class Workspace:
                 "attemptId": attempt_id,
                 "inputId": input_id,
                 "version": version or str(uuid.uuid4()),
+                "payloadFile": payload_file,
             },
             timeout=900,
         )
         return json.loads(process.stdout.decode("utf-8"))
+
+    def plan(self, attempt_id: str, input_id: str, input_manifest: str, manifest_module: str) -> dict:
+        """Compare the captured input with this workspace's last managed state.
+
+        Runs under the workspace lock and the attempt's lease. Only returns what
+        needs data; SYNC still verifies the whole resulting tree.
+        """
+        staging = self.staging_path(attempt_id)
+        payload_file = f"{staging}/payload.json"
+        process = self._py(
+            workspace_scripts.PLAN,
+            {
+                "workspace": self.path,
+                "attempt": self.attempt_path(attempt_id),
+                "stagingWork": f"{staging}/work",
+                "inputManifest": input_manifest,
+                "manifestModule": manifest_module,
+                "attemptId": attempt_id,
+                "inputId": input_id,
+                "payloadFile": payload_file,
+            },
+            timeout=900,
+        )
+        value = json.loads(process.stdout.decode("utf-8"))
+        value["payloadFile"] = payload_file
+        return value
 
     def attempt_path(self, attempt_id: str) -> str:
         return f"{self.path}/attempts/{attempt_id}"
@@ -268,13 +296,14 @@ class WorkspaceAttempt(attempt_module.Attempt):
         """Mark an attempt that never reached publication as interrupted."""
         try:
             self._py(
-                "import base64,json,os,sys\n"
+                "import base64,json,os,shutil,sys\n"
                 "c=json.loads(base64.b64decode(sys.argv[1]).decode('utf-8'))\n"
-                "if os.path.exists(os.path.join(c['staging'],'work')):\n"
-                "    import shutil; shutil.rmtree(os.path.join(c['staging'],'work'), ignore_errors=True)\n"
-                "if os.path.isdir(c['staging']):\n"
-                "    os.rmdir(c['staging'])\n",
-                {"staging": self.staging},
+                "staging=os.path.realpath(c['staging'])\n"
+                "workspace=os.path.realpath(c['workspace'])\n"
+                "if not staging.startswith(workspace + os.sep):\n"
+                "    raise SystemExit('staging escapes the workspace')\n"
+                "shutil.rmtree(staging, ignore_errors=True)\n",
+                {"staging": self.staging, "workspace": self.workspace.path},
                 timeout=120,
             )
         except (attempt_module.Blocked, transport.TransportError):

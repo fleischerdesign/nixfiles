@@ -91,6 +91,16 @@ non-directory ancestor, an unexpected remote edit of a managed source, or a new 
 collides with retained output fails closed instead of deleting it. `rsync --delete` is never used
 across retained output.
 
+Warm runs also upload data incrementally. The client sends the capture manifest and modules, then
+plans under the workspace lease against the last managed manifest: only new or changed file data is
+transferred over `rsync --files-from`. Mode-only changes are applied remotely, symlink changes need
+only their target, and deletions or renames send no old bytes. A first run or `--clean` sends all
+file data. The executor hashes every uploaded payload file, rejects unplanned payload, applies the
+reconciliation, and finally verifies the whole managed tree against the captured manifest, so the
+partial upload never weakens input verification. Local capture still hashes the complete working
+tree. `run` reports the planning counts and the measured `rsync --stats` payload in its JSON under
+`upload.plan` and `upload.payload`.
+
 Sync writes an incomplete marker before mutating the work tree and publishes the verified manifest
 only after success. A crash leaves the workspace marked and the next attempt refuses until the
 partial sync is resolved. `--clean` is the explicit fresh mode inside a workspace: it discards
@@ -261,12 +271,13 @@ capture the intended source through `remote-exec` instead.
 
 ## Observed warm-workspace timing
 
-`apps/remote-exec/tests/bench_workspace.py` runs a generic 80-file fixture whose build step is a
+`apps/remote-exec/tests/bench_workspace.py` runs a generic 80-file fixture whose build step is an
 mtime comparison with a 0.4 s simulated compile. On `cld-ops-01` with the local fixture transport it
-measured cold 2.76 s, unchanged repeat 2.18 s, and one-source-change 2.65 s; the repeat build was the
-only HIT. These are local measurements of capture, transfer, reconciliation and supervision, not a
-claim about a particular toolchain or a live SSH executor; re-run the script on the executor class
-that matters.
+measured cold 3.37 s, unchanged repeat 2.36 s, and one-source-change 2.75 s; the repeat build was the
+only HIT. Measured payload was 798 bytes over 81 paths cold, 0 bytes over 0 paths unchanged, and
+15 bytes over 1 path after one source change. These are local measurements of capture, transfer,
+reconciliation and supervision, not a claim about a particular toolchain or a live SSH executor;
+re-run the script on the executor class that matters.
 
 ## Declared prerequisites
 

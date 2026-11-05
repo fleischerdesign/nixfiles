@@ -202,6 +202,7 @@ try:
         # rsync's size+mtime comparison.
         remove_tree(CONFIG["staging"], workspace)
         os.mkdir(CONFIG["staging"], 0o700)
+        os.mkdir(os.path.join(CONFIG["staging"], "work"), 0o700)
     else:
         try:
             os.mkdir(CONFIG["attempt"])
@@ -211,6 +212,7 @@ try:
             os.mkdir(CONFIG["staging"])
         except FileExistsError:
             fail("attempt staging directory already exists; observe or reset it")
+        os.mkdir(os.path.join(CONFIG["staging"], "work"), 0o700)
     atomic_json(os.path.join(CONFIG["attempt"], "state.json"), {
         "schemaVersion": 2, "phase": "preparing", "attemptId": CONFIG["attemptId"],
     })
@@ -239,9 +241,33 @@ try:
     value = manifest.load_manifest(CONFIG["inputManifest"])
     if value.get("inputId") != CONFIG["inputId"]:
         fail("staged input manifest does not match the captured input id")
-    manifest.verify(CONFIG["stagingWork"], CONFIG["inputManifest"], CONFIG["inputId"])
 
     new_entries = {entry["path"]: entry for entry in value["files"]}
+    payload_plan = None
+    payload_paths = None
+    if CONFIG.get("payloadFile"):
+        payload_plan = read_json(CONFIG["payloadFile"])
+        if not payload_plan or payload_plan.get("inputId") != CONFIG["inputId"]:
+            fail("upload plan does not match the captured input")
+        payload_paths = set(payload_plan.get("payload") or [])
+        for rel in sorted(payload_paths):
+            if rel not in new_entries or new_entries[rel].get("type") != "file":
+                fail("upload plan names %r, which is not a captured file" % rel)
+            staged = os.path.join(CONFIG["stagingWork"], rel)
+            try:
+                observed = manifest.describe(CONFIG["stagingWork"], rel)
+            except (FileNotFoundError, NotADirectoryError):
+                fail("payload file %r is missing from the staged upload" % rel)
+            if observed != new_entries[rel]:
+                fail("payload file %r does not match the captured digest or mode" % rel)
+        if os.path.isdir(CONFIG["stagingWork"]):
+            extras = set(manifest.tree_entries(CONFIG["stagingWork"])) - payload_paths
+            if extras:
+                fail("staged upload contains unplanned payload: %s" % sorted(extras)[:5])
+    else:
+        # Backward-compatible full staging directory: the whole tree must match.
+        manifest.verify(CONFIG["stagingWork"], CONFIG["inputManifest"], CONFIG["inputId"])
+
     incomplete = read_json(incomplete_path)
     resume = False
     if incomplete:
@@ -472,6 +498,31 @@ try:
             continue
         if current == "DIR":
             fail("retained directory still occupies new source %r" % rel)
+        if payload_paths is not None and rel not in payload_paths:
+            if entry["type"] == "symlink":
+                if current is not None:
+                    os.unlink(os.path.join(work, rel))
+                install(rel, entry)
+                changed["added" if current is None else "modified"] += 1
+                continue
+            if (
+                isinstance(current, dict)
+                and current.get("type") == "file"
+                and current.get("sha256") == entry.get("sha256")
+                and current.get("size") == entry.get("size")
+            ):
+                # Same bytes, different executable bit: no payload needed.
+                os.chmod(
+                    os.path.join(work, rel),
+                    0o755 if entry["mode"] == manifest.EXEC_MODE else 0o644,
+                )
+                changed.setdefault("modeOnly", 0)
+                changed["modeOnly"] += 1
+                continue
+            fail(
+                "payload for changed source %r was not uploaded; refusing a partial "
+                "reconciliation" % rel
+            )
         install(rel, entry)
         changed["added" if current is None else "modified"] += 1
 
@@ -511,6 +562,79 @@ try:
 finally:
     unlock(lock_handle)
 print(json.dumps({"workspaceVersion": CONFIG["version"], "inputId": CONFIG["inputId"], "changed": changed}))
+'''
+
+
+PLAN = PRELUDE + r'''
+workspace = CONFIG["workspace"]
+state = os.path.join(workspace, "state")
+manifest = load_module("remote_exec_manifest", CONFIG["manifestModule"])
+lease_path = os.path.join(state, "lease.json")
+lock_handle = lock(os.path.join(state, "lock"))
+try:
+    lease = read_json(lease_path) or {}
+    if lease.get("attemptId") != CONFIG["attemptId"] or lease.get("phase") not in ("updating", "prepared"):
+        fail("workspace lease is not owned by this attempt; refusing to plan (phase=%s)" % lease.get("phase"))
+    value = manifest.load_manifest(CONFIG["inputManifest"])
+    if value.get("inputId") != CONFIG["inputId"]:
+        fail("staged input manifest does not match the captured input id")
+    entries = {entry["path"]: entry for entry in value["files"]}
+    managed = read_json(os.path.join(state, "managed.json"))
+    old_entries = {}
+    if managed is not None:
+        for entry in managed.get("entries") or []:
+            old_entries[entry["path"]] = entry
+        for rel in managed.get("missing") or []:
+            old_entries[rel] = None
+
+    payload = []
+    mode_only = []
+    symlink_changes = []
+    unchanged = 0
+    for rel in sorted(entries):
+        new = entries[rel]
+        old = old_entries.get(rel)
+        if old is not None and old == new:
+            unchanged += 1
+            continue
+        if new["type"] == "symlink":
+            symlink_changes.append(rel)
+            continue
+        if (
+            old is not None
+            and old.get("type") == "file"
+            and old.get("sha256") == new.get("sha256")
+            and old.get("size") == new.get("size")
+        ):
+            mode_only.append(rel)
+            continue
+        payload.append(rel)
+    deleted = sorted(rel for rel in old_entries if rel not in entries)
+    payload_bytes = sum(entries[rel]["size"] for rel in payload)
+    atomic_json(CONFIG["payloadFile"], {
+        "schemaVersion": 1,
+        "attemptId": CONFIG["attemptId"],
+        "inputId": CONFIG["inputId"],
+        "payload": payload,
+        "modeOnly": mode_only,
+        "symlinkChanges": symlink_changes,
+        "unchanged": unchanged,
+        "deleted": deleted,
+        "files": len(entries),
+        "payloadBytes": payload_bytes,
+    })
+finally:
+    unlock(lock_handle)
+print(json.dumps({
+    "payload": payload,
+    "payloadFiles": len(payload),
+    "payloadBytes": payload_bytes,
+    "modeOnly": len(mode_only),
+    "symlinkChanges": len(symlink_changes),
+    "unchanged": unchanged,
+    "deleted": len(deleted),
+    "files": len(entries),
+}))
 '''
 
 

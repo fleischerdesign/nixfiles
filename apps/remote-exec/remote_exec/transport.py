@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -66,6 +67,9 @@ class Transport:
     def pull_paths(self, source: str, destination: str, paths: list[str]) -> None:
         raise NotImplementedError
 
+    def push_paths(self, source: str, destination: str, paths: list[str]) -> dict:
+        raise NotImplementedError
+
     def preflight(self, root: str) -> dict:
         raise NotImplementedError
 
@@ -80,6 +84,16 @@ class Transport:
 
 def _rsync_base() -> list[str]:
     return ["rsync", "-a", "--no-owner", "--no-group", "--protect-args"]
+
+
+def _rsync_stats(output: bytes, path_count: int) -> dict:
+    size = re.search(rb"Total transferred file size: ([\d,]+) bytes", output)
+    files = re.search(rb"Number of regular files transferred: ([\d,]+)", output)
+    return {
+        "paths": path_count,
+        "files": int(files.group(1).replace(b",", b"")) if files else 0,
+        "bytes": int(size.group(1).replace(b",", b"")) if size else 0,
+    }
 
 
 class LocalTransport(Transport):
@@ -125,6 +139,35 @@ class LocalTransport(Transport):
             )
             if process.returncode != 0:
                 raise TransportError(process.stderr.decode("utf-8", "replace").strip())
+        finally:
+            os.unlink(listfile.name)
+
+    def push_paths(self, source: str, destination: str, paths: list[str]) -> dict:
+        if not paths:
+            return {"paths": 0, "files": 0, "bytes": 0}
+        os.makedirs(destination, exist_ok=True)
+        listfile = tempfile.NamedTemporaryFile("wb", delete=False)
+        try:
+            for path in paths:
+                listfile.write(path.encode("utf-8", "surrogateescape") + b"\0")
+            listfile.close()
+            process = subprocess.run(
+                _rsync_base()
+                + [
+                    "--from0",
+                    f"--files-from={listfile.name}",
+                    "--stats",
+                    source.rstrip("/") + "/",
+                    destination.rstrip("/") + "/",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                env=dict(os.environ, LC_ALL="C"),
+            )
+            if process.returncode != 0:
+                raise TransportError(process.stderr.decode("utf-8", "replace").strip())
+            return _rsync_stats(process.stdout, len(paths))
         finally:
             os.unlink(listfile.name)
 
@@ -244,6 +287,38 @@ class SshTransport(Transport):
                 pull=True,
                 extra=["--from0", f"--files-from={listfile.name}"],
             )
+        finally:
+            os.unlink(listfile.name)
+
+    def push_paths(self, source: str, destination: str, paths: list[str]) -> dict:
+        if not paths:
+            return {"paths": 0, "files": 0, "bytes": 0}
+        ssh = shlex.join(self._ssh)
+        remote = f"{self.target}:{destination.rstrip('/')}/"
+        listfile = tempfile.NamedTemporaryFile("wb", delete=False)
+        try:
+            for path in paths:
+                listfile.write(path.encode("utf-8", "surrogateescape") + b"\0")
+            listfile.close()
+            argv = _rsync_base() + [
+                "--from0",
+                f"--files-from={listfile.name}",
+                "--stats",
+                "-e",
+                ssh,
+                source.rstrip("/") + "/",
+                remote,
+            ]
+            process = subprocess.run(
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                env=dict(os.environ, LC_ALL="C"),
+            )
+            if process.returncode != 0:
+                raise TransportError(process.stderr.decode("utf-8", "replace").strip())
+            return _rsync_stats(process.stdout, len(paths))
         finally:
             os.unlink(listfile.name)
 
