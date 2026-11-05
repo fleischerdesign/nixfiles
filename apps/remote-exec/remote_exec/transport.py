@@ -74,7 +74,8 @@ class Transport:
         raise NotImplementedError
 
     def supervise(
-        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None
+        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None,
+        runtime_max_secs: int | None = None,
     ) -> None:
         raise NotImplementedError
 
@@ -200,7 +201,8 @@ class LocalTransport(Transport):
         }
 
     def supervise(
-        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None
+        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None,
+        runtime_max_secs: int | None = None,
     ) -> None:
         process = subprocess.run(
             ["python3", os.path.join(attempt_dir, "runner.py"), os.path.join(attempt_dir, "runner-config.json")],
@@ -351,7 +353,8 @@ class SshTransport(Transport):
         return json.loads(process.stdout.decode("utf-8"))
 
     def supervise(
-        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None
+        self, attempt_dir: str, timeout: int, unit: str | None = None, work_dir: str | None = None,
+        runtime_max_secs: int | None = None,
     ) -> None:
         process = self.run_py(
             "import base64,json,os,subprocess,sys\n"
@@ -363,7 +366,7 @@ class SshTransport(Transport):
             "cfg=json.load(open(os.path.join(c['attempt'],'runner-config.json'),'r',encoding='utf-8'))\n"
             "cmd=['systemd-run','--user','--quiet','--collect','--unit='+c['unit'],\n"
             "     '--property=WorkingDirectory='+c['workDir'],\n"
-            "     '--property=RuntimeMaxSec=%d' % c['timeout'],\n"
+            "     '--property=RuntimeMaxSec=%d' % c['runtimeMax'],\n"
             "     '--property=KillMode=control-group',\n"
             "     '--property=TimeoutStopSec=30',\n"
             "     '--setenv=HOME='+os.path.join(c['attempt'],'home'),\n"
@@ -390,6 +393,7 @@ class SshTransport(Transport):
                 "attempt": attempt_dir,
                 "unit": unit,
                 "timeout": timeout,
+                "runtimeMax": runtime_max_secs or timeout,
                 "workDir": work_dir or os.path.join(attempt_dir, "work"),
             },
             timeout=60,

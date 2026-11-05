@@ -578,3 +578,182 @@ class WorkspaceCollectTest(WorkspaceFixture):
             ["true"], ".", 30, {"PATH": os.environ["PATH"]}, captured["inputId"]
         )
         self.assertEqual(result["phase"], "succeeded")
+
+
+class WorkspaceReviewRegressionTest(WorkspaceFixture):
+    def test_symlinked_work_and_staging_fail_closed_and_reset_recovers(self):
+        ws = self.workspace()
+        attempt = workspace_module.WorkspaceAttempt(self.transport, ws, str(uuid.uuid4()))
+        attempt.prepare()
+        capture_dir = attempt_module.capture_to(self.repo)
+        self._capture_dirs.append(capture_dir)
+        attempt_module.add_runtime_files(capture_dir)
+        with open(os.path.join(capture_dir, "input-files.json"), encoding="utf-8") as handle:
+            captured = json.load(handle)
+        self.transport.push_tree(capture_dir, attempt.staging)
+
+        outside = os.path.join(self.tmp, "outside")
+        os.makedirs(outside)
+        sentinel = os.path.join(outside, "sentinel")
+        with open(sentinel, "w", encoding="utf-8") as handle:
+            handle.write("do not touch\n")
+        work = os.path.join(ws.path, "work")
+        shutil.rmtree(work)
+        os.symlink(outside, work)
+        with self.assertRaises(attempt_module.Blocked):
+            ws.sync(
+                attempt.attempt_id,
+                captured["inputId"],
+                f"{attempt.staging}/input-files.json",
+                f"{attempt.staging}/manifest.py",
+            )
+        with open(sentinel, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "do not touch\n")
+        ws.reset()
+        self.assertTrue(os.path.isdir(work))
+        self.assertFalse(os.path.islink(work))
+        with open(sentinel, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "do not touch\n")
+
+        # The staging root is a trusted directory too.
+        staging = os.path.join(ws.path, "staging")
+        os.symlink(outside, os.path.join(staging, "evil"))
+        ws.reset()
+        self.assertFalse(os.path.lexists(os.path.join(staging, "evil")))
+        self.assertTrue(os.path.isdir(staging))
+        with open(sentinel, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "do not touch\n")
+
+    def test_duplicate_attempt_id_preserves_the_prior_terminal_lease(self):
+        attempt, _, _ = self.run_workspace(
+            ["sh", "-c", "echo kept > work-marker.txt"], attempt_id="duplicate"
+        )
+        ws = attempt.workspace
+        lease_path = os.path.join(ws.path, "state", "lease.json")
+        with open(lease_path, "rb") as handle:
+            lease_before = handle.read()
+        with open(os.path.join(ws.path, "work", "work-marker.txt"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "kept\n")
+        duplicate = workspace_module.WorkspaceAttempt(
+            self.transport, self.workspace(), "duplicate"
+        )
+        with self.assertRaises(attempt_module.Blocked):
+            duplicate.prepare()
+        with open(lease_path, "rb") as handle:
+            self.assertEqual(handle.read(), lease_before)
+        with open(os.path.join(ws.path, "work", "work-marker.txt"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "kept\n")
+
+    def test_existing_staging_without_a_lease_does_not_corrupt_state(self):
+        ws = self.workspace()
+        os.makedirs(ws.path)
+        os.makedirs(os.path.join(ws.path, "staging"))
+        os.makedirs(os.path.join(ws.path, "attempts"))
+        os.makedirs(os.path.join(ws.path, "state"))
+        attempt_id = str(uuid.uuid4())
+        os.makedirs(ws.staging_path(attempt_id))
+        attempt = workspace_module.WorkspaceAttempt(self.transport, ws, attempt_id)
+        with self.assertRaises(attempt_module.Blocked):
+            attempt.prepare()
+        self.assertFalse(os.path.exists(os.path.join(ws.path, "state", "lease.json")))
+        self.assertFalse(os.path.exists(attempt.path))
+
+    def test_unknown_result_never_releases_the_lease(self):
+        ws = self.workspace()
+        attempt = workspace_module.WorkspaceAttempt(self.transport, ws, str(uuid.uuid4()))
+        attempt.prepare()
+        result = {
+            "schemaVersion": 2,
+            "attemptId": attempt.attempt_id,
+            "inputId": "input",
+            "phase": "unknown",
+            "exitCode": None,
+        }
+        with open(os.path.join(attempt.path, "result.json"), "w", encoding="utf-8") as handle:
+            json.dump(result, handle)
+        value = ws.complete_lease(attempt.attempt_id, "terminal", "unknown")
+        self.assertEqual(value["lease"]["phase"], "unknown")
+        value = ws.complete_lease(attempt.attempt_id, "terminal", "unknown")
+        self.assertEqual(value["lease"]["phase"], "unknown")
+        result["phase"] = "succeeded"
+        with open(os.path.join(attempt.path, "result.json"), "w", encoding="utf-8") as handle:
+            json.dump(result, handle)
+        value = ws.complete_lease(attempt.attempt_id, "terminal", "succeeded")
+        self.assertEqual(value["lease"]["phase"], "terminal")
+
+    def test_runner_and_scripts_share_one_lease_lock(self):
+        ws = self.workspace()
+        attempt = workspace_module.WorkspaceAttempt(
+            self.transport, ws, "id", run_id="explicit-run", repo_path="/tmp/repo"
+        )
+        self.assertEqual(
+            attempt.runner_extra()["leaseLockFile"], ws.lock_path
+        )
+        self.assertEqual(attempt.run_id, "explicit-run")
+        recovery = attempt.recovery_command("status")
+        self.assertIn("--workspace-id", recovery)
+        self.assertIn("--repo /tmp/repo", recovery)
+        self.assertIn("--run-id explicit-run", recovery)
+
+    def test_stubborn_child_timeout_still_finalizes_or_refuses_source(self):
+        _, _, result = self.run_workspace(
+            ["sh", "-c", "trap '' TERM; sleep 30 & wait"], timeout=1
+        )
+        self.assertIn(result["phase"], ("cancelled", "unknown"))
+        lease = self.workspace().snoop()["lease"]
+        self.assertIn(lease["phase"], ("terminal", "unknown"))
+        attempt = workspace_module.WorkspaceAttempt(
+            self.transport, self.workspace(), result["attemptId"]
+        )
+        if (result.get("output") or {}).get("status") == "ok":
+            out = os.path.join(self.tmp, "stubborn-collect")
+            attempt.collect(out)
+        else:
+            with self.assertRaises(attempt_module.Blocked):
+                attempt.collect(os.path.join(self.tmp, "stubborn-collect-refused"))
+
+    def test_partial_sync_resumes_an_already_added_source(self):
+        ws = self.workspace()
+        attempt = workspace_module.WorkspaceAttempt(self.transport, ws, "added-resume")
+        attempt.prepare()
+        capture_dir = attempt_module.capture_to(self.repo)
+        self._capture_dirs.append(capture_dir)
+        attempt_module.add_runtime_files(capture_dir)
+        with open(os.path.join(capture_dir, "input-files.json"), encoding="utf-8") as handle:
+            captured = json.load(handle)
+        self.transport.push_tree(capture_dir, attempt.staging)
+        ws.sync(
+            attempt.attempt_id,
+            captured["inputId"],
+            f"{attempt.staging}/input-files.json",
+            f"{attempt.staging}/manifest.py",
+        )
+        self.write("added.txt", "added\n")
+        next_capture = attempt_module.capture_to(self.repo)
+        self._capture_dirs.append(next_capture)
+        with open(os.path.join(next_capture, "input-files.json"), encoding="utf-8") as handle:
+            next_input = json.load(handle)
+        with open(os.path.join(ws.path, "work", "added.txt"), "w", encoding="utf-8") as handle:
+            handle.write("added\n")
+        with open(
+            os.path.join(ws.path, "state", "update-incomplete.json"), "w", encoding="utf-8"
+        ) as handle:
+            json.dump({"attemptId": "added-resume", "inputId": next_input["inputId"]}, handle)
+        _, _, result = self.run_workspace(["true"], attempt_id="added-resume")
+        self.assertEqual(result["phase"], "succeeded", result)
+        with open(os.path.join(ws.path, "work", "added.txt"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "added\n")
+
+    def test_prune_byte_budget_reports_and_only_targets_terminal_attempts(self):
+        attempt, _, _ = self.run_workspace(
+            ["sh", "-c", "head -c 200000 /dev/zero > generated.bin"]
+        )
+        report = attempt.workspace.prune(
+            apply=False, keep=10, max_age_days=14, max_bytes=1
+        )
+        self.assertGreater(report["bytes"], 0)
+        self.assertTrue(
+            any(item.get("budget") for item in report["removed"]),
+            report,
+        )
+        self.assertTrue(os.path.isdir(attempt.path))

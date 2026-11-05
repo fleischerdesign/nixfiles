@@ -32,9 +32,11 @@ import tempfile
 import time
 import uuid
 
-from . import boundary, manifest, runner, source, transport
+from . import boundary, manifest, project_selection, runner, source, transport
 
 ID_PATTERN = __import__("re").compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+STOP_GRACE_SECS = 30
+FINALIZE_SECS = 300
 
 
 class Blocked(Exception):
@@ -202,6 +204,8 @@ class Attempt:
             "argv": argv,
             "env": env,
             "timeoutSecs": timeout_secs,
+            "finalizeTimeoutSecs": FINALIZE_SECS,
+            "runtimeMaxSecs": timeout_secs + STOP_GRACE_SECS + FINALIZE_SECS,
             "attemptId": self.attempt_id,
             "inputId": input_id,
             "unit": unit,
@@ -221,7 +225,10 @@ class Attempt:
                 self._unknown_state(input_id, f"dispatch claim outcome unknown: {error}"),
             ) from error
         try:
-            self.transport.supervise(self.path, timeout_secs, unit, self.work_dir)
+            self.transport.supervise(
+                self.path, timeout_secs, unit, self.work_dir,
+                runtime_max_secs=timeout_secs + STOP_GRACE_SECS + FINALIZE_SECS,
+            )
         except (transport.TransportError, subprocess.TimeoutExpired):
             # The unit may still be running. Never replay: the terminal state is
             # whatever `status` can observe.
@@ -229,7 +236,7 @@ class Attempt:
         # The unit is owned by systemd, not by this SSH session. Observation is
         # a bounded series of independent reads; losing one does not restart or
         # cancel anything.
-        deadline = time.monotonic() + timeout_secs + 120
+        deadline = time.monotonic() + timeout_secs + STOP_GRACE_SECS + FINALIZE_SECS + 60
         last_state: dict | None = None
         while True:
             try:
@@ -264,18 +271,24 @@ class Attempt:
             "inputId": input_id,
             "unit": self.unit,
             "reason": reason,
-            "recovery": (
-                f"remote-exec status --repo-id {self.repo_id} --run-id {self.run_id} "
-                f"--attempt-id {self.attempt_id} ..."
-            ),
+            "recovery": self.recovery_command("status"),
         }
+
+    def recovery_flags(self) -> list[str]:
+        return ["--repo-id", self.repo_id, "--run-id", self.run_id]
+
+    def recovery_command(self, command: str) -> str:
+        flags = list(self.recovery_flags())
+        flags += ["--attempt-id", self.attempt_id]
+        return "remote-exec " + command + " " + " ".join(flags) + " ..."
 
     def cancel(self) -> dict:
         try:
             state = self.status()
         except (Blocked, transport.TransportError, subprocess.TimeoutExpired) as error:
             return self._unknown_state(None, f"cannot observe the attempt: {error}")
-        if state.get("terminal"):
+        phase = (state.get("result") or {}).get("phase") if state.get("terminal") else None
+        if state.get("terminal") and phase != "unknown":
             return state
         dispatch = self.read_json("dispatch.json") or {}
         if not self.transport.supervised:
@@ -283,7 +296,10 @@ class Attempt:
         unit = dispatch.get("unit") or self.unit
         try:
             self.transport.cancel(unit)
-            return self.status()
+            observed = self.status()
+            if observed.get("terminal") and (observed.get("result") or {}).get("phase") == "unknown":
+                observed["cancelAttempted"] = True
+            return observed
         except (Blocked, transport.TransportError, subprocess.TimeoutExpired) as error:
             return self._unknown_state(None, f"cancel was requested but could not be confirmed: {error}")
 
@@ -308,6 +324,7 @@ class Attempt:
                 "attemptDir": self.path,
                 "workDir": f"{self.path}/work",
                 "manifestModule": f"{self.path}/manifest.py",
+                "selectionModule": f"{self.path}/selection.py",
                 "inputManifest": f"{self.path}/input-files.json",
                 "outputManifest": f"{self.path}/output-files.json",
             },
@@ -471,5 +488,9 @@ def add_runtime_files(capture_dir: str) -> None:
     package_dir = os.path.dirname(os.path.abspath(manifest.__file__))
     for name in ("manifest.py", "boundary.py"):
         shutil.copyfile(os.path.join(package_dir, name), os.path.join(capture_dir, name))
+    shutil.copyfile(
+        os.path.abspath(project_selection.__file__),
+        os.path.join(capture_dir, "selection.py"),
+    )
     with open(os.path.join(capture_dir, "verify.py"), "w", encoding="utf-8") as handle:
         handle.write(runner.VERIFY)

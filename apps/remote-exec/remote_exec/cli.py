@@ -198,6 +198,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     add_workspace_arguments(workspace_prune)
     workspace_prune.add_argument("--keep", type=int, default=10)
     workspace_prune.add_argument("--max-age-days", type=float, default=14)
+    workspace_prune.add_argument("--max-bytes", type=int, help="delete oldest terminal attempts above this workspace budget")
     workspace_prune.add_argument("--apply", action="store_true")
     workspace_prune.add_argument("--remove-workspaces", action="store_true")
 
@@ -283,7 +284,11 @@ def attempt_from(args) -> tuple[attempt_module.Attempt, dict | None, dict | None
             source.repo_identity(args.repo),
         )
         attempt = workspace_module.WorkspaceAttempt(
-            transport_, workspace, args.attempt_id or attempt_module.new_attempt_id()
+            transport_,
+            workspace,
+            args.attempt_id or attempt_module.new_attempt_id(),
+            run_id=args.run_id,
+            repo_path=args.repo,
         )
         return attempt, host, executor
     attempt_id = args.attempt_id or attempt_module.new_attempt_id()
@@ -502,7 +507,9 @@ def command_run(args) -> int:
         transport.cleanup(capture_dir)
 
 
-WORKSPACE_METADATA = ("input-files.json", "manifest.py", "boundary.py", "verify.py")
+WORKSPACE_METADATA = (
+    "input-files.json", "manifest.py", "boundary.py", "verify.py", "selection.py",
+)
 
 
 def transfer_workspace(attempt, capture_dir: str, captured: dict) -> dict:
@@ -623,7 +630,10 @@ def command_workspace_prune(args) -> int:
     report = []
     for target in targets:
         value = target.prune(
-            apply=args.apply, keep=args.keep, max_age_days=args.max_age_days
+            apply=args.apply,
+            keep=args.keep,
+            max_age_days=args.max_age_days,
+            max_bytes=args.max_bytes,
         )
         if args.remove_workspaces:
             value["workspaceRemoval"] = target.remove(

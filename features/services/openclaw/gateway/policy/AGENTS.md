@@ -155,7 +155,15 @@ works from scratch. Retained output validity belongs to the build tool that prod
 Each attempt freezes its selected source and receipts. Collecting an older attempt reads that
 snapshot and stays safe after later attempts changed the workspace; if no snapshot exists, source
 collection is refused instead of reading newer workspace state. `workspace-prune` is dry-run by
-default and only deletes terminal attempts beyond retention; automated pruning is not scheduled.
+default and only deletes terminal attempts beyond retention; `--max-bytes` can additionally drop
+the oldest terminal attempts to a reported full-workspace budget. Automated pruning is not
+scheduled.
+
+Only `succeeded`, `failed` or `cancelled` releases the workspace lease, after its unit is inactive.
+An `unknown` result keeps the lease unknown; `cancel` still stops the owned unit, and only a
+verified `workspace-reset --force` makes the workspace reusable. Do not delete or take over a
+workspace whose lease is not terminal, and do not treat a missing dispatch claim as proof that no
+client is active.
 
 `capture`, `verify`, `status` and `collect` exist for inspection, recovery and delta
 integration. `exec` with `host=<node>` is raw execution: it does not export or verify

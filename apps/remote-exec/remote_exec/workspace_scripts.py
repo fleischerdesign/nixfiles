@@ -35,13 +35,21 @@ def fail(message, code=2):
 
 def atomic_json(path, value):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    temporary = path + ".tmp"
+    temporary = path + ".tmp.%d.%s" % (os.getpid(), os.urandom(6).hex())
     with open(temporary, "w", encoding="utf-8") as handle:
         json.dump(value, handle, indent=2, sort_keys=True)
         handle.write("\n")
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(temporary, path)
+    try:
+        directory = os.open(os.path.dirname(path) or ".", os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    except OSError:
+        pass
 
 
 def read_json(path):
@@ -81,6 +89,31 @@ def unlock(handle):
         handle.close()
 
 
+def workspace_lock_path(workspace):
+    """Lock living beside the workspace so retirement and creation serialise."""
+    parent = os.path.dirname(os.path.abspath(workspace))
+    name = os.path.basename(os.path.abspath(workspace))
+    locks = os.path.join(parent, ".locks")
+    if os.path.islink(locks):
+        fail("refusing a symlinked workspace lock directory: %s" % locks)
+    os.makedirs(locks, mode=0o700, exist_ok=True)
+    if not os.path.isdir(locks) or os.path.islink(locks):
+        fail("workspace lock directory %s is not a real directory" % locks)
+    return os.path.join(locks, name + ".lock")
+
+
+def assert_real_dir(path, label):
+    """A workspace-owned path must itself be a directory, not a symlink."""
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        fail("%s is missing: %s" % (label, path))
+    if stat.S_ISLNK(info.st_mode):
+        fail("%s is a symlink; refusing to use it: %s" % (label, path))
+    if not stat.S_ISDIR(info.st_mode):
+        fail("%s is not a directory: %s" % (label, path))
+
+
 def ensure_dir(path):
     if os.path.islink(path):
         fail("refusing a symlinked workspace directory: %s" % path)
@@ -100,13 +133,35 @@ def remove_tree(path, root):
     if not os.path.lexists(path):
         return
     if os.path.islink(path):
-        fail("refusing to remove symlinked workspace path: %s" % path)
+        # Unlink the link itself; never touch its target.
+        os.unlink(path)
+        return
     if not within(path, root):
         fail("refusing to remove a path outside the workspace: %s" % path)
     if os.path.isdir(path):
         shutil.rmtree(path)
     else:
         os.unlink(path)
+
+
+def reset_workspace_dir(path, root):
+    remove_tree(path, root)
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    assert_real_dir(path, "workspace directory")
+
+
+def tree_size(path):
+    total = 0
+    for dirpath, dirnames, filenames in os.walk(path, followlinks=False):
+        for name in list(dirnames):
+            if os.path.islink(os.path.join(dirpath, name)):
+                dirnames.remove(name)
+        for name in filenames:
+            try:
+                total += os.lstat(os.path.join(dirpath, name)).st_size
+            except OSError:
+                pass
+    return total
 
 
 def prune_empty_parents(root, rel):
@@ -124,40 +179,28 @@ def prune_empty_parents(root, rel):
 
 PREPARE = PRELUDE + r'''
 workspace = CONFIG["workspace"]
+workspace = os.path.abspath(workspace)
 state = os.path.join(workspace, "state")
-ensure_dir(workspace)
-for name in ("state", "work", "home", "attempts", "staging"):
-    ensure_dir(os.path.join(workspace, name))
+attempt = CONFIG["attempt"]
+staging = CONFIG["staging"]
+attempt_id = CONFIG["attemptId"]
 
-metadata_path = os.path.join(workspace, "workspace.json")
-metadata = read_json(metadata_path)
-binding = {key: CONFIG.get(key) for key in ("key", "label", "repoId", "repoIdentity", "target", "user", "root")}
-if metadata is None:
-    binding.update({
-        "schemaVersion": 1,
-        "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    })
-    atomic_json(metadata_path, binding)
-else:
-    for key, value in binding.items():
-        if metadata.get(key) != value:
-            fail(
-                "workspace metadata does not match this binding (%s: %r != %r); "
-                "refusing to reuse it" % (key, metadata.get(key), value)
-            )
-
-lease_path = os.path.join(state, "lease.json")
-lock_handle = lock(os.path.join(state, "lock"))
+lock_handle = lock(workspace_lock_path(workspace))
 try:
+    if os.path.lexists(workspace):
+        assert_real_dir(workspace, "workspace root")
+    lease_path = os.path.join(state, "lease.json")
     lease = read_json(lease_path)
+    phase = (lease or {}).get("phase")
+    same = bool(lease) and lease.get("attemptId") == attempt_id
     resume = False
     if lease:
-        same = lease.get("attemptId") == CONFIG["attemptId"]
-        phase = lease.get("phase")
-        if same and phase in ("updating", "prepared") and not CONFIG.get("clean"):
-            if os.path.exists(os.path.join(CONFIG["attempt"], "dispatch.json")):
+        if same and phase in ("updating", "prepared"):
+            if os.path.exists(os.path.join(attempt, "dispatch.json")):
                 fail("attempt is already dispatched; reconcile it with status")
-            resume = os.path.isdir(CONFIG["attempt"])
+            if os.path.lexists(attempt) and (os.path.islink(attempt) or not os.path.isdir(attempt)):
+                fail("attempt path exists but is not a real directory")
+            resume = os.path.lexists(attempt) or os.path.lexists(staging)
         elif phase in ("terminal", "abandoned"):
             pass
         else:
@@ -166,59 +209,98 @@ try:
                 "cancel that attempt, or reset the workspace"
                 % (phase, lease.get("attemptId"))
             )
-    if CONFIG.get("clean"):
-        for name in ("work", "home"):
-            path = os.path.join(workspace, name)
-            if os.path.islink(path):
-                fail("refusing to clean a symlinked workspace path: %s" % path)
-            shutil.rmtree(path)
-            ensure_dir(path)
-        for name in ("managed.json", "synced.json", "update-incomplete.json"):
-            path = os.path.join(state, name)
-            if os.path.lexists(path):
-                if os.path.islink(path):
-                    fail("refusing to remove symlinked workspace state: %s" % path)
-                os.unlink(path)
-    if not os.path.exists(os.path.join(state, "managed.json")):
-        if os.listdir(os.path.join(workspace, "work")):
-            fail(
-                "workspace has content but no managed manifest; it was not created by "
-                "remote-exec. Reset the workspace before reuse."
-            )
+
+    # Preflight every path that must not be overwritten. Nothing below this
+    # point may replace a prior terminal lease before these checks pass.
+    if resume:
+        if os.path.lexists(attempt) and (os.path.islink(attempt) or not os.path.isdir(attempt)):
+            fail("attempt path is not a real directory")
+    else:
+        if os.path.lexists(attempt):
+            fail("attempt already exists; observe it with status instead of staging again")
+        if os.path.lexists(staging):
+            fail("attempt staging directory already exists; observe or reset it")
+
+    ensure_dir(workspace)
+    for name in ("state", "work", "home", "attempts", "staging"):
+        ensure_dir(os.path.join(workspace, name))
+
+    metadata_path = os.path.join(workspace, "workspace.json")
+    metadata = read_json(metadata_path)
+    binding = {key: CONFIG.get(key) for key in ("key", "label", "repoId", "repoIdentity", "target", "user", "root")}
+    if metadata is None:
+        binding.update({
+            "schemaVersion": 1,
+            "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
+        atomic_json(metadata_path, binding)
+    else:
+        for key, value in binding.items():
+            if metadata.get(key) != value:
+                fail(
+                    "workspace metadata does not match this binding (%s: %r != %r); "
+                    "refusing to reuse it" % (key, metadata.get(key), value)
+                )
+
+    previous = lease
     atomic_json(lease_path, {
         "schemaVersion": 2,
         "phase": "updating",
-        "attemptId": CONFIG["attemptId"],
-        "attemptDir": CONFIG["attempt"],
+        "attemptId": attempt_id,
+        "attemptDir": attempt,
         "unit": CONFIG.get("unit"),
         "inputId": None,
         "clean": bool(CONFIG.get("clean")),
         "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "workspace": {key: CONFIG.get(key) for key in ("key", "label", "repoId", "repoIdentity", "target", "user", "root")},
     })
-    if resume:
-        # The previous staging directory may hold a partially pushed capture
-        # with same-size, same-second files. Replace it instead of trusting
-        # rsync's size+mtime comparison.
-        remove_tree(CONFIG["staging"], workspace)
-        os.mkdir(CONFIG["staging"], 0o700)
-        os.mkdir(os.path.join(CONFIG["staging"], "work"), 0o700)
-    else:
+    created_attempt = False
+    created_staging = False
+    try:
+        if CONFIG.get("clean"):
+            reset_workspace_dir(os.path.join(workspace, "work"), workspace)
+            reset_workspace_dir(os.path.join(workspace, "home"), workspace)
+            for name in ("managed.json", "synced.json", "update-incomplete.json"):
+                path = os.path.join(state, name)
+                if os.path.lexists(path):
+                    remove_tree(path, workspace)
+        if resume:
+            reset_workspace_dir(staging, workspace)
+            created_staging = True
+        else:
+            os.mkdir(attempt)
+            created_attempt = True
+            os.mkdir(staging, 0o700)
+            created_staging = True
+        os.mkdir(os.path.join(staging, "work"), 0o700)
+        if not os.path.exists(os.path.join(state, "managed.json")):
+            if os.listdir(os.path.join(workspace, "work")):
+                fail(
+                    "workspace has content but no managed manifest; it was not created by "
+                    "remote-exec. Reset the workspace before reuse."
+                )
+        atomic_json(os.path.join(attempt, "state.json"), {
+            "schemaVersion": 2, "phase": "preparing", "attemptId": attempt_id,
+        })
+    except BaseException:
+        # A failed preparation must not leave a lease claiming this attempt.
         try:
-            os.mkdir(CONFIG["attempt"])
-        except FileExistsError:
-            fail("attempt already exists; observe it with status instead of staging again")
-        try:
-            os.mkdir(CONFIG["staging"])
-        except FileExistsError:
-            fail("attempt staging directory already exists; observe or reset it")
-        os.mkdir(os.path.join(CONFIG["staging"], "work"), 0o700)
-    atomic_json(os.path.join(CONFIG["attempt"], "state.json"), {
-        "schemaVersion": 2, "phase": "preparing", "attemptId": CONFIG["attemptId"],
-    })
+            if created_staging and os.path.lexists(staging):
+                remove_tree(staging, workspace)
+            if created_attempt and os.path.lexists(attempt):
+                remove_tree(attempt, workspace)
+            if previous is None:
+                if os.path.lexists(lease_path):
+                    os.unlink(lease_path)
+            else:
+                atomic_json(lease_path, previous)
+        finally:
+            pass
+        raise
 finally:
     unlock(lock_handle)
-print(json.dumps({"workspace": workspace, "phase": "updating"}))
+print(json.dumps({"workspace": workspace, "phase": "updating", "resumed": resume}))
+
 '''
 
 
@@ -232,8 +314,12 @@ manifest = load_module("remote_exec_manifest", CONFIG["manifestModule"])
 lease_path = os.path.join(state, "lease.json")
 managed_path = os.path.join(state, "managed.json")
 incomplete_path = os.path.join(state, "update-incomplete.json")
-lock_handle = lock(os.path.join(state, "lock"))
+lock_handle = lock(workspace_lock_path(workspace))
 try:
+    assert_real_dir(workspace, "workspace root")
+    assert_real_dir(work, "workspace work directory")
+    assert_real_dir(os.path.dirname(CONFIG["stagingWork"]), "attempt staging directory")
+    assert_real_dir(CONFIG["stagingWork"], "attempt staging work directory")
     lease = read_json(lease_path) or {}
     if lease.get("attemptId") != attempt_id or lease.get("phase") not in ("updating", "prepared"):
         fail("workspace lease is not owned by this attempt; refusing to sync (phase=%s)" % lease.get("phase"))
@@ -359,6 +445,18 @@ try:
         assert_safe_ancestors(rel)
         current = current_state(rel)
         if rel not in old_entries and current is not None:
+            if resume and (
+                same(current, entry)
+                or (
+                    isinstance(current, dict)
+                    and current.get("type") == entry.get("type")
+                    and current.get("sha256") == entry.get("sha256")
+                    and current.get("size") == entry.get("size")
+                    and current.get("target") == entry.get("target")
+                )
+            ):
+                # This exact path was already installed by the interrupted sync.
+                continue
             if current == "DIR":
                 discardable = True
                 root_path = os.path.join(work, rel)
@@ -570,7 +668,7 @@ workspace = CONFIG["workspace"]
 state = os.path.join(workspace, "state")
 manifest = load_module("remote_exec_manifest", CONFIG["manifestModule"])
 lease_path = os.path.join(state, "lease.json")
-lock_handle = lock(os.path.join(state, "lock"))
+lock_handle = lock(workspace_lock_path(workspace))
 try:
     lease = read_json(lease_path) or {}
     if lease.get("attemptId") != CONFIG["attemptId"] or lease.get("phase") not in ("updating", "prepared"):
@@ -644,8 +742,8 @@ work = CONFIG["workDir"]
 manifest = load_module("remote_exec_manifest", CONFIG["manifestModule"])
 boundary = load_module("remote_exec_boundary", CONFIG["boundaryModule"])
 
-if not within(work, os.path.dirname(work)):
-    fail("work directory is not a real directory")
+assert_real_dir(work, "workspace work directory")
+selection = load_module("remote_exec_selection", CONFIG["selectionModule"])
 baseline = manifest.load_manifest(CONFIG["inputManifest"])
 base_paths = [entry["path"] for entry in baseline["files"]]
 
@@ -683,32 +781,14 @@ def assert_safe(rel):
 
 
 def git_selected():
-    home = os.path.join(attempt, "finalize-home")
-    git_dir = os.path.join(attempt, "selection.git")
-    os.makedirs(home, exist_ok=True)
-    gitconfig = os.path.join(home, "gitconfig")
-    with open(gitconfig, "w", encoding="utf-8") as handle:
-        handle.write("[core]\n\texcludesFile =\n")
-    env = dict(os.environ)
-    env.update({
-        "GIT_CONFIG_NOSYSTEM": "1",
-        "GIT_CONFIG_GLOBAL": gitconfig,
-        "GIT_TERMINAL_PROMPT": "0",
-        "HOME": home,
-        "LC_ALL": "C",
-    })
-    if not os.path.isdir(git_dir):
-        subprocess.run(["git", "init", "--bare", "--quiet", git_dir], check=True, env=env)
-    process = subprocess.run(
-        ["git", "--git-dir", git_dir, "--work-tree", work,
-         "-c", "core.excludesFile=/dev/null",
-         "ls-files", "-z", "--others", "--exclude-per-directory=.gitignore"],
-        cwd=work, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, check=False,
-    )
-    if process.returncode != 0:
-        fail(process.stderr.decode("utf-8", "replace").strip() or "git selection failed")
-    return [name for name in process.stdout.decode("utf-8", "surrogateescape").split("\0") if name]
-
+    try:
+        return selection.git_selected(
+            work,
+            os.path.join(attempt, "selection.git"),
+            os.path.join(attempt, "finalize-home"),
+        )
+    except selection.SelectionError as error:
+        fail(str(error))
 
 # Managed-source receipt: the state the next sync may expect to find. Written
 # even when snapshotting later fails, so a later run reconciles against truth.
@@ -720,12 +800,16 @@ for rel in base_paths:
         managed_entries.append(value)
     else:
         managed_missing.append(rel)
-manifest.write_manifest({
-    "schemaVersion": 1,
-    "inputId": baseline["inputId"],
-    "entries": managed_entries,
-    "missing": sorted(managed_missing),
-}, CONFIG["managedFile"])
+managed_lock = lock(workspace_lock_path(CONFIG["workspace"]))
+try:
+    manifest.write_manifest({
+        "schemaVersion": 1,
+        "inputId": baseline["inputId"],
+        "entries": managed_entries,
+        "missing": sorted(managed_missing),
+    }, CONFIG["managedFile"])
+finally:
+    unlock(managed_lock)
 
 selected = [rel for rel in base_paths if os.path.lexists(os.path.join(work, rel))]
 for rel in sorted(set(git_selected()) - set(base_paths)):
@@ -805,7 +889,10 @@ if os.path.isdir(attempts_dir) and not os.path.islink(attempts_dir):
             "hasResult": bool(result),
         })
 usage = 0
-for dirpath, dirnames, filenames in os.walk(attempts_dir if os.path.isdir(attempts_dir) else state):
+for dirpath, dirnames, filenames in os.walk(workspace, followlinks=False):
+    for name in list(dirnames):
+        if os.path.islink(os.path.join(dirpath, name)):
+            dirnames.remove(name)
     for name in filenames:
         path = os.path.join(dirpath, name)
         try:
@@ -834,41 +921,78 @@ print(json.dumps({
 COMPLETE_LEASE = PRELUDE + r'''
 workspace = CONFIG["workspace"]
 state = os.path.join(workspace, "state")
-lock_handle = lock(os.path.join(state, "lock"))
+lease_path = os.path.join(state, "lease.json")
+lock_handle = lock(workspace_lock_path(workspace))
 try:
-    lease = read_json(os.path.join(state, "lease.json"))
+    lease = read_json(lease_path)
     if not lease or lease.get("attemptId") != CONFIG["attemptId"]:
         print(json.dumps({"changed": False, "reason": "lease is not owned by this attempt"}))
         raise SystemExit(0)
-    if lease.get("phase") in ("updating", "prepared"):
-        if CONFIG.get("abandon"):
-            if os.path.exists(os.path.join(state, "update-incomplete.json")):
+    phase = lease.get("phase")
+    if phase in ("terminal", "abandoned"):
+        print(json.dumps({"changed": False, "reason": "lease already %s" % phase}))
+        raise SystemExit(0)
+
+    attempt_dir = lease.get("attemptDir")
+    result = read_json(os.path.join(attempt_dir, "result.json")) if attempt_dir else None
+    result_phase = (result or {}).get("phase")
+    unit = lease.get("unit")
+    unit_active = False
+    if unit:
+        env = dict(os.environ, XDG_RUNTIME_DIR="/run/user/%d" % os.getuid())
+        probe = subprocess.run(
+            ["systemctl", "--user", "show", "-p", "ActiveState", unit],
+            env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+        )
+        unit_active = (
+            b"ActiveState=active" in probe.stdout
+            or b"ActiveState=activating" in probe.stdout
+            or b"ActiveState=reloading" in probe.stdout
+        )
+
+    if result is not None:
+        if result_phase in ("succeeded", "failed", "cancelled"):
+            if unit_active:
                 print(json.dumps({
                     "changed": False,
-                    "reason": "a partial sync exists; reset the workspace instead of abandoning",
+                    "reason": "unit %s is still active; not releasing the lease" % unit,
                 }))
                 raise SystemExit(0)
             lease.update({
-                "phase": "abandoned",
-                "reason": CONFIG.get("reason") or "preparation was never dispatched",
+                "phase": "terminal",
+                "resultPhase": result_phase,
+                "finishedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            })
+        elif result_phase == "unknown":
+            lease.update({
+                "phase": "unknown",
+                "resultPhase": "unknown",
+                "reason": (result or {}).get("reason") or "terminal result is unknown",
                 "finishedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             })
         else:
-            print(json.dumps({"changed": False, "reason": "lease phase is %s" % lease.get("phase")}))
+            print(json.dumps({"changed": False, "reason": "result has no releasable phase"}))
             raise SystemExit(0)
-    elif lease.get("phase") in ("running", "unknown"):
+    elif CONFIG.get("abandon") and phase in ("updating", "prepared"):
+        if os.path.exists(os.path.join(state, "update-incomplete.json")):
+            print(json.dumps({
+                "changed": False,
+                "reason": "a partial sync exists; reset the workspace instead of abandoning",
+            }))
+            raise SystemExit(0)
         lease.update({
-            "phase": CONFIG["phase"],
-            "resultPhase": CONFIG.get("resultPhase"),
+            "phase": "abandoned",
+            "reason": CONFIG.get("reason") or "preparation was never dispatched",
             "finishedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         })
     else:
-        print(json.dumps({"changed": False, "reason": "lease phase is %s" % lease.get("phase")}))
+        print(json.dumps({"changed": False, "reason": "no terminal result"}))
         raise SystemExit(0)
-    atomic_json(os.path.join(state, "lease.json"), lease)
+    atomic_json(lease_path, lease)
 finally:
     unlock(lock_handle)
 print(json.dumps({"changed": True, "lease": lease}))
+
 '''
 
 
@@ -878,7 +1002,7 @@ if not os.path.isdir(workspace) or os.path.islink(workspace):
     print(json.dumps({"reset": False, "reason": "workspace does not exist"}))
     raise SystemExit(0)
 state = os.path.join(workspace, "state")
-lock_handle = lock(os.path.join(state, "lock"))
+lock_handle = lock(workspace_lock_path(workspace))
 try:
     lease = read_json(os.path.join(state, "lease.json")) or {}
     phase = lease.get("phase")
@@ -953,19 +1077,15 @@ try:
     for name in ("managed.json", "synced.json", "update-incomplete.json"):
         path = os.path.join(state, name)
         if os.path.lexists(path):
-            if os.path.islink(path):
-                fail("refusing to remove symlinked state file: %s" % path)
-            os.unlink(path)
+            remove_tree(path, workspace)
     staging_dir = os.path.join(workspace, "staging")
-    if os.path.isdir(staging_dir) and not os.path.islink(staging_dir):
-        for name in sorted(os.listdir(staging_dir)):
-            path = os.path.join(staging_dir, name)
-            if os.path.islink(path):
-                fail("refusing to remove symlinked staging path: %s" % path)
-            if os.path.isdir(path):
-                if not within(path, staging_dir):
-                    fail("staging path escapes the workspace: %s" % path)
-                shutil.rmtree(path)
+    if os.path.lexists(staging_dir):
+        if os.path.islink(staging_dir):
+            os.unlink(staging_dir)
+            os.mkdir(staging_dir, 0o700)
+        else:
+            for name in sorted(os.listdir(staging_dir)):
+                remove_tree(os.path.join(staging_dir, name), workspace)
     lease.update({
         "phase": "abandoned",
         "reason": "workspace reset",
@@ -986,7 +1106,7 @@ if not os.path.isdir(workspace) or os.path.islink(workspace):
     print(json.dumps({"workspace": workspace, "skipped": "does not exist", "removed": [], "kept": []}))
     raise SystemExit(0)
 state = os.path.join(workspace, "state")
-lock_handle = lock(os.path.join(state, "lock"))
+lock_handle = lock(workspace_lock_path(workspace))
 removed = []
 kept = []
 try:
@@ -1019,6 +1139,7 @@ try:
                 epoch = int(os.lstat(path).st_mtime)
             candidates.append((epoch, name, path))
     candidates.sort(reverse=True)
+    retained_terminal = []
     for index, (epoch, name, path) in enumerate(candidates):
         reason = None
         if index < CONFIG["keep"]:
@@ -1027,6 +1148,7 @@ try:
             reason = "younger than retention"
         if reason:
             kept.append({"attemptId": name, "reason": reason})
+            retained_terminal.append((epoch, name, path))
             continue
         if not CONFIG.get("apply"):
             removed.append({"attemptId": name, "dryRun": True})
@@ -1038,10 +1160,15 @@ try:
     # The lease is terminal, so every remaining staging directory belongs to a
     # preparation that will never dispatch. It is an input copy, not a receipt.
     staging_dir = os.path.join(workspace, "staging")
-    if os.path.isdir(staging_dir) and not os.path.islink(staging_dir):
+    if os.path.islink(staging_dir):
+        kept.append({"staging": "staging", "reason": "staging directory is a symlink; reset required"})
+    elif os.path.isdir(staging_dir):
         for name in sorted(os.listdir(staging_dir)):
             path = os.path.join(staging_dir, name)
-            if os.path.islink(path) or not os.path.isdir(path):
+            if os.path.islink(path):
+                kept.append({"staging": name, "reason": "symlinked staging path; reset required"})
+                continue
+            if not os.path.isdir(path):
                 continue
             if CONFIG.get("apply"):
                 if not within(path, staging_dir):
@@ -1049,9 +1176,31 @@ try:
                 shutil.rmtree(path)
             else:
                 removed.append({"staging": name, "dryRun": True})
+    budget = CONFIG.get("maxBytes")
+    usage = tree_size(workspace)
+    if budget is not None:
+        for epoch, name, path in sorted(retained_terminal):
+            if usage <= budget:
+                break
+            size = tree_size(path)
+            if CONFIG.get("apply"):
+                if not within(path, attempts_dir):
+                    fail("attempt path escapes the workspace: %s" % path)
+                shutil.rmtree(path)
+                removed.append({"attemptId": name, "budget": True})
+            else:
+                removed.append({"attemptId": name, "budget": True, "dryRun": True})
+            usage -= size
 finally:
     unlock(lock_handle)
-print(json.dumps({"workspace": workspace, "removed": removed, "kept": kept, "apply": bool(CONFIG.get("apply"))}))
+print(json.dumps({
+    "workspace": workspace,
+    "removed": removed,
+    "kept": kept,
+    "bytes": tree_size(workspace),
+    "maxBytes": CONFIG.get("maxBytes"),
+    "apply": bool(CONFIG.get("apply")),
+}))
 '''
 
 
@@ -1089,7 +1238,7 @@ if os.path.islink(workspace) or not os.path.isdir(workspace):
     print(json.dumps({"removed": False, "reason": "not a real workspace directory"}))
     raise SystemExit(0)
 state = os.path.join(workspace, "state")
-lock_handle = lock(os.path.join(state, "lock"))
+lock_handle = lock(workspace_lock_path(workspace))
 try:
     lease = read_json(os.path.join(state, "lease.json")) or {}
     if lease.get("phase") not in ("terminal", "abandoned", None):
@@ -1112,8 +1261,10 @@ try:
         raise SystemExit(0)
     marker = os.path.join(state, "pruning")
     atomic_json(marker, {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+    # Hold the external lock across deletion: a new PREPARE for this key waits
+    # instead of creating a generation that would be removed underneath it.
+    shutil.rmtree(workspace)
 finally:
     unlock(lock_handle)
-shutil.rmtree(workspace)
 print(json.dumps({"removed": True}))
 '''

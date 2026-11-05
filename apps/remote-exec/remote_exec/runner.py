@@ -89,7 +89,10 @@ def main():
 
     lease_handle = None
     if CONFIG.get("leaseFile"):
-        lease_handle = open(CONFIG["leaseFile"] + ".lock", "a+b")
+        lease_lock = CONFIG.get("leaseLockFile")
+        if not lease_lock:
+            raise SystemExit("workspace lease lock path is missing")
+        lease_handle = open(lease_lock, "a+b")
         fcntl.flock(lease_handle.fileno(), fcntl.LOCK_EX)
         try:
             with open(CONFIG["leaseFile"], "r", encoding="utf-8") as handle:
@@ -175,7 +178,10 @@ def main():
         state["childStart"] = start_time(child.pid)
         atomic_json(os.path.join(attempt, "state.json"), state)
         if CONFIG.get("leaseFile"):
-            lease_handle = open(CONFIG["leaseFile"] + ".lock", "a+b")
+            lease_lock = CONFIG.get("leaseLockFile")
+            if not lease_lock:
+                raise SystemExit("workspace lease lock path is missing")
+            lease_handle = open(lease_lock, "a+b")
             fcntl.flock(lease_handle.fileno(), fcntl.LOCK_EX)
             try:
                 try:
@@ -285,7 +291,10 @@ def main():
     atomic_json(os.path.join(attempt, "state.json"), state)
 
     if CONFIG.get("leaseFile"):
-        lease_handle = open(CONFIG["leaseFile"] + ".lock", "a+b")
+        lease_lock = CONFIG.get("leaseLockFile")
+        if not lease_lock:
+            raise SystemExit("workspace lease lock path is missing")
+        lease_handle = open(lease_lock, "a+b")
         fcntl.flock(lease_handle.fileno(), fcntl.LOCK_EX)
         try:
             try:
@@ -473,30 +482,19 @@ spec.loader.exec_module(manifest)
 
 baseline = manifest.load_manifest(CONFIG["inputManifest"])
 base_paths = [entry["path"] for entry in baseline["files"]]
-git_dir = os.path.join(attempt, "selection.git")
-env = dict(os.environ)
-env.update({
-    "GIT_CONFIG_NOSYSTEM": "1",
-    "GIT_CONFIG_GLOBAL": os.path.join(attempt, "home", "gitconfig"),
-    "GIT_TERMINAL_PROMPT": "0",
-    "HOME": os.path.join(attempt, "home"),
-    "LC_ALL": "C",
-})
-os.makedirs(env["HOME"], exist_ok=True)
-with open(env["GIT_CONFIG_GLOBAL"], "w", encoding="utf-8") as handle:
-    handle.write("[core]\n\texcludesFile =\n")
-if not os.path.isdir(git_dir):
-    subprocess.run(["git", "init", "--bare", "--quiet", git_dir], check=True, env=env)
-process = subprocess.run(
-    ["git", "--git-dir", git_dir, "--work-tree", work,
-     "-c", "core.excludesFile=/dev/null",
-     "ls-files", "-z", "--others", "--exclude-per-directory=.gitignore"],
-    cwd=work, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, check=False,
-)
-if process.returncode != 0:
-    print(process.stderr.decode("utf-8", "replace"), file=sys.stderr)
+selection_spec = importlib.util.spec_from_file_location(
+    "remote_exec_selection", CONFIG["selectionModule"])
+selection = importlib.util.module_from_spec(selection_spec)
+selection_spec.loader.exec_module(selection)
+try:
+    listed = selection.git_selected(
+        work,
+        os.path.join(attempt, "selection.git"),
+        os.path.join(attempt, "home"),
+    )
+except selection.SelectionError as error:
+    print(str(error), file=sys.stderr)
     sys.exit(2)
-listed = [name for name in process.stdout.decode("utf-8", "surrogateescape").split("\0") if name]
 sys.path.insert(0, attempt)
 import boundary
 new = []

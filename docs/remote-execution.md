@@ -68,7 +68,7 @@ opt into a persistent task workspace with `--workspace-id`:
       state/managed.json       expected state of managed source paths
       state/synced.json        last verified input
       state/update-incomplete.json   present while a sync may be partial
-      state/lock               flock serialising workspace transitions
+      .locks/<key>.lock        external flock serialising creation, sync and retirement
       work/                    source plus retained tool output
       home/                    stable HOME for tool-native state
       staging/<attempt-id>/    incoming capture, never inside work/
@@ -119,7 +119,14 @@ with `--clean-home`) only when no dispatch, unit or live process can still be ru
 required for an unknown outcome after those checks. `workspace-prune` is a dry run by default: it
 deletes only terminal attempts older than `--max-age-days` beyond `--keep`, skips a workspace with a
 non-terminal lease, and `--apply` performs the deletion. `--remove-workspaces` additionally deletes
-eligible, unused workspaces of this repository; no automated prune is scheduled.
+eligible, unused workspaces of this repository. `--max-bytes` additionally deletes the oldest
+terminal attempts until the reported full workspace usage (work, home, staging and attempts) fits the
+budget; it never touches a running, pending or unknown lease. Even a dry run creates the external
+lock file as a side effect, but no user data changes. No automated prune is scheduled.
+
+Only `succeeded`, `failed` and `cancelled` results release a lease, and only after the unit is no
+longer active. A result whose phase is `unknown` leaves the lease unknown; `cancel` still stops the
+owned unit, and only an explicit verified `workspace-reset --force` makes the workspace reusable.
 
 ## Source selection
 
@@ -183,13 +190,24 @@ remote-exec collect --target hom-wrk-01 --identity <key> --repo-id nixfiles \
 # Iterative work reuses one task workspace; verification uses a fresh attempt
 # or an explicit clean reset.
 remote-exec run --target hom-wrk-01 --identity <key> --repo-id nixfiles \
-  --workspace-id nixfiles-iter --repo /path/to/worktree -- nix build .#checks
+  --workspace-id nixfiles-iter --run-id <native-run-id> --repo /path/to/worktree \
+  -- nix build .#checks
 remote-exec workspace-status --target hom-wrk-01 --identity <key> \
   --repo-id nixfiles --workspace-id nixfiles-iter --repo /path/to/worktree
 remote-exec workspace-reset  --target hom-wrk-01 --identity <key> \
   --repo-id nixfiles --workspace-id nixfiles-iter --repo /path/to/worktree
 remote-exec workspace-prune  --target hom-wrk-01 --identity <key> \
-  --repo-id nixfiles --repo /path/to/worktree --keep 10 --max-age-days 14
+  --repo-id nixfiles --repo /path/to/worktree --keep 10 --max-age-days 14 \
+  [--max-bytes N] [--apply]
+
+# Workspace recovery keeps the same identity flags as the run.
+remote-exec status  --target hom-wrk-01 --identity <key> --repo-id nixfiles \
+  --workspace-id nixfiles-iter --repo /path/to/worktree --run-id <id> --attempt-id <id>
+remote-exec cancel  --target hom-wrk-01 --identity <key> --repo-id nixfiles \
+  --workspace-id nixfiles-iter --repo /path/to/worktree --run-id <id> --attempt-id <id>
+remote-exec collect --target hom-wrk-01 --identity <key> --repo-id nixfiles \
+  --workspace-id nixfiles-iter --repo /path/to/worktree --run-id <id> --attempt-id <id> \
+  --out ./result --logs --delta
 ```
 
 `capture` and `verify` are the pieces `run` composes; `status` and `collect` are required for

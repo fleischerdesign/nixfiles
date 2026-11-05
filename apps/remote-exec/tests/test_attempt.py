@@ -261,7 +261,7 @@ class AttemptTest(RepoFixture):
         class Offline(transport.Transport):
             supervised = True
 
-            def supervise(self, attempt_dir, timeout, unit=None, work_dir=None):
+            def supervise(self, attempt_dir, timeout, unit=None, work_dir=None, runtime_max_secs=None):
                 raise subprocess.TimeoutExpired(cmd="ssh", timeout=1)
 
         attempt.transport = Offline()

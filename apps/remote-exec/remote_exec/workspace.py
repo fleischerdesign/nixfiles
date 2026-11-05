@@ -72,6 +72,10 @@ class Workspace:
         self.key = workspace_key(root, target, user, self.repo_id, self.label, repo_identity)
         self.path = f"{self.root}/workspaces/{self.key}"
 
+    @property
+    def lock_path(self) -> str:
+        return f"{self.root}/workspaces/.locks/{self.key}.lock"
+
     def _py(self, code: str, args: object, timeout: float | None = 120):
         process = self.transport.run_py(code, args, timeout=timeout)
         if process.returncode != 0:
@@ -203,7 +207,13 @@ class Workspace:
         )
         return json.loads(process.stdout.decode("utf-8"))
 
-    def prune(self, apply: bool = False, keep: int = 10, max_age_days: float = 14) -> dict:
+    def prune(
+        self,
+        apply: bool = False,
+        keep: int = 10,
+        max_age_days: float = 14,
+        max_bytes: int | None = None,
+    ) -> dict:
         process = self._py(
             workspace_scripts.PRUNE,
             {
@@ -211,6 +221,7 @@ class Workspace:
                 "apply": apply,
                 "keep": keep,
                 "cutoff": int(__import__("time").time() - max_age_days * 86400),
+                "maxBytes": max_bytes,
             },
             timeout=900,
         )
@@ -237,12 +248,20 @@ class WorkspaceAttempt(attempt_module.Attempt):
     only the workspace `work/` and `home/` are shared across attempts.
     """
 
-    def __init__(self, transport_: transport.Transport, workspace: Workspace, attempt_id: str):
+    def __init__(
+        self,
+        transport_: transport.Transport,
+        workspace: Workspace,
+        attempt_id: str,
+        run_id: str | None = None,
+        repo_path: str | None = None,
+    ):
         self.transport = transport_
         self.workspace = workspace
         self.root = workspace.root
         self.repo_id = workspace.repo_id
-        self.run_id = workspace.label
+        self.run_id = attempt_module.valid_id(run_id or workspace.label, "run id")
+        self.repo_path = repo_path
         self.attempt_id = attempt_module.valid_id(attempt_id, "attempt id")
         self.path = workspace.attempt_path(self.attempt_id)
         self.staging = workspace.staging_path(self.attempt_id)
@@ -314,9 +333,20 @@ class WorkspaceAttempt(attempt_module.Attempt):
             "workspaceDir": self.workspace.path,
             "homeDir": self.workspace.path + "/home",
             "leaseFile": self.workspace.path + "/state/lease.json",
+            "leaseLockFile": self.workspace.lock_path,
             "finalizeScript": self.path + "/finalize.py",
             "finalizeConfig": self.path + "/finalize-config.json",
         }
+
+    def recovery_flags(self) -> list[str]:
+        flags = [
+            "--repo-id", self.repo_id,
+            "--run-id", self.run_id,
+            "--workspace-id", self.workspace.label,
+        ]
+        if self.repo_path:
+            flags += ["--repo", self.repo_path]
+        return flags
 
     def dispatch_files(self) -> dict[str, str]:
         configuration = {
@@ -328,6 +358,8 @@ class WorkspaceAttempt(attempt_module.Attempt):
             "snapshotDir": f"{self.path}/snapshot",
             "outputManifest": f"{self.path}/output-files.json",
             "managedFile": f"{self.workspace.path}/state/managed.json",
+            "workspace": self.workspace.path,
+            "selectionModule": f"{self.path}/selection.py",
         }
         return {
             "finalize.py": workspace_scripts.FINALIZE,
