@@ -15,8 +15,10 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 from . import attempt as attempt_module
+from . import checkpoint
 from . import manifest, source, transport
 
 DEFAULT_INVENTORY = "/etc/openclaw/remote-exec-inventory.json"
@@ -56,9 +58,12 @@ def resolve_target(value: str | None, name: str) -> tuple[dict, dict]:
 def make_transport(args, host: dict | None, executor: dict | None) -> transport.Transport:
     if args.transport == "local":
         return transport.LocalTransport()
-    if not args.identity:
-        raise attempt_module.Blocked("--identity is required: no implicit SSH credential discovery")
-    identity = os.path.abspath(os.path.expanduser(args.identity))
+    declared = args.identity or load_inventory(args.inventory).get("defaultIdentity")
+    if not declared:
+        raise attempt_module.Blocked(
+            "--identity is required: the inventory declares no default executor identity"
+        )
+    identity = os.path.abspath(os.path.expanduser(declared))
     if not os.path.isfile(identity):
         raise attempt_module.Blocked(f"identity file {identity} does not exist")
     return transport.SshTransport(
@@ -137,6 +142,25 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     verify.add_argument("--manifest", required=True)
     verify.add_argument("--expect-input-id")
 
+    verify_source = sub.add_parser(
+        "verify-source", help="capture a repository and compare its input id"
+    )
+    verify_source.add_argument("--repo", required=True)
+    verify_source.add_argument("--expect-input-id", required=True)
+
+    checkpoint_parser = sub.add_parser(
+        "checkpoint", help="publish a filtered verified export as a private Git checkpoint"
+    )
+    checkpoint_parser.add_argument("--repo", required=True)
+    checkpoint_parser.add_argument("--id")
+    checkpoint_parser.add_argument("--author-name")
+    checkpoint_parser.add_argument("--author-email")
+
+    release = sub.add_parser("checkpoint-release", help="delete an owned checkpoint ref")
+    release.add_argument("--repo", required=True)
+    release.add_argument("--ref", required=True)
+    release.add_argument("--expect-commit", required=True)
+
     status = sub.add_parser("status", help="observe an attempt without dispatching anything")
     add_attempt_arguments(status)
     status.add_argument("--json", action="store_true")
@@ -209,6 +233,40 @@ def command_capture(args) -> int:
 def command_verify(args) -> int:
     value = manifest.verify(args.root, args.manifest, args.expect_input_id)
     print(json.dumps({"inputId": value}))
+    return 0
+
+
+def command_verify_source(args) -> int:
+    capture_dir = attempt_module.capture_to(args.repo)
+    try:
+        with open(os.path.join(capture_dir, "input-files.json"), encoding="utf-8") as handle:
+            value = json.load(handle)
+        if value["inputId"] != args.expect_input_id:
+            raise attempt_module.Blocked(
+                f"source input id {value['inputId']} does not match the expected "
+                f"{args.expect_input_id}; do not edit or build this tree"
+            )
+        print(json.dumps({"inputId": value["inputId"], "sourceRoot": os.path.realpath(args.repo)}))
+        return 0
+    finally:
+        transport.cleanup(capture_dir)
+
+
+def command_checkpoint(args) -> int:
+    capture_dir = attempt_module.capture_to(args.repo)
+    try:
+        receipt = checkpoint.create(
+            args.repo, capture_dir, args.id, args.author_name, args.author_email
+        )
+        print(json.dumps(receipt, indent=2, sort_keys=True))
+        return 0
+    finally:
+        transport.cleanup(capture_dir)
+
+
+def command_checkpoint_release(args) -> int:
+    value = checkpoint.release(args.repo, args.ref, args.expect_commit)
+    print(json.dumps(value, sort_keys=True))
     return 0
 
 
@@ -312,6 +370,13 @@ def command_run(args) -> int:
                 )
             )
             return 3
+        log_dir = default_log_dir(attempt)
+        try:
+            result["diagnostics"] = attempt.diagnostics(log_dir)
+        except (attempt_module.Blocked, transport.TransportError, OSError) as error:
+            # The command is terminal; only its diagnostics failed. This is not
+            # an unknown execution and must never trigger a replay.
+            result["diagnostics"] = {"error": str(error), "logsDir": log_dir}
         print(json.dumps(result, indent=2, sort_keys=True))
         phase = result.get("phase")
         if phase == "succeeded":
@@ -331,6 +396,9 @@ def command_inventory(args) -> int:
 COMMANDS = {
     "capture": command_capture,
     "verify": command_verify,
+    "verify-source": command_verify_source,
+    "checkpoint": command_checkpoint,
+    "checkpoint-release": command_checkpoint_release,
     "status": command_status,
     "cancel": command_cancel,
     "collect": command_collect,
@@ -346,6 +414,20 @@ def main(argv: list[str] | None = None) -> int:
     except attempt_module.Blocked as error:
         print(f"remote-exec: {error}", file=sys.stderr)
         return 2
-    except (source.SourceError, manifest.ManifestError, transport.TransportError) as error:
+    except (
+        source.SourceError,
+        manifest.ManifestError,
+        transport.TransportError,
+        checkpoint.CheckpointError,
+    ) as error:
         print(f"remote-exec: {error}", file=sys.stderr)
         return 2
+
+
+def default_log_dir(attempt: attempt_module.Attempt) -> str:
+    base = os.environ.get("XDG_STATE_HOME") or os.path.join(
+        os.path.expanduser("~"), ".local", "state"
+    )
+    if base.startswith("~"):
+        base = os.path.join(tempfile.gettempdir(), "remote-exec-state")
+    return os.path.join(base, "remote-exec", attempt.repo_id, attempt.run_id, attempt.attempt_id)

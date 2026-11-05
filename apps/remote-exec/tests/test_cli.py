@@ -263,3 +263,35 @@ class CliTest(RepoFixture):
         printed = json.loads(buffer.getvalue())
         self.assertEqual(printed["phase"], "unknown")
         self.assertEqual(printed["attemptId"], "attempt-x")
+
+    def test_run_reports_diagnostics_and_preserves_remote_exit_code(self):
+        state_home = os.path.join(self.tmp, "state")
+        common = self.local_common("run-diagnostics")
+        ran = self.cli(
+            "run", *common,
+            "--repo", self.repo,
+            "--", "sh", "-c", "echo out; echo err >&2; exit 4",
+            env={"XDG_STATE_HOME": state_home},
+        )
+        self.assertEqual(ran.returncode, 1, ran.stderr)
+        printed = json.loads(ran.stdout)
+        self.assertEqual(printed["exitCode"], 4)
+        self.assertIn("out", printed["diagnostics"]["stdoutPreview"])
+        self.assertIn("err", printed["diagnostics"]["stderrPreview"])
+        self.assertTrue(os.path.isdir(printed["diagnostics"]["logsDir"]))
+
+    def test_checkpoint_and_verify_source_commands(self):
+        self.write("tracked.txt", "dirty\n")
+        checked = self.cli("checkpoint", "--repo", self.repo)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        receipt = json.loads(checked.stdout)
+        self.assertTrue(receipt["checkpoint"]["ref"].startswith("refs/remote-exec/checkpoints/"))
+        verified = self.cli(
+            "verify-source", "--repo", self.repo, "--expect-input-id", receipt["inputId"]
+        )
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+        mismatch = self.cli(
+            "verify-source", "--repo", self.repo, "--expect-input-id", "0" * 64
+        )
+        self.assertEqual(mismatch.returncode, 2)
+        self.assertIn("does not match", mismatch.stderr)

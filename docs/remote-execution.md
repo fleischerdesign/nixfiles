@@ -17,6 +17,12 @@ duplicate or concurrent request for the same attempt id observes the existing st
 or runs it again. A preparation interrupted before `input.json` reports `interrupted` and is not
 runnable.
 
+After a terminal result, `run` also fetches the attempt logs into
+`$XDG_STATE_HOME/remote-exec/<repo>/<run>/<attempt>/`, verifies them against the result hashes, and
+includes bounded stdout/stderr previews in its JSON. A failed diagnostic transfer appears as
+`diagnostics.error` while the command's phase and remote exit code remain authoritative; it is a
+diagnostic failure, not an unknown execution, and is never replayed.
+
 ## Executor identity
 
 Identity is the inventory plus a pinned SSH host key plus a declared non-root account:
@@ -30,6 +36,9 @@ Identity is the inventory plus a pinned SSH host key plus a declared non-root ac
 - `--identity` is required; OpenSSH default credential discovery is disabled with
   `IdentitiesOnly=yes`. The gateway's dedicated executor key is the SOPS secret
   `services/remote_exec/ssh_private_key`, readable only by `openclaw`.
+- The inventory declares that path as `defaultIdentity`, so a normal gateway call needs no
+  repeated key argument; `--identity` overrides it explicitly and implicit discovery stays
+  disabled either way.
 - A native pairing id or a device selected in a client UI is not this identity and is not accepted
   as one. Session placement and SSH execution are separate decisions.
 
@@ -111,6 +120,41 @@ remote-exec collect --target hom-wrk-01 --identity <key> --repo-id nixfiles \
 `capture` and `verify` are the pieces `run` composes; `status` and `collect` are required for
 recovery. `--transport local` runs the same runner against a local directory for the fixture suite
 only; its timeout says nothing about SSH transport or systemd supervision.
+
+## Source handoff for a native child
+
+Implicit inheritance of a parent's dirty, untracked, deleted or executable state is not a supported
+contract. The explicit handoff is `remote-exec checkpoint`:
+
+```bash
+remote-exec checkpoint --repo /path/to/worktree
+remote-exec verify-source --repo . --expect-input-id <receipt.inputId>
+```
+
+`checkpoint` captures the same filtered, credential-scanned export as `run`, publishes it as a
+standard-Git commit under the private namespace `refs/remote-exec/checkpoints/`, and prints:
+
+```json
+{
+  "sourceRoot": "/path/to/worktree",
+  "parentRevision": "<original HEAD>",
+  "inputId": "<content-only id>",
+  "checkpoint": {"id": "...", "commit": "...", "tree": "...", "ref": "refs/remote-exec/checkpoints/..."}
+}
+```
+
+The commit is built with `hash-object --no-filters`, `mktree -z` and `commit-tree`, so clean,
+smudge, eol and attribute conversion and hooks do not run. The caller's HEAD, index, branches and
+working bytes are untouched; the original commit is kept as the checkpoint's parent for provenance.
+The ref is the retention record: same-id replay returns the same commit only for the same input,
+and a different input under the same id is refused. Keep it until the consumer is bound and settled.
+`checkpoint-release --expect-commit` deletes only an owned ref, with CAS, and is idempotent when the
+ref is already absent.
+
+Pass `worktree=true`, `cwd=<sourceRoot>` and `worktreeBaseRef=<checkpoint.commit>` to
+`sessions_spawn`, and put `expectedInputId` in the child task. The child runs `verify-source` before
+any edit or build; a mismatch stops it. Integrate child changes after the checkpoint through normal
+Git; the tool does not merge or apply a synthetic checkpoint.
 
 Exit codes: `0` command succeeded, `1` command ran and failed, `2` blocked or input did not verify,
 `3` outcome unknown (reconcile or cancel the same attempt).

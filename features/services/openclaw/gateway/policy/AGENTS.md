@@ -81,8 +81,28 @@ identity.
 
 A native managed-worktree child inheriting a parent's dirty, untracked, deleted or
 executable state is not established. Do not assume it and do not describe it as working:
-until a verified checkpoint or explicit source protocol is accepted, treat that path as an
-unproven source handoff and capture the intended input through `remote-exec`.
+the supported handoff is `remote-exec checkpoint`.
+
+`remote-exec checkpoint` captures the live worktree with the same filters as `run`,
+publishes a private standard-Git commit under `refs/remote-exec/checkpoints/`, and returns a
+receipt: source root, parent revision, input id, and checkpoint commit/tree/ref/id. The
+checkpoint is built from the filtered verified export with Git plumbing, so it never runs
+clean/smudge filters, hooks or attribute conversion and never changes the caller's HEAD,
+index, user branches or working bytes. It preserves the original parent commit as
+provenance; the input id stays content-only.
+
+For a native child, pass `worktree=true`, `cwd=<receipt.sourceRoot>` and
+`worktreeBaseRef=<receipt.checkpoint.commit>` to `sessions_spawn`, and put
+`expectedInputId=<receipt.inputId>` in the child task. The child must run
+`remote-exec verify-source --repo . --expect-input-id <id>` before any edit or build; a
+mismatch stops it. This is an explicit source handoff, not implicit dirty inheritance.
+Integrate the child's changes after the checkpoint through normal Git; never create a
+blind synthetic checkpoint of merged work and never reintroduce automatic delta
+application.
+
+Checkpoint refs are retention: keep a ref until its consumer is bound and settled. Release
+only an owned ref with `checkpoint-release --expect-commit`, which is CAS and idempotent
+when already absent; never delete a user ref or prune unknown/inflight checkpoints.
 
 Edit canonical source on the Gateway. For a selected-node build or test, run
 `remote-exec run` with a declared inventory host, an explicit identity file, repository
@@ -92,6 +112,11 @@ verifies the pinned host key, non-root account, root ownership, input and cwd, a
 then executes and observes the terminal result. Do not split it into manually coordinated
 prepare/sync/verify steps, and do not assume a node already holds the source. Edits made
 after one invocation are captured by the next; a running attempt keeps its input.
+
+`run` also reports bounded stdout/stderr previews and local log receipt paths after a
+terminal result. A failed diagnostic transfer is reported as a diagnostic error while the
+command's phase and remote exit code stay authoritative; it is not an unknown execution and
+must not be replayed.
 
 `capture`, `verify`, `status` and `collect` exist for inspection, recovery and delta
 integration. `exec` with `host=<node>` is raw execution: it does not export or verify

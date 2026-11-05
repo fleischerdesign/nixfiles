@@ -302,6 +302,43 @@ class Attempt:
         )
         return json.loads(process.stdout.decode("utf-8"))
 
+    def diagnostics(self, local_dir: str, preview_bytes: int = 8192) -> dict:
+        """Fetch terminal logs, verify them, and return bounded previews.
+
+        This runs only after a terminal result. A failure here is a diagnostic
+        failure, not an unknown execution.
+        """
+        if os.path.islink(local_dir):
+            raise Blocked("diagnostics target is a symlink")
+        if os.path.exists(local_dir):
+            if not os.path.isdir(local_dir):
+                raise Blocked(f"diagnostics target {local_dir} is not a directory")
+            if os.listdir(local_dir):
+                raise Blocked(f"diagnostics target {local_dir} is not empty")
+        else:
+            os.makedirs(local_dir)
+        result = self.read_json("result.json")
+        if result is None:
+            raise Blocked("attempt has no terminal result")
+        self.transport.pull_tree(f"{self.path}/logs", local_dir)
+        previews = {}
+        truncated = {}
+        for name, expected in result.get("logs", {}).items():
+            rel = f"{name}.log"
+            try:
+                digest = manifest.describe(local_dir, rel)
+            except FileNotFoundError as error:
+                raise Blocked(f"result names a missing {name} log") from error
+            if digest.get("size") != expected.get("size") or digest.get("sha256") != expected.get("sha256"):
+                raise Blocked(f"collected {name} log does not match the result digest")
+            with open(os.path.join(local_dir, rel), "rb") as handle:
+                data = handle.read()
+            previews[f"{name}Preview"] = data[-preview_bytes:].decode("utf-8", "replace")
+            truncated[name] = len(data) > preview_bytes
+        previews["logsDir"] = local_dir
+        previews["truncated"] = truncated
+        return previews
+
     def collect(
         self,
         local_out: str,

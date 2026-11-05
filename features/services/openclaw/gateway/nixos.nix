@@ -21,6 +21,10 @@ let
   remoteExec = pkgs.callPackage ../../../../apps/remote-exec { };
   remoteExecInventory = {
     schemaVersion = 2;
+    # The gateway's dedicated executor key, installed from SOPS. The CLI uses
+    # it unless an explicit --identity overrides it; implicit OpenSSH key
+    # discovery stays disabled.
+    defaultIdentity = config.sops.secrets."services/remote_exec/ssh_private_key".path;
     hosts = lib.mapAttrs (name: host: {
       hostType = host.hostType or null;
       sshAddress = if (host.wireguardIpv4 or null) != null then host.wireguardIpv4 else host.ipv4 or null;

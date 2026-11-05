@@ -106,7 +106,9 @@ pkgs.testers.nixosTest {
     )
     gateway.succeed(
         "remote-exec run " + common + " --attempt-id ok-1 --repo /root/repo -- " + producer
+        + " > /tmp/ok1.json"
     )
+    gateway.succeed("grep -q 'stdoutPreview' /tmp/ok1.json")
     gateway.succeed(
         "remote-exec collect " + common + " --attempt-id ok-1 --out /root/out --delta --logs"
     )

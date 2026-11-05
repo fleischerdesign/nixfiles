@@ -340,3 +340,31 @@ class AttemptTest(RepoFixture):
         out = os.path.join(self.tmp, "collected-artifact-symlink")
         with self.assertRaises(attempt_module.Blocked):
             attempt.collect(out, with_artifacts=True)
+
+    # -- correction batch: bounded run diagnostics ---------------------------
+    def test_diagnostics_return_bounded_previews_and_verify_hashes(self):
+        attempt, _, result = self.dispatch(["sh", "-c", "echo out; echo err >&2"])
+        self.assertEqual(result["phase"], "succeeded")
+        log_dir = os.path.join(self.tmp, "diagnostics")
+        value = attempt.diagnostics(log_dir, preview_bytes=64)
+        self.assertIn("out", value["stdoutPreview"])
+        self.assertIn("err", value["stderrPreview"])
+        self.assertEqual(value["logsDir"], log_dir)
+        self.assertFalse(value["truncated"]["stdout"])
+
+        with open(os.path.join(attempt.path, "logs", "stdout.log"), "a", encoding="utf-8") as handle:
+            handle.write("tampered\n")
+        with self.assertRaises(attempt_module.Blocked):
+            attempt.diagnostics(os.path.join(self.tmp, "diagnostics-tampered"))
+
+    def test_diagnostics_transfer_failure_is_distinct_from_execution(self):
+        attempt, _, result = self.dispatch(["true"])
+        self.assertEqual(result["phase"], "succeeded")
+
+        def fail_pull(source, destination):
+            raise transport.TransportError("network gone")
+
+        attempt.transport.pull_tree = fail_pull
+        with self.assertRaises(transport.TransportError):
+            attempt.diagnostics(os.path.join(self.tmp, "diagnostics-failure"))
+        self.assertEqual(result["phase"], "succeeded")
