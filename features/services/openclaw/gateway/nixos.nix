@@ -15,41 +15,6 @@ let
     export { default } from "${bootstrapHookDir}/handler.js";
   '';
   package = pkgs.openclaw-gateway;
-  # One executor inventory, derived from the topology and from the executor
-  # module each host enabled. A host without that declaration is not eligible:
-  # selection is a configuration fact, not a name in a task.
-  remoteExec = pkgs.callPackage ../../../../apps/remote-exec { };
-  remoteExecInventory = {
-    schemaVersion = 2;
-    # The gateway's dedicated executor key, installed from SOPS. The CLI uses
-    # it unless an explicit --identity overrides it; implicit OpenSSH key
-    # discovery stays disabled.
-    defaultIdentity = config.sops.secrets."services/remote_exec/ssh_private_key".path;
-    hosts = lib.mapAttrs (name: host: {
-      hostType = host.hostType or null;
-      sshAddress = if (host.wireguardIpv4 or null) != null then host.wireguardIpv4 else host.ipv4 or null;
-      fqdn = config.my.contracts.projections.hostFqdnOf.${name};
-      # Only a server or workstation is an executor; embedded and client
-      # entries stay addressable but carry no architecture claim.
-      architecture =
-        if (host.hostType or null) == "server" || (host.hostType or null) == "workstation" then
-          pkgs.stdenv.hostPlatform.parsed.cpu.name
-        else
-          null;
-      executor =
-        let
-          declared =
-            if lib.hasAttr name systems then
-              systems.${name}.config.my.features.services.remote-exec or null
-            else
-              null;
-        in
-        lib.optionalAttrs (declared != null && declared.enable) {
-          inherit (declared) user root runtimePath;
-          hostKey = systems.${name}.config.programs.ssh.knownHosts.${name}.publicKey;
-        };
-    }) config.my.topology.hosts;
-  };
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
   portals = config.my.contracts.provides.openclaw.publications.portals;
@@ -337,15 +302,7 @@ in
         ]
         ++ map (subscription: subscription.apiKeySecret) subscriptions
       ) (_: { })
-      // {
-        # Dedicated least-privilege executor key. It is readable only by the
-        # gateway account and never by the executor; the root deploy key is a
-        # different credential and is not used for builds.
-        "services/remote_exec/ssh_private_key" = {
-          owner = "openclaw";
-          mode = "0400";
-        };
-      };
+      // { };
     sops.templates.openclaw-gateway-env.content = ''
       OPENCLAW_GATEWAY_PASSWORD=${config.sops.placeholder."openclaw/gateway_password"}
       HASS_MCP_TOKEN=${config.sops.placeholder."services/home/hass_mcp_token"}
@@ -372,7 +329,6 @@ in
         pkgs.git
         pkgs.ripgrep
         pkgs.nix
-        remoteExec
       ];
       config = lib.recursiveUpdate {
         auth = {
@@ -672,9 +628,6 @@ in
           email = moebius@vyrx.de
     '';
 
-    # Read by `remote-exec` through $REMOTE_EXEC_INVENTORY's default path.
-    environment.etc."openclaw/remote-exec-inventory.json".text = builtins.toJSON remoteExecInventory;
-
     systemd.services.openclaw-gateway = {
       after = [ "wireguard-wg0.service" ];
       restartTriggers = [
@@ -706,7 +659,6 @@ in
     };
     environment.systemPackages = [
       operator
-      remoteExec
     ];
 
     # OpenClaw keeps portal ingress on loopback. Expose only a mesh socket to

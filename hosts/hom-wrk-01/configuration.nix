@@ -25,15 +25,6 @@
     enable = true;
     camera.enable = true;
   };
-  # Canary executor: one workstation, one dedicated non-root account. The key
-  # is the public half of the gateway's executor credential; the private half
-  # is a SOPS secret owned by the gateway account.
-  my.features.services.remote-exec = {
-    enable = true;
-    authorizedKeys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOt1QXJDp90dDdQyA3oyqIoL5VoztGSMHw9NRHRSUKWK remote-exec@cld-ops-01"
-    ];
-  };
   # The session comes from the desktop role; only the output layout is a fact of this host.
   my.features.desktop.niri.outputs = {
     "DP-1".position = {

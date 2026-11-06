@@ -339,8 +339,12 @@ rejecting links. The patch is anchored by symbols rather than file names or line
 `postFixup` step, so a version bump keeps applying it; when an anchor disappears the build fails and names
 the overlay, and it refuses to run against a package that already carries the change. Delete the overlay
 and its `flake.nix` entry once upstream distinguishes immutable store outputs from mutable skill roots;
-the limitation returns until then. Remote-execution session details stay in
-[remote-execution.md](remote-execution.md).
+the limitation returns until then.
+
+Remote build and test of a Gateway-held working tree is no longer a local tool. The
+executor account, its inventory and its dedicated credential were removed with it; a task
+that needs another machine uses native worker session placement instead of a second
+execution path beside `exec`.
 
 Skills supply task-specific procedures, not duplicate routing rules. Memory records
 preferences and decisions, not technical defaults. Existing sessions and auth profiles
