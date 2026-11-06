@@ -14,7 +14,9 @@ import path from "node:path";
 
 const TAG = "openclaw capability-read trace";
 const MARKER = "throw new SessionCapabilityReadRequired(query);";
-const TRACED = `console.error("${TAG}: caller stack", new Error().stack);\n\t\t${MARKER}`;
+// Also print what the scope prepared: a miss is either a missing scope or a key
+// mismatch, and the two need different fixes.
+const TRACED = `console.error("${TAG}: caller stack", JSON.stringify({ requested: readKey(query), scope: preparedScope ? [...preparedScope.entries.keys()] : null, retain: preparedScope?.retain ?? null }), new Error().stack);\n\t\t${MARKER}`;
 
 function fail(message) {
   console.error(`${TAG}: ${message}`);
