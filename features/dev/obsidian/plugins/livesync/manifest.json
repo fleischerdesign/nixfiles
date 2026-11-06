@@ -1,9 +1,9 @@
 {
   "name": "obsidian-livesync",
   "pname": "obsidian-livesync",
-  "version": "1.0.43",
-  "mainHash": "18850zgdxfmxav3f4sgsiq4xpj4q5fpman2j72d4av1g259sznkz",
-  "manifestHash": "1w1ylx34ziinbfvvqnvpr18d26gzr94s5y8xfrbn0klgairsfbxp",
+  "version": "1.0.45",
+  "mainHash": "03zbmbsslvj2yy5fgvl2ii11h6k0ikwz9k5pgkpjka00ddqxdcz6",
+  "manifestHash": "1gigp6x2zgsxcblyd4yk0czi20h4ihpzxrb1xpxc7s6gn7r6wf8b",
   "stylesHash": "17575zysix4zq6kqj18x8cv83aj56knksw324q2j9wfrxv19japl",
   "upstream": {
     "type": "obsidian-plugin",
