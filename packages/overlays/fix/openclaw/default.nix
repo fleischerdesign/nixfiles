@@ -22,6 +22,8 @@ _final: prev: {
         "$out/lib/node_modules/openclaw"
       ${prev.nodejs}/bin/node ${./prepare-worker-capability-reads.mjs} \
         "$out/lib/node_modules/openclaw"
+      ${prev.nodejs}/bin/node ${./trace-capability-read.mjs} \
+        "$out/lib/node_modules/openclaw"
     '';
   });
 }
