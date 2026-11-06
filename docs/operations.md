@@ -327,24 +327,18 @@ Only these explicitly managed files are replaced; personal `AGENTS.md`, `USER.md
 memory and learned skills are not regenerated. Policy changes alter the service unit and therefore follow normal nod
 activation and rollback. They do not depend on a skill being selected for a turn.
 
-Worker skill delivery has a related boundary. The worker bundler rejects every hardlinked file, while
-`auto-optimise-store` hardlinks identical files across content-addressed Nix store outputs. Bundled,
-custodian and plugin skill trees are therefore unreadable on a worker turn that bundles skills, and the
-turn fails with `INVALID_BUNDLE` before any model call.
+Worker execution is unavailable on the pinned OpenClaw release, and this configuration carries no local
+patch for it. Two upstream boundaries block it. The worker bundler rejects every hardlinked file, while
+`auto-optimise-store` hardlinks identical files across content-addressed Nix store outputs, so a turn that
+bundles bundled, custodian or plugin skills fails with `INVALID_BUNDLE` before any model call. And a
+session placed on a device or cloud worker fails before inference with `Session capability metadata
+requires worker preparation` (openclaw/openclaw#182647). The package is used exactly as upstream ships
+it; remote placement stays unused until upstream resolves both.
 
-`packages/overlays/fix/openclaw` carries a local patch for that read: the bundle reader now applies the
-plugin hardlink policy instead of an unconditional rejection, so an immutable store root is trusted in
-Nix mode exactly like ordinary skill discovery, while workspace, managed and configured roots keep
-rejecting links. The patch is anchored by symbols rather than file names or line numbers and runs as a
-`postFixup` step, so a version bump keeps applying it; when an anchor disappears the build fails and names
-the overlay, and it refuses to run against a package that already carries the change. Delete the overlay
-and its `flake.nix` entry once upstream distinguishes immutable store outputs from mutable skill roots;
-the limitation returns until then.
-
-Remote build and test of a Gateway-held working tree is no longer a local tool. The
-executor account, its inventory and its dedicated credential were removed with it; a task
-that needs another machine uses native worker session placement instead of a second
-execution path beside `exec`.
+Remote build and test of a Gateway-held working tree is no longer a local tool either. The executor
+account, its inventory and its dedicated credential were removed with it. A task that needs another
+machine therefore has no supported path in this configuration today: it does not fall back to a second
+execution path beside `exec`, and it does not run on a placed worker.
 
 Skills supply task-specific procedures, not duplicate routing rules. Memory records
 preferences and decisions, not technical defaults. Existing sessions and auth profiles

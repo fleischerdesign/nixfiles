@@ -82,8 +82,6 @@
         (import ./packages/overlays/fix/paperless-ngx)
         (import ./packages/overlays/fix/moonraker)
         inputs.openclaw.overlays.default
-        # Must follow the input overlay: it patches the package that overlay provides.
-        (import ./packages/overlays/fix/openclaw)
         inputs.nix-vscode-extensions.overlays.default
         (import ./packages/custom)
       ];
