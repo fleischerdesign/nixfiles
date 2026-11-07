@@ -2,6 +2,7 @@
   endpoint,
   camera,
   webapps,
+  nodeWorkspacePlugin,
 }:
 {
   config,
@@ -41,11 +42,25 @@ let
         }
         // lib.optionalAttrs (!hasDesktop) { headless = true; };
       }
-      // lib.optionalAttrs camera {
-        # The Linux node plugin keeps camera capture off by default, so the node
-        # advertises camera.list/snap/clip only once this is on and FFmpeg is on the
-        # service's PATH.
-        plugins.entries."linux-node".config.camera.enabled = true;
+      // {
+        # Both plugin entries live in one attribute set: a plain `//` merge of two
+        # `plugins` blocks would replace the camera entry instead of extending it.
+        plugins =
+          lib.recursiveUpdate
+            (lib.optionalAttrs camera {
+              # The Linux node plugin keeps camera capture off by default, so the node
+              # advertises camera.list/snap/clip only once this is on and FFmpeg is on the
+              # service's PATH.
+              entries."linux-node".config.camera.enabled = true;
+            })
+            {
+              # The node half of the workspace plugin: the nodews.* commands run in
+              # this host's process, so the plugin root is loaded here as well as on
+              # the gateway. A load path is the supported way to add a fixed plugin
+              # root in Nix mode; install/enable stay owned by this file.
+              load.paths = [ "${nodeWorkspacePlugin}" ];
+              entries."node-workspace".enabled = true;
+            };
       }
     )
   );

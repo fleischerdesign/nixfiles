@@ -62,6 +62,12 @@ let
   # range, and the lock is generated per host release.
   tokenjuicePlugin =
     inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}."openclaw-runtime-plugin-tokenjuice";
+  # Node workspace: publishes one selected directory to a paired node and
+  # returns selected changes after a preview. The same plugin root is loaded by
+  # the node host, which is where the nodews.* commands run; the gateway half
+  # only registers the agent tools. Both halves speak protocol 4, so the gateway
+  # and the node must run the same revision.
+  nodeWorkspacePlugin = pkgs.custom.openclaw-node-workspace;
   # Composio: ClawHub runtime plugin plus the CLI it drives. The plugin ships
   # the reviewed skill and the routing hook; the CLI performs live tool
   # discovery and execution inside the agent's exec environment.
@@ -406,6 +412,15 @@ in
               "file.create"
               "camera.snap"
               "camera.clip"
+              # The node workspace commands are all classified dangerous, so the
+              # allowlist is their only way in. nodews.push/fetch/status act on
+              # files inside the node's configured roots; nodews.tree reads a
+              # tree and nodews.return streams a selected change set back.
+              "nodews.push"
+              "nodews.fetch"
+              "nodews.status"
+              "nodews.tree"
+              "nodews.return"
             ];
           };
         };
@@ -565,7 +580,9 @@ in
           "${searxngPlugin}"
           "${composioPlugin}"
           "${tokenjuicePlugin}"
+          "${nodeWorkspacePlugin}"
         ];
+        plugins.entries.node-workspace.enabled = true;
         plugins.entries.searxng = {
           enabled = true;
           config.webSearch.baseUrl = searxngBaseUrl;

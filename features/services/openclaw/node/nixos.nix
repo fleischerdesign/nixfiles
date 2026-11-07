@@ -69,7 +69,13 @@ in
     ];
 
     home-manager.sharedModules = [
-      (import ./home.nix { inherit endpoint camera webapps; })
+      (import ./home.nix {
+        inherit endpoint camera webapps;
+        # Resolved here, where the system package set with the repository overlay
+        # is in scope; the Home Manager module receives the plugin root as an
+        # argument instead of assuming the same package set.
+        nodeWorkspacePlugin = pkgs.custom.openclaw-node-workspace;
+      })
     ];
 
     # Camera capture opens /dev/video*, whose device nodes belong to the video group. The
