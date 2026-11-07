@@ -62,6 +62,15 @@
     openclaw = {
       url = "github:openclaw/nix-openclaw";
     };
+
+    zapfast = {
+      url = "github:crmne/zapfast/v0.21.1";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
+    yapfast = {
+      url = "github:yapfast/yapfast/v0.3.0";
+    };
   };
 
   outputs =

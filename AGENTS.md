@@ -132,6 +132,10 @@ the generator was told.
 4. A test double models only what the test needs. An unexpected call is recorded, not fatal - the
    provider's own tests own its HTTP surface.
 5. A heavy test is selected by risk (changed paths), never run unconditionally.
+6. Inspect the transitive build dependencies, not just the test script. A check that references a
+   whole Home Manager profile or system closure builds every package in it; do not pull a closure
+   into the gate to verify a handful of declarations. Measure actual runtime behaviour separately
+   when it is worth the cost.
 
 A check that cannot fail on a plausible change is not a check - it is documentation with a build
 job. The named failure is the test of that: if the only sentence it can produce is "the generator
@@ -142,6 +146,8 @@ So these are never written:
 
 - a check that greps a generated file for a string the generator just wrote into it;
 - a check that repeats an assertion another layer already makes;
+- a check that verifies Home Manager installed packages that the same integration declares, rather
+  than detecting a defect in the integration itself;
 - a check whose failure message does not name a defect a person could have introduced;
 - a test double that must be extended whenever the code under test calls a new endpoint.
 

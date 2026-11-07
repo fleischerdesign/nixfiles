@@ -60,15 +60,7 @@ let
       settingsPlugins = lib.attrNames (settings.plugin_settings or { });
       namedWidgets = lib.attrNames (settings.widget or { });
 
-      # The phone plugin is a plugin that runs external tools; on NixOS each has to be in the
-      # session profile, so the check verifies the profile rather than the declaration.
       phonePluginEnabled = lib.elem "icefish/phone-operate" enabledPlugins;
-      phoneTools = [
-        "scrcpy"
-        "adb"
-        "sshfs"
-        "gdbus"
-      ];
 
       # Each claim is a property. The error names the ones that do not hold.
       claims = {
@@ -237,14 +229,6 @@ let
           fail=1
         fi
 
-        ${lib.optionalString phonePluginEnabled ''
-          for tool in ${lib.concatStringsSep " " phoneTools}; do
-            if [ ! -x ${lib.escapeShellArg "${user.home.path}/bin"}/"$tool" ]; then
-              echo "niri-noctalia[${name}]: the phone plugin needs $tool in the session profile" >&2
-              fail=1
-            fi
-          done
-        ''}
       '';
     in
     {
