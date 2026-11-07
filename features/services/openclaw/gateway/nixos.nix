@@ -582,7 +582,21 @@ in
           "${tokenjuicePlugin}"
           "${nodeWorkspacePlugin}"
         ];
-        plugins.entries.node-workspace.enabled = true;
+        plugins.entries.node-workspace = {
+          enabled = true;
+          # The agent publishes from its own workspace and receives returned files
+          # into it. Roots are an authorization boundary, not a sandbox: anything
+          # under them can be read, and a returned project is node-authored code.
+          config.gateway = {
+            localRoots = [ "/var/lib/openclaw/workspace" ];
+            artifactRoots = [ "/var/lib/openclaw/workspace" ];
+            returnRoots = [ "/var/lib/openclaw/workspace" ];
+            exclude = [
+              ".git"
+              "node_modules"
+            ];
+          };
+        };
         plugins.entries.searxng = {
           enabled = true;
           config.webSearch.baseUrl = searxngBaseUrl;

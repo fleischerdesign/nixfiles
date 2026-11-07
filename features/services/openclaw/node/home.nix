@@ -59,7 +59,17 @@ let
               # the gateway. A load path is the supported way to add a fixed plugin
               # root in Nix mode; install/enable stay owned by this file.
               load.paths = [ "${nodeWorkspacePlugin}" ];
-              entries."node-workspace".enabled = true;
+              entries."node-workspace" = {
+                enabled = true;
+                # Only this side's namespace is declared: the plugin reads the
+                # namespace it needs and treats a missing one as empty. The
+                # workspace directory is the node's own agent workspace.
+                config.node = {
+                  pushRoots = [ "${stateDir}/workspace" ];
+                  artifactRoots = [ "${stateDir}/workspace" ];
+                  returnRoots = [ "${stateDir}/workspace" ];
+                };
+              };
             };
       }
     )
@@ -72,7 +82,7 @@ let
     export OPENCLAW_CONFIG_PATH=${lib.escapeShellArg "${stateDir}/openclaw.json"}
     export OPENCLAW_WORKSPACE_DIR=${lib.escapeShellArg "${stateDir}/workspace"}
     umask 077
-    ${pkgs.coreutils}/bin/install -d -m 0700 "$OPENCLAW_STATE_DIR"
+    ${pkgs.coreutils}/bin/install -d -m 0700 "$OPENCLAW_STATE_DIR" "$OPENCLAW_WORKSPACE_DIR"
     cd "$OPENCLAW_STATE_DIR"
   '';
   cli = pkgs.writeShellScriptBin "openclaw-node" ''
