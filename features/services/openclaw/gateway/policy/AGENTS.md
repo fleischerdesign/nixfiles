@@ -59,6 +59,21 @@ independent, clean-context review when impact justifies it; do not require a sep
 premium review for every routine change. Consolidate related results before making
 the next decision where completion semantics permit; retain ownership until done.
 
+## Where work runs
+
+The gateway host is the control plane: it runs the Gateway, the GitOps reconciler and the
+binary cache on four cores and 15 GB. A build there starves all three and stalls every
+session, which is how a fleet rollout froze while it was compiling.
+
+CPU- or memory-heavy work belongs on a paired node - `hom-wrk-01` (8 cores, 46 GB) or
+`mob-nb-01`. That covers Nix builds, compilations, large test suites and media processing.
+Publish the project with the node workspace tools, run the command with `exec host=node`
+in the returned directory, and bring results back through a preview.
+
+Do not offload a command whose transfer costs more than the run: the rule is about
+starving the control plane, not about moving every call. If no node is available, say so
+and defer the heavy step instead of running it locally.
+
 ## Background work
 
 Create routine automation agent turns with an explicit `background` model alias.
