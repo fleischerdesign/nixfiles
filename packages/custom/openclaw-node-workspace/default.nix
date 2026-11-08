@@ -15,8 +15,8 @@ buildNpmPackage {
   src = fetchFromGitHub {
     owner = "fleischerdesign";
     repo = "openclaw-node-workspace";
-    rev = "0c6d299b8de481134a1c88bb15182f46ecba0500";
-    hash = "sha256-fCs5YeH7putKqUV2d5nrIBDUR5jFDa4XrdWDoEBffVY=";
+    rev = "d13684b856544550b7604d9af6708d693ab0bae2";
+    hash = "sha256-VLDwfwjG1czOaRx+aHaY2L0PTlpDQ7q7flb/5HtDGoo=";
   };
 
   npmDepsHash = "sha256-luH8/9XstxpnT7mbNiIlAB2vo/7uLL1eXH/4y/wPGuY=";

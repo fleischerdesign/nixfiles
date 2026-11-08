@@ -282,6 +282,13 @@ in
     # escape: it can read logs, not change them.
     users.users.openclaw.extraGroups = [ "systemd-journal" ];
 
+    # The node workspace plugin publishes from this directory only. It lives
+    # beside the workspace's memory and policy files, so it is created here
+    # rather than widening the plugin's roots to the whole workspace.
+    systemd.tmpfiles.rules = [
+      "d /var/lib/openclaw/workspace/projects 0700 openclaw openclaw -"
+    ];
+
     # The agent is the operator's admin assistant on this host. The grant is a
     # declarative sudoers rule, not `tools.elevated`: that setting only escapes
     # a sandbox, while this gateway runs unsandboxed and already executes as
@@ -584,13 +591,15 @@ in
         ];
         plugins.entries.node-workspace = {
           enabled = true;
-          # The agent publishes from its own workspace and receives returned files
-          # into it. Roots are an authorization boundary, not a sandbox: anything
-          # under them can be read, and a returned project is node-authored code.
+          # The agent publishes from, and receives returned files into, a dedicated
+          # project directory rather than the whole workspace: memory, notes and
+          # policy files live beside it and must not be publishable by accident.
+          # Roots are an authorization boundary, not a sandbox: anything under them
+          # can be read, and a returned project is node-authored code.
           config.gateway = {
-            localRoots = [ "/var/lib/openclaw/workspace" ];
-            artifactRoots = [ "/var/lib/openclaw/workspace" ];
-            returnRoots = [ "/var/lib/openclaw/workspace" ];
+            localRoots = [ "/var/lib/openclaw/workspace/projects" ];
+            artifactRoots = [ "/var/lib/openclaw/workspace/projects" ];
+            returnRoots = [ "/var/lib/openclaw/workspace/projects" ];
             exclude = [
               ".git"
               "node_modules"
