@@ -591,15 +591,13 @@ in
         ];
         plugins.entries.node-workspace = {
           enabled = true;
-          # The agent publishes from, and receives returned files into, a dedicated
-          # project directory rather than the whole workspace: memory, notes and
-          # policy files live beside it and must not be publishable by accident.
-          # Roots are an authorization boundary, not a sandbox: anything under them
-          # can be read, and a returned project is node-authored code.
+          # The plugin authorizes a local path against the session's own workspace,
+          # the boundary OpenClaw already hands to every tool. No root is configured
+          # here: the folder a session was opened on is the boundary, and a session
+          # without one falls back to the agent workspace. Roots are an
+          # authorization boundary, not a sandbox, and a returned project is
+          # node-authored code.
           config.gateway = {
-            localRoots = [ "/var/lib/openclaw/workspace/projects" ];
-            artifactRoots = [ "/var/lib/openclaw/workspace/projects" ];
-            returnRoots = [ "/var/lib/openclaw/workspace/projects" ];
             exclude = [
               ".git"
               "node_modules"

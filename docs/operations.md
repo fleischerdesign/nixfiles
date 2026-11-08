@@ -293,11 +293,12 @@ revision with `npmDepsHash`, and both sides load that store path; the gateway al
 commands, which are all classified dangerous and therefore reachable only through that list. The
 plugin speaks one protocol version, so the gateway and the nodes must run the same revision; a bump
 changes the store path on both sides and is one change, not two. Each side declares only its own
-config namespace: the gateway publishes from and returns into `/var/lib/openclaw/workspace/projects`, the node
-publishes inside its own agent workspace. A push never replaces an existing destination, a return
-never deletes and never overwrites a file that changed on both sides, and a returned project is
-node-authored content: building or running it executes code the node chose. The plugin's own
-repository carries the protocol, the security model and the recovery rules.
+config namespace: the gateway authorizes a local path against the calling session's workspace - the
+boundary OpenClaw already hands to every tool - and a session without one falls back to the agent
+workspace; the node publishes inside its own agent workspace. A push never replaces an existing
+destination, a return never deletes and never overwrites a file that changed on both sides, and a
+returned project is node-authored content: building or running it executes code the node chose. The
+plugin's own repository carries the protocol, the security model and the recovery rules.
 The built-in memory engine uses `openai/text-embedding-3-small` through OpenRouter. Search and
 cross-conversation recall are explicitly enabled with `memory` and `sessions` as sources. Active
 Memory is enabled in `escalate` mode for eligible private direct and explicit UI conversations;
