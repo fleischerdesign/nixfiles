@@ -36,6 +36,10 @@
     model = "openai/gpt-6.1-sol";
     subagentModel = "opencode-go/deepseek-v4.1-flash";
     adminSudo = true;
+    # Background learning is off by explicit request: Workshop skills are kept
+    # and remain usable, but the agent no longer saves, updates or archives them
+    # on its own. Nothing is deleted by this setting.
+    settings.skills.workshop.autonomous.mode = "off";
     opencodeSubscriptions = [
       {
         name = "subscription-3";
