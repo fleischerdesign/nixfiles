@@ -167,7 +167,10 @@ in
             clientId = "INUkxbseZQSmCfa4SsFpW6mkzRME4Kc28Daw9PH2";
             clientSecretEnv = "AUTHENTIK_OIDC_PAPERLESS_SECRET";
             secretPath = "services/apps/paperless_oidc_secret";
-            redirectPaths = [ "/accounts/authentik/login/callback/" ];
+            # allauth's openid_connect provider routes its callback below the provider id:
+            # /accounts/oidc/<provider_id>/login/callback/. The shorter path never matches the
+            # URI Paperless sends, so Authentik rejects every login with redirect_uri_no_match.
+            redirectPaths = [ "/accounts/oidc/authentik/login/callback/" ];
             subMode = "hashed_user_id";
             includeClaimsInIdToken = true;
           };
