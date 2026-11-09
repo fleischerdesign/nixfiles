@@ -9,7 +9,6 @@
 #   github-source    — GitHub Release, rebuild from source tarball
 #   github-rev       — Pinned to a git commit, tracks default branch HEAD
 #   pypi             — PyPI package, single or multi-package manifests
-#   obsidian-plugin  — GitHub Release assets (main.js, manifest.json, styles.css)
 #   npm              — Package published to the npm registry (tarball as source)
 #
 # github-source manifests support .upstream.tagPrefix (default "v") for repos
@@ -630,70 +629,6 @@ for manifest_path in "${MANIFEST_PATHS[@]}"; do
       mv "$tmp_manifest" "$manifest_path"
       echo "  ✨ Updated $pkg_name to $latest_version"
     fi
-
-  # =========================================================================
-  # obsidian-plugin — GitHub Release assets (main.js, manifest.json, styles.css)
-  # =========================================================================
-
-  elif [ "$upstream_type" = "obsidian-plugin" ]; then
-    owner="$(jq -r '.upstream.owner' "$manifest_path")"
-    repo="$(jq -r '.upstream.repo' "$manifest_path")"
-    current_version="$(jq -r '.version' "$manifest_path")"
-
-    echo "  Current version: $current_version"
-    echo "  Checking GitHub upstream: $owner/$repo..."
-
-    RELEASE_JSON="$(gh_api "https://api.github.com/repos/$owner/$repo/releases/latest")" || {
-      echo "  ⚠️ Could not fetch latest release for $owner/$repo"
-      failures=$((failures + 1))
-      continue
-    }
-
-    latest_tag="$(echo "$RELEASE_JSON" | jq -r '.tag_name // empty' | strip_v)"
-
-    if [ -z "$latest_tag" ]; then
-      echo "  ⚠️ Could not parse latest release tag"
-      failures=$((failures + 1))
-      continue
-    fi
-
-    if [ "$latest_tag" = "$current_version" ]; then
-      echo "  ✅ $pkg_name is already up to date (v$current_version)."
-      continue
-    fi
-
-    echo "  🎉 New version available: v$latest_tag (current: v$current_version)"
-
-    tag_ver="$latest_tag"
-    if echo "$RELEASE_JSON" | jq -r '.tag_name' | grep -q '^v'; then
-      tag_ver="v$latest_tag"
-    fi
-
-    main_url="https://github.com/$owner/$repo/releases/download/$tag_ver/main.js"
-    manifest_url="https://github.com/$owner/$repo/releases/download/$tag_ver/manifest.json"
-    styles_url="https://github.com/$owner/$repo/releases/download/$tag_ver/styles.css"
-
-    echo "  Downloading and hashing plugin assets..."
-    main_hash="$(nix-prefetch-url "$main_url" 2>/dev/null || true)"
-    manifest_hash="$(nix-prefetch-url "$manifest_url" 2>/dev/null || true)"
-    styles_hash="$(nix-prefetch-url "$styles_url" 2>/dev/null || true)"
-
-    if [ -z "$main_hash" ] || [ -z "$manifest_hash" ]; then
-      echo "  ❌ Failed to calculate hashes for plugin assets"
-      failures=$((failures + 1))
-      continue
-    fi
-
-    tmp_manifest="$(mktemp)"
-    jq --arg ver "$latest_tag" \
-       --arg main "$main_hash" \
-       --arg manifest "$manifest_hash" \
-       --arg styles "${styles_hash:-}" \
-       '.version = $ver | .mainHash = $main | .manifestHash = $manifest | .stylesHash = $styles' \
-       "$manifest_path" > "$tmp_manifest"
-
-    mv "$tmp_manifest" "$manifest_path"
-    echo "  ✨ Updated $pkg_name to v$latest_tag"
 
   # =========================================================================
   # npm — package published to the npm registry (tarball as source)

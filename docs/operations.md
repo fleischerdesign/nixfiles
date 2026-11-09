@@ -196,7 +196,7 @@ nix run .#update-custom-packages -- composio     # a single package
 ```
 
 Manifests under `packages/custom` and `features` select their upstream with `upstream.type` (release,
-revision, PyPI, npm, Obsidian, GitHub release). Source updates measure fixed-output hashes
+revision, PyPI, npm, GitHub release). Source updates measure fixed-output hashes
 from the package derivations and verify them with a second build; `github-release` can select exactly one
 named asset via `upstream.assetTemplate`. The mutable `latest` download is never a package source. A
 failed refresh restores the previous manifest and leaves errors on stderr.
