@@ -147,14 +147,16 @@
       timeout = 120;
       env = [ "CLOUDFLARE_API_TOKEN" ];
       policy = {
-        # The apex and the mail/delegation records are never deleted; one
-        # deletion per run is enough for a deliberate removal.
+        # The apex and the mail/delegation records are never deleted. The cap
+        # bounds an accidental mass deletion; two is what a deliberate removal of
+        # a service with a name and its companion record needs, because a plan
+        # that exceeds the cap is refused whole rather than trimmed.
         protect = [
           "A:vyrx.de"
           "MX:*"
           "NS:*"
         ];
-        maxDeletions = 1;
+        maxDeletions = 2;
       };
     };
 
