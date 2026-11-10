@@ -54,6 +54,8 @@
   my.features.system.nod-sync = {
     enable = true;
     strategy = "canary";
+    # Each host evaluation retains several GiB; serialize them on this 15 GiB controller.
+    concurrency = 1;
     targets = [
       "cld-edge-01"
       "cld-ops-01"
@@ -79,6 +81,9 @@
       map (provider: provider.desired) (builtins.attrValues config.services.nod.providers)
     );
   };
+
+  # Limit builders as well as host evaluations; OpenChamber's web builds can use several GiB each.
+  systemd.services.nod-sync.environment.NIX_CONFIG = "max-jobs = 1\ncores = 2";
 
   # The fleet declaration, typed by nod's `services.nod` module. The daemon
   # reads `config.services.nod.fleet` through the flake output; the provider
