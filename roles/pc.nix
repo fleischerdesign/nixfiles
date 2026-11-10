@@ -46,6 +46,7 @@
   programs.kdeconnect.enable = lib.mkDefault true;
 
   my.features.dev = {
+    openchamber.subscriptions = import ../inventory/opencode-subscriptions.nix;
     containers.enable = lib.mkDefault true;
     codium.enable = lib.mkDefault true;
     nixvim.enable = lib.mkDefault true;

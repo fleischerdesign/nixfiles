@@ -441,3 +441,50 @@ caller disables audio, so camera access includes the microphone. Computer contro
 bundled CUA driver implements X11 only, and the fleet's Niri session is native Wayland, so an
 enabled provider would advertise `screen.snapshot` and `computer.act` and refuse every call.
 Desktop screenshots on those hosts run through shell execution instead.
+
+## OpenChamber workspaces
+
+`my.features.dev.openchamber.enable` installs OpenChamber Desktop and runs a persistent OpenChamber
+workspace under the host's primary user on `hom-wrk-01` and `mob-nb-01`. The feature is in
+`features/dev/openchamber/`. Its upstream flake supplies the server, Electron app and matching OpenCode
+CLI; OpenChamber starts and manages OpenCode itself, including its limit-failover plugin.
+
+The service listens on loopback. Each desktop receives SSH Remote Instances for the other enabled
+hosts, derived from their topology addresses, primary users and service ports. These use external
+mode: SSH forwards to the NixOS-managed service instead of installing or updating software remotely.
+Choose the host in OpenChamber to connect; the app reconnects the selected default host on startup.
+The peer must be reachable over WireGuard and the existing operator SSH identity must be available,
+for example through the unlocked desktop SSH agent. Host keys come from the fleet inventory. This
+registration does not manufacture client tokens, copy private keys or depend on an external relay.
+Personal connections and connection credentials remain in the writable settings file. A switch
+reconciles only entries with the `nixfiles:` ID prefix; restart the desktop after switching to load the
+new binary and peer configuration.
+
+Go workspaces are listed once in `inventory/opencode-subscriptions.nix`, shared with OpenClaw. The
+personal-computer role selects this list through the feature's `subscriptions` option. SOPS decrypts
+the keys at runtime, and the service reconciles named credentials through OpenCode's API after startup.
+Stable credential IDs preserve the selected account across unchanged switches. Changed keys are
+replaced, retired declared keys are removed, and independently added accounts remain. OpenCode stores
+these credentials in its normal writable credential database; no key is written into the Nix store.
+The desktop and service share the primary user's OpenCode credentials.
+
+Account switching is enabled for `opencode-go`. OpenChamber rotates stored credentials when quota or
+budget exhaustion, or a rate limit of at least a minute, stops a turn. Reset hints control cooldowns;
+without a hint the default is one hour, and cooldowns are forgotten on restart. The active credential
+belongs to the OpenCode integration, not an individual session. OpenCode Go and Zen share the
+`opencode` integration, so switching changes the account used by that integration. A separate fallback
+model is an interactive preference; the feature does not configure one. OpenClaw and the two
+OpenChamber instances consume the same subscription limits and maintain independent cooldowns.
+
+Every immediate directory in `features/dev/openchamber/plugins/` is discovered as an app-shipped
+extension. Its manifest and runtime assets are validated by OpenChamber's own package inspector during
+the build. App-shipped extensions trust the permissions declared in the repository and can be disabled
+in the UI. Runtime extensions remain supported through Settings → Extensions and `/new-extension`;
+the feature does not replace the writable extension catalog. See
+[`plugins/README.md`](../features/dev/openchamber/plugins/README.md) for the package contract and how to
+promote a runtime extension into the configuration.
+
+The upstream Nix build uses import-from-derivation for its Bun dependency catalog. Evaluation can
+therefore build the converter. Keep the upstream nixpkgs/Bun pin with the OpenChamber input: its
+OpenCode build requires the matching Bun runtime. Updates go through the repository gate and a server
+and desktop build before activation.

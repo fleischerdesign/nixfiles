@@ -40,20 +40,7 @@
     # and remain usable, but the agent no longer saves, updates or archives them
     # on its own. Nothing is deleted by this setting.
     settings.skills.workshop.autonomous.mode = "off";
-    opencodeSubscriptions = [
-      {
-        name = "subscription-3";
-        apiKeySecret = "ai/opencode_api_key_3";
-      }
-      {
-        name = "subscription-2";
-        apiKeySecret = "ai/opencode_api_key_2";
-      }
-      {
-        name = "subscription-1";
-        apiKeySecret = "ai/opencode_api_key";
-      }
-    ];
+    opencodeSubscriptions = import ../../inventory/opencode-subscriptions.nix;
   };
 
   # The gateway host is the fleet's control plane, so it runs the GitOps
