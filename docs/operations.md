@@ -476,12 +476,13 @@ Go subscriptions are independent of device enrollment. They are listed in
 `inventory/opencode-subscriptions.nix`, shared with OpenClaw; the personal-computer role selects the
 list through `subscriptions`. The `openchamber-accounts` oneshot runs as the primary user after
 Home Manager at boot and when its declaration or SOPS keys change. It reconciles OpenCode's own
-credential store with the supported `auth list`, `import`, `switch` and `logout` commands. Every command uses `--standalone`: its private helper ends with the command and does not
-create a background service. Key values reach `auth import` through stdin and never enter the Nix
-store or process arguments. Stable IDs preserve selections; rotated keys are imported before an
-active declared account is switched and retired declared credentials are removed. Manually added
-accounts remain. Restart OpenCode in the app after changing credentials if its running integration
-still shows the previous state. Failover is seeded as a desktop default; existing profile preferences
+credential store with the supported `auth list`, `import`, `switch` and `logout` commands. Every
+command uses `--standalone`: its private helper ends with the command and does not create a
+background service. Key values reach `auth import` through stdin and never enter the Nix store or
+process arguments. Stable IDs preserve selections; rotated keys are imported before an active
+declared account is switched and retired declared credentials are removed. Manually added accounts
+remain. Restart OpenCode in the app after changing credentials if its running integration still
+shows the previous state. Failover is seeded as a desktop default; existing profile preferences
 remain owned by OpenChamber.
 
 Account switching defaults to `opencode-go`. OpenChamber rotates stored credentials when quota or
