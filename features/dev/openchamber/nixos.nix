@@ -9,6 +9,15 @@ let
   cfg = config.my.features.dev.openchamber;
   systems = (import ../../../lib/fleet-configs.nix { inherit lib; }).systems config;
   peers = lib.filterAttrs (_: system: system.config.my.features.dev.openchamber.enable) systems;
+  accountPlan = pkgs.writeText "openchamber-subscriptions.json" (
+    builtins.toJSON (
+      map (subscription: {
+        inherit (subscription) name;
+        path = config.sops.secrets.${subscription.apiKeySecret}.path;
+      }) cfg.subscriptions
+    )
+  );
+  accountUnit = "openchamber-accounts";
   packages = import ./package.nix {
     inherit lib pkgs;
     upstream = inputs.openchamber.packages.${pkgs.stdenv.hostPlatform.system};
@@ -75,9 +84,31 @@ in
         subscription:
         lib.nameValuePair subscription.apiKeySecret {
           owner = lib.mkDefault config.my.user.primary;
+          restartUnits = [ "${accountUnit}.service" ];
         }
       ) cfg.subscriptions
     );
+    systemd.services.${accountUnit} = {
+      description = "Reconcile this device's declared OpenCode accounts";
+      wantedBy = [ "multi-user.target" ];
+      requires = [ "home-manager-${config.my.user.primary}.service" ];
+      after = [ "home-manager-${config.my.user.primary}.service" ];
+      environment.HOME = config.users.users.${config.my.user.primary}.home;
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = config.my.user.primary;
+        WorkingDirectory = config.users.users.${config.my.user.primary}.home;
+        UMask = "0077";
+        TimeoutStartSec = 180;
+        ExecStart = "${pkgs.python3}/bin/python ${
+          builtins.path {
+            path = ./credentials.py;
+            name = "openchamber-credentials.py";
+          }
+        } ${packages.opencode}/bin/opencode ${accountPlan}";
+      };
+    };
     my.contracts.provides.openchamber.endpoints.desktop = {
       inherit (cfg) port;
       directAccess = {

@@ -14,14 +14,6 @@ let
       inherit path;
       name = baseNameOf path;
     };
-  subscriptions = pkgs.writeText "openchamber-subscriptions.json" (
-    builtins.toJSON (
-      map (subscription: {
-        inherit (subscription) name;
-        path = osConfig.sops.secrets.${subscription.apiKeySecret}.path;
-      }) cfg.subscriptions
-    )
-  );
   plan = pkgs.writeText "openchamber-fleet.json" (
     builtins.toJSON {
       host = osConfig.networking.hostName;
@@ -77,8 +69,6 @@ in
     home.activation.openchamber = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       run ${pkgs.python3}/bin/python ${file ./reconcile.py} \
         ${lib.escapeShellArg "${config.home.homeDirectory}/.config/openchamber/settings.json"} ${desired}
-      run ${pkgs.python3}/bin/python ${file ./credentials.py} \
-        ${cfg.packages.opencode}/bin/opencode ${subscriptions}
     '';
   };
 }
