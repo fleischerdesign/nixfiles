@@ -15,10 +15,9 @@ let
   };
 in
 {
-  imports = [ inputs.openchamber.nixosModules.openchamber ];
 
   options.my.features.dev.openchamber = {
-    enable = lib.mkEnableOption "OpenChamber desktop and persistent local workspace";
+    enable = lib.mkEnableOption "OpenChamber desktop and native fleet pairing";
     subscriptions = lib.mkOption {
       type = lib.types.listOf (
         lib.types.submodule {
@@ -33,8 +32,8 @@ in
     };
     port = lib.mkOption {
       type = lib.types.port;
-      default = 3000;
-      description = "Loopback port of the workspace reached through SSH.";
+      default = 7337;
+      description = "Desktop network port, shared by runtime settings and the WireGuard endpoint.";
     };
     packages = lib.mkOption {
       type = lib.types.attrsOf lib.types.package;
@@ -61,7 +60,7 @@ in
         assertion =
           config.my.features.system.networking.ssh.enable
           && lib.all (peer: peer.address != null) (lib.attrValues cfg.peers);
-        message = "OpenChamber Remote Instances require SSH and a WireGuard address for each peer";
+        message = "OpenChamber native enrollment requires SSH and a WireGuard address for each peer";
       }
 
       {
@@ -76,34 +75,16 @@ in
         subscription:
         lib.nameValuePair subscription.apiKeySecret {
           owner = lib.mkDefault config.my.user.primary;
-          restartUnits = [ "openchamber.service" ];
         }
       ) cfg.subscriptions
     );
-    systemd.services.openchamber = {
-      serviceConfig.TimeoutStartSec = 120;
-      postStart =
-        let
-          plan = pkgs.writeText "openchamber-credentials.json" (
-            builtins.toJSON (
-              map (subscription: {
-                inherit (subscription) name;
-                path = config.sops.secrets.${subscription.apiKeySecret}.path;
-              }) cfg.subscriptions
-            )
-          );
-          script = builtins.path {
-            path = ./credentials.py;
-            name = "openchamber-credentials.py";
-          };
-        in
-        "${pkgs.python3}/bin/python ${script} http://127.0.0.1:${toString cfg.port} ${plan}";
-    };
-    services.openchamber = {
-      enable = true;
-      package = packages.server;
-      user = config.my.user.primary;
+    my.contracts.provides.openchamber.endpoints.desktop = {
       inherit (cfg) port;
+      directAccess = {
+        enable = cfg.peers != { };
+        interface = "wireguard";
+        fromHosts = lib.attrNames cfg.peers;
+      };
     };
     environment.systemPackages = [ pkgs.curl ];
     my.features.system.networking.ssh.admitsHosts = lib.attrNames cfg.peers;

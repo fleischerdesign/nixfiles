@@ -64,4 +64,5 @@ let
 in
 {
   inherit server desktop;
+  opencode = upstream.opencode-cli;
 }

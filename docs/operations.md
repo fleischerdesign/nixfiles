@@ -444,31 +444,47 @@ Desktop screenshots on those hosts run through shell execution instead.
 
 ## OpenChamber workspaces
 
-`my.features.dev.openchamber.enable` installs OpenChamber Desktop and runs a persistent OpenChamber
-workspace under the host's primary user on `hom-wrk-01` and `mob-nb-01`. The feature is in
-`features/dev/openchamber/`. Its upstream flake supplies the server, Electron app and matching OpenCode
-CLI; OpenChamber starts and manages OpenCode itself, including its limit-failover plugin.
+`my.features.dev.openchamber.enable` installs OpenChamber Desktop on `hom-wrk-01` and
+`mob-nb-01`. The desktop owns its server and OpenCode process; no separate NixOS OpenChamber
+server runs. The feature is in `features/dev/openchamber/`. Its pinned upstream flake supplies
+the unmodified Electron app, server CLI and matching OpenCode CLI.
 
-The service listens on loopback. Each desktop receives SSH Remote Instances for the other enabled
-hosts, derived from their topology addresses, primary users and service ports. These use external
-mode: SSH forwards to the NixOS-managed service instead of installing or updating software remotely.
-Choose the host in OpenChamber to connect; the app reconnects the selected default host on startup.
-The peer must be reachable over WireGuard and the existing operator SSH identity must be available,
-for example through the unlocked desktop SSH agent. Host keys come from the fleet inventory. This
-registration does not manufacture client tokens, copy private keys or depend on an external relay.
-Personal connections and connection credentials remain in the writable settings file. A switch
-reconciles only entries with the `nixfiles:` ID prefix; restart the desktop after switching to load the
-new binary and peer configuration.
+The desktop's network port is declared once by the feature's `port` option (default 7337).
+Activation merges that port and network access into writable desktop settings. Existing UI passwords
+are retained; a fresh device gets a random password stored only in its mode-0600 settings file.
+The endpoint contract admits only the other enabled OpenChamber hosts over WireGuard. Desktop
+autostart remains the app's own preference; a device's desktop must be running to use its workspace.
 
-Go workspaces are listed once in `inventory/opencode-subscriptions.nix`, shared with OpenClaw. The
-personal-computer role selects this list through the feature's `subscriptions` option. SOPS decrypts
-the keys at runtime, and the service reconciles named credentials through OpenCode's API after startup.
-Stable credential IDs preserve the selected account across unchanged switches. Changed keys are
-replaced, retired declared keys are removed, and independently added accounts remain. OpenCode stores
-these credentials in its normal writable credential database; no key is written into the Nix store.
-The desktop and service share the primary user's OpenCode credentials.
+Native device tokens connect the desktops directly over WireGuard. `openchamber-fleet-pair` uses
+OpenChamber's pairing-session and redemption APIs to issue one token per declared source device.
+Only initial enrollment uses the existing operator SSH identity to authorize the request on the
+target as its primary user. UI passwords and local desktop tokens stay on the target. Subsequent
+connections need neither SSH nor a relay. A user timer retries enrollment one minute after login
+and five minutes after each completed attempt; its oneshot process starts no server and exits after
+checking the peers. An offline peer keeps its saved entry. A revoked token is reported and is not
+automatically replaced. Remove the managed local entry to request enrollment again, or pair it in
+the app. The operator SSH identity must be available for enrollment, for example through an unlocked
+SSH agent. The Nix-managed IDs use the `nixfiles:` prefix; personal connections remain untouched.
 
-Account switching is enabled for `opencode-go`. OpenChamber rotates stored credentials when quota or
+The switch removes managed SSH entries, discards their old tunnel tokens once and registers native
+host addresses from the inventory. Native tokens are retained on later switches. Only a changed
+settings document is atomically replaced. Enrollment re-reads the file after network operations;
+upstream exposes no shared cross-process settings lock, so avoid simultaneous device edits during
+activation or initial enrollment. Restart the desktop after migration to release its old SSH sessions.
+
+Go subscriptions are independent of device enrollment. They are listed in
+`inventory/opencode-subscriptions.nix`, shared with OpenClaw; the personal-computer role selects the
+list through `subscriptions`. Each device's Home Manager activation reads its SOPS keys and reconciles
+OpenCode's own credential store with the supported `auth list`, `import`, `switch` and `logout`
+commands. Every command uses `--standalone`: its private helper ends with the command and does not
+create a background service. Key values reach `auth import` through stdin and never enter the Nix
+store or process arguments. Stable IDs preserve selections; rotated keys are imported before an
+active declared account is switched and retired declared credentials are removed. Manually added
+accounts remain. Restart OpenCode in the app after changing credentials if its running integration
+still shows the previous state. Failover is seeded as a desktop default; existing profile preferences
+remain owned by OpenChamber.
+
+Account switching defaults to `opencode-go`. OpenChamber rotates stored credentials when quota or
 budget exhaustion, or a rate limit of at least a minute, stops a turn. Reset hints control cooldowns;
 without a hint the default is one hour, and cooldowns are forgotten on restart. The active credential
 belongs to the OpenCode integration, not an individual session. OpenCode Go and Zen share the

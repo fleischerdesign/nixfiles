@@ -4,9 +4,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
-import threading
 import unittest
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 def load(name, path):
@@ -47,7 +45,9 @@ class State(unittest.TestCase):
             }
             settings.reconcile(path, desired)
             first = json.loads(path.read_text())
+            inode = path.stat().st_ino
             settings.reconcile(path, desired)
+            self.assertEqual(path.stat().st_ino, inode)
             self.assertEqual(first, json.loads(path.read_text()))
             self.assertEqual(first["theme"], "custom")
             self.assertEqual(first["desktopDefaultHostId"], "local")
@@ -55,10 +55,28 @@ class State(unittest.TestCase):
             self.assertEqual(first["accountSwitchProviders"], ["other"])
             self.assertEqual(first["desktopSshInstances"][0], initial["desktopSshInstances"][0])
             self.assertEqual(first["desktopSshInstances"][1]["auth"], {"sshPassword": "fixture"})
-            self.assertEqual(first["desktopHosts"][1]["url"], "http://127.0.0.1:4567")
+            self.assertEqual(first["desktopHosts"][1]["url"], "http://127.0.0.1/")
             self.assertEqual(first["desktopHosts"][1]["clientToken"], "fixture")
             self.assertNotIn("nixfiles:old", path.read_text())
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_native_migration_drops_the_old_ssh_token_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'settings.json'
+            path.write_text(json.dumps({
+                'desktopSshInstances': [{'id': 'nixfiles:peer'}],
+                'desktopHosts': [{'id': 'nixfiles:peer', 'url': 'http://127.0.0.1:4567', 'clientToken': 'old-ssh'}],
+            }))
+            desired = {'desktopSshInstances': [], 'desktopHosts': [
+                {'id': 'nixfiles:peer', 'url': 'http://peer:7337'}]}
+            settings.reconcile(path, desired)
+            migrated = json.loads(path.read_text())
+            self.assertNotIn('clientToken', migrated['desktopHosts'][0])
+            self.assertEqual(migrated['desktopSshInstances'], [])
+            migrated['desktopHosts'][0]['clientToken'] = 'new-native'
+            path.write_text(json.dumps(migrated))
+            settings.reconcile(path, desired)
+            self.assertEqual(json.loads(path.read_text())['desktopHosts'][0]['clientToken'], 'new-native')
 
     def test_invalid_state_is_not_replaced(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -75,80 +93,53 @@ class State(unittest.TestCase):
             "cred_nixfiles_go_retired": {"id": "cred_nixfiles_go_retired", "active": False},
         }
         calls = []
-        reject = {"create": False}
-        profile = {"accountSwitchProviders": ["other"], "fallbackModel": "manual/model"}
+        reject = False
 
-        class Handler(BaseHTTPRequestHandler):
-            def log_message(self, *_):
-                pass
+        def run(arguments, payload=None):
+            calls.append(arguments)
+            if arguments[0] == 'list':
+                rows = sorted(stored.values(), key=lambda item: not item['active'])
+                return json.dumps([{'id': 'opencode', 'connections': [
+                    {'id': item['id'], 'label': item.get('label', ''), 'type': 'credential'}
+                    for item in rows]}])
+            if arguments[0] == 'import':
+                if reject:
+                    raise RuntimeError('Import failed')
+                for item in json.loads(payload):
+                    stored[item['id']] = item
+            if arguments[0] == 'logout':
+                del stored[arguments[2]]
+            if arguments[0] == 'switch':
+                for item in stored.values():
+                    item['active'] = item['id'] == arguments[2]
+            return ''
 
-            def do_GET(self):
-                calls.append(("GET", self.path))
-                self.send_response(200)
-                self.end_headers()
-                connections = sorted(stored.values(), key=lambda item: not item["active"])
-                payload = profile if self.path == "/api/config/settings" else {"data": {
-                    "connections": [{"id": item["id"], "label": item.get("label", ""), "type": "credential"}
-                                    for item in connections]}}
-
-                self.wfile.write(json.dumps(payload).encode())
-
-            def do_PUT(self):
-                calls.append(("PUT", self.path))
-                profile.update(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
-                self.send_response(204)
-                self.end_headers()
-
-            def do_DELETE(self):
-                calls.append(("DELETE", self.path))
-                stored.pop(self.path.rsplit("/", 1)[-1], None)
-                self.send_response(204)
-                self.end_headers()
-
-            def do_POST(self):
-                calls.append(("POST", self.path))
-                item = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                if reject["create"]:
-                    self.send_response(503)
-                    self.end_headers()
-                    return
-                item["active"] = item.pop("activate")
-                stored[item["id"]] = item
-                self.send_response(204)
-                self.end_headers()
-
-        server = HTTPServer(("127.0.0.1", 0), Handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
-            with tempfile.TemporaryDirectory() as directory:
-                key = Path(directory) / "key"
-                key.write_text("rotated\n")
-                plan = [{"name": "one", "path": str(key)}]
-                base = f"http://127.0.0.1:{server.server_port}"
-                credentials.reconcile(base, plan)
-                replacement = next(item for key, item in stored.items() if key.startswith("cred_nixfiles_go_one_"))
-                self.assertEqual(replacement["value"]["key"], "rotated")
-                self.assertFalse(replacement["active"])
-                self.assertLess(next(i for i, call in enumerate(calls) if call[0] == "POST"),
-                                next(i for i, call in enumerate(calls) if call[0] == "DELETE"))
-                self.assertTrue(stored["manual"]["active"])
-                self.assertNotIn("cred_nixfiles_go_retired", stored)
-                calls.clear()
-                credentials.reconcile(base, plan)
-                self.assertEqual(calls, [("GET", "/api/integration/opencode"), ("GET", "/api/config/settings")])
-                self.assertEqual(profile, {"accountSwitchProviders": ["opencode-go", "other"], "fallbackModel": "manual/model"})
-                before = json.loads(json.dumps(stored))
-                key.write_text("another-key")
-                reject["create"] = True
-                with self.assertRaises(credentials.urllib.error.HTTPError) as caught:
-                    credentials.reconcile(base, plan)
-                caught.exception.close()
-                self.assertEqual(stored, before)
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
+        with tempfile.TemporaryDirectory() as directory:
+            key = Path(directory)/'key'
+            key.write_text('rotated\n')
+            plan = [{'name': 'one', 'path': str(key)}]
+            credentials.reconcile(plan, run)
+            replacement = next(item for name, item in stored.items() if name.startswith('cred_nixfiles_go_one_'))
+            self.assertEqual(replacement['value']['key'], 'rotated')
+            self.assertTrue(stored['manual']['active'])
+            self.assertNotIn('cred_nixfiles_go_retired', stored)
+            self.assertLess(next(i for i,c in enumerate(calls) if c[0]=='import'),
+                            next(i for i,c in enumerate(calls) if c[0]=='logout'))
+            calls.clear()
+            credentials.reconcile(plan, run)
+            self.assertEqual(calls, [['list', '--format', 'json']])
+            for item in stored.values():
+                item['active'] = item['id'] == replacement['id']
+            key.write_text('second')
+            credentials.reconcile(plan, run)
+            selected = next(item for item in stored.values() if item['active'])
+            self.assertEqual(selected['value']['key'], 'second')
+            before = json.loads(json.dumps(stored))
+            key.write_text('third')
+            reject = True
+            with self.assertRaises(RuntimeError):
+                credentials.reconcile(plan, run)
+            self.assertEqual(stored, before)
 
 
 unittest.main()
