@@ -117,7 +117,6 @@ in
         fromHosts = lib.attrNames cfg.peers;
       };
     };
-    environment.systemPackages = [ pkgs.curl ];
     my.features.system.networking.ssh.admitsHosts = lib.attrNames cfg.peers;
     home-manager.sharedModules = [ ./home.nix ];
   };
