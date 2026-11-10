@@ -27,6 +27,14 @@ in
 
   options.my.features.dev.openchamber = {
     enable = lib.mkEnableOption "OpenChamber desktop and native fleet pairing";
+    autostart = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Start OpenChamber Desktop at login through the XDG autostart entry. The desktop's own
+        toggle reflects the file's existence; the next activation restores a disabled entry.
+      '';
+    };
     subscriptions = lib.mkOption {
       type = lib.types.listOf (
         lib.types.submodule {

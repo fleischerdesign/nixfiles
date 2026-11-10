@@ -452,8 +452,12 @@ the unmodified Electron app, server CLI and matching OpenCode CLI.
 The desktop's network port is declared once by the feature's `port` option (default 7337).
 Activation merges that port and network access into writable desktop settings. Existing UI passwords
 are retained; a fresh device gets a random password stored only in its mode-0600 settings file.
-The endpoint contract admits only the other enabled OpenChamber hosts over WireGuard. Desktop
-autostart remains the app's own preference; a device's desktop must be running to use its workspace.
+The endpoint contract admits only the other enabled OpenChamber hosts over WireGuard. The feature's
+`autostart` option (default on) writes the XDG autostart entry at
+`~/.config/autostart/openchamber.desktop`; the desktop's own checkbox reflects the file's existence,
+and the next activation restores an entry disabled in the app. The entry is a regular file, not a
+`home.file` symlink, because the desktop rewrites its `Exec` path at startup. A device's desktop must
+be running to use its workspace.
 
 Native device tokens connect the desktops directly over WireGuard. `openchamber-fleet-pair` uses
 OpenChamber's pairing-session and redemption APIs to issue one token per declared source device.

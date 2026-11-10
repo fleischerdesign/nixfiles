@@ -40,6 +40,18 @@ let
       desktopLanAccessEnabled = true;
     }
   );
+  autostartPath = "${config.home.homeDirectory}/.config/autostart/openchamber.desktop";
+  # The desktop rewrites this entry on startup (linux-autostart.mjs), so it must be a regular
+  # file; a home.file symlink into the read-only store would make that write fail.
+  autostartEntry = pkgs.writeText "openchamber-autostart.desktop" ''
+    [Desktop Entry]
+    Type=Application
+    Name=OpenChamber
+    Exec=${cfg.packages.desktop}/share/openchamber/openchamber --background
+    Terminal=false
+    X-GNOME-Autostart-enabled=true
+    StartupWMClass=openchamber
+  '';
 in
 {
   config = lib.mkIf primary {
@@ -70,5 +82,15 @@ in
       run ${pkgs.python3}/bin/python ${file ./reconcile.py} \
         ${lib.escapeShellArg "${config.home.homeDirectory}/.config/openchamber/settings.json"} ${desired}
     '';
+    home.activation.openchamberAutostart = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      if cfg.autostart then
+        ''
+          run ${pkgs.coreutils}/bin/install -Dm644 ${autostartEntry} ${lib.escapeShellArg autostartPath}
+        ''
+      else
+        ''
+          run ${pkgs.coreutils}/bin/rm -f ${lib.escapeShellArg autostartPath}
+        ''
+    );
   };
 }
