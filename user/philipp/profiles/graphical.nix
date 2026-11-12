@@ -11,7 +11,6 @@
   imports = [
     ../chrome.nix
     ../rclone-bookmarks.nix
-    inputs.zapfast.homeManagerModules.default
   ];
 
   home.packages = with pkgs; [
@@ -35,11 +34,8 @@
     dbeaver-bin
     figma-linux
     figma-agent
+    zapfast
   ];
-
-  # ZapFast ships its Home Manager module, which owns the package, the settings merge and the
-  # secret handling; enabling it is the whole integration, no local wrapper.
-  programs.zapfast.enable = true;
 
   programs.ghostty = {
     enable = true;
