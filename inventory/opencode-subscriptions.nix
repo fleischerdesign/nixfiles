@@ -1,4 +1,4 @@
-# Paid workspaces shared by the coding runtimes; ordering expresses the initial preference.
+# Paid workspaces for OpenClaw's model provider; ordering expresses the initial preference.
 [
   {
     name = "subscription-3";

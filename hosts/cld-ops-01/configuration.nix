@@ -82,7 +82,7 @@
     );
   };
 
-  # Limit builders as well as host evaluations; OpenChamber's web builds can use several GiB each.
+  # Limit builders as well as host evaluations; web builds can use several GiB each.
   systemd.services.nod-sync.environment.NIX_CONFIG = "max-jobs = 1\ncores = 2";
 
   # The fleet declaration, typed by nod's `services.nod` module. The daemon

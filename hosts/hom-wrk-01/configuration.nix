@@ -19,7 +19,6 @@
   my.features.system.networking.wireguard.clientConfigs = [ "mob-ph-01" ];
 
   # Features
-  my.features.dev.openchamber.enable = true;
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
   my.features.services.openclaw.node = {
