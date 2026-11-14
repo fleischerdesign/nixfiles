@@ -268,6 +268,12 @@ in
 
         "Mod+Shift+P".action = power-off-monitors;
         "Mod+Shift+E".action = quit;
+      }
+      // lib.optionalAttrs (config.my.features.desktop.webapps.apps ? openclaw) {
+        # `Mod+O` opens the Control UI. The launcher is projected by the OpenClaw node
+        # feature from the gateway publication; the key exists only where that
+        # projection produced an app, so it never spawns a missing command.
+        "Mod+O".action = spawn "webapp-openclaw";
       };
     };
 
