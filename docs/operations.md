@@ -341,18 +341,23 @@ Only these explicitly managed files are replaced; personal `AGENTS.md`, `USER.md
 memory and learned skills are not regenerated. Policy changes alter the service unit and therefore follow normal nod
 activation and rollback. They do not depend on a skill being selected for a turn.
 
-Worker execution is unavailable on the pinned OpenClaw release, and this configuration carries no local
-patch for it. Two upstream boundaries block it. The worker bundler rejects every hardlinked file, while
-`auto-optimise-store` hardlinks identical files across content-addressed Nix store outputs, so a turn that
-bundles bundled, custodian or plugin skills fails with `INVALID_BUNDLE` before any model call. And a
-session placed on a device or cloud worker fails before inference with `Session capability metadata
-requires worker preparation` (openclaw/openclaw#182647). The package is used exactly as upstream ships
-it; remote placement stays unused until upstream resolves both.
+The worker skill bundler rejects hardlinked files, including the identical files linked by
+`auto-optimise-store` in the Nix store. Before each start, the Gateway copies the package's `skills`
+and `custodian-skills` into its private systemd runtime directory `/run/openclaw-skills` and sets
+`OPENCLAW_BUNDLED_SKILLS_DIR` to its `skills` subdirectory. OpenClaw derives the custodian directory
+from that sibling layout. These are ordinary runtime copies, not links; systemd removes them when
+the service stops, and a restart refreshes them from the selected package. Personal and learned skills
+are untouched, and neither OpenClaw nor its hardlink checks are patched. Home Manager's upstream
+skill materialization covers declared user/plugin skills, not these built-in package trees.
 
-Remote build and test of a Gateway-held working tree is no longer a local tool either. The executor
-account, its inventory and its dedicated credential were removed with it. A task that needs another
-machine therefore has no supported path in this configuration today: it does not fall back to a second
-execution path beside `exec`, and it does not run on a placed worker.
+This addresses built-in skill resource preparation, not every worker failure. Plugin skills loaded
+directly from the store remain subject to the same hardlink restriction. Session capability-policy
+preparation and completed node turns are separate runtime boundaries; passing the skill reader
+does not verify them.
+
+Remote work uses native node capabilities or session placement, not a separate executor account
+or custom remote-exec synchronization tool. End-to-end worker execution must be verified separately
+from skill resource preparation.
 
 Skills supply task-specific procedures, not duplicate routing rules. Memory records
 preferences and decisions, not technical defaults. Existing sessions and auth profiles

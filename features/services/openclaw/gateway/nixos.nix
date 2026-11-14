@@ -15,6 +15,20 @@ let
     export { default } from "${bootstrapHookDir}/handler.js";
   '';
   package = pkgs.openclaw-gateway;
+  bundledSkillsDir = "/run/openclaw-skills";
+  materializeBundledSkills = pkgs.writeShellScript "openclaw-materialize-bundled-skills" ''
+    set -euo pipefail
+    # systemd creates and clears this private directory with the service. Copy,
+    # never link: the worker bundle reader rejects optimized Nix-store hardlinks.
+    # Keep both siblings together; OpenClaw derives custodian-skills from skills.
+    ${pkgs.coreutils}/bin/cp -rL --preserve=mode --no-preserve=ownership -- \
+      ${package}/lib/node_modules/openclaw/skills \
+      ${package}/lib/node_modules/openclaw/custodian-skills \
+      "''${RUNTIME_DIRECTORY:?}/"
+    # Preserve executable helpers, but make the service-owned copies removable.
+    ${pkgs.coreutils}/bin/chmod -R u+w -- \
+      "$RUNTIME_DIRECTORY/skills" "$RUNTIME_DIRECTORY/custodian-skills"
+  '';
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
   portals = config.my.contracts.provides.openclaw.publications.portals;
@@ -674,11 +688,14 @@ in
       ];
       serviceConfig = {
         UMask = "0077";
+        RuntimeDirectory = "openclaw-skills";
+        RuntimeDirectoryMode = "0700";
         StandardOutput = lib.mkForce "journal";
         StandardError = lib.mkForce "journal";
         ExecStartPre = [
           provisionGitHubProfile
           provisionAuth
+          materializeBundledSkills
           # Materialize inside the workspace: the bootstrap loader rejects
           # symlinks that resolve outside it, including links into the Nix store.
           "${pkgs.coreutils}/bin/install -D -m0444 ${workflowPolicy} ${workspaceDir}/.openclaw-policy/AGENTS.md"
@@ -690,6 +707,7 @@ in
       };
       # Git identity for every process the agent starts, including exec.
       environment.GIT_CONFIG_GLOBAL = "/etc/openclaw/gitconfig";
+      environment.OPENCLAW_BUNDLED_SKILLS_DIR = "${bundledSkillsDir}/skills";
       # The package wrapper sets this too; naming it here keeps the skill hardlink
       # policy (and the rest of Nix mode) identical in worker processes that may
       # receive a narrower environment.
