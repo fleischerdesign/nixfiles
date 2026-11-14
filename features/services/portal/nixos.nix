@@ -290,6 +290,12 @@ in
     my.features.services.vyrx-landing.projection = fleet;
     my.features.services.vyrx-landing.adapters = adapters;
 
+    # The assistant's provider key is read as a systemd credential: it never enters
+    # the Nix store, the service environment or the browser.
+    sops.secrets."ai/openrouter_api_key" = {
+      restartUnits = [ "vyrx-portal-api.service" ];
+    };
+
     # The portal's API and pages are one process. It reaches the collector over the mesh and, later, the
     # services themselves; what may reach it is decided by the firewall and the ingress, like every other
     # service in this fleet.
@@ -302,6 +308,9 @@ in
       preStart = "${projectionWriter}/bin/vyrx-portal-projection";
       serviceConfig = {
         ExecStart = "${pkgs.nodejs_24}/bin/node ${portalArtifact}/server/entry.mjs";
+        # The app reads `${CREDENTIALS_DIRECTORY}/assistant-key`; systemd materialises
+        # the SOPS secret there with the service's own permissions.
+        LoadCredential = "assistant-key:${config.sops.secrets."ai/openrouter_api_key".path}";
         Environment = [
           # Loopback, because the ingress proxies to `127.0.0.1:<port>` for its own host - and because it is
           # stricter: this process trusts the identity headers the proxy forwards, so nothing but the proxy
@@ -313,6 +322,8 @@ in
           # Favorites, reports and the action log are this host's own state, not a projection: the
           # dynamic user gets a state directory systemd makes writable under `ProtectSystem = "strict"`.
           "PORTAL_STORE=%S/vyrx-portal/portal.sqlite"
+          "PORTAL_ASSISTANT_BASE_URL=https://openrouter.ai/api/v1"
+          "PORTAL_ASSISTANT_MODEL=anthropic/claude-haiku-5.5"
         ]
         ++ lib.optional (
           prometheusAddress != null
