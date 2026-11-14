@@ -364,6 +364,16 @@ This addresses skill resource preparation, not every worker failure. Session cap
 preparation and completed node turns are separate runtime boundaries; passing the skill reader
 does not verify them.
 
+The Gateway package backports upstream [#194540](https://github.com/openclaw/openclaw/pull/194540)
+for worker search-policy preparation. It resolves admitted web-search availability first and wraps
+only the synchronous policy call in the existing capability-read preparation owner; tool admission
+and permission checks are unchanged. `packages/custom/openclaw-gateway-worker-fix` patches the
+installed Gateway graph, not the sealed worker archive or the nodes' supervisor package. Its build
+rejects an already-prepared call with an explicit removal instruction, and rejects unfamiliar call
+shapes rather than silently skipping the repair. When the repair ships upstream, remove that
+package and restore `pkgs.openclaw-gateway` in the Gateway feature; no version-number guess or
+runtime mutation is involved.
+
 Remote work uses native node capabilities or session placement, not a separate executor account
 or custom remote-exec synchronization tool. End-to-end worker execution must be verified separately
 from skill resource preparation.

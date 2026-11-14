@@ -14,7 +14,9 @@ let
   bootstrapHookHandler = pkgs.writeText "openclaw-bootstrap-extra-files-handler.js" ''
     export { default } from "${bootstrapHookDir}/handler.js";
   '';
-  package = pkgs.openclaw-gateway;
+  # Self-expiring upstream #194540 backport; the package build names what to
+  # remove once an updated OpenClaw already prepares the worker policy read.
+  package = pkgs.custom.openclaw-gateway-worker-fix;
   bundledSkillsDir = "/run/openclaw-skills";
   # Keep native plugin discovery and its activation policy: only the skill
   # trees are overlaid with copies, at their original paths inside this unit.
