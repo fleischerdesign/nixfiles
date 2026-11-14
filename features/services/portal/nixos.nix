@@ -384,6 +384,7 @@ in
           "/"
           "/.well-known/security.txt"
           "/_astro/*"
+          "/api/media/poster"
           "/apple-touch-icon.png"
           "/en"
           "/en/"
