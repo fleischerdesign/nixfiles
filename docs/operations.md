@@ -350,8 +350,17 @@ the service stops, and a restart refreshes them from the selected package. Perso
 are untouched, and neither OpenClaw nor its hardlink checks are patched. Home Manager's upstream
 skill materialization covers declared user/plugin skills, not these built-in package trees.
 
-This addresses built-in skill resource preparation, not every worker failure. Plugin skills loaded
-directly from the store remain subject to the same hardlink restriction. Session capability-policy
+Plugin skills have the same restriction. OpenClaw publishes generated symlinks under
+`/var/lib/openclaw/plugin-skills`; replacing those links would conflict with its discovery lifecycle.
+The Gateway therefore also copies the browser, canvas and Composio skill trees into its runtime
+directory and uses service-private read-only bind mounts at their original store paths. Native
+plugin activation, discovery, precedence and generated symlinks stay unchanged, and the host's
+Nix store is untouched. The materializer runs first: systemd skips the initially absent bind sources
+for that command, then installs the mounts for subsequent commands and the Gateway. A copy failure
+aborts startup. Additional store-backed plugin skill roots need the same declaration in
+`pluginSkillTrees`; personal and learned roots are not mounted or replaced.
+
+This addresses skill resource preparation, not every worker failure. Session capability-policy
 preparation and completed node turns are separate runtime boundaries; passing the skill reader
 does not verify them.
 

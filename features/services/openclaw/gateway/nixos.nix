@@ -16,6 +16,13 @@ let
   '';
   package = pkgs.openclaw-gateway;
   bundledSkillsDir = "/run/openclaw-skills";
+  # Keep native plugin discovery and its activation policy: only the skill
+  # trees are overlaid with copies, at their original paths inside this unit.
+  pluginSkillTrees = {
+    browser = "${package}/lib/node_modules/openclaw/dist/extensions/browser/skills";
+    canvas = "${package}/lib/node_modules/openclaw/dist/extensions/canvas/skills";
+    composio = "${composioPlugin}/skills";
+  };
   materializeBundledSkills = pkgs.writeShellScript "openclaw-materialize-bundled-skills" ''
     set -euo pipefail
     # systemd creates and clears this private directory with the service. Copy,
@@ -25,9 +32,15 @@ let
       ${package}/lib/node_modules/openclaw/skills \
       ${package}/lib/node_modules/openclaw/custodian-skills \
       "''${RUNTIME_DIRECTORY:?}/"
+    ${pkgs.coreutils}/bin/mkdir -p "$RUNTIME_DIRECTORY/plugin-skills"
+    ${lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (name: source: ''
+        ${pkgs.coreutils}/bin/cp -rL --preserve=mode --no-preserve=ownership -- \
+          ${lib.escapeShellArg source} "$RUNTIME_DIRECTORY/plugin-skills/${name}"
+      '') pluginSkillTrees
+    )}
     # Preserve executable helpers, but make the service-owned copies removable.
-    ${pkgs.coreutils}/bin/chmod -R u+w -- \
-      "$RUNTIME_DIRECTORY/skills" "$RUNTIME_DIRECTORY/custodian-skills"
+    ${pkgs.coreutils}/bin/chmod -R u+w -- "$RUNTIME_DIRECTORY"
   '';
   domain = config.my.contracts.provides.openclaw.publications.web.canonicalDomain;
   sandbox = config.my.contracts.provides.openclaw.publications.sandbox;
@@ -690,12 +703,19 @@ in
         UMask = "0077";
         RuntimeDirectory = "openclaw-skills";
         RuntimeDirectoryMode = "0700";
+        # systemd prepares a fresh mount namespace for each Exec* command. The
+        # first pre-start creates these sources; later commands, including the
+        # gateway, see read-only copies. Missing sources are ignored only until
+        # that first command completes; a failed copy aborts service startup.
+        BindReadOnlyPaths = lib.mapAttrsToList (
+          name: source: "-${bundledSkillsDir}/plugin-skills/${name}:${source}"
+        ) pluginSkillTrees;
         StandardOutput = lib.mkForce "journal";
         StandardError = lib.mkForce "journal";
         ExecStartPre = [
+          materializeBundledSkills
           provisionGitHubProfile
           provisionAuth
-          materializeBundledSkills
           # Materialize inside the workspace: the bootstrap loader rejects
           # symlinks that resolve outside it, including links into the Nix store.
           "${pkgs.coreutils}/bin/install -D -m0444 ${workflowPolicy} ${workspaceDir}/.openclaw-policy/AGENTS.md"
