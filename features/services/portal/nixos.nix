@@ -291,8 +291,9 @@ in
     my.features.services.vyrx-landing.adapters = adapters;
 
     # The assistant's provider key is read as a systemd credential: it never enters
-    # the Nix store, the service environment or the browser.
-    sops.secrets."ai/openrouter_api_key" = {
+    # the Nix store, the service environment or the browser. The portal uses the
+    # DeepSeek API; OpenClaw keeps its own OpenRouter credential.
+    sops.secrets."ai/deepseek_api_key" = {
       restartUnits = [ "vyrx-portal-api.service" ];
     };
 
@@ -318,7 +319,7 @@ in
         # The app reads `${CREDENTIALS_DIRECTORY}/assistant-key`; systemd materialises
         # the SOPS secret there with the service's own permissions.
         LoadCredential = [
-          "assistant-key:${config.sops.secrets."ai/openrouter_api_key".path}"
+          "assistant-key:${config.sops.secrets."ai/deepseek_api_key".path}"
           "seerr-key:${config.sops.secrets."services/media/seerr_api_key".path}"
         ];
         Environment = [
@@ -332,8 +333,8 @@ in
           # Favorites, reports and the action log are this host's own state, not a projection: the
           # dynamic user gets a state directory systemd makes writable under `ProtectSystem = "strict"`.
           "PORTAL_STORE=%S/vyrx-portal/portal.sqlite"
-          "PORTAL_ASSISTANT_BASE_URL=https://openrouter.ai/api/v1"
-          "PORTAL_ASSISTANT_MODEL=anthropic/claude-haiku-5.5"
+          "PORTAL_ASSISTANT_BASE_URL=https://api.deepseek.com"
+          "PORTAL_ASSISTANT_MODEL=deepseek-flash"
           "PORTAL_SEERR_API_KEY_FILE=%d/seerr-key"
         ]
         ++ lib.optional (
