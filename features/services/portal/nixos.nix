@@ -335,6 +335,7 @@ in
           "PORTAL_STORE=%S/vyrx-portal/portal.sqlite"
           "PORTAL_ASSISTANT_BASE_URL=https://api.deepseek.com"
           "PORTAL_ASSISTANT_MODEL=deepseek-flash"
+          "PORTAL_MEDIA_REQUESTS=on"
           "PORTAL_SEERR_API_KEY_FILE=%d/seerr-key"
         ]
         ++ lib.optional (
