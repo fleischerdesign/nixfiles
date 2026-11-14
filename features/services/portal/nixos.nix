@@ -296,6 +296,13 @@ in
       restartUnits = [ "vyrx-portal-api.service" ];
     };
 
+    # Seerr is read and written only from the server. The key is the instance's
+    # global API key; per-user actions are scoped with X-Api-User, never with a
+    # browser-supplied id.
+    sops.secrets."services/media/seerr_api_key" = {
+      restartUnits = [ "vyrx-portal-api.service" ];
+    };
+
     # The portal's API and pages are one process. It reaches the collector over the mesh and, later, the
     # services themselves; what may reach it is decided by the firewall and the ingress, like every other
     # service in this fleet.
@@ -310,7 +317,10 @@ in
         ExecStart = "${pkgs.nodejs_24}/bin/node ${portalArtifact}/server/entry.mjs";
         # The app reads `${CREDENTIALS_DIRECTORY}/assistant-key`; systemd materialises
         # the SOPS secret there with the service's own permissions.
-        LoadCredential = "assistant-key:${config.sops.secrets."ai/openrouter_api_key".path}";
+        LoadCredential = [
+          "assistant-key:${config.sops.secrets."ai/openrouter_api_key".path}"
+          "seerr-key:${config.sops.secrets."services/media/seerr_api_key".path}"
+        ];
         Environment = [
           # Loopback, because the ingress proxies to `127.0.0.1:<port>` for its own host - and because it is
           # stricter: this process trusts the identity headers the proxy forwards, so nothing but the proxy
@@ -324,6 +334,7 @@ in
           "PORTAL_STORE=%S/vyrx-portal/portal.sqlite"
           "PORTAL_ASSISTANT_BASE_URL=https://openrouter.ai/api/v1"
           "PORTAL_ASSISTANT_MODEL=anthropic/claude-haiku-5.5"
+          "PORTAL_SEERR_API_KEY_FILE=%d/seerr-key"
         ]
         ++ lib.optional (
           prometheusAddress != null
