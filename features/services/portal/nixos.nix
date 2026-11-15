@@ -304,6 +304,14 @@ in
       restartUnits = [ "vyrx-portal-api.service" ];
     };
 
+    sops.secrets."services/portal/vapid_public_key" = {
+      restartUnits = [ "vyrx-portal-api.service" ];
+    };
+
+    sops.secrets."services/portal/vapid_private_key" = {
+      restartUnits = [ "vyrx-portal-api.service" ];
+    };
+
     # The portal's API and pages are one process. It reaches the collector over the mesh and, later, the
     # services themselves; what may reach it is decided by the firewall and the ingress, like every other
     # service in this fleet.
@@ -321,6 +329,8 @@ in
         LoadCredential = [
           "assistant-key:${config.sops.secrets."ai/deepseek_api_key".path}"
           "seerr-key:${config.sops.secrets."services/media/seerr_api_key".path}"
+          "vapid-public:${config.sops.secrets."services/portal/vapid_public_key".path}"
+          "vapid-private:${config.sops.secrets."services/portal/vapid_private_key".path}"
         ];
         Environment = [
           # Loopback, because the ingress proxies to `127.0.0.1:<port>` for its own host - and because it is
@@ -337,6 +347,9 @@ in
           "PORTAL_ASSISTANT_MODEL=deepseek-flash"
           "PORTAL_MEDIA_REQUESTS=on"
           "PORTAL_SEERR_API_KEY_FILE=%d/seerr-key"
+          "PORTAL_VAPID_PUBLIC_KEY_FILE=%d/vapid-public"
+          "PORTAL_VAPID_PRIVATE_KEY_FILE=%d/vapid-private"
+          "PORTAL_VAPID_SUBJECT=mailto:noreply@vyrx.de"
         ]
         ++ lib.optional (
           prometheusAddress != null
@@ -407,6 +420,7 @@ in
           "/project/*"
           "/robots.txt"
           "/site.webmanifest"
+          "/sw.js"
         ];
 
       };
