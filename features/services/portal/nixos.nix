@@ -324,7 +324,7 @@ in
         LoadCredential = [
           "scan-secret:${config.sops.secrets."services/portal/scan_secret".path}"
         ];
-        ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.curl}/bin/curl -fsS --max-time 60 -X POST -H \"x-vyrx-scan: $(cat %d/scan-secret)\" http://127.0.0.1:${toString portalApiPort}/api/notifications/scan'";
+        ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.curl}/bin/curl -fsS --max-time 60 -X POST -H \"x-vyrx-scan: $(cat %d/scan-secret)\" -H \"Origin: http://127.0.0.1:${toString portalApiPort}\" http://127.0.0.1:${toString portalApiPort}/api/notifications/scan'";
       };
     };
 
