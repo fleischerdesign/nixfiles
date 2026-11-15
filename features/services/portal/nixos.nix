@@ -374,6 +374,7 @@ in
           "PORTAL_VAPID_PRIVATE_KEY_FILE=%d/vapid-private"
           "PORTAL_VAPID_SUBJECT=mailto:noreply@vyrx.de"
           "PORTAL_SCAN_SECRET_FILE=%d/scan-secret"
+          "PORTAL_BUILD=${portalArtifact}"
         ]
         ++ lib.optional (
           prometheusAddress != null
