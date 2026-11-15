@@ -369,6 +369,7 @@ in
           "PORTAL_ASSISTANT_BASE_URL=https://api.deepseek.com"
           "PORTAL_ASSISTANT_MODEL=deepseek-flash"
           "PORTAL_ASSISTANT_TIMEOUT_MS=60000"
+          "PORTAL_ASSISTANT_MAX_TOKENS=2000"
           "PORTAL_MEDIA_REQUESTS=on"
           "PORTAL_SEERR_API_KEY_FILE=%d/seerr-key"
           "PORTAL_VAPID_PUBLIC_KEY_FILE=%d/vapid-public"
