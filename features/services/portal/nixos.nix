@@ -312,9 +312,31 @@ in
       restartUnits = [ "vyrx-portal-api.service" ];
     };
 
+    sops.secrets."services/portal/scan_secret" = {};
+
     # The portal's API and pages are one process. It reaches the collector over the mesh and, later, the
     # services themselves; what may reach it is decided by the firewall and the ingress, like every other
     # service in this fleet.
+    systemd.services.vyrx-portal-scan = {
+      description = "VYRX portal media-watch scan";
+      serviceConfig = {
+        Type = "oneshot";
+        LoadCredential = [
+          "scan-secret:${config.sops.secrets."services/portal/scan_secret".path}"
+        ];
+        ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.curl}/bin/curl -fsS --max-time 60 -X POST -H \"x-vyrx-scan: $(cat %d/scan-secret)\" http://127.0.0.1:${toString portalApiPort}/api/notifications/scan'";
+      };
+    };
+
+    systemd.timers.vyrx-portal-scan = {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "2min";
+        OnUnitActiveSec = "5min";
+        RandomizedDelaySec = "20s";
+      };
+    };
+
     systemd.services.vyrx-portal-api = {
       description = "VYRX portal (landing page and its API)";
       wantedBy = [ "multi-user.target" ];
@@ -331,6 +353,7 @@ in
           "seerr-key:${config.sops.secrets."services/media/seerr_api_key".path}"
           "vapid-public:${config.sops.secrets."services/portal/vapid_public_key".path}"
           "vapid-private:${config.sops.secrets."services/portal/vapid_private_key".path}"
+          "scan-secret:${config.sops.secrets."services/portal/scan_secret".path}"
         ];
         Environment = [
           # Loopback, because the ingress proxies to `127.0.0.1:<port>` for its own host - and because it is
@@ -350,6 +373,7 @@ in
           "PORTAL_VAPID_PUBLIC_KEY_FILE=%d/vapid-public"
           "PORTAL_VAPID_PRIVATE_KEY_FILE=%d/vapid-private"
           "PORTAL_VAPID_SUBJECT=mailto:noreply@vyrx.de"
+          "PORTAL_SCAN_SECRET_FILE=%d/scan-secret"
         ]
         ++ lib.optional (
           prometheusAddress != null
