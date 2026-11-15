@@ -312,7 +312,7 @@ in
       restartUnits = [ "vyrx-portal-api.service" ];
     };
 
-    sops.secrets."services/portal/scan_secret" = {};
+    sops.secrets."services/portal/scan_secret" = { };
 
     # The portal's API and pages are one process. It reaches the collector over the mesh and, later, the
     # services themselves; what may reach it is decided by the firewall and the ingress, like every other
