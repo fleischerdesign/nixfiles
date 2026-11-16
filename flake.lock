@@ -705,11 +705,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794804541,
-        "narHash": "sha256-2yvyXC00O4ect3TUVBWj6KI/QaVRUiLLqbBF1utqZb4=",
+        "lastModified": 1794805144,
+        "narHash": "sha256-ITjCJQSUsELOOF57aTUm7ZI0yyevmB6fQT1wYRL+Xto=",
         "owner": "fleischerdesign",
         "repo": "vyrx.de",
-        "rev": "7f864d85cf0b8aa3046b8b8d49bab80513442719",
+        "rev": "a54a8edf753a0bfeb1ee82ae05f03b21e150ff3c",
         "type": "github"
       },
       "original": {
