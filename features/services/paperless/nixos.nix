@@ -130,9 +130,15 @@ in
           config.sops.templates."paperless.env".path;
 
         # Scanner Service
+        #
+        # On the host's network, like the other containers of this host: the fleet firewall's forward
+        # chain has policy `drop` and declares no rule for podman's bridge, so a bridged container
+        # reaches neither the printer nor anything else. A scanner that cannot reach its printer never
+        # registers as a "Scan to Computer" target, which is why the printer listed no destination.
         virtualisation.oci-containers.backend = "podman";
         virtualisation.oci-containers.containers."node-hp-scan-to" = {
           image = "docker.io/manuc66/node-hp-scan-to:latest";
+          extraOptions = [ "--network=host" ];
           environment = {
             PUID = "315";
             PGID = "987";
