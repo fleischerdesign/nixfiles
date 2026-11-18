@@ -345,7 +345,14 @@ in
         # makes every retry for the next half hour fail. Measured: with the check off, all four
         # orders on hom-srv-01 failed with exactly that NXDOMAIN. It is pinned to a public resolver
         # for the same reason the zone lookup is: these hosts resolve through our own views.
-        dnsPropagationCheck = true;
+        #
+        # The check itself is deliberately not set here. nixpkgs 26.11 split the single
+        # `dnsPropagationCheck` switch into `dnsAuthoritativePropagationCheck` and
+        # `dnsRecursivePropagationCheck`, and the old option now fails evaluation with "no longer
+        # has any effect"; naming either new one breaks the pinned nixpkgs that predates the split.
+        # The module's defaults are the pair we want: the authoritative check - the one that asks
+        # the zone's own nameservers - is on, the recursive check, which can read a resolver's
+        # negative cache, is off. Leave both alone.
         # systemd credentials rather than an environment file: lego reads the token from the path
         # the variable names, so the secret never appears in a process environment.
         credentialFiles = {
