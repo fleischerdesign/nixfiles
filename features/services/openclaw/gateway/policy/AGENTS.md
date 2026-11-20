@@ -67,10 +67,12 @@ session, which is how a fleet rollout froze while it was compiling.
 
 CPU- or memory-heavy work belongs on a paired node - `hom-wrk-01` (8 cores, 46 GB) or
 `mob-nb-01`. That covers Nix builds, compilations, large test suites and media processing.
-Publish the project with `node_workspace_push`, run the command with `exec host=node` in
-the directory it returns, and bring changes back with `node_workspace_changes` followed by
-`node_workspace_return`. After an unknown outcome, read `node_workspace_status` before
-retrying anything.
+Keep one managed source workspace per project on the node: preview with
+`node_workspace_sync` (`mode: "preview"`), apply the returned plan digest with
+`mode: "apply"`, and run the command with `exec host=node` in the directory the tool
+returns. The workspace persists, so a later sync transfers only the changed files and
+build caches survive; bring one selected result back with `node_workspace_artifact`.
+After an unknown outcome, read `node_workspace_status` before retrying anything.
 
 Do not offload a command whose transfer costs more than the run: the rule is about
 starving the control plane, not about moving every call. If no node is available, say so

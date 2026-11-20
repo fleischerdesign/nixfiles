@@ -54,10 +54,11 @@ let
               entries."linux-node".config.camera.enabled = true;
             })
             {
-              # The node half of the workspace plugin: the nodews.* commands run in
-              # this host's process, so the plugin root is loaded here as well as on
-              # the gateway. A load path is the supported way to add a fixed plugin
-              # root in Nix mode; install/enable stay owned by this file.
+              # The node half of the workspace plugin: the nodews.sync/status/fetch
+              # commands run in this host's process, so the plugin root is loaded
+              # here as well as on the gateway. A load path is the supported way to
+              # add a fixed plugin root in Nix mode; install/enable stay owned by
+              # this file.
               load.paths = [ "${nodeWorkspacePlugin}" ];
               entries."node-workspace" = {
                 enabled = true;
@@ -67,7 +68,6 @@ let
                 config.node = {
                   pushRoots = [ "${stateDir}/workspace" ];
                   artifactRoots = [ "${stateDir}/workspace" ];
-                  returnRoots = [ "${stateDir}/workspace" ];
                 };
               };
             };

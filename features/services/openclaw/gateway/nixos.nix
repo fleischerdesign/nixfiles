@@ -91,11 +91,11 @@ let
   # range, and the lock is generated per host release.
   tokenjuicePlugin =
     inputs.openclaw.packages.${pkgs.stdenv.hostPlatform.system}."openclaw-runtime-plugin-tokenjuice";
-  # Node workspace: publishes one selected directory to a paired node and
-  # returns selected changes after a preview. The same plugin root is loaded by
-  # the node host, which is where the nodews.* commands run; the gateway half
-  # only registers the agent tools. Both halves speak protocol 4, so the gateway
-  # and the node must run the same revision.
+  # Node workspace: keeps one managed source workspace on a paired node, syncs
+  # it in place and fetches one selected artifact back. The same plugin root is
+  # loaded by the node host, which is where the nodews.* commands run; the
+  # gateway half only registers the agent tools. Both halves speak protocol 5,
+  # so the gateway and the node must run the same revision.
   nodeWorkspacePlugin = pkgs.custom.openclaw-node-workspace;
   # Composio: ClawHub runtime plugin plus the CLI it drives. The plugin ships
   # the reviewed skill and the routing hook; the CLI performs live tool
@@ -449,14 +449,12 @@ in
               "camera.snap"
               "camera.clip"
               # The node workspace commands are all classified dangerous, so the
-              # allowlist is their only way in. nodews.push/fetch/status act on
-              # files inside the node's configured roots; nodews.tree reads a
-              # tree and nodews.return streams a selected change set back.
-              "nodews.push"
-              "nodews.fetch"
+              # allowlist is their only way in: sync applies one managed plan in
+              # place, status reads readiness and receipt, fetch returns one
+              # selected artifact. Nothing outside the node's roots is reachable.
+              "nodews.sync"
               "nodews.status"
-              "nodews.tree"
-              "nodews.return"
+              "nodews.fetch"
             ];
           };
         };
@@ -618,21 +616,14 @@ in
           "${tokenjuicePlugin}"
           "${nodeWorkspacePlugin}"
         ];
-        plugins.entries.node-workspace = {
-          enabled = true;
-          # The plugin authorizes a local path against the session's own workspace,
-          # the boundary OpenClaw already hands to every tool. No root is configured
-          # here: the folder a session was opened on is the boundary, and a session
-          # without one falls back to the agent workspace. Roots are an
-          # authorization boundary, not a sandbox, and a returned project is
-          # node-authored code.
-          config.gateway = {
-            exclude = [
-              ".git"
-              "node_modules"
-            ];
-          };
-        };
+        # The plugin authorizes a local path against the session's own workspace,
+        # the boundary OpenClaw already hands to every tool, and the node side
+        # authorizes the destination against its own roots. No root is configured
+        # here: the folder a session was opened on is the boundary, and a session
+        # without one falls back to the agent workspace. Roots are an
+        # authorization boundary, not a sandbox. Path filtering is the managed
+        # policy's job, so there is nothing to declare at this layer.
+        plugins.entries.node-workspace.enabled = true;
         plugins.entries.searxng = {
           enabled = true;
           config.webSearch.baseUrl = searxngBaseUrl;
