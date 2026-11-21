@@ -50,6 +50,11 @@ in
   options.my.features.services.openclaw.node = {
     enable = lib.mkEnableOption "native OpenClaw session hosting for the primary Home Manager user";
     camera.enable = lib.mkEnableOption "camera capture through this node (requires a V4L2 camera and FFmpeg)";
+    browser.allowedHostnames = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Explicit browser hostname exceptions for this node; private-network access stays disabled.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -71,6 +76,7 @@ in
     home-manager.sharedModules = [
       (import ./home.nix {
         inherit endpoint camera webapps;
+        browserAllowedHostnames = cfg.browser.allowedHostnames;
         # Resolved here, where the system package set with the repository overlay
         # is in scope; the Home Manager module receives the plugin root as an
         # argument instead of assuming the same package set.

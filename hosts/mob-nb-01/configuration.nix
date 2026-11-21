@@ -22,6 +22,8 @@
   my.features.services.openclaw.node = {
     enable = true;
     camera.enable = true;
+    # Local development previews, without granting the entire private network.
+    browser.allowedHostnames = [ "127.0.0.1" ];
   };
 
   my.features.media.gaming.sunshine.enable = false;

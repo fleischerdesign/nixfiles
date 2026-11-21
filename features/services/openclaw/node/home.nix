@@ -3,6 +3,7 @@
   camera,
   webapps,
   nodeWorkspacePlugin,
+  browserAllowedHostnames,
 }:
 {
   config,
@@ -38,6 +39,12 @@ let
               attachOnly = true;
               userDataDir = "${config.xdg.configHome}/google-chrome";
             };
+          };
+        }
+        // lib.optionalAttrs (browserAllowedHostnames != [ ]) {
+          ssrfPolicy = {
+            allowedHostnames = browserAllowedHostnames;
+            dangerouslyAllowPrivateNetwork = false;
           };
         }
         // lib.optionalAttrs (!hasDesktop) { headless = true; };
