@@ -40,6 +40,68 @@
     # and remain usable, but the agent no longer saves, updates or archives them
     # on its own. Nothing is deleted by this setting.
     settings.skills.workshop.autonomous.mode = "off";
+    # GPT-6.2 Sol shipped after the pinned OpenClaw build, whose OpenAI provider
+    # manifest stops at 6.1. This row mirrors the upstream manifest so the
+    # subscription model is selectable now; drop it once the package carries
+    # the model itself.
+    settings.models.providers.openai.models = [
+      {
+        id = "gpt-6.2-sol";
+        name = "GPT-6.2 Sol";
+        reasoning = true;
+        input = [
+          "text"
+          "image"
+        ];
+        contextWindow = 1050000;
+        contextTokens = 272000;
+        maxTokens = 128000;
+        cost = {
+          input = 2;
+          output = 10;
+          cacheRead = 0.1;
+          cacheWrite = 2.5;
+          tieredPricing = [
+            {
+              range = [
+                0
+                272001
+              ];
+              input = 2;
+              output = 10;
+              cacheRead = 0.1;
+              cacheWrite = 2.5;
+            }
+            {
+              range = [ 272001 ];
+              input = 4;
+              output = 15;
+              cacheRead = 0.2;
+              cacheWrite = 5;
+            }
+          ];
+        };
+        thinkingLevelMap = {
+          off = null;
+          minimal = "low";
+          xhigh = "xhigh";
+          max = "max";
+        };
+        compat = {
+          defaultThinkingLevel = "medium";
+          supportsReasoningEffort = true;
+          supportedReasoningEfforts = [
+            "low"
+            "medium"
+            "high"
+            "xhigh"
+            "max"
+          ];
+          supportsTemperature = false;
+          codeMode = "preferred";
+        };
+      }
+    ];
     opencodeSubscriptions = import ../../inventory/opencode-subscriptions.nix;
   };
 
