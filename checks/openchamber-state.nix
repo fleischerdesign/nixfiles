@@ -11,6 +11,7 @@ in
 pkgs.runCommand "openchamber-state" { nativeBuildInputs = [ pkgs.python3 ]; } ''
   python ${file ./fixtures/openchamber/state.py} \
     ${file ../features/dev/openchamber/reconcile.py} \
-    ${file ../features/dev/openchamber/credentials.py}
+    ${file ../features/dev/openchamber/credentials.py} \
+    ${file ../features/dev/openchamber/pair.py}
   touch "$out"
 ''

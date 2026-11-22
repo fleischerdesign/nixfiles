@@ -52,6 +52,22 @@ in
       default = 7337;
       description = "Desktop network port, shared by runtime settings and the WireGuard endpoint.";
     };
+    defaultHost = lib.mkOption {
+      type = lib.types.nullOr (lib.types.strMatching "[a-zA-Z0-9_-]+");
+      default = null;
+      description = ''
+        Peer name the desktop selects at startup. Null keeps Local; an offline peer falls back
+        to Local through OpenChamber's normal boot probe.
+      '';
+    };
+    uiPasswordSecret = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        SOPS secret holding the desktop UI password. Null generates a random password on the
+        first activation and keeps it in the mode-0600 settings file.
+      '';
+    };
     packages = lib.mkOption {
       type = lib.types.attrsOf lib.types.package;
       readOnly = true;
@@ -86,16 +102,27 @@ in
           == lib.length cfg.subscriptions;
         message = "OpenChamber subscription names must be unique";
       }
+
+      {
+        assertion = cfg.defaultHost == null || builtins.hasAttr cfg.defaultHost cfg.peers;
+        message = "OpenChamber defaultHost must name an enabled peer";
+      }
     ];
-    sops.secrets = lib.listToAttrs (
-      map (
-        subscription:
-        lib.nameValuePair subscription.apiKeySecret {
+    sops.secrets =
+      lib.listToAttrs (
+        map (
+          subscription:
+          lib.nameValuePair subscription.apiKeySecret {
+            owner = lib.mkDefault config.my.user.primary;
+            restartUnits = [ "${accountUnit}.service" ];
+          }
+        ) cfg.subscriptions
+      )
+      // lib.optionalAttrs (cfg.uiPasswordSecret != null) {
+        ${cfg.uiPasswordSecret} = {
           owner = lib.mkDefault config.my.user.primary;
-          restartUnits = [ "${accountUnit}.service" ];
-        }
-      ) cfg.subscriptions
-    );
+        };
+      };
     systemd.services.${accountUnit} = {
       description = "Reconcile this device's declared OpenCode accounts";
       wantedBy = [ "multi-user.target" ];

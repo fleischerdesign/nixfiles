@@ -35,13 +35,23 @@ let
     }
   );
   original = upstream.openchamber;
+  mergeRegistry = builtins.path {
+    path = ./merge-registry.py;
+    name = "merge-openchamber-registry.py";
+  };
+  # Upstream overrides installPhase; this stdenv does not run postInstall for a custom phase, so
+  # append the extension injection here rather than relying on the hook.
   core = original.passthru.core.overrideAttrs (old: {
-    postInstall = (old.postInstall or "") + ''
+    installPhase = old.installPhase + ''
       root="$out/lib/openchamber/packages/web/build/server/built-in-extensions"
       mkdir -p "$root"
-      cp ${registry} "$root/registry.json"
+      ${pkgs.python3}/bin/python ${mergeRegistry} "$root/registry.json" ${registry}
       cd "$out/lib/openchamber"
       ${lib.concatMapStringsSep "\n" (plugin: ''
+        if [ -e "$root/${plugin.name}" ]; then
+          echo "OpenChamber: built-in extension directory already exists: ${plugin.name}" >&2
+          exit 1
+        fi
         cp -R ${plugin.source} "$root/${plugin.name}"
       '') plugins}
       ${pkgs.bun}/bin/bun ${

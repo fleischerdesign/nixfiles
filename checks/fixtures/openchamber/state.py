@@ -1,10 +1,12 @@
 """A switch must preserve interactive state and rotate only changed declared credentials."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 def load(name, path):
@@ -16,6 +18,7 @@ def load(name, path):
 
 settings = load("settings", sys.argv.pop(1))
 credentials = load("credentials", sys.argv.pop(1))
+pair = load("pair", sys.argv.pop(1))
 
 
 class State(unittest.TestCase):
@@ -77,6 +80,98 @@ class State(unittest.TestCase):
             path.write_text(json.dumps(migrated))
             settings.reconcile(path, desired)
             self.assertEqual(json.loads(path.read_text())['desktopHosts'][0]['clientToken'], 'new-native')
+
+    def test_password_secret_and_default_host_are_applied(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            secret = Path(directory) / "password"
+            secret.write_text("known-password\n")
+            desired = {
+                "desktopSshInstances": [],
+                "desktopHosts": [{"id": "nixfiles:peer", "url": "http://peer:7337"}],
+                "desktopLocalPort": 7337,
+                "desktopLanAccessEnabled": True,
+                "desktopDefaultHostId": "nixfiles:peer",
+                "desktopUiPasswordPath": str(secret),
+            }
+            settings.reconcile(path, desired)
+            current = json.loads(path.read_text())
+            self.assertEqual(current["desktopUiPassword"], "known-password")
+            self.assertEqual(current["desktopDefaultHostId"], "nixfiles:peer")
+            self.assertNotIn("desktopUiPasswordPath", current)
+            desired["desktopUiPasswordPath"] = None
+            settings.reconcile(path, desired)
+            self.assertEqual(json.loads(path.read_text())["desktopUiPassword"], "known-password")
+
+    def test_removed_managed_peer_is_queued_for_revocation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            path.write_text(json.dumps({
+                "desktopHosts": [{
+                    "id": "nixfiles:old", "url": "http://old:7337",
+                    "apiUrl": "http://old:7337", "clientToken": "old-token",
+                }],
+            }))
+            settings.reconcile(path, {
+                "desktopSshInstances": [], "desktopHosts": [],
+            })
+            current = json.loads(path.read_text())
+            self.assertEqual(current["desktopHosts"], [])
+            self.assertEqual(current["nixfilesPendingRevocations"][0]["id"], "nixfiles:old")
+            self.assertEqual(current["nixfilesPendingRevocations"][0]["clientToken"], "old-token")
+
+    def test_pair_bootstraps_and_creates_a_desktop_client(self):
+        calls = []
+
+        def fake_request(base, route, token=None, payload=None, method=None):
+            calls.append((route, token, payload, method))
+            if route == '/health':
+                return {'runtime': 'desktop'}
+            if route == '/auth/session':
+                return {'clientToken': 'short'}
+            if route == '/api/client-auth/clients' and token == 'short':
+                return {'token': 'local-token'}
+            if route == '/api/client-auth/clients' and token == 'local-token':
+                return {'token': 'peer-token'}
+            raise AssertionError(route)
+
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'openchamber'
+            config.mkdir()
+            path = config / 'settings.json'
+            path.write_text(json.dumps({'desktopLocalPort': 7337, 'desktopUiPassword': 'pw'}))
+            with mock.patch.dict(os.environ, {'XDG_CONFIG_HOME': directory}), \
+                    mock.patch.object(pair, 'request', fake_request):
+                current = pair.read_settings(pair.settings_path())
+                token = pair.bootstrap_token(current, 'http://127.0.0.1:7337')
+                self.assertEqual(token, 'local-token')
+                self.assertEqual(json.loads(path.read_text())['desktopLocalClientToken'], 'local-token')
+                with mock.patch.object(pair, 'ensure_local_token', lambda _: 'local-token'):
+                    result = pair.issue({'peers': {'peer': {}}, 'host': 'source'}, 'peer')
+                self.assertEqual(result, {'clientToken': 'peer-token'})
+                create = [
+                    call for call in calls
+                    if call[0] == '/api/client-auth/clients'
+                    and call[2] and call[2].get('clientKind') == 'desktop'
+                ]
+                self.assertEqual(create[0][2]['dedupeKey'], 'nixfiles:peer')
+
+    def test_pair_keeps_only_unrevoked_pending_peers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'openchamber'
+            config.mkdir()
+            path = config / 'settings.json'
+            path.write_text(json.dumps({
+                'nixfilesPendingRevocations': [
+                    {'id': 'nixfiles:a', 'url': 'http://a:7337', 'clientToken': 'a-token'},
+                    {'id': 'nixfiles:b', 'url': 'http://b:7337', 'clientToken': 'b-token'},
+                ],
+            }))
+            with mock.patch.dict(os.environ, {'XDG_CONFIG_HOME': directory}), \
+                    mock.patch.object(pair, 'revoke_peer', lambda entry: entry['id'] == 'nixfiles:a'):
+                pair.reconcile({'peers': {}, 'host': 'source'})
+            pending = json.loads(path.read_text())['nixfilesPendingRevocations']
+            self.assertEqual([item['id'] for item in pending], ['nixfiles:b'])
 
     def test_invalid_state_is_not_replaced(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -38,8 +38,26 @@ let
       }) cfg.peers;
       desktopLocalPort = cfg.port;
       desktopLanAccessEnabled = true;
+      desktopDefaultHostId = if cfg.defaultHost == null then "local" else "nixfiles:${cfg.defaultHost}";
+      desktopUiPasswordPath =
+        if cfg.uiPasswordSecret == null then null else osConfig.sops.secrets.${cfg.uiPasswordSecret}.path;
     }
   );
+  portCheck = pkgs.writeShellScript "openchamber-port-check" ''
+    set -eu
+    port=${toString cfg.port}
+    for _ in 1 2 3; do
+      if ${pkgs.curl}/bin/curl -fsS --max-time 1 "http://127.0.0.1:$port/health" 2>/dev/null \
+        | ${pkgs.gnugrep}/bin/grep -Eq '"runtime"[[:space:]]*:[[:space:]]*"desktop"'; then
+        exit 0
+      fi
+      ${pkgs.coreutils}/bin/sleep 1
+    done
+    if ${pkgs.iproute2}/bin/ss -ltnH "sport = :$port" | ${pkgs.gnugrep}/bin/grep -q .; then
+      echo "OpenChamber: TCP port $port is already in use by another service" >&2
+      exit 1
+    fi
+  '';
   autostartPath = "${config.xdg.configHome}/autostart/openchamber.desktop";
   # The desktop rewrites this entry on startup (linux-autostart.mjs), so it must be a regular
   # file; a home.file symlink into the read-only store would make that write fail.
@@ -88,6 +106,9 @@ in
       };
       Install.WantedBy = [ "timers.target" ];
     };
+    home.activation.openchamberPort = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      run ${portCheck}
+    '';
     home.activation.openchamber = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       run ${pkgs.python3}/bin/python ${file ./reconcile.py} \
         ${lib.escapeShellArg "${config.xdg.configHome}/openchamber/settings.json"} ${desired}

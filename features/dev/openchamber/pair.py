@@ -1,5 +1,7 @@
-"""Enroll declared desktops with OpenChamber's pairing API; SSH only bootstraps trust."""
+"""Enroll declared desktops with OpenChamber's local admin API; SSH only bootstraps trust."""
 
+from contextlib import contextmanager
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -25,17 +27,24 @@ def settings_path():
     return root/'openchamber/settings.json'
 
 
-def request(base, route, token=None, payload=None):
-    headers = {'Content-Type': 'application/json'}
-    if token:
-        headers['Authorization'] = 'Bearer ' + token
-    req = urllib.request.Request(base + route, headers=headers,
-                                 data=json.dumps(payload).encode() if payload is not None else None)
-    with http.open(req, timeout=4) as response:
-        return json.load(response)
+@contextmanager
+def settings_lock(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.parent/'.settings.lock'
+    with open(lock_path, 'a') as handle:
+        os.chmod(lock_path, 0o600)
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def write(path, value):
+def read_settings(path):
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def write_settings(path, value):
     if path.exists() and json.loads(path.read_text()) == value:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -48,6 +57,19 @@ def write(path, value):
         os.chmod(path, 0o600)
     finally:
         Path(name).unlink(missing_ok=True)
+
+
+def request(base, route, token=None, payload=None, method=None):
+    headers = {'Content-Type': 'application/json'}
+    if token:
+        headers['Authorization'] = 'Bearer ' + token
+    req = urllib.request.Request(
+        base + route, headers=headers,
+        data=json.dumps(payload).encode() if payload is not None else None,
+        method=method,
+    )
+    with http.open(req, timeout=4) as response:
+        return json.load(response)
 
 
 def bootstrap_token(settings, base):
@@ -68,71 +90,82 @@ def bootstrap_token(settings, base):
     token = result.get('token')
     if not token:
         raise ValueError('Desktop did not create a local client')
-    current = json.loads(settings_path().read_text())
-    current['desktopLocalClientToken'] = token
-    write(settings_path(), current)
+    path = settings_path()
+    with settings_lock(path):
+        current = read_settings(path)
+        current['desktopLocalClientToken'] = token
+        write_settings(path, current)
     return token
 
 
 def ensure_local_token(settings):
     if not settings.get('desktopUiPassword'):
-        return
+        return None
     try:
         base = 'http://127.0.0.1:' + str(settings['desktopLocalPort'])
         if request(base, '/health').get('runtime') != 'desktop':
-            return
+            return None
     except (OSError, ValueError, KeyError, urllib.error.URLError):
-        return
+        return None
     token = settings.get('desktopLocalClientToken')
     if token:
         try:
             request(base, '/api/config/settings', token)
-            return
+            return token
         except urllib.error.HTTPError as error:
             if error.code not in (401, 403):
-                return
+                return token
         except (OSError, ValueError, urllib.error.URLError):
-            return
+            return token
     try:
-        bootstrap_token(settings, base)
+        return bootstrap_token(settings, base)
     except Exception as error:
         print(f'OpenChamber local token bootstrap failed ({type(error).__name__})', file=sys.stderr)
+        return None
+
+
+def revoke_peer(entry):
+    token = entry.get('clientToken')
+    base = entry.get('apiUrl') or entry.get('url')
+    if not token or not base:
+        return True
+    try:
+        clients = request(base, '/api/client-auth/clients', token).get('clients', [])
+        for client in clients:
+            client_id = client.get('id')
+            if client_id:
+                request(base, '/api/client-auth/clients/' + client_id, token, method='DELETE')
+    except urllib.error.HTTPError as error:
+        return error.code in (401, 403, 404)
+    except (OSError, ValueError, KeyError, urllib.error.URLError):
+        return False
+    return True
 
 
 def issue(plan, source):
     if source not in plan['peers']:
         raise ValueError('Device is not a declared peer')
-    settings = json.loads(settings_path().read_text())
+    settings = read_settings(settings_path())
     base = 'http://127.0.0.1:' + str(settings['desktopLocalPort'])
     if request(base, '/health').get('runtime') != 'desktop':
         raise ValueError('Desktop is not running')
-    token = settings.get('desktopLocalClientToken')
-    try:
-        pairing = request(base, '/api/client-auth/pairing/sessions', token, {
-            'label': source, 'allowedClientKinds': ['desktop'],
-            'includeRelay': False, 'includeDirect': True,
-        })['pairing']
-    except urllib.error.HTTPError as error:
-        if error.code not in (401, 403):
-            raise
-        token = bootstrap_token(settings, base)
-        pairing = request(base, '/api/client-auth/pairing/sessions', token, {
-            'label': source, 'allowedClientKinds': ['desktop'],
-            'includeRelay': False, 'includeDirect': True,
-        })['pairing']
-    result = request(base, '/api/client-auth/pairing/redeem', payload={
-        'pairingId': pairing['id'], 'secret': pairing['secret'],
-        'clientLabel': source, 'clientKind': 'desktop', 'deviceName': source,
-        'devicePlatform': 'linux', 'dedupeKey': 'nixfiles:' + source,
+    token = ensure_local_token(settings)
+    result = request(base, '/api/client-auth/clients', token, {
+        'label': source, 'clientKind': 'desktop', 'dedupeKey': 'nixfiles:' + source,
     })
-    return {'clientToken': result['clientToken']}
+    return {'clientToken': result['token']}
 
 
 def reconcile(plan):
     path = settings_path()
-    current = json.loads(path.read_text()) if path.exists() else {}
-    if isinstance(current, dict):
-        ensure_local_token(current)
+    current = read_settings(path)
+    if not isinstance(current, dict):
+        raise ValueError('OpenChamber settings must be a JSON object')
+    ensure_local_token(current)
+    current = read_settings(path)
+    pending = current.get('nixfilesPendingRevocations', [])
+    remaining = [entry for entry in pending if isinstance(entry, dict) and not revoke_peer(entry)]
+    revoked_ids = {entry.get('id') for entry in pending if entry not in remaining and isinstance(entry, dict)}
     existing = {item['id']: item for item in current.get('desktopHosts', [])}
     enrolled = {}
     for name, peer in plan['peers'].items():
@@ -148,10 +181,10 @@ def reconcile(plan):
         except (OSError, ValueError, urllib.error.URLError):
             if token:
                 print('OpenChamber peer offline or token revoked: ' + name, file=sys.stderr)
-                enrolled[identifier] = {'id': identifier, 'label': name, 'url': base, 'apiUrl': base}
+                enrolled[identifier] = {'id': identifier, 'label': name,
+                                        'url': base, 'apiUrl': base,
+                                        'clientToken': token}
                 continue
-            # Check reachability before asking the peer to issue a token. Offline devices
-            # retain their saved token and are retried by the next enrollment run.
             try:
                 if request(base, '/health').get('runtime') != 'desktop':
                     raise ValueError('Not a desktop runtime')
@@ -173,18 +206,30 @@ def reconcile(plan):
         enrolled[identifier] = {'id': identifier, 'label': name, 'url': base, 'apiUrl': base}
         if issued:
             enrolled[identifier]['clientToken'] = token
-    # Re-read after network calls to keep changes the desktop made while enrollment ran.
-    current = json.loads(path.read_text()) if path.exists() else {}
-    latest = {item['id']: item for item in current.get('desktopHosts', [])}
-    current['desktopHosts'] = [item for item in current.get('desktopHosts', [])
-                               if not item.get('id', '').startswith('nixfiles:')] + [
-        latest.get(identifier, {}) | value for identifier, value in enrolled.items()]
-    current['desktopSshInstances'] = [item for item in current.get('desktopSshInstances', [])
-                                      if not item.get('id', '').startswith('nixfiles:')]
-    default = current.get('desktopDefaultHostId', '')
-    if default.startswith('nixfiles:') and default not in enrolled:
-        current['desktopDefaultHostId'] = 'local'
-    write(path, current)
+    with settings_lock(path):
+        current = read_settings(path)
+        latest = {item['id']: item for item in current.get('desktopHosts', [])}
+        current['desktopHosts'] = [item for item in current.get('desktopHosts', [])
+                                   if not item.get('id', '').startswith('nixfiles:')] + [
+            latest.get(identifier, {}) | value for identifier, value in enrolled.items()]
+        current['desktopSshInstances'] = [item for item in current.get('desktopSshInstances', [])
+                                          if not item.get('id', '').startswith('nixfiles:')]
+        default = current.get('desktopDefaultHostId', '')
+        if default.startswith('nixfiles:') and default not in enrolled:
+            current['desktopDefaultHostId'] = 'local'
+        pending_now = current.get('nixfilesPendingRevocations', [])
+        keep = {
+            entry['id']: entry
+            for entry in pending_now
+            if isinstance(entry, dict) and entry.get('id') and entry['id'] not in revoked_ids
+        }
+        for entry in remaining:
+            keep[entry['id']] = entry
+        if keep:
+            current['nixfilesPendingRevocations'] = list(keep.values())
+        else:
+            current.pop('nixfilesPendingRevocations', None)
+        write_settings(path, current)
 
 
 if __name__ == '__main__':

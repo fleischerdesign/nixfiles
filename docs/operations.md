@@ -474,31 +474,40 @@ server runs. The feature is in `features/dev/openchamber/`. Its pinned upstream 
 the unmodified Electron app, server CLI and matching OpenCode CLI.
 
 The desktop's network port is declared once by the feature's `port` option (default 7337).
-Activation merges that port and network access into writable desktop settings. Existing UI passwords
-are retained; a fresh device gets a random password stored only in its mode-0600 settings file.
+Activation first checks that the port is free or already served by a running desktop with the
+`desktop` runtime; another listener fails the switch instead of letting the app fall back to a random
+port. Activation merges the port and network access into writable desktop settings. Existing UI
+passwords are retained; if `uiPasswordSecret` names a SOPS secret, its value becomes the desktop
+password, otherwise a fresh device gets a random password stored only in its mode-0600 settings file.
 The endpoint contract admits only the other enabled OpenChamber hosts over WireGuard. The feature's
 `autostart` option (default on) writes the XDG autostart entry at
-`~/.config/autostart/openchamber.desktop`; the desktop's own checkbox reflects the file's existence,
-and the next activation restores an entry disabled in the app. The entry is a regular file, not a
-`home.file` symlink, because the desktop rewrites its `Exec` path at startup. A device's desktop must
-be running to use its workspace.
+`${XDG_CONFIG_HOME}/autostart/openchamber.desktop`; the desktop's own checkbox reflects the file's
+existence, and the next activation restores an entry disabled in the app. The entry points at the Nix
+wrapper and the pinned OpenCode CLI is also on the session PATH, because the desktop rewrites `Exec`
+to its raw Electron path at startup. A device's desktop must be running to use its workspace.
 
-Native device tokens connect the desktops directly over WireGuard. `openchamber-fleet-pair` uses
-OpenChamber's pairing-session and redemption APIs to issue one token per declared source device.
-Only initial enrollment uses the existing operator SSH identity to authorize the request on the
-target as its primary user. UI passwords and local desktop tokens stay on the target. Subsequent
-connections need neither SSH nor a relay. A user timer retries enrollment one minute after login
-and five minutes after each completed attempt; its oneshot process starts no server and exits after
-checking the peers. An offline peer keeps its saved entry. A revoked token is reported and is not
-automatically replaced. Remove the managed local entry to request enrollment again, or pair it in
-the app. The operator SSH identity must be available for enrollment, for example through an unlocked
-SSH agent. The Nix-managed IDs use the `nixfiles:` prefix; personal connections remain untouched.
+Native device tokens connect the desktops directly over WireGuard. `openchamber-fleet-pair --issue`
+runs on the target over the existing operator SSH identity and creates one `desktop` client token
+through the target's local admin API (`POST /api/client-auth/clients`); the source stores that token
+in `desktopHosts`. Only initial enrollment uses SSH. Before issuing, the target ensures its own
+`desktop-local` token: if it is missing or rejected, it logs in over loopback with the stored UI
+password and creates a permanent `desktop-local` client, so enrollment does not depend on a manual
+UI login. UI passwords and local desktop tokens stay on the target. Subsequent connections need
+neither SSH nor a relay. A user timer retries enrollment one minute after login and five minutes
+after each completed attempt; its oneshot process starts no server and exits after checking the
+peers. An offline peer keeps its saved entry. A revoked token is reported and is not automatically
+replaced. Remove the managed local entry to request enrollment again, or pair it in the app. The
+operator SSH identity must be available for enrollment, for example through an unlocked SSH agent.
+The Nix-managed IDs use the `nixfiles:` prefix; personal connections remain untouched. `defaultHost`
+selects a peer or `null` (Local) at desktop startup; an offline peer falls back to Local.
 
 The switch removes managed SSH entries, discards their old tunnel tokens once and registers native
-host addresses from the inventory. Native tokens are retained on later switches. Only a changed
-settings document is atomically replaced. Enrollment re-reads the file after network operations;
-upstream exposes no shared cross-process settings lock, so avoid simultaneous device edits during
-activation or initial enrollment. Restart the desktop after migration to release its old SSH sessions.
+host addresses from the inventory. Native tokens are retained on later switches. Both settings writers
+take an exclusive `flock` on `.settings.lock` and atomically replace only a changed document; a peer
+that disappears from the declaration is queued for best-effort revocation on the next enrollment
+pass. Electron serialises its own writes only inside its process and upstream exposes no external
+settings API, so avoid simultaneous device edits during activation or enrollment. Restart the desktop
+after migration to release its old SSH sessions.
 
 Go subscriptions are independent of device enrollment. They are listed in
 `inventory/opencode-subscriptions.nix`, shared with OpenClaw; the personal-computer role selects the
@@ -522,13 +531,20 @@ integration. A separate fallback model is an interactive preference; the feature
 one. OpenClaw and the two
 OpenChamber instances consume the same subscription limits and maintain independent cooldowns.
 
-Every immediate directory in `features/dev/openchamber/plugins/` is discovered as an app-shipped
-extension. Its manifest and runtime assets are validated by OpenChamber's own package inspector during
-the build. App-shipped extensions trust the permissions declared in the repository and can be disabled
-in the UI. Runtime extensions remain supported through Settings → Extensions and `/new-extension`;
-the feature does not replace the writable extension catalog. See
+Every immediate directory in `features/dev/openchamber/plugins/` is merged into the app's own
+built-in registry; an ID or directory collision with an upstream built-in fails the build instead of
+replacing it. Its manifest and runtime assets are validated by OpenChamber's own package inspector
+during the build. The manifest requires `openchamber.apiVersion: 1`, a non-empty semver `version`,
+`panel.id`, `panel.name` and `panel.icon`; `panel.entry` must point at a self-contained HTML entry when
+used. App-shipped extensions trust the permissions declared in the repository and can be disabled in
+the UI. Runtime extensions remain supported through Settings → Extensions and `/new-extension`; the
+feature does not replace the writable extension catalog. See
 [`plugins/README.md`](../features/dev/openchamber/plugins/README.md) for the package contract and how to
 promote a runtime extension into the configuration.
+
+OpenChamber's optional shared `opencode serve --service` mode is not enabled. The pinned Nix CLI
+registers its service under the channel-specific file while the v2.8.0 desktop client looks for the
+generic one; enabling the toggle without aligning that would start a second unreachable daemon.
 
 The upstream Nix build uses import-from-derivation for its Bun dependency catalog. Evaluation can
 therefore build the converter. Keep the upstream nixpkgs/Bun pin with the OpenChamber input: its
