@@ -63,6 +63,8 @@
       url = "github:openclaw/nix-openclaw";
     };
 
+    openchamber.url = "github:openchamber/openchamber/v2.8.0";
+
     yapfast = {
       url = "github:yapfast/yapfast/v0.3.0";
     };

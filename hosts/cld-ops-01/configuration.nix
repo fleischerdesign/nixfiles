@@ -82,8 +82,9 @@
     );
   };
 
-  # Limit builders as well as host evaluations; web builds can use several GiB each.
-  systemd.services.nod-sync.environment.NIX_CONFIG = "max-jobs = 1\ncores = 2";
+  # Limit builders as well as host evaluations; OpenChamber's web builds can use several GiB each.
+  # Fixed-output npm fetches need network; ordinary derivations stay sandboxed.
+  systemd.services.nod-sync.environment.NIX_CONFIG = "max-jobs = 1\ncores = 2\nsandbox = relaxed";
 
   # The fleet declaration, typed by nod's `services.nod` module. The daemon
   # reads `config.services.nod.fleet` through the flake output; the provider

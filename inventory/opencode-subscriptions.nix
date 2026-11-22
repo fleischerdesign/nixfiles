@@ -1,6 +1,6 @@
-# Paid workspaces for OpenClaw's model provider; ordering is the auth failover preference.
-# Keep the funded subscription first: worker-placed sessions select the first profile and do not
-# rotate to another account when it reports a billing error.
+# Paid workspaces shared by OpenClaw's model provider and the coding runtimes; ordering
+# expresses the initial preference. Keep the funded subscription first: worker-placed sessions
+# select the first profile and do not rotate to another account when it reports a billing error.
 [
   {
     name = "subscription-1";
