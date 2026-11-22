@@ -75,7 +75,8 @@ in
       Service = {
         Type = "oneshot";
         ExecStart = "${pair}/bin/openchamber-fleet-pair";
-        TimeoutStartSec = 60;
+        Environment = "XDG_CONFIG_HOME=${config.xdg.configHome}";
+        TimeoutStartSec = 120;
         UMask = "0077";
       };
     };

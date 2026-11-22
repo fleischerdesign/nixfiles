@@ -74,6 +74,31 @@ def bootstrap_token(settings, base):
     return token
 
 
+def ensure_local_token(settings):
+    if not settings.get('desktopUiPassword'):
+        return
+    try:
+        base = 'http://127.0.0.1:' + str(settings['desktopLocalPort'])
+        if request(base, '/health').get('runtime') != 'desktop':
+            return
+    except (OSError, ValueError, KeyError, urllib.error.URLError):
+        return
+    token = settings.get('desktopLocalClientToken')
+    if token:
+        try:
+            request(base, '/api/config/settings', token)
+            return
+        except urllib.error.HTTPError as error:
+            if error.code not in (401, 403):
+                return
+        except (OSError, ValueError, urllib.error.URLError):
+            return
+    try:
+        bootstrap_token(settings, base)
+    except Exception as error:
+        print(f'OpenChamber local token bootstrap failed ({type(error).__name__})', file=sys.stderr)
+
+
 def issue(plan, source):
     if source not in plan['peers']:
         raise ValueError('Device is not a declared peer')
@@ -106,6 +131,8 @@ def issue(plan, source):
 def reconcile(plan):
     path = settings_path()
     current = json.loads(path.read_text()) if path.exists() else {}
+    if isinstance(current, dict):
+        ensure_local_token(current)
     existing = {item['id']: item for item in current.get('desktopHosts', [])}
     enrolled = {}
     for name, peer in plan['peers'].items():
