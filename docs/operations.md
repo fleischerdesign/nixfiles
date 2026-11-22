@@ -516,9 +516,10 @@ remain owned by OpenChamber.
 Account switching defaults to `opencode-go`. OpenChamber rotates stored credentials when quota or
 budget exhaustion, or a rate limit of at least a minute, stops a turn. Reset hints control cooldowns;
 without a hint the default is one hour, and cooldowns are forgotten on restart. The active credential
-belongs to the OpenCode integration, not an individual session. OpenCode Go and Zen share the
-`opencode` integration, so switching changes the account used by that integration. A separate fallback
-model is an interactive preference; the feature does not configure one. OpenClaw and the two
+belongs to the OpenCode integration, not an individual session. OpenCode Go is its own
+`opencode-go` integration; OpenCode Zen uses `opencode`. Switching changes the account used by that
+integration. A separate fallback model is an interactive preference; the feature does not configure
+one. OpenClaw and the two
 OpenChamber instances consume the same subscription limits and maintain independent cooldowns.
 
 Every immediate directory in `features/dev/openchamber/plugins/` is discovered as an app-shipped

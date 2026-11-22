@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 http = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+
+def settings_path():
+    config_home = os.environ.get('XDG_CONFIG_HOME')
+    root = Path(config_home) if config_home else Path.home()/'.config'
+    return root/'openchamber/settings.json'
 
 
 def request(base, route, token=None, payload=None):
@@ -38,22 +45,56 @@ def write(path, value):
             json.dump(value, handle, indent=2)
             handle.write('\n')
         os.replace(name, path)
+        os.chmod(path, 0o600)
     finally:
         Path(name).unlink(missing_ok=True)
+
+
+def bootstrap_token(settings, base):
+    password = settings.get('desktopUiPassword')
+    if not password:
+        raise ValueError('Desktop requires authentication but has no UI password')
+    short = request(base, '/auth/session', payload={
+        'password': password, 'trustDevice': False, 'issueClientToken': True,
+        'clientLabel': 'nixfiles-enrollment', 'clientKind': 'desktop-local',
+        'dedupeKey': 'nixfiles-bootstrap',
+    }).get('clientToken')
+    if not short:
+        raise ValueError('Desktop did not issue a bootstrap token')
+    result = request(base, '/api/client-auth/clients', short, {
+        'label': 'nixfiles-enrollment', 'clientKind': 'desktop-local',
+        'dedupeKey': 'nixfiles-enrollment',
+    })
+    token = result.get('token')
+    if not token:
+        raise ValueError('Desktop did not create a local client')
+    current = json.loads(settings_path().read_text())
+    current['desktopLocalClientToken'] = token
+    write(settings_path(), current)
+    return token
 
 
 def issue(plan, source):
     if source not in plan['peers']:
         raise ValueError('Device is not a declared peer')
-    settings = json.loads((Path.home()/'.config/openchamber/settings.json').read_text())
+    settings = json.loads(settings_path().read_text())
     base = 'http://127.0.0.1:' + str(settings['desktopLocalPort'])
     if request(base, '/health').get('runtime') != 'desktop':
         raise ValueError('Desktop is not running')
     token = settings.get('desktopLocalClientToken')
-    pairing = request(base, '/api/client-auth/pairing/sessions', token, {
-        'label': source, 'allowedClientKinds': ['desktop'],
-        'includeRelay': False, 'includeDirect': True,
-    })['pairing']
+    try:
+        pairing = request(base, '/api/client-auth/pairing/sessions', token, {
+            'label': source, 'allowedClientKinds': ['desktop'],
+            'includeRelay': False, 'includeDirect': True,
+        })['pairing']
+    except urllib.error.HTTPError as error:
+        if error.code not in (401, 403):
+            raise
+        token = bootstrap_token(settings, base)
+        pairing = request(base, '/api/client-auth/pairing/sessions', token, {
+            'label': source, 'allowedClientKinds': ['desktop'],
+            'includeRelay': False, 'includeDirect': True,
+        })['pairing']
     result = request(base, '/api/client-auth/pairing/redeem', payload={
         'pairingId': pairing['id'], 'secret': pairing['secret'],
         'clientLabel': source, 'clientKind': 'desktop', 'deviceName': source,
@@ -63,7 +104,7 @@ def issue(plan, source):
 
 
 def reconcile(plan):
-    path = Path.home()/'.config/openchamber/settings.json'
+    path = settings_path()
     current = json.loads(path.read_text()) if path.exists() else {}
     existing = {item['id']: item for item in current.get('desktopHosts', [])}
     enrolled = {}
@@ -87,9 +128,11 @@ def reconcile(plan):
             try:
                 if request(base, '/health').get('runtime') != 'desktop':
                     raise ValueError('Not a desktop runtime')
+                command = 'bash -lc ' + shlex.quote(
+                    'exec openchamber-fleet-pair --issue ' + plan['host'])
                 result = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=4',
                                          '-p', str(peer['sshPort']), peer['user']+'@'+peer['address'],
-                                         'openchamber-fleet-pair', '--issue', plan['host']],
+                                         command],
                                         capture_output=True, text=True, timeout=20)
                 if result.returncode:
                     raise RuntimeError('Enrollment unavailable')

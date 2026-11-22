@@ -54,8 +54,14 @@ let
   });
   server = original.overrideAttrs (old: {
     installPhase =
-      builtins.replaceStrings [ (toString original.passthru.core) ] [ (toString core) ]
-        old.installPhase;
+      let
+        patched = builtins.replaceStrings [ (toString original.passthru.core) ] [ (toString core) ]
+          old.installPhase;
+      in
+      if patched == old.installPhase then
+        throw "OpenChamber: server installPhase no longer references the overridden core"
+      else
+        patched;
     passthru = old.passthru // {
       inherit core;
     };

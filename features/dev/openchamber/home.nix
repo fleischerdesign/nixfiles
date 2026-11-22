@@ -40,14 +40,14 @@ let
       desktopLanAccessEnabled = true;
     }
   );
-  autostartPath = "${config.home.homeDirectory}/.config/autostart/openchamber.desktop";
+  autostartPath = "${config.xdg.configHome}/autostart/openchamber.desktop";
   # The desktop rewrites this entry on startup (linux-autostart.mjs), so it must be a regular
   # file; a home.file symlink into the read-only store would make that write fail.
   autostartEntry = pkgs.writeText "openchamber-autostart.desktop" ''
     [Desktop Entry]
     Type=Application
     Name=OpenChamber
-    Exec=${cfg.packages.desktop}/share/openchamber/openchamber --background
+    Exec=${cfg.packages.desktop}/bin/openchamber-desktop --background
     Terminal=false
     X-GNOME-Autostart-enabled=true
     StartupWMClass=openchamber
@@ -58,8 +58,17 @@ in
     home.packages = [
       cfg.packages.desktop
       cfg.packages.server
+      cfg.packages.opencode
       pair
     ];
+
+    # The desktop rewrites the autostart entry to its raw Electron path on every start, so the
+    # wrapper's environment must also exist in the session. The pinned CLI itself is on PATH via
+    # home.packages, not only through the wrapper's runtime path.
+    home.sessionVariables = {
+      ELECTRON_OZONE_PLATFORM_HINT = "auto";
+      CHROME_DEVEL_SANDBOX = "${cfg.packages.desktop}/share/openchamber/chrome-sandbox";
+    };
 
     systemd.user.services.openchamber-enrollment = {
       Unit.Description = "Enroll declared OpenChamber desktop peers";
@@ -80,7 +89,7 @@ in
     };
     home.activation.openchamber = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       run ${pkgs.python3}/bin/python ${file ./reconcile.py} \
-        ${lib.escapeShellArg "${config.home.homeDirectory}/.config/openchamber/settings.json"} ${desired}
+        ${lib.escapeShellArg "${config.xdg.configHome}/openchamber/settings.json"} ${desired}
     '';
     home.activation.openchamberAutostart = lib.hm.dag.entryAfter [ "writeBoundary" ] (
       if cfg.autostart then

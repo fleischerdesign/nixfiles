@@ -48,6 +48,7 @@ def reconcile(path, desired):
             json.dump(current, handle, indent=2)
             handle.write("\n")
         os.replace(temporary, path)
+        os.chmod(path, 0o600)
     finally:
         Path(temporary).unlink(missing_ok=True)
 

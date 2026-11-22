@@ -6,13 +6,23 @@ from pathlib import Path
 import subprocess
 import sys
 
+INTEGRATION_ID = 'opencode-go'
+
+
+def integration_connections(integrations):
+    integration = next((item for item in integrations if item['id'] == INTEGRATION_ID), None)
+    if integration is None:
+        return None, []
+    return integration, integration.get('connections', [])
+
 
 def reconcile(subscriptions, run):
     integrations = json.loads(run(['list', '--format', 'json']))
-    integration = next((item for item in integrations if item['id'] == 'opencode'), {})
-    connections = integration.get('connections', [])
-    active = connections[0].get('id') if connections else None
-    stored = {item['id']: item for item in connections if item['type'] == 'credential'}
+    _, connections = integration_connections(integrations)
+    credentials = [item for item in connections if item['type'] == 'credential']
+    # OpenCode lists the selected credential first in `auth list --format json`.
+    active = credentials[0].get('id') if credentials else None
+    stored = {item['id']: item for item in credentials}
     desired = []
     replacements = []
     for subscription in subscriptions:
@@ -21,7 +31,7 @@ def reconcile(subscriptions, run):
             raise ValueError('Empty Go credential')
         fingerprint = hashlib.sha256(key.encode()).hexdigest()[:16]
         credential_id = 'cred_nixfiles_go_' + subscription['name'] + '_' + fingerprint
-        desired.append({'id': credential_id, 'integrationID': 'opencode',
+        desired.append({'id': credential_id, 'integrationID': INTEGRATION_ID,
                         'label': subscription['name'], 'active': False,
                         'value': {'type': 'key', 'key': key}})
         old = next((item for item in stored.values()
@@ -33,12 +43,17 @@ def reconcile(subscriptions, run):
     missing = [item for item in desired if item['id'] not in stored]
     if missing:
         run(['import'], json.dumps(missing))
+        integrations = json.loads(run(['list', '--format', 'json']))
+        integration, connections = integration_connections(integrations)
+        if integration is None:
+            raise RuntimeError('OpenCode integration ' + INTEGRATION_ID + ' is missing after import')
+        stored = {item['id']: item for item in connections if item['type'] == 'credential'}
     for credential_id in replacements:
-        run(['switch', 'opencode', credential_id])
+        run(['switch', INTEGRATION_ID, credential_id])
     wanted = {item['id'] for item in desired}
     for credential_id in sorted(stored.keys() - wanted):
         if credential_id.startswith('cred_nixfiles_go_'):
-            run(['logout', 'opencode', credential_id])
+            run(['logout', INTEGRATION_ID, credential_id])
 
 
 def cli(binary):
