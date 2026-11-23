@@ -9,6 +9,14 @@ let
   cfg = config.my.features.dev.openchamber;
   systems = (import ../../../lib/fleet-configs.nix { inherit lib; }).systems config;
   peers = lib.filterAttrs (_: system: system.config.my.features.dev.openchamber.enable) systems;
+  desktopPeers = lib.filterAttrs (
+    _: system: system.config.my.features.dev.openchamber.role != "server"
+  ) peers;
+  hasDesktop = cfg.role != "server";
+  hasServer = cfg.role != "desktop";
+  primary = config.my.user.primary;
+  primaryHome = config.users.users.${primary}.home;
+  address = config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4 or null;
   accountPlan = pkgs.writeText "openchamber-subscriptions.json" (
     builtins.toJSON (
       map (subscription: {
@@ -22,11 +30,53 @@ let
     inherit lib pkgs;
     upstream = inputs.openchamber.packages.${pkgs.stdenv.hostPlatform.system};
   };
+  serverCommand = pkgs.writeShellScript "openchamber-server" ''
+    set -eu
+    ${lib.optionalString (cfg.server.uiPasswordSecret != null) ''
+      export OPENCHAMBER_UI_PASSWORD="$(cat "$CREDENTIALS_DIRECTORY/ui-password")"
+    ''}
+    ${lib.optionalString (cfg.server.uiPasswordSecret == null) ''
+      password_file="${primaryHome}/.local/state/openchamber/server-ui-password"
+      if [ ! -s "$password_file" ]; then
+        ${pkgs.coreutils}/bin/install -d -m 700 "$(dirname "$password_file")"
+        (umask 077; ${pkgs.openssl}/bin/openssl rand -base64 32 > "$password_file")
+      fi
+      export OPENCHAMBER_UI_PASSWORD="$(cat "$password_file")"
+    ''}
+    exec ${packages.server}/bin/openchamber serve --port ${toString cfg.server.port} --lan --api-only
+  '';
 in
 {
 
   options.my.features.dev.openchamber = {
     enable = lib.mkEnableOption "OpenChamber desktop and native fleet pairing";
+    role = lib.mkOption {
+      type = lib.types.enum [
+        "desktop"
+        "server"
+        "both"
+      ];
+      default = "desktop";
+      description = ''
+        Desktop installs the Electron client and native fleet pairing. Server installs only a
+        headless `openchamber serve` runtime for clients on other hosts. Both runs both.
+      '';
+    };
+    server = {
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 7338;
+        description = "Headless OpenChamber server port.";
+      };
+      uiPasswordSecret = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          SOPS secret for the headless server UI password. Null generates a password once at
+          ~/.local/state/openchamber/server-ui-password.
+        '';
+      };
+    };
     autostart = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -93,7 +143,7 @@ in
         assertion =
           config.my.features.system.networking.ssh.enable
           && lib.all (peer: peer.address != null) (lib.attrValues cfg.peers);
-        message = "OpenChamber native enrollment requires SSH and a WireGuard address for each peer";
+        message = "OpenChamber native enrollment requires SSH and a WireGuard address for each desktop peer";
       }
 
       {
@@ -104,8 +154,18 @@ in
       }
 
       {
-        assertion = cfg.defaultHost == null || builtins.hasAttr cfg.defaultHost cfg.peers;
-        message = "OpenChamber defaultHost must name an enabled peer";
+        assertion = !hasDesktop || cfg.defaultHost == null || builtins.hasAttr cfg.defaultHost cfg.peers;
+        message = "OpenChamber defaultHost must name an enabled desktop peer";
+      }
+
+      {
+        assertion = !hasServer || address != null;
+        message = "OpenChamber server role requires a WireGuard address";
+      }
+
+      {
+        assertion = cfg.role != "both" || cfg.port != cfg.server.port;
+        message = "OpenChamber desktop and server ports must differ when role = \"both\"";
       }
     ];
     sops.secrets =
@@ -122,18 +182,22 @@ in
         ${cfg.uiPasswordSecret} = {
           owner = lib.mkDefault config.my.user.primary;
         };
+      }
+      // lib.optionalAttrs (hasServer && cfg.server.uiPasswordSecret != null) {
+        ${cfg.server.uiPasswordSecret} = {
+          owner = lib.mkDefault config.my.user.primary;
+        };
       };
     systemd.services.${accountUnit} = {
       description = "Reconcile this device's declared OpenCode accounts";
       wantedBy = [ "multi-user.target" ];
-      requires = [ "home-manager-${config.my.user.primary}.service" ];
-      after = [ "home-manager-${config.my.user.primary}.service" ];
-      environment.HOME = config.users.users.${config.my.user.primary}.home;
+      after = [ "home-manager-${primary}.service" ];
+      environment.HOME = primaryHome;
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        User = config.my.user.primary;
-        WorkingDirectory = config.users.users.${config.my.user.primary}.home;
+        User = primary;
+        WorkingDirectory = primaryHome;
         UMask = "0077";
         TimeoutStartSec = 180;
         ExecStart = "${pkgs.python3}/bin/python ${
@@ -144,15 +208,51 @@ in
         } ${packages.opencode}/bin/opencode ${accountPlan}";
       };
     };
-    my.contracts.provides.openchamber.endpoints.desktop = {
-      inherit (cfg) port;
-      directAccess = {
-        enable = cfg.peers != { };
-        interface = "wireguard";
-        fromHosts = lib.attrNames cfg.peers;
+    systemd.services.openchamber-server = lib.mkIf hasServer {
+      description = "OpenChamber headless server";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      environment = {
+        HOME = primaryHome;
+        XDG_CONFIG_HOME = "${primaryHome}/.config";
+      };
+      serviceConfig = {
+        Type = "simple";
+        User = primary;
+        WorkingDirectory = primaryHome;
+        UMask = "0077";
+        ExecStart = serverCommand;
+        Restart = "on-failure";
+        RestartSec = 5;
+        TimeoutStopSec = 30;
+        LoadCredential =
+          lib.optional (cfg.server.uiPasswordSecret != null)
+            "ui-password:${config.sops.secrets.${cfg.server.uiPasswordSecret}.path}";
       };
     };
-    my.features.system.networking.ssh.admitsHosts = lib.attrNames cfg.peers;
-    home-manager.sharedModules = [ ./home.nix ];
+    my.contracts.provides.openchamber.endpoints =
+      lib.optionalAttrs hasDesktop {
+        desktop = {
+          inherit (cfg) port;
+          directAccess = {
+            enable = desktopPeers != { };
+            interface = "wireguard";
+            fromHosts = lib.attrNames desktopPeers;
+          };
+        };
+      }
+      // lib.optionalAttrs hasServer {
+        server = {
+          inherit (cfg.server) port;
+          directAccess = {
+            enable = desktopPeers != { };
+            interface = "wireguard";
+            fromHosts = lib.attrNames desktopPeers;
+          };
+        };
+      };
+    my.features.system.networking.ssh.admitsHosts = lib.attrNames desktopPeers;
+    home-manager.sharedModules = lib.optionals hasDesktop [ ./home.nix ];
   };
 }

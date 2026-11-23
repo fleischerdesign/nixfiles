@@ -1,0 +1,30 @@
+{
+  "name": "openchamber-builtin-fleet-session-journal",
+  "version": "0.1.0",
+  "private": true,
+  "openchamber": {
+    "apiVersion": 1,
+    "engines": {
+      "openchamber": ">=2.8.0"
+    },
+    "id": "openchamber-builtin-fleet-session-journal",
+    "name": "Fleet Session Journal",
+    "icon": "book-open",
+    "contributes": {
+      "service": {
+        "entry": "service/main.js",
+        "runtime": "host",
+        "keepRunning": true
+      },
+      "sessionEvents": {
+        "events": [
+          "turn-finished",
+          "turn-failed",
+          "permission-asked",
+          "question-asked"
+        ],
+        "content": true
+      }
+    }
+  }
+}

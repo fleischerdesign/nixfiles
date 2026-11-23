@@ -30,14 +30,21 @@ Requirements:
 - `version` must be a non-empty semver string; OpenChamber's package inspector rejects a missing
   version. This feature keeps the declared version as-is.
 - `openchamber.apiVersion` must be `1`.
-- `openchamber.contributes.panel.id` must be `openchamber-builtin-<directory-name>`.
-- `panel.name` must be non-empty. `panel.icon` is a built-in icon name (matching the panel-id
-  pattern) or a relative `.svg` file in the package.
+- `openchamber.id` must be `openchamber-builtin-<directory-name>`. The older
+  `openchamber.contributes.panel.id` is accepted when `openchamber.id` is absent, but the two must
+  agree when both exist.
+- `openchamber.contributes.panel` is optional. Service-only, background-only, page-only and
+  `opencodePlugin`-only extensions are valid and are shipped without a rail panel.
+- When a panel is present, `panel.name` must be non-empty and `panel.icon` must be a built-in icon
+  name (matching the panel-id pattern) or a relative `.svg` file in the package.
 - `panel.entry`, when present, must point at a self-contained HTML file whose local scripts exist.
   Include the built HTML/JavaScript and any runtime assets; dependency installation and arbitrary
   build scripts are not run for extension directories.
 - Declared capabilities are granted automatically to built-ins, but normal capability, path,
   credential-target and enabled-state checks still apply. Built-in status is not extra authority.
+- `package.json` and every declared entry must be shipped prebuilt. The feature copies the directory
+  as-is; it does not run dependency installation or plugin build scripts. Build TypeScript and
+  service/OpenCode-plugin bundles before committing the package.
 
 The Nix build merges this directory into the app's own built-in registry. An ID or directory
 collision with an upstream built-in fails the build instead of silently replacing it. The merged
@@ -61,3 +68,5 @@ extension-specific data before removing the development install. Secrets and gen
 
 These are OpenChamber extensions, which may themselves contribute an OpenCode plugin. Bare OpenCode
 plugins belong in OpenChamber's Plugins settings or in an extension's `opencodePlugin` contribution.
+The `fleet-session-journal` package is the panel-less fixture: it ships only a local service and a
+`sessionEvents` subscription.

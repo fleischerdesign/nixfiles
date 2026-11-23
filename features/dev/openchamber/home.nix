@@ -8,6 +8,7 @@
 let
   cfg = osConfig.my.features.dev.openchamber;
   primary = config.home.username == osConfig.my.user.primary;
+  address = osConfig.my.topology.hosts.${osConfig.networking.hostName}.wireguardIpv4 or null;
   file =
     path:
     builtins.path {
@@ -25,6 +26,15 @@ let
     runtimeInputs = [ pkgs.openssh ];
     text = ''
       exec ${pkgs.python3}/bin/python ${file ./pair.py} ${plan} "$@"
+    '';
+  };
+  mobilePair = pkgs.writeShellApplication {
+    name = "openchamber-mobile-pair";
+    text = ''
+      exec ${cfg.packages.server}/bin/openchamber connect-url \
+        --port ${toString cfg.port} \
+        --server ${lib.escapeShellArg "http://${address}:${toString cfg.port}"} \
+        --qr "$@"
     '';
   };
   desired = pkgs.writeText "openchamber-settings.json" (
@@ -78,7 +88,8 @@ in
       cfg.packages.server
       cfg.packages.opencode
       pair
-    ];
+    ]
+    ++ lib.optionals (address != null) [ mobilePair ];
 
     # The desktop rewrites the autostart entry to its raw Electron path on every start, so the
     # wrapper's environment must also exist in the session. The pinned CLI itself is on PATH via
