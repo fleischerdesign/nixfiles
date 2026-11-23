@@ -236,5 +236,74 @@ class State(unittest.TestCase):
                 credentials.reconcile(plan, run)
             self.assertEqual(stored, before)
 
+    def test_device_that_lists_only_the_go_integration_reconciles_there(self):
+        stored = {
+            "manual": {"id": "manual", "label": "mine", "value": {"type": "key", "key": "manual"}, "active": False},
+            "cred_nixfiles_go_one_old": {"id": "cred_nixfiles_go_one_old", "label": "one",
+                                         "value": {"type": "key", "key": "old"}, "active": True},
+        }
+        calls = []
+
+        def run(arguments, payload=None):
+            calls.append(arguments)
+            if arguments[0] == 'list':
+                rows = sorted(stored.values(), key=lambda item: not item['active'])
+                return json.dumps([{'id': 'opencode-go', 'connections': [
+                    {'id': item['id'], 'label': item.get('label', ''), 'type': 'credential'}
+                    for item in rows]}])
+            if arguments[0] == 'import':
+                for item in json.loads(payload):
+                    stored[item['id']] = item
+            if arguments[0] == 'switch':
+                for item in stored.values():
+                    item['active'] = item['id'] == arguments[2]
+            if arguments[0] == 'logout':
+                del stored[arguments[2]]
+            return ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            key = Path(directory) / 'key'
+            key.write_text('rotated\n')
+            credentials.reconcile([{'name': 'one', 'path': str(key)}], run)
+            replacement = next(item for item in stored.values()
+                               if item['id'].startswith('cred_nixfiles_go_one_')
+                               and item['id'] != 'cred_nixfiles_go_one_old')
+            self.assertTrue(replacement['active'])
+            self.assertNotIn('cred_nixfiles_go_one_old', stored)
+            self.assertIn(['switch', 'opencode-go', replacement['id']], calls)
+            self.assertIn(['logout', 'opencode-go', 'cred_nixfiles_go_one_old'], calls)
+
+    def test_first_run_prefers_the_console_integration_when_both_are_listed(self):
+        stored = {}
+
+        def run(arguments, payload=None):
+            if arguments[0] == 'list':
+                return json.dumps([
+                    {'id': 'opencode-go', 'connections': []},
+                    {'id': 'opencode', 'connections': [
+                        {'id': item['id'], 'label': item['label'], 'type': 'credential'}
+                        for item in stored.values()]},
+                ])
+            if arguments[0] == 'import':
+                for item in json.loads(payload):
+                    stored[item['id']] = item
+            return ''
+
+        with tempfile.TemporaryDirectory() as directory:
+            key = Path(directory) / 'key'
+            key.write_text('fresh\n')
+            credentials.reconcile([{'name': 'one', 'path': str(key)}], run)
+            self.assertEqual([item['integrationID'] for item in stored.values()], ['opencode'])
+
+    def test_device_without_a_go_integration_fails_loudly(self):
+        def run(arguments, payload=None):
+            return json.dumps([{'id': 'openai', 'connections': []}])
+
+        with tempfile.TemporaryDirectory() as directory:
+            key = Path(directory) / 'key'
+            key.write_text('key\n')
+            with self.assertRaises(RuntimeError):
+                credentials.reconcile([{'name': 'one', 'path': str(key)}], run)
+
 
 unittest.main()

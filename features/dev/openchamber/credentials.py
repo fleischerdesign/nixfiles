@@ -6,23 +6,39 @@ from pathlib import Path
 import subprocess
 import sys
 
-# OpenCode registers its Console service-account keys under the integration id `opencode`;
-# `opencode-go` only names the provider that carries its models, and appears in `auth list`
-# as an environment-variable connection with no credentials of its own.
-INTEGRATION_ID = 'opencode'
+CREDENTIAL_PREFIX = 'cred_nixfiles_go_'
+# A device exposes whichever integration its provider catalog knows: some list `opencode`
+# (the Console) and carry the declared keys there, others only `opencode-go` (Go). The
+# integration that already holds declared keys decides; the order only settles a first run.
+INTEGRATION_IDS = ('opencode', 'opencode-go')
 
 
-def integration_connections(integrations):
-    integration = next((item for item in integrations if item['id'] == INTEGRATION_ID), None)
-    if integration is None:
-        return None, []
-    return integration, integration.get('connections', [])
+def credential_integrations(integrations):
+    return [
+        (item['id'], [connection for connection in item.get('connections', [])
+                      if connection['type'] == 'credential'])
+        for item in integrations
+    ]
+
+
+def resolve_integration(integrations):
+    stores = credential_integrations(integrations)
+    owned = [
+        (integration_id, connections) for integration_id, connections in stores
+        if any(item['id'].startswith(CREDENTIAL_PREFIX) for item in connections)
+    ]
+    if owned:
+        return max(owned, key=lambda store: len(store[1]))
+    for candidate in INTEGRATION_IDS:
+        for integration_id, connections in stores:
+            if integration_id == candidate:
+                return integration_id, connections
+    raise RuntimeError('OpenCode exposes no integration for the declared Go keys')
 
 
 def reconcile(subscriptions, run):
     integrations = json.loads(run(['list', '--format', 'json']))
-    _, connections = integration_connections(integrations)
-    credentials = [item for item in connections if item['type'] == 'credential']
+    integration_id, credentials = resolve_integration(integrations)
     # OpenCode lists the selected credential first in `auth list --format json`.
     active = credentials[0].get('id') if credentials else None
     stored = {item['id']: item for item in credentials}
@@ -33,12 +49,12 @@ def reconcile(subscriptions, run):
         if not key:
             raise ValueError('Empty Go credential')
         fingerprint = hashlib.sha256(key.encode()).hexdigest()[:16]
-        credential_id = 'cred_nixfiles_go_' + subscription['name'] + '_' + fingerprint
-        desired.append({'id': credential_id, 'integrationID': INTEGRATION_ID,
+        credential_id = CREDENTIAL_PREFIX + subscription['name'] + '_' + fingerprint
+        desired.append({'id': credential_id, 'integrationID': integration_id,
                         'label': subscription['name'], 'active': False,
                         'value': {'type': 'key', 'key': key}})
         old = next((item for item in stored.values()
-                    if item['id'].startswith('cred_nixfiles_go_')
+                    if item['id'].startswith(CREDENTIAL_PREFIX)
                     and item.get('label') == subscription['name']), None)
         if credential_id not in stored and old and old['id'] == active:
             replacements.append(credential_id)
@@ -47,16 +63,17 @@ def reconcile(subscriptions, run):
     if missing:
         run(['import'], json.dumps(missing))
         integrations = json.loads(run(['list', '--format', 'json']))
-        integration, connections = integration_connections(integrations)
-        if integration is None:
-            raise RuntimeError('OpenCode integration ' + INTEGRATION_ID + ' is missing after import')
-        stored = {item['id']: item for item in connections if item['type'] == 'credential'}
+        integration_id, credentials = resolve_integration(integrations)
+        stored = {item['id']: item for item in credentials}
+        absent = [item['id'] for item in missing if item['id'] not in stored]
+        if absent:
+            raise RuntimeError('OpenCode did not store the imported keys in ' + integration_id)
     for credential_id in replacements:
-        run(['switch', INTEGRATION_ID, credential_id])
+        run(['switch', integration_id, credential_id])
     wanted = {item['id'] for item in desired}
     for credential_id in sorted(stored.keys() - wanted):
-        if credential_id.startswith('cred_nixfiles_go_'):
-            run(['logout', INTEGRATION_ID, credential_id])
+        if credential_id.startswith(CREDENTIAL_PREFIX):
+            run(['logout', integration_id, credential_id])
 
 
 def cli(binary):

@@ -531,9 +531,10 @@ keys change. It reconciles OpenCode's own credential store with the supported `a
 ends with the command and does not create a background service. Key values reach `auth import`
 through stdin and never enter the Nix store or process arguments. Stable IDs preserve selections;
 rotated keys are imported before an active declared account is switched and retired declared
-credentials are removed. Manually added accounts remain. The reconciliation reads and writes the
-`opencode` integration, where OpenCode stores its Console and service-account keys, and fails
-loudly when `auth import` does not produce it. Restart OpenCode in the app after changing
+credentials are removed. Manually added accounts remain. The reconciliation writes into the
+integration that already holds the declared keys and fails loudly rather than guessing on a device
+that lists none; a first run prefers `opencode` and falls back to `opencode-go`, because a device
+only exposes the integrations its provider catalog knows. Restart OpenCode in the app after changing
 credentials if its running integration still shows the previous state. The feature seeds
 `accountSwitchProviders: ["opencode-go"]` only when the key is absent; an existing preference remains
 owned by OpenChamber.
@@ -541,13 +542,12 @@ owned by OpenChamber.
 Account switching defaults to the `opencode-go` provider. OpenChamber rotates stored credentials when
 quota or budget exhaustion, or a rate limit of at least a minute, stops a turn. Reset hints control
 cooldowns; without a hint the default is one hour, and cooldowns are forgotten on restart. The
-active credential belongs to a credential integration, not an individual session. Every OpenCode Go
-subscription is stored in OpenCode's `opencode` integration, beside OpenCode Zen: `opencode-go` names
-the provider that carries its models and appears in `auth list` only as an environment-variable
-connection without credentials of its own. Switching changes the account used by that integration. A
-separate fallback model is an interactive preference; the feature does not configure one. OpenClaw
-and the OpenChamber runtimes consume the same subscription limits and maintain independent
-cooldowns.
+active credential belongs to a credential integration, not an individual session. OpenCode shows
+its Console as `opencode` and its Go plan as `opencode-go`; which of the two carries the declared
+keys depends on the provider catalog the device knows, so the reconciliation follows the existing
+store instead of naming one. Switching changes the account used by that integration. A separate
+fallback model is an interactive preference; the feature does not configure one. OpenClaw and the
+OpenChamber runtimes consume the same subscription limits and maintain independent cooldowns.
 
 The pinned OpenChamber v2.8.0 does not include OpenCode's `provider.go-limit` in either failover
 boundary by itself. `features/dev/openchamber/patch-limit-failover.py` adds it to the server
