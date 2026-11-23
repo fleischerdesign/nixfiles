@@ -37,7 +37,8 @@ let
   serverCommand = pkgs.writeShellScript "openchamber-server" ''
     set -eu
     ${lib.optionalString (cfg.server.uiPasswordSecret != null) ''
-      export OPENCHAMBER_UI_PASSWORD="$(cat "$CREDENTIALS_DIRECTORY/ui-password")"
+      OPENCHAMBER_UI_PASSWORD="$(cat "$CREDENTIALS_DIRECTORY/ui-password")"
+      export OPENCHAMBER_UI_PASSWORD
     ''}
     ${lib.optionalString (cfg.server.uiPasswordSecret == null) ''
       password_file="${primaryHome}/.local/state/openchamber/server-ui-password"
@@ -45,7 +46,8 @@ let
         ${pkgs.coreutils}/bin/install -d -m 700 "$(dirname "$password_file")"
         (umask 077; ${pkgs.openssl}/bin/openssl rand -base64 32 > "$password_file")
       fi
-      export OPENCHAMBER_UI_PASSWORD="$(cat "$password_file")"
+      OPENCHAMBER_UI_PASSWORD="$(cat "$password_file")"
+      export OPENCHAMBER_UI_PASSWORD
     ''}
     exec ${packages.server}/bin/openchamber serve --port ${toString cfg.server.port} --lan --api-only
   '';
@@ -59,7 +61,8 @@ let
           "${primaryHome}/.local/state/openchamber/server-ui-password"
       }
       if [ -s "$password_file" ]; then
-        export OPENCHAMBER_UI_PASSWORD="$(cat "$password_file")"
+        OPENCHAMBER_UI_PASSWORD="$(cat "$password_file")"
+        export OPENCHAMBER_UI_PASSWORD
       fi
       exec ${packages.server}/bin/openchamber connect-url \
         --port ${toString cfg.server.port} \
