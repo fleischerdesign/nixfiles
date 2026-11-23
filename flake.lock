@@ -286,7 +286,7 @@
     },
     "nix-openclaw-tools": {
       "inputs": {
-        "nixpkgs": "nixpkgs_3"
+        "nixpkgs": "nixpkgs_4"
       },
       "locked": {
         "lastModified": 1790151707,
@@ -439,6 +439,22 @@
     },
     "nixpkgs_3": {
       "locked": {
+        "lastModified": 1795234589,
+        "narHash": "sha256-f/VVvxf5RsQgWVhUtefoca5ktVg0DA2bnkMOcmSnozo=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "2786a2a72088ecf32aea5b3ec52099e6a7cff78f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_4": {
+      "locked": {
         "lastModified": 1792812153,
         "narHash": "sha256-T2+XBfNbf9pecLUWS4+RtuVNZ3W8K5taG5QdV71mWlk=",
         "owner": "NixOS",
@@ -453,7 +469,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_4": {
+    "nixpkgs_5": {
       "locked": {
         "lastModified": 1792773339,
         "narHash": "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw=",
@@ -469,7 +485,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_5": {
+    "nixpkgs_6": {
       "locked": {
         "lastModified": 1782847189,
         "narHash": "sha256-twXPFqFsrrY5r28Zh7Homgcp2gUMBgQ6WDS98Q/3xFI=",
@@ -549,12 +565,31 @@
         "type": "github"
       }
     },
+    "openchamber-fleet": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_3"
+      },
+      "locked": {
+        "lastModified": 1795469777,
+        "narHash": "sha256-wjq1VP7cVI1pO2DsZDLQKHymYScVhIIZkbsh6LafY38=",
+        "owner": "fleischerdesign",
+        "repo": "openchamber-fleet",
+        "rev": "646851811bccb5ef79129ede7c5374e074fde6ca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "fleischerdesign",
+        "repo": "openchamber-fleet",
+        "rev": "646851811bccb5ef79129ede7c5374e074fde6ca",
+        "type": "github"
+      }
+    },
     "openclaw": {
       "inputs": {
         "flake-utils": "flake-utils",
         "home-manager": "home-manager_2",
         "nix-openclaw-tools": "nix-openclaw-tools",
-        "nixpkgs": "nixpkgs_4",
+        "nixpkgs": "nixpkgs_5",
         "qmd": "qmd"
       },
       "locked": {
@@ -648,6 +683,7 @@
         "nixvim": "nixvim",
         "nod": "nod",
         "openchamber": "openchamber",
+        "openchamber-fleet": "openchamber-fleet",
         "openclaw": "openclaw",
         "portfolio": "portfolio",
         "sops-nix": "sops-nix",
@@ -909,7 +945,7 @@
     },
     "yapfast": {
       "inputs": {
-        "nixpkgs": "nixpkgs_5",
+        "nixpkgs": "nixpkgs_6",
         "rust-overlay": "rust-overlay"
       },
       "locked": {

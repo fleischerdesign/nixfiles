@@ -54,6 +54,10 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
+    openchamber-fleet = {
+      url = "github:fleischerdesign/openchamber-fleet/646851811bccb5ef79129ede7c5374e074fde6ca";
+    };
+
     nod = {
       url = "github:fleischerdesign/nod/develop";
       inputs.nixpkgs-unstable.follows = "nixpkgs-unstable";
