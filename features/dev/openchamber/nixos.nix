@@ -49,7 +49,7 @@ let
       OPENCHAMBER_UI_PASSWORD="$(cat "$password_file")"
       export OPENCHAMBER_UI_PASSWORD
     ''}
-    exec ${packages.server}/bin/openchamber serve --port ${toString cfg.server.port} --lan --api-only
+    exec ${packages.server}/bin/openchamber serve --foreground --port ${toString cfg.server.port} --lan --api-only
   '';
   serverPair = pkgs.writeShellApplication {
     name = "openchamber-server-pair";
@@ -262,7 +262,7 @@ in
         WorkingDirectory = primaryHome;
         UMask = "0077";
         ExecStart = serverCommand;
-        Restart = "on-failure";
+        Restart = "always";
         RestartSec = 5;
         TimeoutStopSec = 30;
         LoadCredential =

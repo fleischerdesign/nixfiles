@@ -489,8 +489,11 @@ wrapper and the pinned OpenCode CLI is also on the session PATH, because the des
 `Exec` to its raw Electron path at startup. A device's desktop must be running to use its
 workspace.
 
-The headless role runs `openchamber serve --port 7338 --lan --api-only` as the primary user
-through the `openchamber-server` systemd unit. It generates a mode-0600 UI password once at
+The headless role runs `openchamber serve --foreground --port 7338 --lan --api-only` as the primary
+user through the `openchamber-server` systemd unit: without `--foreground` the command daemonises
+and exits, so the unit would report a successful stop instead of a running server. It restarts
+always, which turns an unexpected exit into a visible restart loop rather than a silent stop, and
+generates a mode-0600 UI password once at
 `${XDG_STATE_HOME}/openchamber/server-ui-password`, or reads `server.uiPasswordSecret`; a SOPS
 secret reaches the process through `LoadCredential`, never argv. The endpoint contract admits the
 desktop peers and the phone over WireGuard. `openchamber-server-pair` on a server prints a
