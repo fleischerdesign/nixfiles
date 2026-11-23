@@ -18,7 +18,7 @@ let
   plan = pkgs.writeText "openchamber-fleet.json" (
     builtins.toJSON {
       host = osConfig.networking.hostName;
-      inherit (cfg) peers;
+      inherit (cfg) peers serverPeers;
     }
   );
   pair = pkgs.writeShellApplication {
@@ -40,15 +40,28 @@ let
   desired = pkgs.writeText "openchamber-settings.json" (
     builtins.toJSON {
       desktopSshInstances = [ ];
-      desktopHosts = lib.mapAttrsToList (name: peer: {
-        id = "nixfiles:${name}";
-        label = name;
-        url = "http://${peer.address}:${toString peer.port}";
-        apiUrl = "http://${peer.address}:${toString peer.port}";
-      }) cfg.peers;
+      desktopHosts =
+        lib.mapAttrsToList (name: peer: {
+          id = "nixfiles:${name}";
+          label = name;
+          url = "http://${peer.address}:${toString peer.port}";
+          apiUrl = "http://${peer.address}:${toString peer.port}";
+        }) cfg.peers
+        ++ lib.mapAttrsToList (name: peer: {
+          id = "nixfiles-server:${name}";
+          label = name;
+          url = "http://${peer.address}:${toString peer.port}";
+          apiUrl = "http://${peer.address}:${toString peer.port}";
+        }) cfg.serverPeers;
       desktopLocalPort = cfg.port;
       desktopLanAccessEnabled = true;
-      desktopDefaultHostId = if cfg.defaultHost == null then "local" else "nixfiles:${cfg.defaultHost}";
+      desktopDefaultHostId =
+        if cfg.defaultHost == null then
+          "local"
+        else if builtins.hasAttr cfg.defaultHost cfg.serverPeers then
+          "nixfiles-server:${cfg.defaultHost}"
+        else
+          "nixfiles:${cfg.defaultHost}";
       desktopUiPasswordPath =
         if cfg.uiPasswordSecret == null then null else osConfig.sops.secrets.${cfg.uiPasswordSecret}.path;
     }

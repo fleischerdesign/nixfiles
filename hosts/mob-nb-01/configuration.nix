@@ -17,7 +17,10 @@
   # The graphical session comes from the personal-computer role (`roles/pc.nix`): Niri and
   # Noctalia, the same as the desktop.
 
-  my.features.dev.openchamber.enable = true;
+  my.features.dev.openchamber = {
+    enable = true;
+    defaultHost = "hom-srv-01";
+  };
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;
   my.features.services.openclaw.node = {

@@ -79,6 +79,23 @@ let
     ''}
     exec ${packages.server}/bin/openchamber serve --foreground --port ${toString cfg.server.port} --lan --api-only
   '';
+  serverEnroll = pkgs.writeShellApplication {
+    name = "openchamber-server-enroll";
+    runtimeInputs = [ pkgs.python3 ];
+    text = ''
+      exec ${pkgs.python3}/bin/python ${
+        builtins.path {
+          path = ./server_enroll.py;
+          name = "openchamber-server-enroll.py";
+        }
+      } ${toString cfg.server.port} ${
+        if cfg.server.uiPasswordSecret != null then
+          config.sops.secrets.${cfg.server.uiPasswordSecret}.path
+        else
+          "${primaryHome}/.local/state/openchamber/server-ui-password"
+      } "$@"
+    '';
+  };
   serverPair = pkgs.writeShellApplication {
     name = "openchamber-server-pair";
     text = ''
@@ -196,6 +213,26 @@ in
             ) peers
           );
     };
+    serverPeers = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      readOnly = true;
+      internal = true;
+      default =
+        lib.mapAttrs
+          (name: system: {
+            user = system.config.my.user.primary;
+            address = config.my.topology.hosts.${name}.wireguardIpv4;
+            port = system.config.my.features.dev.openchamber.server.port;
+            sshPort = system.config.my.contracts.provides.ssh.endpoints.ssh.port;
+          })
+          (
+            lib.filterAttrs (
+              name: system:
+              name != config.networking.hostName
+              && system.config.my.features.dev.openchamber.role == "server"
+            ) peers
+          );
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -215,8 +252,12 @@ in
       }
 
       {
-        assertion = !hasDesktop || cfg.defaultHost == null || builtins.hasAttr cfg.defaultHost cfg.peers;
-        message = "OpenChamber defaultHost must name an enabled desktop peer";
+        assertion =
+          !hasDesktop
+          || cfg.defaultHost == null
+          || builtins.hasAttr cfg.defaultHost cfg.peers
+          || builtins.hasAttr cfg.defaultHost cfg.serverPeers;
+        message = "OpenChamber defaultHost must name an enabled desktop or server peer";
       }
 
       {
@@ -302,6 +343,7 @@ in
       packages.server
       packages.opencode
       serverPair
+      serverEnroll
     ];
     my.contracts.provides.openchamber.endpoints =
       lib.optionalAttrs hasDesktop {
