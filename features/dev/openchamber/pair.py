@@ -163,6 +163,31 @@ def issue(plan, source):
     return {'clientToken': result['token']}
 
 
+def set_server_token(plan, server, token):
+    peers = plan.get('serverPeers', {})
+    if server not in peers:
+        raise ValueError('Unknown server peer')
+    peer = peers[server]
+    base = 'http://' + peer['address'] + ':' + str(peer['port'])
+    token = token.strip()
+    if not token:
+        raise ValueError('Empty server token')
+    request(base, '/api/config/settings', token)
+    path = settings_path()
+    with settings_lock(path):
+        current = read_settings(path)
+        hosts = current.get('desktopHosts', [])
+        identifier = 'nixfiles-server:' + server
+        entry = next((item for item in hosts if item.get('id') == identifier), None)
+        if entry is None:
+            entry = {'id': identifier, 'label': server}
+            hosts.append(entry)
+        entry.update({'url': base, 'apiUrl': base, 'clientToken': token})
+        current['desktopHosts'] = hosts
+        write_settings(path, current)
+    print('OpenChamber server token stored for ' + server)
+
+
 def reconcile(plan):
     path = settings_path()
     current = read_settings(path)
@@ -280,6 +305,8 @@ if __name__ == '__main__':
         plan = json.loads(Path(sys.argv[1]).read_text())
         if len(sys.argv) == 4 and sys.argv[2] == '--issue':
             print(json.dumps(issue(plan, sys.argv[3])))
+        elif len(sys.argv) == 4 and sys.argv[2] == '--set-server-token':
+            set_server_token(plan, sys.argv[3], sys.stdin.read())
         else:
             reconcile(plan)
     except Exception as error:

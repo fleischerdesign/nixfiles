@@ -79,6 +79,19 @@ let
     ''}
     exec ${packages.server}/bin/openchamber serve --foreground --port ${toString cfg.server.port} --lan --api-only
   '';
+  serverPushPlan = pkgs.writeText "openchamber-server-push.json" (
+    builtins.toJSON {
+      host = config.networking.hostName;
+      desktops = lib.mapAttrs (name: peer: {
+        inherit (peer) user address sshPort;
+      }) cfg.peers;
+    }
+  );
+  serverPush = pkgs.runCommand "openchamber-server-push" { } ''
+    mkdir -p $out
+    cp ${./server_enroll.py} $out/server_enroll.py
+    cp ${./server_push.py} $out/server_push.py
+  '';
   serverEnroll = pkgs.writeShellApplication {
     name = "openchamber-server-enroll";
     runtimeInputs = [ pkgs.python3 ];
@@ -308,6 +321,34 @@ in
             name = "openchamber-credentials.py";
           }
         } ${packages.opencode}/bin/opencode ${accountPlan}";
+      };
+    };
+    systemd.services.openchamber-server-enroll = lib.mkIf hasServer {
+      description = "Deliver OpenChamber server tokens to declared desktops";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "${accountUnit}.service" "openchamber-server.service" ];
+      wants = [ "openchamber-server.service" ];
+      path = [ pkgs.openssh ];
+      serviceConfig = {
+        Type = "oneshot";
+        User = primary;
+        WorkingDirectory = primaryHome;
+        UMask = "0077";
+      };
+      script = ''
+        exec ${pkgs.python3}/bin/python ${serverPush}/server_push.py ${toString cfg.server.port} ${
+          if cfg.server.uiPasswordSecret != null then
+            config.sops.secrets.${cfg.server.uiPasswordSecret}.path
+          else
+            "${primaryHome}/.local/state/openchamber/server-ui-password"
+        } ${serverPushPlan}
+      '';
+    };
+    systemd.timers.openchamber-server-enroll = lib.mkIf hasServer {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "2m";
+        OnUnitInactiveSec = "10m";
       };
     };
     systemd.services.openchamber-server = lib.mkIf hasServer {

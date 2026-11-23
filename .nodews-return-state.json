@@ -1,0 +1,1825 @@
+{
+  "version": 1,
+  "bases": {
+    "[\"2da43dde2b39c3d58ced5420f75d746bf8bc67f1e70e3b651f8b93bb50a12493\",\"/home/philipp/.local/state/openclaw-node/workspace/nixfiles-20261109-1818\"]": {
+      "nodeId": "2da43dde2b39c3d58ced5420f75d746bf8bc67f1e70e3b651f8b93bb50a12493",
+      "remotePath": "/home/philipp/.local/state/openclaw-node/workspace/nixfiles-20261109-1818",
+      "treeDigest": "99554bb030abb1f49c87756a0d396565f063bb37e7b258650344de288a3a7b4b",
+      "files": [
+        {
+          "path": ".envrc",
+          "size": 10,
+          "sha256": "1d26c74fd25a4c3dbb09e029fc609588da499fd4af2a41c88f6316c7f8c54cf1",
+          "executable": false
+        },
+        {
+          "path": ".githooks/pre-commit",
+          "size": 1970,
+          "sha256": "e2b19d4cbcc92840487ca44c7b9babf06375b33b71c65da5b6ab681c84c5ce6e",
+          "executable": true
+        },
+        {
+          "path": ".github/actions/build-nixos-host/action.yml",
+          "size": 2039,
+          "sha256": "4cbed250ca759360969edaefba68627dd738c6622c1cbb94ae2ddcaa1c091767",
+          "executable": false
+        },
+        {
+          "path": ".github/actions/setup-nix/action.yml",
+          "size": 1167,
+          "sha256": "94b0478addcb0d5ecd777862765a01e53a06976199cf6c9057239daa2aa9c306",
+          "executable": false
+        },
+        {
+          "path": ".github/dependabot.yml",
+          "size": 240,
+          "sha256": "8cc9bcf7d4e677461cfa0fd2740ed354b704381ff3ab9b3be04c23c2244472ba",
+          "executable": false
+        },
+        {
+          "path": ".github/scripts/push-flake-update.sh",
+          "size": 3806,
+          "sha256": "12c6dd9b238aeed05f777c1d5852f128d2dbc665c8deeaff8185462fdd58043d",
+          "executable": true
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "size": 2335,
+          "sha256": "ada384952ccc132b20508a5d173cd20ebb38e5938613bcc7fa53302b12eb3985",
+          "executable": false
+        },
+        {
+          "path": ".github/workflows/update.yml",
+          "size": 5374,
+          "sha256": "a8d201409e651e4c1735197216b78b2f80f324ba9a584e0bac860cbe3d2c6f38",
+          "executable": false
+        },
+        {
+          "path": ".gitignore",
+          "size": 178,
+          "sha256": "74ca316219a817459f952db511b823951b0aa030da46e681e51bf067f7ad3c78",
+          "executable": false
+        },
+        {
+          "path": ".sops.yaml",
+          "size": 2436,
+          "sha256": "f6c2d02315824e6bb928205c8ada8cda056f022b11e9d8f309cf3e9ee0e6d992",
+          "executable": false
+        },
+        {
+          "path": "AGENTS.md",
+          "size": 11892,
+          "sha256": "3413288e354ee3067ac9382d77c1d960431c4e3467adb4950a77ec0cdc3b086e",
+          "executable": false
+        },
+        {
+          "path": "LICENSE",
+          "size": 35149,
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "executable": false
+        },
+        {
+          "path": "README.md",
+          "size": 724,
+          "sha256": "099b28b7582d1b38536648f4c8a755882558ab66ffe9d9c023737122a06da824",
+          "executable": false
+        },
+        {
+          "path": "apps/exposure-audit/default.nix",
+          "size": 7518,
+          "sha256": "2c7e6bec0f87ea66d89d615ed2f88372874634c52d29cecea9c07456a7909de5",
+          "executable": false
+        },
+        {
+          "path": "apps/lib/fleet.nix",
+          "size": 1050,
+          "sha256": "66de510d07d30e4668c8900041d19e3ba02f8410b52afc2c02fbb4c58d3f895d",
+          "executable": false
+        },
+        {
+          "path": "apps/network-audit/default.nix",
+          "size": 11442,
+          "sha256": "8254a26aac337af315ea56cb641f3cf4c5d603b99ffb300dcbcd6b106d5919f7",
+          "executable": false
+        },
+        {
+          "path": "apps/update-custom-packages/cef-metadata.py",
+          "size": 1217,
+          "sha256": "2fae2732118ee857fe47bb7a3ba219a1e08367c7472f3321432286941790d212",
+          "executable": false
+        },
+        {
+          "path": "apps/update-custom-packages/fix-npm-integrity.mjs",
+          "size": 1697,
+          "sha256": "b903d1a9e65bdef65cbba7d005d123d9c1708b6d0e525121d81b71c7658c1f5f",
+          "executable": false
+        },
+        {
+          "path": "apps/update-custom-packages/tests/test_github_source.py",
+          "size": 5938,
+          "sha256": "82728ea69c7103906ed43cb5240d542bdc34fbd54f3a760648640a332c678ee0",
+          "executable": false
+        },
+        {
+          "path": "apps/update-custom-packages/update-custom-packages.sh",
+          "size": 28734,
+          "sha256": "cd1b9734e5e3f13116fcedccf64fd6a8dde8cd936f17257900a3fb209ce83c0d",
+          "executable": true
+        },
+        {
+          "path": "checks/authentication-paths.nix",
+          "size": 3218,
+          "sha256": "1429041abe7e48270cf565cad4872c3e85a238e9db0295a248080328cf4c7b5b",
+          "executable": false
+        },
+        {
+          "path": "checks/authentication-paths.py",
+          "size": 963,
+          "sha256": "ab3856aa6ff9d227042921eb700411a026f62e0993e3b9ebd7e510beb9751733",
+          "executable": false
+        },
+        {
+          "path": "checks/backup-contract.nix",
+          "size": 2481,
+          "sha256": "7f4ee20c6e0e23e59285a6b0397eb5f190465533d7a94f5e5d049c3f7430cc21",
+          "executable": false
+        },
+        {
+          "path": "checks/caddy-auth-order.nix",
+          "size": 1416,
+          "sha256": "34c82ac16bf3e3021a4012f31659315edc418e9faf1cf2eacb3acb9b7936de51",
+          "executable": false
+        },
+        {
+          "path": "checks/caddy-auth-order.py",
+          "size": 4164,
+          "sha256": "af6f1aa72ebb8083eff915f5ebec0afff3b21e25ed52f45d85f8531fec138f17",
+          "executable": false
+        },
+        {
+          "path": "checks/custom-package-updater.nix",
+          "size": 488,
+          "sha256": "aa63504c5e98e2e8e710d8d4abbf90e8b79dc51009a414f0efadd2ed2aa1b0fc",
+          "executable": false
+        },
+        {
+          "path": "checks/deadnix.nix",
+          "size": 201,
+          "sha256": "8c4ddb68547ccd0aa5acfdf3891fb508cc5a5732e52c8288a0ed19d176448f24",
+          "executable": false
+        },
+        {
+          "path": "checks/default.nix",
+          "size": 522,
+          "sha256": "a882c29181544cd45ae7a22be682b34995ec192266426865860f1da6e5959b1a",
+          "executable": false
+        },
+        {
+          "path": "checks/dependencies-contract.nix",
+          "size": 3917,
+          "sha256": "c337b979a5ca9e3913c3ef17572a1e3d31ebc062307573189b4fbf91e67b6e00",
+          "executable": false
+        },
+        {
+          "path": "checks/directory-preflight.py",
+          "size": 4072,
+          "sha256": "835e126f6df6f455d8df36612e9f65c8d6fda8cbcab98bbf323e1b1962d1f742",
+          "executable": false
+        },
+        {
+          "path": "checks/directory.nix",
+          "size": 2690,
+          "sha256": "95f4c3294e2417ab5b6d92a1d34d87c9469c747ab707936add58380dd0a07904",
+          "executable": false
+        },
+        {
+          "path": "checks/eval-hosts.nix",
+          "size": 570,
+          "sha256": "a4ca3b853d43e2b6690f06e0c79909c180465ba428a22e3013fc528e5e0602ac",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/discovery-malformed/helper.nix",
+          "size": 4,
+          "sha256": "1d6faa9e1a76d13f3ab8558a3640158b1f0a54f624a4e37ddc3ef41ed4191058",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/discovery-malformed/nixos.nix/.gitkeep",
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/discovery/helpers/lib/helper.nix",
+          "size": 4,
+          "sha256": "1d6faa9e1a76d13f3ab8558a3640158b1f0a54f624a4e37ddc3ef41ed4191058",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/discovery/helpers/nixos.nix",
+          "size": 4,
+          "sha256": "1d6faa9e1a76d13f3ab8558a3640158b1f0a54f624a4e37ddc3ef41ed4191058",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/discovery/nested/child/nixos.nix",
+          "size": 4,
+          "sha256": "1d6faa9e1a76d13f3ab8558a3640158b1f0a54f624a4e37ddc3ef41ed4191058",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/discovery/nested/nixos.nix",
+          "size": 4,
+          "sha256": "1d6faa9e1a76d13f3ab8558a3640158b1f0a54f624a4e37ddc3ef41ed4191058",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/discovery/old-style/default.nix",
+          "size": 4,
+          "sha256": "1d6faa9e1a76d13f3ab8558a3640158b1f0a54f624a4e37ddc3ef41ed4191058",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/discovery/plain/nixos.nix",
+          "size": 4,
+          "sha256": "1d6faa9e1a76d13f3ab8558a3640158b1f0a54f624a4e37ddc3ef41ed4191058",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/users/alice/home.nix",
+          "size": 7,
+          "sha256": "f99eb0855a49de56d4db9b21ee94788259efc790e2344a219da9a1e290ad41c2",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/users/alice/metadata.nix",
+          "size": 83,
+          "sha256": "0e3b90cc4f0517dae03928f7f23daa22dc724f8191548372ce04bbb281425e3f",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/users/zoe/home.nix",
+          "size": 7,
+          "sha256": "f99eb0855a49de56d4db9b21ee94788259efc790e2344a219da9a1e290ad41c2",
+          "executable": false
+        },
+        {
+          "path": "checks/fixtures/users/zoe/metadata.nix",
+          "size": 79,
+          "sha256": "1d23bf5e145560237cffb33f58531c9f51cfdba7eb7481b11311e6cc03273bb2",
+          "executable": false
+        },
+        {
+          "path": "checks/fleet-configs.nix",
+          "size": 2462,
+          "sha256": "16c4973fbc8fbce1f28631f2a6fcf0ce34a904d1476faeb9cb30a6f7e337bb22",
+          "executable": false
+        },
+        {
+          "path": "checks/format.nix",
+          "size": 786,
+          "sha256": "cb011356bf36bb6903f8ed30a770ddbcaddb6b16b1c6a9415c2a20386b9a4319",
+          "executable": false
+        },
+        {
+          "path": "checks/identity-contract.nix",
+          "size": 3929,
+          "sha256": "e4502bdb67acecd50f9daf1e62f2e1b94091d70b04466e1ace89af188849626f",
+          "executable": false
+        },
+        {
+          "path": "checks/lib/network-invariants.nix",
+          "size": 17358,
+          "sha256": "c63deda45499629ef3da319320e5c7ec8b11814e3b5a8272e866d6a8f3442db0",
+          "executable": false
+        },
+        {
+          "path": "checks/module-discovery.nix",
+          "size": 3036,
+          "sha256": "c4cb660b6f5ade98ac87d768f515187039ba83a5b2ef7dd5f4b81e5c7e2561c4",
+          "executable": false
+        },
+        {
+          "path": "checks/network-invariants.nix",
+          "size": 980,
+          "sha256": "36b0834b0518a023dde243f027219a043052909e5e49eede1285dfd215c7c61a",
+          "executable": false
+        },
+        {
+          "path": "checks/nftables-rules.nix",
+          "size": 1868,
+          "sha256": "09674aa4bcd1fc79886b3bf3c328ef01aec8d23ce61cfd4285eb4d225d0750b4",
+          "executable": false
+        },
+        {
+          "path": "checks/niri-noctalia.nix",
+          "size": 12310,
+          "sha256": "c65e33dd8f451b906de62bc469fe3795ef0e5c570a3f3ada03ab62542134bb77",
+          "executable": false
+        },
+        {
+          "path": "checks/nod-declaration.nix",
+          "size": 3217,
+          "sha256": "10accfe9fdf038e1e7866da7aa820c05cd27f231d50f99a41f7cc85c3b412267",
+          "executable": false
+        },
+        {
+          "path": "checks/openclaw-node-connect.nix",
+          "size": 2579,
+          "sha256": "68c6bd3dfa90a74275b2a45ed577da18b0f387901ffbab0feaca156e5c72b127",
+          "executable": false
+        },
+        {
+          "path": "checks/presentation-contract.nix",
+          "size": 2027,
+          "sha256": "a05639670fd18f09c826e5428ab28a1f0c91934c174dd47f30809540c641faae",
+          "executable": false
+        },
+        {
+          "path": "checks/publication-contract.nix",
+          "size": 8038,
+          "sha256": "2e014565c7fbb6a0048aa8474e05131352f97b006def8501637994ee63ef9c02",
+          "executable": false
+        },
+        {
+          "path": "checks/seerr-oidc.py",
+          "size": 3180,
+          "sha256": "df74310de2f21ae1da25705720debeccf82ea30336f11b93ddfad0425e904b8f",
+          "executable": false
+        },
+        {
+          "path": "checks/statix.nix",
+          "size": 272,
+          "sha256": "b4b11bb48ac127f31dd76c8f96aac68bda17b9222bcd806419e4fc7adad82f8c",
+          "executable": false
+        },
+        {
+          "path": "checks/telemetry-contract.nix",
+          "size": 6058,
+          "sha256": "e04ba6a40a782f3cfc8c27ee555e131d8a221dadd79138d33710f5930b853f2a",
+          "executable": false
+        },
+        {
+          "path": "checks/topology-inventory.nix",
+          "size": 7033,
+          "sha256": "73d74e706f3254dc7c5d23e6ea4baa1f3ac2fa5144ad9db665933d3909c5ef37",
+          "executable": false
+        },
+        {
+          "path": "checks/users.nix",
+          "size": 4809,
+          "sha256": "df8405a658b22f4eefd4d7d70b739ddfbd98305c9b5be0168b8b629fef79d1b0",
+          "executable": false
+        },
+        {
+          "path": "checks/vyrx-portal.nix",
+          "size": 7014,
+          "sha256": "f9f7ca7afd250dc7c733658a93e9315426331f5869e960ddf0a4450b80bb0daa",
+          "executable": false
+        },
+        {
+          "path": "checks/webapps.nix",
+          "size": 5200,
+          "sha256": "3f02d7efaa0eeb5b07148fea4a583be42c4c99c887282029e67bb395d54309ae",
+          "executable": false
+        },
+        {
+          "path": "checks/wireguard-interface.nix",
+          "size": 1521,
+          "sha256": "d79705c5a99d8cef857cdd0916aed054c79087dd987eee0a6c246275d00efa20",
+          "executable": false
+        },
+        {
+          "path": "contracts/backup/nixos.nix",
+          "size": 5259,
+          "sha256": "377b3cca097edbc840fc131e12800c7462a643cde063c68a66fff93dde0ed9f6",
+          "executable": false
+        },
+        {
+          "path": "contracts/dependencies/nixos.nix",
+          "size": 7621,
+          "sha256": "765667ade198ffd0e27d598957f9bb9ca299bf92d78c3e1a7259f64b3a213772",
+          "executable": false
+        },
+        {
+          "path": "contracts/desktop/home.nix",
+          "size": 4641,
+          "sha256": "532df541c295b0d9fc620ac6d455b27eb5f42085f9296dbb9c707b484aa0b0d1",
+          "executable": false
+        },
+        {
+          "path": "contracts/desktop/nixos.nix",
+          "size": 1304,
+          "sha256": "3d23c8fec84b36b340e0638ed42909ad44506188059a54d9e5df007bcf197fbf",
+          "executable": false
+        },
+        {
+          "path": "contracts/directory/lib/preflight.py",
+          "size": 2038,
+          "sha256": "e0eddfab2f273991212f93734ddc3928032b021a93857d987e248d58c7f2c1e8",
+          "executable": false
+        },
+        {
+          "path": "contracts/directory/nixos.nix",
+          "size": 6376,
+          "sha256": "ee6b796c443c18f2c29e52e95670df3784d2dc59b16f0062c341a069ed72b0ff",
+          "executable": false
+        },
+        {
+          "path": "contracts/endpoints/lib/identifiers.nix",
+          "size": 585,
+          "sha256": "541512a2158e2d19589f26b06dbbd4608b37eed6b8507cd0ff2a1811c076c6ef",
+          "executable": false
+        },
+        {
+          "path": "contracts/endpoints/nixos.nix",
+          "size": 4140,
+          "sha256": "db1dfed5cac43da1ce6ff7dbcb62aeed8a68e8e4be509db9bfebae02564a3075",
+          "executable": false
+        },
+        {
+          "path": "contracts/identity/integration.nix",
+          "size": 6439,
+          "sha256": "07778609ae0446829cf4ba98cddaa73c38fa4aed483d0a21db541a3a9cdd42c0",
+          "executable": false
+        },
+        {
+          "path": "contracts/identity/lib/audience.nix",
+          "size": 444,
+          "sha256": "00545a94496a8f7101ca72a72b7359aa2db02d8db3a33f3a99c3d7bd746c0ffb",
+          "executable": false
+        },
+        {
+          "path": "contracts/identity/nixos.nix",
+          "size": 7597,
+          "sha256": "854a665be475b77373cd07f983b2d36929da84da8efe3a44d015cc37d57f61b7",
+          "executable": false
+        },
+        {
+          "path": "contracts/identity/publication.nix",
+          "size": 2941,
+          "sha256": "df8d5cc8169810a2ba106bd2964b7589a55b3daae66e02339b3293e415e3a7b7",
+          "executable": false
+        },
+        {
+          "path": "contracts/ingress/publication.nix",
+          "size": 2288,
+          "sha256": "4bb7c64d4ec7f2c9386082d6c8c68263d01acbc221c27aa1ad9c766311a6420a",
+          "executable": false
+        },
+        {
+          "path": "contracts/naming/nixos.nix",
+          "size": 8182,
+          "sha256": "bc534b3858ccc9e829c1d1c3eeb0700ff149c7ee0b55bad85f8f42458905cd6a",
+          "executable": false
+        },
+        {
+          "path": "contracts/portal/nixos.nix",
+          "size": 10671,
+          "sha256": "c11f5fdf8b7cac4574a6c2919706bb705f9a6c98b6386aca276246be82828d7c",
+          "executable": false
+        },
+        {
+          "path": "contracts/portal/tile.nix",
+          "size": 1029,
+          "sha256": "e74ce5e7734635ce220cf717d823b4db1a603c0d328c4ec738392915e1eb378d",
+          "executable": false
+        },
+        {
+          "path": "contracts/projections/nixos.nix",
+          "size": 2497,
+          "sha256": "680f671b0a645cd14cceb8b1c898aa82682c9c725ff41a880bb7266319964cb4",
+          "executable": false
+        },
+        {
+          "path": "contracts/publications/nixos.nix",
+          "size": 7195,
+          "sha256": "d06475cb154564e2795e4da6bd86f9160218c456279c8cc341d8ed81ddccdfc7",
+          "executable": false
+        },
+        {
+          "path": "contracts/storage/nixos.nix",
+          "size": 2048,
+          "sha256": "6caeba111b9a0e5ba021734d1fcd211808cd13a6a9ca46ec9652ab0fb4e8cf96",
+          "executable": false
+        },
+        {
+          "path": "contracts/telemetry/nixos.nix",
+          "size": 4556,
+          "sha256": "d1383981527532c440f0f9a72c21a23238d829402e6ce501a0f658d5382d69f1",
+          "executable": false
+        },
+        {
+          "path": "contracts/topology/lib/access-sources.nix",
+          "size": 1060,
+          "sha256": "082fcff7ab851cfb579b516f2630903626bafd4c30839a4df35aa094d9edb96a",
+          "executable": false
+        },
+        {
+          "path": "contracts/topology/lib/service-address.nix",
+          "size": 1676,
+          "sha256": "79f3e1a38d6efc43cb5f2714dba337d794b257ba1ba8a7b08fc894b9efee785d",
+          "executable": false
+        },
+        {
+          "path": "contracts/topology/nixos.nix",
+          "size": 30385,
+          "sha256": "24327d0b8caa62bcff414a467ec1d59560f94d8167855eb32a5f7803ab9ed861",
+          "executable": false
+        },
+        {
+          "path": "docs/README.md",
+          "size": 2152,
+          "sha256": "5e5fa2260f6f8a8d7b64b77a050285f6d5a693c5553c6e190d524c0555eee8cf",
+          "executable": false
+        },
+        {
+          "path": "docs/architecture.md",
+          "size": 18756,
+          "sha256": "804a1b5386c9d26e23baa5faa4a1c4b91d48062402d7af78ba6e5df5258fad42",
+          "executable": false
+        },
+        {
+          "path": "docs/design.md",
+          "size": 9583,
+          "sha256": "a24e3bc18562686751d2b4acdebda79dcacc6a7f1f25bee909ae9871251172c9",
+          "executable": false
+        },
+        {
+          "path": "docs/desktop.md",
+          "size": 10240,
+          "sha256": "7c0fe67a01f77d08e9bf43c0adc1758a058d1b4662a2862198744463a43d1dcf",
+          "executable": false
+        },
+        {
+          "path": "docs/embedded.md",
+          "size": 8202,
+          "sha256": "34f7391f40794b19817e44c6307b6477fb7c7d6effd5fbc19e5c7b2c29a49c45",
+          "executable": false
+        },
+        {
+          "path": "docs/identity.md",
+          "size": 17456,
+          "sha256": "d9153a4c79be8c355a2128c16134adc57239fe6593f8e8987fc507245273842f",
+          "executable": false
+        },
+        {
+          "path": "docs/operations.md",
+          "size": 33001,
+          "sha256": "250187d193aeaf7f22807cc80312d4e3b9a376a1ea71faf03eac8874d9584eaa",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/gnome/home.nix",
+          "size": 4287,
+          "sha256": "ada63f13d19e1370ccb6d35650d61b04c6aa6e2053ee6492f9c225377761bd0d",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/gnome/nixos.nix",
+          "size": 2803,
+          "sha256": "8aeb2092a72101b043d15d9e04fe44c474642d9f2e54612f5d34026069337945",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/niri/home.nix",
+          "size": 9937,
+          "sha256": "fe7dd48786c5a35db6b0edda6558aba516126f93e92d2b1ebb414bf9675fa72d",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/niri/nixos.nix",
+          "size": 1592,
+          "sha256": "18eafbae0c855d064f1715e8104b6d1e5d95d8d1639e68459df322e5a3a512c5",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/config.nix",
+          "size": 3168,
+          "sha256": "417958983af2161e50ddc67e93301254b0cc3e2662bd4073a7f3e4747263e41d",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/greeter.nix",
+          "size": 2298,
+          "sha256": "306a9ce845495b85821a41821c840ce08397b892b7a29c40598182dc94f6a742",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/home.nix",
+          "size": 7806,
+          "sha256": "846ecebc718cec79bf0137ed6103269f47b98aeaf0ce9dd32e4d8503468e8da6",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/community-templates.nix",
+          "size": 2665,
+          "sha256": "3b7044fcce0f52fab7bc270a292216dd2fc7149677b0146ed1ae4ffd07c90630",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/ghostty.nix",
+          "size": 526,
+          "sha256": "c7642dc7f226e3b787ce8a352223522096931f24475b151bad9fa9b47882213f",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/gtk.nix",
+          "size": 1913,
+          "sha256": "244f2d7d1cd467070c3a8833df8ae5b25c84869c2b1a825ddaf0b3c26a7fbe44",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/hassio.nix",
+          "size": 493,
+          "sha256": "e88045c5a279e0a0da9463bb81226de3b21cbe266b51859950a556b4a3451834",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/nvim.nix",
+          "size": 1525,
+          "sha256": "b271ed8d572ad820b1d0af9b722c73e21ff049c6b310b947e2e4e05c297a69d4",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/phone-operate.nix",
+          "size": 935,
+          "sha256": "b672298b728349598eefd1997c0bea5b8f493d5497d571bdb6e652c555220638",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/printers.nix",
+          "size": 531,
+          "sha256": "980d503fa6b3a810481367c61e2fad2ac37c95b246cdd67dbd208187437d14c6",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/qt.nix",
+          "size": 670,
+          "sha256": "14a7dccdaa49699e43c111e42d35cc77553c587d27b3e7144001957d8bc0a86a",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/integrations/vscode.nix",
+          "size": 2674,
+          "sha256": "b739962da644a0519781b6c5ca6543cdf2f82a3c18a18926ef1a9ee713d106be",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/nixos.nix",
+          "size": 440,
+          "sha256": "a5127794de3e6503b683ecda5e0756abe08658ab6107c54aad23f480d6afbee9",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/templates/gtk-imports.css",
+          "size": 55,
+          "sha256": "936f05a2e4125b034d3f4786cfbff48649efaaceb1b728c106379bf9756094dc",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/noctalia/templates/neovim-base16.lua",
+          "size": 4620,
+          "sha256": "471ce41d7d2231e77c312061c61121383b5abb58b7cccf4b13fa27f8f4c5eafb",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/webapps/home.nix",
+          "size": 5988,
+          "sha256": "d7c6a5cf0384d09565d9508d8865249b0e1b8edfe420ad7b8e6fb2ef50c85d61",
+          "executable": false
+        },
+        {
+          "path": "features/desktop/webapps/nixos.nix",
+          "size": 483,
+          "sha256": "67a04a388b623cd2dbc2ced17710feeb0021566c6b10fd90c798c4a077d5e4ad",
+          "executable": false
+        },
+        {
+          "path": "features/dev/android/nixos.nix",
+          "size": 322,
+          "sha256": "0ea5c5e560c2293fd54149e4e2e78c181b4a4fa87a29e3bb3fb898fbaa83f2a1",
+          "executable": false
+        },
+        {
+          "path": "features/dev/codium/home.nix",
+          "size": 2174,
+          "sha256": "8ca35bfd92ed79091f23fba4de3abec2ffc6b8f27c826b68b8915cd6836e0732",
+          "executable": false
+        },
+        {
+          "path": "features/dev/codium/nixos.nix",
+          "size": 295,
+          "sha256": "c8a816be555cc0a350e60b28d2507e053646c0ea5bcf9da67c54df040d3baeea",
+          "executable": false
+        },
+        {
+          "path": "features/dev/containers/nixos.nix",
+          "size": 625,
+          "sha256": "1de70e1dd3c81dd7ea233f61350df25073bcad4e60fdbe02f3e3430cfc56c46c",
+          "executable": false
+        },
+        {
+          "path": "features/dev/git/home.nix",
+          "size": 1775,
+          "sha256": "da4a8a1f6faabb6263b5119618fb5f8a92a4ad7e9cb635c47bc9c15f613d65e3",
+          "executable": false
+        },
+        {
+          "path": "features/dev/git/nixos.nix",
+          "size": 2319,
+          "sha256": "5f107af716a152843a3b109c0a1cd01085481bb2e76bd517e893f24edd429a2c",
+          "executable": false
+        },
+        {
+          "path": "features/dev/nixvim/home.nix",
+          "size": 11039,
+          "sha256": "6c5135672de1e35d0a424933e794edb1a5cd7e68eab603a1b463a726bdd7d41b",
+          "executable": false
+        },
+        {
+          "path": "features/dev/nixvim/nixos.nix",
+          "size": 291,
+          "sha256": "4646f3fee1eff85c72618edd6b6d9102cff2d24901c884be3e8603ced37e749a",
+          "executable": false
+        },
+        {
+          "path": "features/media/gaming/nixos.nix",
+          "size": 915,
+          "sha256": "bf575180cf5b783a771b00a06ff863979f3fbded5e4e593645b84a0793e0e9a8",
+          "executable": false
+        },
+        {
+          "path": "features/media/spotify/home.nix",
+          "size": 391,
+          "sha256": "fe56be7554d8b2106617e2aa6a224a0c9be94fcb40a1bc1bda22e98bea02adb2",
+          "executable": false
+        },
+        {
+          "path": "features/media/spotify/nixos.nix",
+          "size": 619,
+          "sha256": "90e8f8a66167ad45cd1e20f1495a50d61a24740a43c2969a06aa46bde33a0239",
+          "executable": false
+        },
+        {
+          "path": "features/services/attic/client/nixos.nix",
+          "size": 4241,
+          "sha256": "cb2353e2223240f0b0e5d668286743fc5937c4d020d2be3ef196dee6977e4a62",
+          "executable": false
+        },
+        {
+          "path": "features/services/attic/server/nixos.nix",
+          "size": 3040,
+          "sha256": "f58a6026dbaae61599d25eedccc471da8fef22ee918917d7844256f1eab0a415",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/lib/blueprint.nix",
+          "size": 16446,
+          "sha256": "6ace6fe11ecea7d15afe192da20cce2db47ea2fb112b0674fcbc03c570916ff3",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/lib/blueprints-check.py",
+          "size": 13308,
+          "sha256": "6773b36aa250fe35a221840e6968d45cba8dc75dee8122ff619bef124a28c577",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/lib/core.nix",
+          "size": 1523,
+          "sha256": "d6e9eb1b4f74bc01fd314d749b6ea72df006d833969c29f01562150d7ac4239f",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/lib/nod.nix",
+          "size": 4460,
+          "sha256": "5323d7655cc61c1fbcc2ee7d2664a15132342ed66f16176ea2baa6b53802dbfa",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/lib/render-blueprint.py",
+          "size": 961,
+          "sha256": "87f791b2403b9016d646359d988c48b60a3b40ec117db7f3336bb7823679dfce",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/outpost/ldap/nixos.nix",
+          "size": 3828,
+          "sha256": "9bda25c1a25a6a897e8fd4bc4baa0d88321a197adc1e4257d01b44e02c802886",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/outpost/proxy/nixos.nix",
+          "size": 2986,
+          "sha256": "ed483562cf72821d50b21895a0d274e22be00bea639c894116b7aa3d165f1c6a",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/server/blueprints.nix",
+          "size": 49828,
+          "sha256": "6b219787cca6b3586bf2728d5aabc8856fe804b0c8f17b150faefc1950928a97",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/server/blueprints/00-system/brand.yaml",
+          "size": 659,
+          "sha256": "45bdb77646dc4a594f21e9177cd57b24025d58e985eb5ca9b1d594b34b794608",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/server/blueprints/00-system/retired-applications.yaml",
+          "size": 728,
+          "sha256": "8948506a3e256b5b5d8f30df082a5c2f180650b41eaede4c034077bb0a210978",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/server/blueprints/02-flows/enrollment.yaml",
+          "size": 4364,
+          "sha256": "e00768e8408d864c23269bfe2ef49175d34a74cc4bf38c856d8cbf87dfa8068d",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/server/blueprints/02-flows/passkey-autofill.yaml",
+          "size": 936,
+          "sha256": "132908270f44dc0ced35e88c4a356e7be118ec674bfab9bb54a2cb3ffeed48f5",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/server/blueprints/02-flows/recovery.yaml",
+          "size": 4241,
+          "sha256": "22326b8ac3f425a676935e55aa6c8589a780e26975f3c3625e82917376db493e",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/server/blueprints/02-flows/remember-me.yaml",
+          "size": 785,
+          "sha256": "58fc05ade8197693344d9f0dedb9ff0bd0adfe6be811e6fbe73581ed43143769",
+          "executable": false
+        },
+        {
+          "path": "features/services/authentik/server/nixos.nix",
+          "size": 50780,
+          "sha256": "846da42962c0fa1fdb621123422d5b93b51bc00f1a86d5a21ab395a90361966f",
+          "executable": false
+        },
+        {
+          "path": "features/services/bazarr/nixos.nix",
+          "size": 1302,
+          "sha256": "2901ac44c5220b74454ef2e176e9519b99bf43db9bcb2c8a0b5dce21e89535dd",
+          "executable": false
+        },
+        {
+          "path": "features/services/blocky/nixos.nix",
+          "size": 6348,
+          "sha256": "5e04b39a2e1dff89ac7ef730ffb7618fa9008879bca68d0c2d84228e47d93710",
+          "executable": false
+        },
+        {
+          "path": "features/services/caddy/nixos.nix",
+          "size": 19793,
+          "sha256": "2e5015d5c2e8325cbb1d3084e1d9382e48d539fa9d56364f781f6c2d3a7ff619",
+          "executable": false
+        },
+        {
+          "path": "features/services/crowdsec/nixos.nix",
+          "size": 11483,
+          "sha256": "531d5c87e06c5014a1509c43c5404dda2974b9565a2e8519e98c3ef6fc7eebb8",
+          "executable": false
+        },
+        {
+          "path": "features/services/dns/nixos.nix",
+          "size": 25849,
+          "sha256": "8151bae3be9b178df5cc3335c1f2252f7d3231eaf0206882c661b98c5c1945f6",
+          "executable": false
+        },
+        {
+          "path": "features/services/esphome/devices/switches.nix",
+          "size": 2057,
+          "sha256": "50dc339f74483e95c6114af7b3804b57b037b90e94a7a59c8d9b04ee62680677",
+          "executable": false
+        },
+        {
+          "path": "features/services/esphome/nixos.nix",
+          "size": 3490,
+          "sha256": "a4189b5f5b3e3a684f1feb104ca388fa772465ecbf9e2afbf4fe24cc2d55af6b",
+          "executable": false
+        },
+        {
+          "path": "features/services/esphome/sync.py",
+          "size": 7237,
+          "sha256": "1fa0a3025002b2e4c578a7dd1d0420cc64dc8953eb13e3de3d85493fa29949a3",
+          "executable": false
+        },
+        {
+          "path": "features/services/esphome/templates/sonoff-basic.nix",
+          "size": 5031,
+          "sha256": "1a186c11504bbd4965c7a32c2bbf87859fd274d884e134526e6e131e4c9f8e25",
+          "executable": false
+        },
+        {
+          "path": "features/services/homarr/nixos.nix",
+          "size": 3914,
+          "sha256": "f4d4900419d53f07fe976228026ef1b7f7534cfed17beaba435bea30d67698f7",
+          "executable": false
+        },
+        {
+          "path": "features/services/home-assistant/nixos.nix",
+          "size": 6232,
+          "sha256": "ef06e6767d4e3a6a61bebb122eeca0429e3b57e8622c31701e1670c3ceb41cc2",
+          "executable": false
+        },
+        {
+          "path": "features/services/jellyfin/nixos.nix",
+          "size": 7811,
+          "sha256": "568abaa6e554841d8308e6785a1cc20e44b8d7ccfd8d133f9f2e5a36aac04808",
+          "executable": false
+        },
+        {
+          "path": "features/services/jellyseerr/configure-oidc.py",
+          "size": 3667,
+          "sha256": "6d1d37125739d74f9cbe59b2dc753673e2d66c4c4409bf54d293f31001d86b17",
+          "executable": false
+        },
+        {
+          "path": "features/services/jellyseerr/nixos.nix",
+          "size": 4627,
+          "sha256": "4f9ffd087115714b28a2cf00e39c53e9b4fe2311ec5f4e54f571a38e2d30f1c7",
+          "executable": false
+        },
+        {
+          "path": "features/services/klipper/nixos.nix",
+          "size": 7079,
+          "sha256": "6a5da59ec3b7bd348b0987fc79346f89799c40e929efa16266255b0265b9fb08",
+          "executable": false
+        },
+        {
+          "path": "features/services/klipper/printer-config/macros.cfg",
+          "size": 1397,
+          "sha256": "56b1afc6bedaee7ef2793cadd37f4c3c6a6e438d34f658a2497150514d784060",
+          "executable": false
+        },
+        {
+          "path": "features/services/linkwarden/nixos.nix",
+          "size": 3374,
+          "sha256": "0471a20ebdec70996e6be907687756875f820342e2f038a6143b0ad64861d0c0",
+          "executable": false
+        },
+        {
+          "path": "features/services/mail/nixos.nix",
+          "size": 11132,
+          "sha256": "91e82b89f4945a98b98a98e42fad0040c62181a2d107c25db913ca0f48e060ab",
+          "executable": false
+        },
+        {
+          "path": "features/services/mealie/nixos.nix",
+          "size": 4868,
+          "sha256": "df726c308d9ec653b887ad8cf8ef3bfb7b93b2ce527a08b5908c1cc3ea6a045b",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/alloy/nixos.nix",
+          "size": 1367,
+          "sha256": "af2d1418c9144f8fc881105f5f490cb6050ff38140e94690f58a9fa116f709eb",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/blackbox-exporter/nixos.nix",
+          "size": 1630,
+          "sha256": "2c7cf2ff87c5cdd2897664da8210b6d86f29aaeec813079c9d64d56af8f4b85a",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/grafana/dashboards/1-fleet-overview.json",
+          "size": 9160,
+          "sha256": "f39c36ee0c88761ec1b3fab279f15f2514da30572c39ec545cb42cd31acc44f0",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/grafana/dashboards/2-network-mesh.json",
+          "size": 5159,
+          "sha256": "862d7ac62ca614cf6d041eba854dff635918aba64ddffaa17018b89b14215271",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/grafana/dashboards/3-services-ingress.json",
+          "size": 5200,
+          "sha256": "c6910cb4e235a1f5d24e2de9449fbcc621dd8d13d682d9a6d907e914f0f49edb",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/grafana/nixos.nix",
+          "size": 13180,
+          "sha256": "62cc157a325662257e60882af671d097c04308a84efc12b2fd2d6435220539f4",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/loki/nixos.nix",
+          "size": 2097,
+          "sha256": "de11cdf6294a65cefd537c625bb53919175788c20d4d49fe91a45595a5045968",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/node-exporter/nixos.nix",
+          "size": 1717,
+          "sha256": "06156c5a511f5820f66076dbb12a19a14664395231cad890874dcd07aaf89694",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/pipeline/nixos.nix",
+          "size": 3567,
+          "sha256": "a59b4bdae75a3d190cc0d00cd4c128519106c3b3c02ae0752a1a84d1e50c5d53",
+          "executable": false
+        },
+        {
+          "path": "features/services/monitoring/prometheus/nixos.nix",
+          "size": 12472,
+          "sha256": "f72c0005f94878fc7944157b2f5d6abe0a8749bf5e47e42684d172d15f74f22d",
+          "executable": false
+        },
+        {
+          "path": "features/services/ntfy/nixos.nix",
+          "size": 2695,
+          "sha256": "3bae92c28b74fd5ea27400635657fc90450309fc36fccd5ee8ab6841a119fdd2",
+          "executable": false
+        },
+        {
+          "path": "features/services/openclaw/gateway/nixos.nix",
+          "size": 32633,
+          "sha256": "887facc53213c209fa0803ba84c07052ce63be1d85aab44ca0b724fc43b6a7f9",
+          "executable": false
+        },
+        {
+          "path": "features/services/openclaw/gateway/policy/AGENTS.md",
+          "size": 4837,
+          "sha256": "b2916cf49f7eea87b902d48ece6ef1d5f2d3d54680ab4f20217fede03aa1c4d0",
+          "executable": false
+        },
+        {
+          "path": "features/services/openclaw/node/home.nix",
+          "size": 7630,
+          "sha256": "240ef53bc8e8b971db93b90e9ed02ba07c4520a235a5f23381bddbc75a85244b",
+          "executable": false
+        },
+        {
+          "path": "features/services/openclaw/node/nixos.nix",
+          "size": 4429,
+          "sha256": "479ff79c10d935c4fb20207eb282bb218a70780974df2c7f6ce732f2956116f3",
+          "executable": false
+        },
+        {
+          "path": "features/services/paperless/nixos.nix",
+          "size": 7363,
+          "sha256": "16c2c26875b0e36f092eca22a1603d0b1ab7bcedf6dbfa22d4bf44f0895babc9",
+          "executable": false
+        },
+        {
+          "path": "features/services/plausible/nixos.nix",
+          "size": 2676,
+          "sha256": "ee3cc0655d41fcc956f3f6a7a6ece898bbf2cdda936e2b0c68b4ba56cfa26bcd",
+          "executable": false
+        },
+        {
+          "path": "features/services/portal/nixos.nix",
+          "size": 17740,
+          "sha256": "25cd3cf8d1e53d2b592b634fd0c965e67b141bf1ab5ff03e31dbf1c242d74834",
+          "executable": false
+        },
+        {
+          "path": "features/services/portfolio/nixos.nix",
+          "size": 4043,
+          "sha256": "cc1c4a78d2d0fd0768d5e569d706844c5799c507e8062d44473edac6e6d33ff0",
+          "executable": false
+        },
+        {
+          "path": "features/services/postgresql/nixos.nix",
+          "size": 2159,
+          "sha256": "b1e1574253b590763f54ebecd46042854f1eeabfeece6e33629d5326aa9c2466",
+          "executable": false
+        },
+        {
+          "path": "features/services/prowlarr/nixos.nix",
+          "size": 2865,
+          "sha256": "40859087ca52922352ffbc7771dd2694193cd899b5fdc4f3a2292e4452fb68bc",
+          "executable": false
+        },
+        {
+          "path": "features/services/radarr/nixos.nix",
+          "size": 3058,
+          "sha256": "b6b4921d1c9b9c4923f7d7444d21ac9b5bbf0f672eb1ecf75b9e4a205297e795",
+          "executable": false
+        },
+        {
+          "path": "features/services/recyclarr/nixos.nix",
+          "size": 2509,
+          "sha256": "d04d68d5cc3cf1b7070379bac1462027f083ae108a74ff11a44c7c0a37067bb8",
+          "executable": false
+        },
+        {
+          "path": "features/services/redis/nixos.nix",
+          "size": 817,
+          "sha256": "1e5ba4bf0ea41d968c9b8d9db0e039a22b6d801dcc618021906f879360105fa1",
+          "executable": false
+        },
+        {
+          "path": "features/services/sabnzbd/nixos.nix",
+          "size": 5183,
+          "sha256": "68d26372d1ee74a55564e834b51abf869181c6f7dad6c8f787a7c8dc66cfe868",
+          "executable": false
+        },
+        {
+          "path": "features/services/searxng/nixos.nix",
+          "size": 7134,
+          "sha256": "9067b0f0a9821fff5b6ae65f21004794ba545a267d75fd9e56480a5b26af994a",
+          "executable": false
+        },
+        {
+          "path": "features/services/sonarr/nixos.nix",
+          "size": 3049,
+          "sha256": "85eef4da72a384013c3906d4bf1d412d4ded78133bd9f9025267836445bda269",
+          "executable": false
+        },
+        {
+          "path": "features/services/vikunja/nixos.nix",
+          "size": 4115,
+          "sha256": "2a41f3c890e7d2607d8d8f95ddc6405d4505c869d559128a89cadb3fba47b37e",
+          "executable": false
+        },
+        {
+          "path": "features/system/audio/nixos.nix",
+          "size": 856,
+          "sha256": "967756fdc78d0480899d3255e6dc1774558040519a0b44ba818aed7fc278b8fe",
+          "executable": false
+        },
+        {
+          "path": "features/system/backups/restic/nixos.nix",
+          "size": 2921,
+          "sha256": "ea6710a3a26af88a8c3c0c86347d835ccf226af28a7c866999ba44c7639d7d1a",
+          "executable": false
+        },
+        {
+          "path": "features/system/bluetooth/nixos.nix",
+          "size": 545,
+          "sha256": "fc3df0aaf79443e06f2713c60525dae60997b97c3ccaaf8a9fbbf25ab62004ae",
+          "executable": false
+        },
+        {
+          "path": "features/system/bootloader/nixos.nix",
+          "size": 1363,
+          "sha256": "40ed4f95e1b28012d25f2c7c7a261200270a40a35690fc4e68bb02fdb530abfc",
+          "executable": false
+        },
+        {
+          "path": "features/system/common/geoip/nixos.nix",
+          "size": 515,
+          "sha256": "b3cf44ecbb4ef15a88a086002acc4c4d48c17e91324f731a24263efc0e39624a",
+          "executable": false
+        },
+        {
+          "path": "features/system/common/nixos.nix",
+          "size": 2476,
+          "sha256": "42c2077bf2dc05468581e4a50d8f1e99d372bf79391c03b1444dc466ff57f857",
+          "executable": false
+        },
+        {
+          "path": "features/system/fish-shell/nixos.nix",
+          "size": 351,
+          "sha256": "9ae20455e4f772c8a34fba258ef73d23f1d91827f1a5e2af4b463155e94c7eb9",
+          "executable": false
+        },
+        {
+          "path": "features/system/kernel/nixos.nix",
+          "size": 335,
+          "sha256": "dbc1007bb2092387d7b55b5f473e9b08e4f674ce977fb8b37b3db121597f1898",
+          "executable": false
+        },
+        {
+          "path": "features/system/locate/nixos.nix",
+          "size": 677,
+          "sha256": "43950b3eb2e4c2022e626eabf4749311f0ab89d83cb1417512dcf60c4642f071",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/cloudflare/nixos.nix",
+          "size": 11095,
+          "sha256": "5db9d5dc8a3b8449f44f0b2e6835eab8566a42b2eb875f4f45038f284994346a",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/firewall/nixos.nix",
+          "size": 7861,
+          "sha256": "864070738ccb63e0a52e4dd6f8a9d07df4eb6f0cdaa3cf38a17b026d6a15a1d5",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/fritzbox/nixos.nix",
+          "size": 7181,
+          "sha256": "f13ff07643a9462b19a6c9c108367cf33017deda769a59f96b064efdceea6f17",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/fritzbox/sync.py",
+          "size": 10699,
+          "sha256": "3d6764a02952ad81856ae532b21fc1af5c67f028f0f1cd2a345a3cdd28203187",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/gateway/nixos.nix",
+          "size": 18314,
+          "sha256": "b53b19b2f719af80640361d054d63cc369a56d3f796169f8a1713e5699aacc37",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/lan-preference/nixos.nix",
+          "size": 10380,
+          "sha256": "4d387dd8d2b486f5003b2264372346d8959fd8aae6296ab020b19b1c962adf04",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/lib/nftables-render.nix",
+          "size": 1186,
+          "sha256": "6e237ef1b02422ba5076fcde9b36a27dc1d59c81a342cd344df6cb5cfb73d0e8",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/resolver/nixos.nix",
+          "size": 4530,
+          "sha256": "2b95019822c747c13fb1009ae4a333fc821b479cf34387d20c16f12798054b7a",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/ssh/nixos.nix",
+          "size": 6550,
+          "sha256": "291bc138f7e8deefb90e169d0963a4d8c314b9ce955c73b27e34a5aedd2f758f",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/static/nixos.nix",
+          "size": 3444,
+          "sha256": "d00ecc926090b78b38202aad0a2d032f38355d090368ac7ec0d9df7829e4b2b0",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/tplink-ap/nixos.nix",
+          "size": 3252,
+          "sha256": "bfbc63bae43d803943b36c8e0ff310ce227f05d6ac64d1179eaa1d33208e5f95",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/tplink-ap/sync.py",
+          "size": 4826,
+          "sha256": "51b454b606110c9a56737b5db33d19e8b641298db146c90b38d60e79d2e14895",
+          "executable": false
+        },
+        {
+          "path": "features/system/networking/wireguard/nixos.nix",
+          "size": 22245,
+          "sha256": "753e2858324f29aa7491bb8f9f2ed1701e967b5fff8dbae9650bfd5d275c6910",
+          "executable": false
+        },
+        {
+          "path": "features/system/nod-sync/nixos.nix",
+          "size": 11073,
+          "sha256": "77f0acac6a204da34cc4d06bb02237376da54da904fba34adc07eb157153b3d6",
+          "executable": false
+        },
+        {
+          "path": "features/system/printing/nixos.nix",
+          "size": 362,
+          "sha256": "0b5bde0cc7f8db9e581331d4a7069d1a0f15e62ff5844832988542097475d1c1",
+          "executable": false
+        },
+        {
+          "path": "features/system/rclone/home.nix",
+          "size": 5868,
+          "sha256": "5509efeba9c85fbff47e22e613ad92187e47557ed65047bf94469827a13660bd",
+          "executable": false
+        },
+        {
+          "path": "features/system/rclone/nixos.nix",
+          "size": 552,
+          "sha256": "0eacd0c74684d30c2cc27e7ad5f891ad650fb5fe3853e1abb7723f984899f956",
+          "executable": false
+        },
+        {
+          "path": "features/system/security/nixos.nix",
+          "size": 5520,
+          "sha256": "81a59df661939bd2bf2e851b94c8d3fc68a07eec76bd75f05f218f2caf7a73fb",
+          "executable": false
+        },
+        {
+          "path": "features/system/smtp/nixos.nix",
+          "size": 1260,
+          "sha256": "9aaf424efd3972914c1595bf73dabfb5a15d6723bbfd45ba634223c59968adec",
+          "executable": false
+        },
+        {
+          "path": "features/system/theme/assets/authentik.css",
+          "size": 2008,
+          "sha256": "9ce2400e759e7f8566d29538c2ccb8a425c59c39b12c7b1f14b3b7494094642c",
+          "executable": false
+        },
+        {
+          "path": "features/system/theme/assets/error-502.html",
+          "size": 5117,
+          "sha256": "5efae1725ef2eaa1ce29112a9aef199cf31b3f42f915cef00da6c7c66ebdf7c5",
+          "executable": false
+        },
+        {
+          "path": "features/system/theme/assets/logo.svg",
+          "size": 305,
+          "sha256": "e938dc558bc6bf467bd7420d8adfbf97ac1dd785bf4ecfccbe935ff543794942",
+          "executable": false
+        },
+        {
+          "path": "features/system/theme/nixos.nix",
+          "size": 1288,
+          "sha256": "759e93afde340920ccd5355fc245d1509b91326ac7453a6ea8c02744c7ce8fc7",
+          "executable": false
+        },
+        {
+          "path": "features/system/user/nixos.nix",
+          "size": 6987,
+          "sha256": "c4bbdf708c4a224612141353828d4eb755ffefdf68610718b3b0418d7ad93ae3",
+          "executable": false
+        },
+        {
+          "path": "features/system/wayland/nixos.nix",
+          "size": 379,
+          "sha256": "ddded15d4bd6b7fffd10a7ab0fae7cfc1c236331395fcb5c9945e923283142e8",
+          "executable": false
+        },
+        {
+          "path": "flake.lock",
+          "size": 22118,
+          "sha256": "495a7f3dcc556fb07400fc5e1d7933d5c4cf32f35d0c5ea8e84a62ce4eae927b",
+          "executable": false
+        },
+        {
+          "path": "flake.nix",
+          "size": 10477,
+          "sha256": "72e27f3c176c1ccc9ba6e3979d5c6a883036c7397246f1034b4b447399082efe",
+          "executable": false
+        },
+        {
+          "path": "hosts/cld-edge-01/configuration.nix",
+          "size": 1792,
+          "sha256": "fd42d868c217935e19768380399b1d796300ed4dc61dc7a245f5af114ed46b25",
+          "executable": false
+        },
+        {
+          "path": "hosts/cld-edge-01/disk-config.nix",
+          "size": 794,
+          "sha256": "913015cf33e8e3d452bef3665b724930fbe95fc7a49255587c571c2e06829b30",
+          "executable": false
+        },
+        {
+          "path": "hosts/cld-edge-01/hardware-configuration.nix",
+          "size": 526,
+          "sha256": "a8832f5b1929d5c8be1c576a30aca23457dcd19127f02ce01a3b744d184c0010",
+          "executable": false
+        },
+        {
+          "path": "hosts/cld-edge-01/hardware-specific.nix",
+          "size": 486,
+          "sha256": "ba15b9728e07d0a251a11961668764e2a21262c0a1ea0e4107d59582248aa1df",
+          "executable": false
+        },
+        {
+          "path": "hosts/cld-ops-01/configuration.nix",
+          "size": 9679,
+          "sha256": "9cd41da4cbeaf0aecb63a0e6a3b2182dda7962cd564bec4f832802e5481a4a1f",
+          "executable": false
+        },
+        {
+          "path": "hosts/cld-ops-01/disk-config.nix",
+          "size": 522,
+          "sha256": "35736657d6a7c0c603c736ac92c055540b4918ebf7362c37d0214329024f98c8",
+          "executable": false
+        },
+        {
+          "path": "hosts/cld-ops-01/hardware-configuration.nix",
+          "size": 471,
+          "sha256": "e9e96f22b73fbe086c553a958534146be9655c442ffccb0a07f2ab69e9753b6b",
+          "executable": false
+        },
+        {
+          "path": "hosts/cld-ops-01/hardware-specific.nix",
+          "size": 173,
+          "sha256": "128b679782d20f2af4cfc729b6e834bf7bf7c7b041755556d889e8f06fa84609",
+          "executable": false
+        },
+        {
+          "path": "hosts/hom-srv-01/configuration.nix",
+          "size": 3268,
+          "sha256": "6eb2778fd79e8fc36d33d3d52c5f261700087b5b094a5d7709c8e1d96a2a24cb",
+          "executable": false
+        },
+        {
+          "path": "hosts/hom-srv-01/hardware-configuration.nix",
+          "size": 1530,
+          "sha256": "2f6c40ca7051f4aa831f65a750107de094a4344b594634cf5166bfd1be50f908",
+          "executable": false
+        },
+        {
+          "path": "hosts/hom-srv-01/hardware-specific.nix",
+          "size": 758,
+          "sha256": "c95d3d9ae92c75e434e3873174ede99bc03fc7230f48f31e1653409af70b995d",
+          "executable": false
+        },
+        {
+          "path": "hosts/hom-wrk-01/configuration.nix",
+          "size": 1358,
+          "sha256": "f314995a883ef5410af5ee7daf390b6aad6677d8a53e69d808ae2b7f3cb291ce",
+          "executable": false
+        },
+        {
+          "path": "hosts/hom-wrk-01/disk-config.nix",
+          "size": 2165,
+          "sha256": "fd4093178294dab226e7be34bd47bfe54f0d3d1eb712a4b41b9e56185604a2f5",
+          "executable": false
+        },
+        {
+          "path": "hosts/hom-wrk-01/hardware-configuration.nix",
+          "size": 1660,
+          "sha256": "eeb1615a86093b4a96169a4f316898fd2c31056619984e7a3022c88c467f8462",
+          "executable": false
+        },
+        {
+          "path": "hosts/hom-wrk-01/hardware-specific.nix",
+          "size": 958,
+          "sha256": "b23c772f0ab0fe3a23db9058e70098bca0bc31012506d9dd12b9a24148f74733",
+          "executable": false
+        },
+        {
+          "path": "hosts/mob-nb-01/configuration.nix",
+          "size": 897,
+          "sha256": "df063ff9ba8b23bd3453f6f79f17a478f5cb9aceb9c56b28f7df38cfc8bb084d",
+          "executable": false
+        },
+        {
+          "path": "hosts/mob-nb-01/disk-config.nix",
+          "size": 2157,
+          "sha256": "3e45f754498a6b052cee0621bd6b9f375a3ad65ddbe49fa0982ab67b71186161",
+          "executable": false
+        },
+        {
+          "path": "hosts/mob-nb-01/hardware-configuration.nix",
+          "size": 1079,
+          "sha256": "9a3b839248f42a93d7dc3b8c8c411e6acd2b5b930c400544f4af0301ed5aedd5",
+          "executable": false
+        },
+        {
+          "path": "hosts/mob-nb-01/hardware-specific.nix",
+          "size": 53,
+          "sha256": "8f58897df416065ce0585e6b101bbf2ee0d88fcdbcb393cea8d94e069771ab96",
+          "executable": false
+        },
+        {
+          "path": "inventory/devices.nix",
+          "size": 3219,
+          "sha256": "c7bc32aee6336285b658b76156faed389ecf950e8a19274d9798c73e856e34ee",
+          "executable": false
+        },
+        {
+          "path": "inventory/dns.nix",
+          "size": 774,
+          "sha256": "3e8dd64f6052e0fb984cdd6aad4a42efb0006136593d38f9423700c3bba72fdb",
+          "executable": false
+        },
+        {
+          "path": "inventory/hosts.nix",
+          "size": 4238,
+          "sha256": "27fe8469ffaf5f37996e01e227099d6e050deecccdf23ccdbff5d92d40a0887c",
+          "executable": false
+        },
+        {
+          "path": "inventory/identity.nix",
+          "size": 1312,
+          "sha256": "d01cbba1a66bc3952d5a0dc77340629f27b5054e1f2d7fb8452b8d2f51f40672",
+          "executable": false
+        },
+        {
+          "path": "inventory/site.nix",
+          "size": 654,
+          "sha256": "a7d6b8aa3c4be102adc27a0f8494ccdd29d91cba6b909bab80aec3ac1c8a3da9",
+          "executable": false
+        },
+        {
+          "path": "inventory/smtp.nix",
+          "size": 274,
+          "sha256": "a0f81c7506d451560f63e816d107a3d2af047910391245438c1f23c1daed8d37",
+          "executable": false
+        },
+        {
+          "path": "inventory/ssh.nix",
+          "size": 896,
+          "sha256": "68bf1e6491486de5d8e124ba04300b803a402c0dd3a014df3f91770b9f8ad873",
+          "executable": false
+        },
+        {
+          "path": "inventory/subnets.nix",
+          "size": 2260,
+          "sha256": "bcd1aec47b417e6ddae6e1ae5e22620483943f5e63c3cd2c23656a9c77bc897b",
+          "executable": false
+        },
+        {
+          "path": "lib/checks.nix",
+          "size": 1776,
+          "sha256": "c0b95a81a9d8b51a5559cd4e6749d76c350b25fc66533b8dbe31b49d29a2e7e5",
+          "executable": false
+        },
+        {
+          "path": "lib/cidr.nix",
+          "size": 9012,
+          "sha256": "afb06f8a52b5dbfd3f8afabb929f280427c99e90bf75664dfc0a242da2fc4d7c",
+          "executable": false
+        },
+        {
+          "path": "lib/default.nix",
+          "size": 240,
+          "sha256": "daaf9e09ee3fbdc849f67c51349fe4cb8054e4576379a8e667a3679394b87784",
+          "executable": false
+        },
+        {
+          "path": "lib/discovery.nix",
+          "size": 1466,
+          "sha256": "c82879597739b17e4a1a925eff43537e4eba47333ba41be7557f3fc057439b42",
+          "executable": false
+        },
+        {
+          "path": "lib/feature-dependencies.nix",
+          "size": 1196,
+          "sha256": "42c6b667c6b933377fbe12289708b36fa0b13a7293128ec58ad43796e24a3706",
+          "executable": false
+        },
+        {
+          "path": "lib/fleet-configs.nix",
+          "size": 1791,
+          "sha256": "b76f96e7e74c0145de22de7a0c2330d258845c6995151c40d25cb01bfe19a44f",
+          "executable": false
+        },
+        {
+          "path": "lib/mk-system.nix",
+          "size": 5336,
+          "sha256": "d9c5c0b42bf3cb699f96c93637c1bb96f00a98b8d5230a23930aa9fc56771f03",
+          "executable": false
+        },
+        {
+          "path": "lib/users.nix",
+          "size": 837,
+          "sha256": "f062e6b852d34fe7da9c37ff4450ee61f1e33e5801a2f8e5105cf6fe7e279119",
+          "executable": false
+        },
+        {
+          "path": "media/avatar-philipp.jpg",
+          "size": 304949,
+          "sha256": "44fffea931594f4979832ec289510db6a9843de2fc9e1605c805eb555aa59da3",
+          "executable": false
+        },
+        {
+          "path": "media/gmail.png",
+          "size": 8102,
+          "sha256": "27f82fc1992329630d1d99e7e9d478a0597cb1afafd9881db8ba69cf8cb0457c",
+          "executable": false
+        },
+        {
+          "path": "media/google-calendar.png",
+          "size": 10897,
+          "sha256": "18d38ef17e827629be60358f32b0571ad30fcd1c2a53bcce6d391c6bb787c8a3",
+          "executable": false
+        },
+        {
+          "path": "media/google-meet.png",
+          "size": 10121,
+          "sha256": "0219d6b5ec401dc098d6e5e66811f2d4ffa0bca2f5fe7e08f02d47aac2655e8c",
+          "executable": false
+        },
+        {
+          "path": "media/google-photos.png",
+          "size": 14730,
+          "sha256": "a3813e879ee9cee034cb62d3ea29f270ad75fe5a26551b7b80db7dfd321fd8ae",
+          "executable": false
+        },
+        {
+          "path": "media/google-tasks.png",
+          "size": 28541,
+          "sha256": "32c6a5cb47df47362f34689136036ac8ffc6789dfbba976255a43056d19f3499",
+          "executable": false
+        },
+        {
+          "path": "media/moebius.png",
+          "size": 509230,
+          "sha256": "8d6fe829c82b24c4fcd2a3d5e8266395ce536352410d4a39cdd30dd7584fc888",
+          "executable": false
+        },
+        {
+          "path": "media/openclaw.png",
+          "size": 27708,
+          "sha256": "7ef234a3befb3a9eb95d3940f8b260d5c539bf6ba4ec73bf86fe90b59563a694",
+          "executable": false
+        },
+        {
+          "path": "media/wallpaper.jpg",
+          "size": 2406432,
+          "sha256": "1bf598c0a3ee33a91caa419589b67b839c269aa6907bb3680bedcd5316b0e27c",
+          "executable": false
+        },
+        {
+          "path": "media/youtube.png",
+          "size": 10345,
+          "sha256": "2e3a16fb3835cc0cd9b7f7691433831050cf00a8fa6346b725e00e23a5eb1e8d",
+          "executable": false
+        },
+        {
+          "path": "packages/custom/chrome-devtools-mcp/default.nix",
+          "size": 1222,
+          "sha256": "e45fe95826022cd0d2cf73d82b3cb513dcbcc16de193fcaef5f59d3a36e509e8",
+          "executable": false
+        },
+        {
+          "path": "packages/custom/chrome-devtools-mcp/manifest.json",
+          "size": 204,
+          "sha256": "b4b03b3d7c07dad07f04fa9fd98511072fb57817b9a272d6fd6e06d4aa9cdd98",
+          "executable": false
+        },
+        {
+          "path": "packages/custom/composio/default.nix",
+          "size": 1503,
+          "sha256": "50956e79ba9c8fb9ff8c05c5d8f0684be7616f8bfcf706e48c6ac8a839b8dd39",
+          "executable": false
+        },
+        {
+          "path": "packages/custom/composio/manifest.json",
+          "size": 338,
+          "sha256": "fcecfd274a03022d2cb9cd2a5ce6f0ad1e4a30280589e93dd747de175b4d8d9f",
+          "executable": false
+        },
+        {
+          "path": "packages/custom/default.nix",
+          "size": 478,
+          "sha256": "b43baa242794394ef4844cfbe3517dbfa7ddc49bd51afc4110778d0c23aa468e",
+          "executable": false
+        },
+        {
+          "path": "packages/custom/openclaw-node-workspace/default.nix",
+          "size": 1535,
+          "sha256": "e2289d9ec5493a83c63621b6b09b5deeea46dfd12bbbbc7b49ce893591f32954",
+          "executable": false
+        },
+        {
+          "path": "packages/custom/tplinkrouterc6u/default.nix",
+          "size": 761,
+          "sha256": "3eb0e2af6a653cf1554a2dc12f75d41ab267c65711fcf3b0adb8b9241d1ee9dd",
+          "executable": false
+        },
+        {
+          "path": "packages/overlays/fix/authentik/default.nix",
+          "size": 2059,
+          "sha256": "7262a33757fa74874db484c5d2af0e940c1e7ecfd73b708a9ba183739dd46d89",
+          "executable": false
+        },
+        {
+          "path": "packages/overlays/fix/bottles/default.nix",
+          "size": 90,
+          "sha256": "7e840753cc31a265bb8f097e46a6fe38d7b60f7631f4181a16d92a741670e864",
+          "executable": false
+        },
+        {
+          "path": "packages/overlays/fix/moonraker/default.nix",
+          "size": 1072,
+          "sha256": "0d449a3dd6d3c6a5be40c4fe9eada579d10548cb655a9a73750da823ea260dca",
+          "executable": false
+        },
+        {
+          "path": "packages/overlays/fix/paperless-ngx/default.nix",
+          "size": 182,
+          "sha256": "827356eabd9f7305f727938c74fdb0dc91aa3071f385342d1b6ab203da004c71",
+          "executable": false
+        },
+        {
+          "path": "roles/base.nix",
+          "size": 2661,
+          "sha256": "d4c052998ebf57de427dee6a9682f0bc9040144d336904b4c51d20b5b0054825",
+          "executable": false
+        },
+        {
+          "path": "roles/desktop.nix",
+          "size": 586,
+          "sha256": "b1ea2b03f5078a399d5926c0b519058dce870b6c50faaf0c51fe52bfb9bcf176",
+          "executable": false
+        },
+        {
+          "path": "roles/notebook.nix",
+          "size": 353,
+          "sha256": "147aa2cb8f86a01c725ba06d5602e907e3a5cdac6c3871410586ea4af194536a",
+          "executable": false
+        },
+        {
+          "path": "roles/pc.nix",
+          "size": 1581,
+          "sha256": "ffeb86356a7741682638dd312c40cdcf7176ebe08349b1e75b3a97662291a324",
+          "executable": false
+        },
+        {
+          "path": "roles/server.nix",
+          "size": 1184,
+          "sha256": "7fd8786a6affc37843358b359293197b4f52b6eef6c6a01eba5bcbffa21244de",
+          "executable": false
+        },
+        {
+          "path": "secrets/authentik-signing.yaml",
+          "size": 7726,
+          "sha256": "c6b5ff2081f4e8d31648a5945913a1f7c85103ef4d0cfd083b18d262ee401212",
+          "executable": false
+        },
+        {
+          "path": "secrets/deploy-key.yaml",
+          "size": 4513,
+          "sha256": "db936ecc259cdc11d25f553f739f9523e0096839b98bda4a4ce5b77194aee957",
+          "executable": false
+        },
+        {
+          "path": "secrets/nod-provider.yaml",
+          "size": 2287,
+          "sha256": "2ffa76e0f389d974a97cce9335a8b14933d7a5ea76210ff46acff6b5515bf6e0",
+          "executable": false
+        },
+        {
+          "path": "secrets/node-tunnel.yaml",
+          "size": 4506,
+          "sha256": "1ad6c55a53b6f08b1d52f40f2aee3c6ab1f5c2cb406dd771daf37f5d2d3d9ca6",
+          "executable": false
+        },
+        {
+          "path": "secrets/secrets.yaml",
+          "size": 27138,
+          "sha256": "03ce2f5e4436ff579f20f7d11589983fd14ddc7ec2c99bc5cc8c57c4d36f0bc1",
+          "executable": false
+        },
+        {
+          "path": "statix.toml",
+          "size": 99,
+          "sha256": "0ef694c08c11781a77409076fb16b9484b631f362c5ac52c8298a52622de435d",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/chrome.nix",
+          "size": 377,
+          "sha256": "8595a274b79cbdda56b75ee4f5552f833166e3270aa327ce1a16c8f07943375c",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/fish.nix",
+          "size": 4773,
+          "sha256": "6b9e8746a0167adf352e3d3cdfd137923fa28c1cc5391cbb75af17b34caa6061",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/home.nix",
+          "size": 7717,
+          "sha256": "0070148bba7be897326ae6177f58ab335c5db0d5aaaaf1722c4f945024be396f",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/metadata.nix",
+          "size": 255,
+          "sha256": "deab1327cdbd10220efdcd3e33bb0248d04e120f38f4ef834ceccd4dcc996ace",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/packages.nix",
+          "size": 344,
+          "sha256": "3b0b88b53be584372eb5be80bff48a41c0be64bf12056667d617986ccb506c8b",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/profiles/core.nix",
+          "size": 232,
+          "sha256": "2e278e09ee3c1b4124ddfb66ea3fa93de796d455d91f9ebdf24b5e72cce6d4f8",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/profiles/graphical.nix",
+          "size": 2928,
+          "sha256": "06e8fe7afc74059ba63b55cfba4c24bbac146913cd85d2bf3dd2982b077e2877",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/rclone-bookmarks.nix",
+          "size": 1170,
+          "sha256": "fdd9c812c08b974ac66533d25756515ce9b9adb896550f40bcc7573ea159c4f9",
+          "executable": false
+        },
+        {
+          "path": "user/philipp/rclone.nix",
+          "size": 2585,
+          "sha256": "fdffd0181eb2bc49ba0854e23a3dde002c3723f0d955b621eaf9accb30bb9145",
+          "executable": false
+        }
+      ],
+      "updatedAt": "2026-11-09T17:21:26.922Z"
+    }
+  }
+}
