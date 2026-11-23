@@ -58,7 +58,7 @@ let
     port=${toString cfg.port}
     for _ in 1 2 3; do
       if ${pkgs.curl}/bin/curl -fsS --max-time 1 "http://127.0.0.1:$port/health" 2>/dev/null \
-        | ${pkgs.gnugrep}/bin/grep -Eq '"runtime"[[:space:]]*:[[:space:]]*"desktop"'; then
+        | ${pkgs.gnugrep}/bin/grep -Eq '"runtime"[[:space:]]*:[[:space:]]*"(desktop|web)"'; then
         exit 0
       fi
       ${pkgs.coreutils}/bin/sleep 1
