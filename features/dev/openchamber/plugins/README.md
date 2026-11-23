@@ -13,11 +13,11 @@ package envelope, so `openchamber` sits beside `name` and `version`:
   "version": "0.0.1",
   "openchamber": {
     "apiVersion": 1,
+    "id": "openchamber-builtin-example-panel",
+    "name": "Example",
+    "icon": "apps",
     "contributes": {
       "panel": {
-        "id": "openchamber-builtin-example-panel",
-        "name": "Example",
-        "icon": "apps",
         "entry": "panel/index.html"
       }
     }

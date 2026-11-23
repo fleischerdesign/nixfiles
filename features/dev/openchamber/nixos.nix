@@ -9,9 +9,6 @@ let
   cfg = config.my.features.dev.openchamber;
   systems = (import ../../../lib/fleet-configs.nix { inherit lib; }).systems config;
   peers = lib.filterAttrs (_: system: system.config.my.features.dev.openchamber.enable) systems;
-  desktopPeers = lib.filterAttrs (
-    _: system: system.config.my.features.dev.openchamber.role != "server"
-  ) peers;
   hasDesktop = cfg.role != "server";
   hasServer = cfg.role != "desktop";
   primary = config.my.user.primary;
@@ -128,12 +125,20 @@ in
       type = lib.types.attrsOf lib.types.anything;
       readOnly = true;
       internal = true;
-      default = lib.mapAttrs (name: system: {
-        user = system.config.my.user.primary;
-        address = config.my.topology.hosts.${name}.wireguardIpv4;
-        port = system.config.my.features.dev.openchamber.port;
-        sshPort = system.config.my.contracts.provides.ssh.endpoints.ssh.port;
-      }) (lib.filterAttrs (name: _: name != config.networking.hostName) peers);
+      default =
+        lib.mapAttrs
+          (name: system: {
+            user = system.config.my.user.primary;
+            address = config.my.topology.hosts.${name}.wireguardIpv4;
+            port = system.config.my.features.dev.openchamber.port;
+            sshPort = system.config.my.contracts.provides.ssh.endpoints.ssh.port;
+          })
+          (
+            lib.filterAttrs (
+              name: system:
+              name != config.networking.hostName && system.config.my.features.dev.openchamber.role != "server"
+            ) peers
+          );
     };
   };
 
@@ -236,9 +241,9 @@ in
         desktop = {
           inherit (cfg) port;
           directAccess = {
-            enable = desktopPeers != { };
+            enable = cfg.peers != { };
             interface = "wireguard";
-            fromHosts = lib.attrNames desktopPeers;
+            fromHosts = lib.attrNames cfg.peers;
           };
         };
       }
@@ -246,13 +251,13 @@ in
         server = {
           inherit (cfg.server) port;
           directAccess = {
-            enable = desktopPeers != { };
+            enable = cfg.peers != { };
             interface = "wireguard";
-            fromHosts = lib.attrNames desktopPeers;
+            fromHosts = lib.attrNames cfg.peers;
           };
         };
       };
-    my.features.system.networking.ssh.admitsHosts = lib.attrNames desktopPeers;
+    my.features.system.networking.ssh.admitsHosts = lib.attrNames cfg.peers;
     home-manager.sharedModules = lib.optionals hasDesktop [ ./home.nix ];
   };
 }
