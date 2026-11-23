@@ -569,7 +569,9 @@ to promote a runtime extension into the configuration.
 `fleet-session-journal` is the panel-less fixture: it ships only a local service and a
 `sessionEvents` subscription with content, appends each event to its private data directory, and is
 disabled without deleting data. Built-in services run as the primary user with normal process access;
-treat their code and data as trusted configuration.
+treat their code and data as trusted configuration. `fleet-opencode-tools` is the
+`contributes.opencodePlugin` fixture: it adds the `fleet_runtime` tool through the managed OpenCode
+config while the extension is enabled, and removes it when the extension is disabled.
 
 OpenChamber's optional shared `opencode serve --service` mode is not enabled. The pinned Nix CLI
 registers its service under the channel-specific file while the v2.8.0 desktop client looks for the
