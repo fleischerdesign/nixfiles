@@ -16,6 +16,12 @@
 
   my.features.services.openclaw.node.enable = true;
 
+  my.features.dev.openchamber = {
+    enable = true;
+    role = "server";
+    subscriptions = import ../../inventory/opencode-subscriptions.nix;
+  };
+
   my.user.extraGroups = [
     "networkmanager"
     "wheel"

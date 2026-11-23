@@ -14,6 +14,13 @@ let
   primary = config.my.user.primary;
   primaryHome = config.users.users.${primary}.home;
   address = config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4 or null;
+  clientHosts = lib.filter (
+    name:
+    name != config.networking.hostName
+    && (config.my.topology.hosts.${name}.hostType or null) == "client"
+    && (config.my.topology.hosts.${name}.wireguardIpv4 or null) != null
+  ) (lib.attrNames config.my.topology.hosts);
+  endpointClients = lib.unique (lib.attrNames cfg.peers ++ clientHosts);
   accountPlan = pkgs.writeText "openchamber-subscriptions.json" (
     builtins.toJSON (
       map (subscription: {
@@ -42,6 +49,24 @@ let
     ''}
     exec ${packages.server}/bin/openchamber serve --port ${toString cfg.server.port} --lan --api-only
   '';
+  serverPair = pkgs.writeShellApplication {
+    name = "openchamber-server-pair";
+    text = ''
+      password_file=${
+        if cfg.server.uiPasswordSecret != null then
+          config.sops.secrets.${cfg.server.uiPasswordSecret}.path
+        else
+          "${primaryHome}/.local/state/openchamber/server-ui-password"
+      }
+      if [ -s "$password_file" ]; then
+        export OPENCHAMBER_UI_PASSWORD="$(cat "$password_file")"
+      fi
+      exec ${packages.server}/bin/openchamber connect-url \
+        --port ${toString cfg.server.port} \
+        --server ${lib.escapeShellArg "http://${address}:${toString cfg.server.port}"} \
+        --qr "$@"
+    '';
+  };
 in
 {
 
@@ -236,14 +261,19 @@ in
             "ui-password:${config.sops.secrets.${cfg.server.uiPasswordSecret}.path}";
       };
     };
+    environment.systemPackages = lib.optionals hasServer [
+      packages.server
+      packages.opencode
+      serverPair
+    ];
     my.contracts.provides.openchamber.endpoints =
       lib.optionalAttrs hasDesktop {
         desktop = {
           inherit (cfg) port;
           directAccess = {
-            enable = cfg.peers != { };
+            enable = endpointClients != [ ];
             interface = "wireguard";
-            fromHosts = lib.attrNames cfg.peers;
+            fromHosts = endpointClients;
           };
         };
       }
@@ -251,9 +281,9 @@ in
         server = {
           inherit (cfg.server) port;
           directAccess = {
-            enable = cfg.peers != { };
+            enable = endpointClients != [ ];
             interface = "wireguard";
-            fromHosts = lib.attrNames cfg.peers;
+            fromHosts = endpointClients;
           };
         };
       };
