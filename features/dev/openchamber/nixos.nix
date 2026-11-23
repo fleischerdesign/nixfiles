@@ -244,8 +244,14 @@ in
     systemd.services.openchamber-server = lib.mkIf hasServer {
       description = "OpenChamber headless server";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
+      after = [
+        "network-online.target"
+        "${accountUnit}.service"
+      ];
+      wants = [
+        "network-online.target"
+        "${accountUnit}.service"
+      ];
       environment = {
         HOME = primaryHome;
         XDG_CONFIG_HOME = "${primaryHome}/.config";

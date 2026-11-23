@@ -469,24 +469,36 @@ Desktop screenshots on those hosts run through shell execution instead.
 ## OpenChamber workspaces
 
 `my.features.dev.openchamber.enable` installs OpenChamber Desktop on `hom-wrk-01` and
-`mob-nb-01`. The desktop owns its server and OpenCode process; no separate NixOS OpenChamber
-server runs. The feature is in `features/dev/openchamber/`. Its pinned upstream flake supplies
-the unmodified Electron app, server CLI and matching OpenCode CLI.
+`mob-nb-01` (`role = "desktop"`) and a headless OpenChamber runtime on `hom-srv-01` and
+`cld-edge-01` (`role = "server"`). `role = "both"` runs the desktop and the headless server on
+one host, with different ports. Clients use the desktops for local work and the server runtimes for
+work that must outlive a laptop.
 
 The desktop's network port is declared once by the feature's `port` option (default 7337).
 Activation first checks that the port is free or already served by a running desktop with the
-`desktop` runtime; another listener fails the switch instead of letting the app fall back to a random
-port. Activation merges the port and network access into writable desktop settings. Existing UI
-passwords are retained; if `uiPasswordSecret` names a SOPS secret, its value becomes the desktop
+`desktop` runtime; another listener fails the switch instead of letting the app fall back to a
+random port. Activation merges the port and network access into writable desktop settings. Existing
+UI passwords are retained; if `uiPasswordSecret` names a SOPS secret, its value becomes the desktop
 password, otherwise a fresh device gets a random password stored only in its mode-0600 settings file.
-The endpoint contract admits only the other enabled OpenChamber hosts over WireGuard. The feature's
-`autostart` option (default on) writes the XDG autostart entry at
+The endpoint contract admits the other enabled OpenChamber hosts and every inventory host with
+`hostType = "client"` over WireGuard; that includes the phone without giving it a NixOS host entry.
+The feature's `autostart` option (default on) writes the XDG autostart entry at
 `${XDG_CONFIG_HOME}/autostart/openchamber.desktop`; the desktop's own checkbox reflects the file's
 existence, and the next activation restores an entry disabled in the app. The entry points at the Nix
-wrapper and the pinned OpenCode CLI is also on the session PATH, because the desktop rewrites `Exec`
-to its raw Electron path at startup. A device's desktop must be running to use its workspace.
+wrapper and the pinned OpenCode CLI is also on the session PATH, because the desktop rewrites
+`Exec` to its raw Electron path at startup. A device's desktop must be running to use its
+workspace.
 
-Native device tokens connect the desktops directly over WireGuard. `openchamber-fleet-pair --issue`
+The headless role runs `openchamber serve --port 7338 --lan --api-only` as the primary user
+through the `openchamber-server` systemd unit. It generates a mode-0600 UI password once at
+`${XDG_STATE_HOME}/openchamber/server-ui-password`, or reads `server.uiPasswordSecret`; a SOPS
+secret reaches the process through `LoadCredential`, never argv. The endpoint contract admits the
+desktop peers and the phone over WireGuard. `openchamber-server-pair` on a server prints a
+one-time QR/link for a desktop or phone; the client imports it in Settings → Remote Instances. The
+desktop helper `openchamber-mobile-pair` does the same for a phone connecting to a desktop. Pairing
+links are single-use secrets and are never written into the Nix store.
+
+Native device tokens connect desktops directly over WireGuard. `openchamber-fleet-pair --issue`
 runs on the target over the existing operator SSH identity and creates one `desktop` client token
 through the target's local admin API (`POST /api/client-auth/clients`); the source stores that token
 in `desktopHosts`. Only initial enrollment uses SSH. Before issuing, the target ensures its own
@@ -498,8 +510,9 @@ after each completed attempt; its oneshot process starts no server and exits aft
 peers. An offline peer keeps its saved entry. A revoked token is reported and is not automatically
 replaced. Remove the managed local entry to request enrollment again, or pair it in the app. The
 operator SSH identity must be available for enrollment, for example through an unlocked SSH agent.
-The Nix-managed IDs use the `nixfiles:` prefix; personal connections remain untouched. `defaultHost`
-selects a peer or `null` (Local) at desktop startup; an offline peer falls back to Local.
+The Nix-managed IDs use the `nixfiles:` prefix; personal connections remain untouched.
+`defaultHost` selects a peer or `null` (Local) at desktop startup; an offline peer falls back to
+Local.
 
 The switch removes managed SSH entries, discards their old tunnel tokens once and registers native
 host addresses from the inventory. Native tokens are retained on later switches. Both settings writers
@@ -511,16 +524,17 @@ after migration to release its old SSH sessions.
 
 Go subscriptions are independent of device enrollment. They are listed in
 `inventory/opencode-subscriptions.nix`, shared with OpenClaw; the personal-computer role selects the
-list through `subscriptions`. The `openchamber-accounts` oneshot runs as the primary user after
-Home Manager at boot and when its declaration or SOPS keys change. It reconciles OpenCode's own
-credential store with the supported `auth list`, `import`, `switch` and `logout` commands. Every
-command uses `--standalone`: its private helper ends with the command and does not create a
-background service. Key values reach `auth import` through stdin and never enter the Nix store or
-process arguments. Stable IDs preserve selections; rotated keys are imported before an active
-declared account is switched and retired declared credentials are removed. Manually added accounts
-remain. Restart OpenCode in the app after changing credentials if its running integration still
-shows the previous state. Failover is seeded as a desktop default; existing profile preferences
-remain owned by OpenChamber.
+list through `subscriptions`, and the two headless server hosts select it in their own configuration.
+The `openchamber-accounts` oneshot runs as the primary user at boot and when its declaration or SOPS
+keys change. It reconciles OpenCode's own credential store with the supported `auth list`,
+`import`, `switch` and `logout` commands. Every command uses `--standalone`: its private helper
+ends with the command and does not create a background service. Key values reach `auth import`
+through stdin and never enter the Nix store or process arguments. Stable IDs preserve selections;
+rotated keys are imported before an active declared account is switched and retired declared
+credentials are removed. Manually added accounts remain. Restart OpenCode in the app after changing
+credentials if its running integration still shows the previous state. The feature seeds
+`accountSwitchProviders: ["opencode-go"]` only when the key is absent; an existing preference remains
+owned by OpenChamber.
 
 Account switching defaults to `opencode-go`. OpenChamber rotates stored credentials when quota or
 budget exhaustion, or a rate limit of at least a minute, stops a turn. Reset hints control cooldowns;
@@ -528,19 +542,34 @@ without a hint the default is one hour, and cooldowns are forgotten on restart. 
 belongs to the OpenCode integration, not an individual session. OpenCode Go is its own
 `opencode-go` integration; OpenCode Zen uses `opencode`. Switching changes the account used by that
 integration. A separate fallback model is an interactive preference; the feature does not configure
-one. OpenClaw and the two
-OpenChamber instances consume the same subscription limits and maintain independent cooldowns.
+one. OpenClaw and the OpenChamber runtimes consume the same subscription limits and maintain
+independent cooldowns.
+
+The pinned OpenChamber v2.8.0 does not include OpenCode's `provider.go-limit` in either failover
+boundary by itself. `features/dev/openchamber/patch-limit-failover.py` adds it to the server
+classifier and to the generated OpenCode plugin in one build phase, and fails when either upstream
+block changes shape. `checks/openchamber-failover.nix` exercises both patch boundaries and rejects a
+drifted shape. Without this patch the seeded `opencode-go` switch never fires for an OpenCode Go
+quota exhaustion.
 
 Every immediate directory in `features/dev/openchamber/plugins/` is merged into the app's own
 built-in registry; an ID or directory collision with an upstream built-in fails the build instead of
 replacing it. Its manifest and runtime assets are validated by OpenChamber's own package inspector
 during the build. The manifest requires `openchamber.apiVersion: 1`, a non-empty semver `version`,
-`panel.id`, `panel.name` and `panel.icon`; `panel.entry` must point at a self-contained HTML entry when
-used. App-shipped extensions trust the permissions declared in the repository and can be disabled in
-the UI. Runtime extensions remain supported through Settings → Extensions and `/new-extension`; the
+and `openchamber.id = openchamber-builtin-<directory>`; the older `panel.id` is accepted when
+`openchamber.id` is absent, and both must agree when present. `contributes.panel` is optional:
+service-only, background-only, page-only and `opencodePlugin`-only extensions are valid. Panel
+entries must point at self-contained HTML with built scripts; service entries must be built JS.
+App-shipped extensions trust the permissions declared in the repository and can be disabled in the
+UI. Runtime extensions remain supported through Settings → Extensions and `/new-extension`; the
 feature does not replace the writable extension catalog. See
-[`plugins/README.md`](../features/dev/openchamber/plugins/README.md) for the package contract and how to
-promote a runtime extension into the configuration.
+[`plugins/README.md`](../features/dev/openchamber/plugins/README.md) for the package contract and how
+to promote a runtime extension into the configuration.
+
+`fleet-session-journal` is the panel-less fixture: it ships only a local service and a
+`sessionEvents` subscription with content, appends each event to its private data directory, and is
+disabled without deleting data. Built-in services run as the primary user with normal process access;
+treat their code and data as trusted configuration.
 
 OpenChamber's optional shared `opencode serve --service` mode is not enabled. The pinned Nix CLI
 registers its service under the channel-specific file while the v2.8.0 desktop client looks for the
@@ -548,5 +577,6 @@ generic one; enabling the toggle without aligning that would start a second unre
 
 The upstream Nix build uses import-from-derivation for its Bun dependency catalog. Evaluation can
 therefore build the converter. Keep the upstream nixpkgs/Bun pin with the OpenChamber input: its
-OpenCode build requires the matching Bun runtime. Updates go through the repository gate and a server
-and desktop build before activation.
+OpenCode build requires the matching Bun runtime. The feature's server role is evaluated and built
+with the same pin. Updates go through the repository gate and a server and desktop build before
+activation; the failover patch guard must pass first.
