@@ -489,6 +489,21 @@ wrapper and the pinned OpenCode CLI is also on the session PATH, because the des
 `Exec` to its raw Electron path at startup. A device's desktop must be running to use its
 workspace.
 
+### One server, thin clients
+
+The server role is the session authority. Desktop clients seed one host per server-role host
+(`nixfiles-server:<name>`) and default to `defaultHost` (the home server), so a session starts on the
+server, not locally; `local` remains only as the offline fallback.
+
+Enrollment runs server → desktop, because desktops do not have a primary-user SSH path to the
+servers while servers do. `openchamber-server-enroll` (oneshot at boot, then every ten minutes) mints
+one client token per declared desktop through the server's UI password and delivers it over SSH as
+the primary user; `openchamber-fleet-pair --set-server-token` verifies it against
+`/api/config/settings` and writes the host entry. Tokens travel over stdin, never argv or logs, and a
+removed desktop is revoked through the existing pending-revocation path.
+
+Mobile clients pair with `openchamber-server-pair` on the server instead of the desktop helper.
+
 The headless role runs `openchamber serve --foreground --port 7338 --lan --api-only` as the primary
 user through the `openchamber-server` systemd unit: without `--foreground` the command daemonises
 and exits, so the unit would report a successful stop instead of a running server. It restarts
