@@ -183,7 +183,7 @@ class State(unittest.TestCase):
 
     def test_credential_rotation_preserves_healthy_selection_and_manual_accounts(self):
         stored = {
-            "manual": {"id": "manual", "integrationID": "opencode-go", "label": "mine", "value": {"type": "key", "key": "manual"}, "active": True},
+            "manual": {"id": "manual", "integrationID": "opencode", "label": "mine", "value": {"type": "key", "key": "manual"}, "active": True},
             "cred_nixfiles_go_one": {"id": "cred_nixfiles_go_one", "label": "one", "value": {"type": "key", "key": "old"}, "active": False},
             "cred_nixfiles_go_retired": {"id": "cred_nixfiles_go_retired", "active": False},
         }
@@ -194,7 +194,7 @@ class State(unittest.TestCase):
             calls.append(arguments)
             if arguments[0] == 'list':
                 rows = sorted(stored.values(), key=lambda item: not item['active'])
-                return json.dumps([{'id': 'opencode-go', 'connections': [
+                return json.dumps([{'id': 'opencode', 'connections': [
                     {'id': item['id'], 'label': item.get('label', ''), 'type': 'credential'}
                     for item in rows]}])
             if arguments[0] == 'import':

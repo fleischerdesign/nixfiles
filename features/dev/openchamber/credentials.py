@@ -6,7 +6,10 @@ from pathlib import Path
 import subprocess
 import sys
 
-INTEGRATION_ID = 'opencode-go'
+# OpenCode registers its Console service-account keys under the integration id `opencode`;
+# `opencode-go` only names the provider that carries its models, and appears in `auth list`
+# as an environment-variable connection with no credentials of its own.
+INTEGRATION_ID = 'opencode'
 
 
 def integration_connections(integrations):
