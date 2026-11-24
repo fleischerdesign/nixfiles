@@ -61,12 +61,51 @@ const property = (object, name) => object?.type === "ObjectExpression"
 const context = property(call.arguments[11], "nativeWebSearchPolicyContext");
 const search = property(context, "webSearchEnabled");
 const sessionKey = property(context, "sessionKey");
-const compact = text => text.replace(/\s+/g, "");
-const expectedSearch = '(await getWorkerTurnToolSurface(identity)?.getSurface(identity))?.tools.some(({ definition }) => definition.name === "web_search") === true';
-if (!search || !sessionKey || compact(reader.slice(search.start, search.end)) !== compact(expectedSearch)
-    || compact(reader.slice(sessionKey.start, sessionKey.end)) !== "target.sessionKey") {
+const memberNamed = (node, name) => node?.type === "MemberExpression" && !node.computed
+  && node.property.type === "Identifier" && node.property.name === name;
+const chainValue = node => node?.type === "ChainExpression" ? node.expression : node;
+const identifierName = node => node?.type === "Identifier" ? node.name : undefined;
+const sameIdentifier = (left, right) => identifierName(left) !== undefined
+  && identifierName(left) === identifierName(right);
+// Minified npm builds rename every bound identifier, so verify the call shape
+// upstream's repair depends on, not the source text that 2026.11.4 kept.
+function admitsWorkerWebSearch(node) {
+  if (node?.type !== "BinaryExpression" || node.operator !== "==="
+      || node.right.type !== "Literal" || node.right.value !== true) return false;
+  const someCall = chainValue(node.left);
+  if (someCall?.type !== "CallExpression" || !memberNamed(someCall.callee, "some")
+      || someCall.arguments.length !== 1) return false;
+  const arrow = someCall.arguments[0];
+  if (arrow?.type !== "ArrowFunctionExpression" || arrow.params.length !== 1
+      || arrow.body?.type !== "BinaryExpression" || arrow.body.operator !== "==="
+      || arrow.body.right.type !== "Literal" || arrow.body.right.value !== "web_search") return false;
+  const pattern = arrow.params[0];
+  if (pattern?.type !== "ObjectPattern" || pattern.properties.length !== 1) return false;
+  const prop = pattern.properties[0];
+  if (prop.type !== "Property" || prop.computed || prop.key.type !== "Identifier"
+      || prop.key.name !== "definition" || prop.value.type !== "Identifier") return false;
+  if (!memberNamed(arrow.body.left, "name") || !sameIdentifier(arrow.body.left.object, prop.value)) return false;
+  const tools = someCall.callee.object;
+  if (!memberNamed(tools, "tools") || tools.object?.type !== "AwaitExpression") return false;
+  const surfaceCall = chainValue(tools.object.argument);
+  if (surfaceCall?.type !== "CallExpression" || !memberNamed(surfaceCall.callee, "getSurface")
+      || surfaceCall.arguments.length !== 1) return false;
+  const lookup = surfaceCall.callee.object;
+  if (lookup?.type !== "CallExpression" || identifierName(lookup.callee) !== "getWorkerTurnToolSurface"
+      || lookup.arguments.length !== 1) return false;
+  return sameIdentifier(lookup.arguments[0], surfaceCall.arguments[0]);
+}
+// The admitted session key stays the worker target's: the same object supplies
+// the agent id on this call.
+function readsTargetSessionKey(node) {
+  if (!memberNamed(node, "sessionKey") || node.object.type !== "Identifier") return false;
+  return call.arguments.some(argument => memberNamed(argument, "agentId")
+    && identifierName(argument.object) === node.object.name);
+}
+if (!search || !sessionKey || !admitsWorkerWebSearch(search) || !readsTargetSessionKey(sessionKey)) {
   fail("Admitted web-search policy input changed; inspect upstream rather than guessing.");
 }
+
 // Keep the asynchronous tool-surface lookup OUTSIDE the synchronous preparation
 // callback. Wrapping an async callback does not catch the capability-read retry.
 const admitted = reader.slice(search.start, search.end);
