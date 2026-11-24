@@ -239,7 +239,7 @@ in
     backgroundModel = lib.mkOption {
       type = lib.types.str;
       default = cfg.subagentModel;
-      description = "Model for heartbeats, memory maintenance and the background automation alias.";
+      description = "Model for memory maintenance and the background automation alias.";
     };
     utilityModel = lib.mkOption {
       type = lib.types.str;
@@ -509,14 +509,7 @@ in
           # An explicit empty policy disables legacy restrictions inferred from
           # model settings and keeps the provider's discovered catalog selectable.
           modelPolicy = { };
-          heartbeat = {
-            model = cfg.backgroundModel;
-            every = "1h";
-            lightContext = true;
-            isolatedSession = true;
-            # Browser/app users have no external channel delivery route.
-            target = "none";
-          };
+          # OpenClaw 2026.11.6 removed agents.defaults.heartbeat; cron remains enabled below.
         };
         cron.enabled = true;
         hooks.internal = {
