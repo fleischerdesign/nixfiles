@@ -13,6 +13,11 @@ let
   hasServer = cfg.role != "desktop";
   primary = config.my.user.primary;
   primaryHome = config.users.users.${primary}.home;
+  serverPasswordFile =
+    if cfg.server.uiPasswordSecret != null then
+      config.sops.secrets.${cfg.server.uiPasswordSecret}.path
+    else
+      "${primaryHome}/.local/state/openchamber/server-ui-password";
   address = config.my.topology.hosts.${config.networking.hostName}.wireguardIpv4 or null;
   clientHosts = lib.filter (
     name:
@@ -32,18 +37,16 @@ let
   accountUnit = "openchamber-accounts";
   fleetController = inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.controller;
   fleetAgent = inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.fleet-agent;
-  fleetExtension = import ./fleet-extension.nix { inherit pkgs inputs; };
-  packages = import ./package.nix {
-    inherit lib pkgs;
-    upstream = inputs.openchamber.packages.${pkgs.stdenv.hostPlatform.system};
-    extraPlugins = [
-      {
-        name = "fleet";
-        id = "openchamber-builtin-fleet";
-        source = fleetExtension;
-      }
-    ];
-  };
+  fleetExtension = inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.extension;
+  fleetInstaller = import ./fleet-installer.nix { inherit pkgs; };
+  packages =
+    import ./package.nix {
+      inherit lib pkgs;
+      upstream = inputs.openchamber.packages.${pkgs.stdenv.hostPlatform.system};
+    }
+    // {
+      inherit fleetExtension fleetInstaller;
+    };
   serverCommand = pkgs.writeShellScript "openchamber-server" ''
     set -eu
     ${lib.optionalString (cfg.server.uiPasswordSecret != null) ''
@@ -328,18 +331,32 @@ in
         UMask = "0077";
       };
       script = ''
-        exec ${pkgs.python3}/bin/python ${serverPush}/server_push.py ${toString cfg.server.port} ${
-          if cfg.server.uiPasswordSecret != null then
-            config.sops.secrets.${cfg.server.uiPasswordSecret}.path
-          else
-            "${primaryHome}/.local/state/openchamber/server-ui-password"
-        } ${serverPushPlan}
+        exec ${pkgs.python3}/bin/python ${serverPush}/server_push.py ${toString cfg.server.port} ${serverPasswordFile} ${serverPushPlan}
       '';
     };
     systemd.timers.openchamber-server-enroll = lib.mkIf hasServer {
       wantedBy = [ "timers.target" ];
       timerConfig = {
         OnBootSec = "2m";
+        OnUnitInactiveSec = "10m";
+      };
+    };
+    systemd.services.openchamber-fleet-extension = lib.mkIf hasServer {
+      description = "Install the Fleet OpenChamber runtime extension";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "openchamber-server.service" ];
+      wants = [ "openchamber-server.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        TimeoutStartSec = 300;
+        ExecStart = "${fleetInstaller}/bin/openchamber-fleet-extension-install --mode server --port ${toString cfg.server.port} --password-file ${lib.escapeShellArg serverPasswordFile} --extension ${lib.escapeShellArg "${fleetExtension}"} --timeout 240";
+      };
+    };
+    systemd.timers.openchamber-fleet-extension = lib.mkIf hasServer {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "3m";
         OnUnitInactiveSec = "10m";
       };
     };

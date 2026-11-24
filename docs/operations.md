@@ -595,12 +595,16 @@ treat their code and data as trusted configuration. `fleet-opencode-tools` is th
 `contributes.opencodePlugin` fixture: it adds the `fleet_runtime` tool through the managed OpenCode
 config while the extension is enabled, and removes it when the extension is disabled.
 
-The real `openchamber-builtin-fleet` package is built by the `openchamber-fleet` input from its
-portable `extensions/openchamber` artifact. Nix copies that artifact and reserves only the built-in
-ID; it does not assemble a second plugin. The package contributes the Fleet panel, local status
-service, Work Status section, native tool cards and the OpenCode plugin. Every OpenChamber host also
-installs the `fleet` CLI and `fleet-agent`; `FLEET_AGENT_PATH` names the stable system profile binary
-and `FLEET_SSH_PATH` names the packaged OpenSSH client.
+Fleet is a normal OpenChamber runtime extension, not a built-in. The `openchamber-fleet` input
+provides its portable `extensions/openchamber` package unchanged (ID `openchamber-fleet`); the
+OpenChamber core is built without it. After the runtime is up, a server system service installs and
+approves it through OpenChamber's official `/api/guests` install and capabilities routes; a desktop
+user service does the same with the local app's client token. The installer approves exactly the
+capabilities the package requests, so a version that widens its scope shows as needs-approval until
+the system deploys the new package. Because the extension is not part of the app build, a Fleet
+version bump changes only the small extension path and does not rebuild the OpenChamber core.
+Every OpenChamber host also installs the `fleet` CLI and `fleet-agent`; `FLEET_AGENT_PATH` names the
+stable system profile binary and `FLEET_SSH_PATH` names the packaged OpenSSH client.
 Hosts are machine-level in `$XDG_CONFIG_HOME/openchamber-fleet/hosts.json`; a project selects
 aliases in `workspaces/<project-id>.json`, so the extension works without Nix or a Nix host list.
 The panel edits both local documents; nothing is written into the repository. A legacy `fleet.json`

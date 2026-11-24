@@ -142,6 +142,28 @@ in
       };
       Install.WantedBy = [ "timers.target" ];
     };
+
+    systemd.user.services.openchamber-fleet-extension = lib.mkIf (cfg.role != "server") {
+      Unit = {
+        Description = "Install the Fleet OpenChamber runtime extension";
+        After = [ "graphical-session.target" ];
+      };
+      Service = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        TimeoutStartSec = 300;
+        ExecStart = "${cfg.packages.fleetInstaller}/bin/openchamber-fleet-extension-install --mode desktop --settings-file ${lib.escapeShellArg "${config.xdg.configHome}/openchamber/settings.json"} --extension ${lib.escapeShellArg "${cfg.packages.fleetExtension}"} --timeout 240";
+      };
+      Install.WantedBy = [ "graphical-session.target" ];
+    };
+    systemd.user.timers.openchamber-fleet-extension = lib.mkIf (cfg.role != "server") {
+      Unit.Description = "Retry the Fleet runtime extension install when OpenChamber starts";
+      Timer = {
+        OnStartupSec = "2m";
+        OnUnitInactiveSec = "10m";
+      };
+      Install.WantedBy = [ "timers.target" ];
+    };
     home.activation.openchamberPort = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       run ${portCheck}
     '';

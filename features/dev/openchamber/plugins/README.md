@@ -70,3 +70,7 @@ These are OpenChamber extensions, which may themselves contribute an OpenCode pl
 plugins belong in OpenChamber's Plugins settings or in an extension's `opencodePlugin` contribution.
 The `fleet-session-journal` package is the panel-less fixture: it ships only a local service and a
 `sessionEvents` subscription.
+
+Fleet is deliberately not in this directory. It is a runtime extension installed and approved by
+the `openchamber-fleet-extension` services; keeping it out of the app build is what lets a Fleet
+bump update only the extension instead of rebuilding and re-copying the OpenChamber core.

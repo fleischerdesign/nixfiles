@@ -3,7 +3,6 @@
   lib,
   pkgs,
   upstream,
-  extraPlugins ? [ ],
 }:
 let
   entries = builtins.readDir ./plugins;
@@ -34,7 +33,7 @@ let
     else
       { inherit name source id; }
   ) names;
-  plugins = staticPlugins ++ extraPlugins;
+  plugins = staticPlugins;
   registry = pkgs.writeText "openchamber-builtins.json" (
     builtins.toJSON {
       version = 1;
