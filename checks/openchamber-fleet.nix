@@ -81,9 +81,12 @@ pkgs.runCommand "openchamber-fleet-check"
     const expected = [
       'fleet_exec',
       'fleet_fetch',
+      'fleet_hosts',
       'fleet_job_cancel',
       'fleet_job_status',
+      'fleet_jobs',
       'fleet_recover',
+      'fleet_run',
       'fleet_status',
       'fleet_sync',
     ];

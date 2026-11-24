@@ -612,12 +612,18 @@ aliases in `workspaces/<project-id>.json`, so the extension works without Nix or
 The panel edits both local documents; nothing is written into the repository. A legacy `fleet.json`
 is still read until the split project configuration exists.
 
-The agent tools are `fleet_status`, `fleet_sync`, `fleet_exec`, `fleet_fetch`, `fleet_job_status`,
-`fleet_job_cancel` and `fleet_recover`. Exec evaluates a host/cwd/env-key descriptor under `fleet.exec`
-and OpenCode's `shell` permissions for the exact remote argv, fetch evaluates `edit` and
-`external_directory`, and sync apply/recovery use dedicated Fleet actions. `fleet_exec` with `background: true` returns a job id and resumes the same session via
-OpenCode's official synthetic-message API when the job finishes. Background jobs belong to the
-running OpenCode runtime; restart, plugin unload and location eviction are reported as interruptions.
+The agent tools are `fleet_run`, `fleet_status`, `fleet_sync`, `fleet_exec`, `fleet_fetch`,
+`fleet_hosts`, `fleet_jobs`, `fleet_job_status`, `fleet_job_cancel` and `fleet_recover`. `fleet_run`
+is the normal path: it synchronizes when the local tree changed, then executes, with `sync: auto`
+as the default and `sync: never|plan|apply` available to the agent per call. There is no user-facing
+sync switch. Hosts can carry tags, and `fleet_run` accepts `host: auto` with requirements; the agent
+chooses the machine. `fleet_run`/`fleet_exec` with `background: true` return a job id and resume the
+same session via OpenCode's official synthetic-message API when the job finishes; `fleet_jobs` lists
+the session's jobs and `fleet_job_status` returns their tails. `fleet_run` evaluates the combined
+sync-and-run descriptor under `fleet.run` and the exact command under OpenCode's `shell` permission;
+raw `fleet_exec` uses `fleet.exec` and `shell`. Fetch evaluates `edit` and `external_directory`, and
+sync apply/recovery use dedicated Fleet actions. Background jobs belong to the running OpenCode
+runtime; restart, plugin unload and location eviction are reported as interruptions.
 
 OpenChamber's optional shared `opencode serve --service` mode is not enabled. The pinned Nix CLI
 registers its service under the channel-specific file while the v2.8.0 desktop client looks for the
