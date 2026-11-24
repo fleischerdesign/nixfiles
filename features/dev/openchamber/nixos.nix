@@ -160,6 +160,14 @@ in
         '';
       };
     };
+    serverOnlyClients = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        When true a desktop exposes only the declared server hosts in its host list: no desktop
+        peers are seeded or enrolled. Local remains the client's offline fallback.
+      '';
+    };
     autostart = lib.mkOption {
       type = lib.types.bool;
       default = true;

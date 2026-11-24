@@ -20,6 +20,7 @@
   my.features.dev.openchamber = {
     enable = true;
     defaultHost = "hom-srv-01";
+    serverOnlyClients = true;
   };
   my.features.dev.containers.enable = true;
   my.features.dev.android.enable = true;

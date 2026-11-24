@@ -15,10 +15,16 @@ let
       inherit path;
       name = baseNameOf path;
     };
+  serverHosts =
+    if cfg.serverOnlyClients && cfg.defaultHost != null && builtins.hasAttr cfg.defaultHost cfg.serverPeers then
+      { ${cfg.defaultHost} = cfg.serverPeers.${cfg.defaultHost}; }
+    else
+      cfg.serverPeers;
   plan = pkgs.writeText "openchamber-fleet.json" (
     builtins.toJSON {
       host = osConfig.networking.hostName;
-      inherit (cfg) peers serverPeers;
+      peers = if cfg.serverOnlyClients then { } else cfg.peers;
+      serverPeers = serverHosts;
     }
   );
   pair = pkgs.writeShellApplication {
@@ -41,18 +47,18 @@ let
     builtins.toJSON {
       desktopSshInstances = [ ];
       desktopHosts =
-        lib.mapAttrsToList (name: peer: {
+        lib.optionals (!cfg.serverOnlyClients) (lib.mapAttrsToList (name: peer: {
           id = "nixfiles:${name}";
           label = name;
           url = "http://${peer.address}:${toString peer.port}";
           apiUrl = "http://${peer.address}:${toString peer.port}";
-        }) cfg.peers
+        }) cfg.peers)
         ++ lib.mapAttrsToList (name: peer: {
           id = "nixfiles-server:${name}";
           label = name;
           url = "http://${peer.address}:${toString peer.port}";
           apiUrl = "http://${peer.address}:${toString peer.port}";
-        }) cfg.serverPeers;
+        }) serverHosts;
       desktopLocalPort = cfg.port;
       desktopLanAccessEnabled = true;
       desktopDefaultHostId =
