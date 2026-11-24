@@ -18,7 +18,6 @@
     nerd-fonts.jetbrains-mono
     gimp
     orca-slicer
-    lycheeslicer
     resources
     moonlight-qt
     packet
