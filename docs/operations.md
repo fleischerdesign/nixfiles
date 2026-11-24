@@ -601,7 +601,10 @@ ID; it does not assemble a second plugin. The package contributes the Fleet pane
 service, Work Status section, native tool cards and the OpenCode plugin. Every OpenChamber host also
 installs the `fleet` CLI and `fleet-agent`; `FLEET_AGENT_PATH` names the stable system profile binary
 and `FLEET_SSH_PATH` names the packaged OpenSSH client.
-Hosts remain workspace-local in `fleet.json`, so the extension works without Nix or a Nix host list.
+Hosts are machine-level in `$XDG_CONFIG_HOME/openchamber-fleet/hosts.json`; a project selects
+aliases in `workspaces/<project-id>.json`, so the extension works without Nix or a Nix host list.
+The panel edits both local documents; nothing is written into the repository. A legacy `fleet.json`
+is still read until the split project configuration exists.
 
 The agent tools are `fleet_status`, `fleet_sync`, `fleet_exec`, `fleet_fetch`, `fleet_job_status`,
 `fleet_job_cancel` and `fleet_recover`. Exec evaluates a host/cwd/env-key descriptor under `fleet.exec`
