@@ -90,7 +90,7 @@ let
   serverPushPlan = pkgs.writeText "openchamber-server-push.json" (
     builtins.toJSON {
       host = config.networking.hostName;
-      desktops = lib.mapAttrs (name: peer: {
+      desktops = lib.mapAttrs (_: peer: {
         inherit (peer) user address sshPort;
       }) cfg.peers;
     }
