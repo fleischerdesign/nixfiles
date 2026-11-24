@@ -32,7 +32,9 @@ let
   accountUnit = "openchamber-accounts";
   fleetExtension = pkgs.runCommand "openchamber-builtin-fleet" { } ''
     mkdir -p $out/plugin
-    cp -r ${inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.controller}/lib/node_modules/openchamber-fleet/dist $out/plugin/dist
+    cp -r ${
+      inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.controller
+    }/lib/node_modules/openchamber-fleet/dist $out/plugin/dist
     cat > $out/plugin/package.json <<'JSON'
     {
       "name": "openchamber-fleet-plugin",
@@ -60,7 +62,13 @@ let
   packages = import ./package.nix {
     inherit lib pkgs;
     upstream = inputs.openchamber.packages.${pkgs.stdenv.hostPlatform.system};
-    extraPlugins = [ { name = "fleet"; id = "openchamber-builtin-fleet"; source = fleetExtension; } ];
+    extraPlugins = [
+      {
+        name = "fleet";
+        id = "openchamber-builtin-fleet";
+        source = fleetExtension;
+      }
+    ];
   };
   serverCommand = pkgs.writeShellScript "openchamber-server" ''
     set -eu
@@ -249,8 +257,7 @@ in
           (
             lib.filterAttrs (
               name: system:
-              name != config.networking.hostName
-              && system.config.my.features.dev.openchamber.role == "server"
+              name != config.networking.hostName && system.config.my.features.dev.openchamber.role == "server"
             ) peers
           );
     };
@@ -334,7 +341,10 @@ in
     systemd.services.openchamber-server-enroll = lib.mkIf hasServer {
       description = "Deliver OpenChamber server tokens to declared desktops";
       wantedBy = [ "multi-user.target" ];
-      after = [ "${accountUnit}.service" "openchamber-server.service" ];
+      after = [
+        "${accountUnit}.service"
+        "openchamber-server.service"
+      ];
       wants = [ "openchamber-server.service" ];
       path = [ pkgs.openssh ];
       serviceConfig = {
@@ -388,7 +398,10 @@ in
             "ui-password:${config.sops.secrets.${cfg.server.uiPasswordSecret}.path}";
       };
     };
-    environment.systemPackages = [ inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.fleet-agent ] ++ lib.optionals hasServer [
+    environment.systemPackages = [
+      inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.fleet-agent
+    ]
+    ++ lib.optionals hasServer [
       packages.server
       packages.opencode
       serverPair

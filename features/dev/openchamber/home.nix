@@ -16,7 +16,9 @@ let
       name = baseNameOf path;
     };
   serverHosts =
-    if cfg.serverOnlyClients && cfg.defaultHost != null && builtins.hasAttr cfg.defaultHost cfg.serverPeers then
+    if
+      cfg.serverOnlyClients && cfg.defaultHost != null && builtins.hasAttr cfg.defaultHost cfg.serverPeers
+    then
       { ${cfg.defaultHost} = cfg.serverPeers.${cfg.defaultHost}; }
     else
       cfg.serverPeers;
@@ -47,12 +49,14 @@ let
     builtins.toJSON {
       desktopSshInstances = [ ];
       desktopHosts =
-        lib.optionals (!cfg.serverOnlyClients) (lib.mapAttrsToList (name: peer: {
-          id = "nixfiles:${name}";
-          label = name;
-          url = "http://${peer.address}:${toString peer.port}";
-          apiUrl = "http://${peer.address}:${toString peer.port}";
-        }) cfg.peers)
+        lib.optionals (!cfg.serverOnlyClients) (
+          lib.mapAttrsToList (name: peer: {
+            id = "nixfiles:${name}";
+            label = name;
+            url = "http://${peer.address}:${toString peer.port}";
+            apiUrl = "http://${peer.address}:${toString peer.port}";
+          }) cfg.peers
+        )
         ++ lib.mapAttrsToList (name: peer: {
           id = "nixfiles-server:${name}";
           label = name;
