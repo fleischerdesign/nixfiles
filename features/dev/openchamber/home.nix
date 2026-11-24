@@ -150,17 +150,16 @@ in
       };
       Service = {
         Type = "oneshot";
-        RemainAfterExit = true;
-        TimeoutStartSec = 300;
-        ExecStart = "${cfg.packages.fleetInstaller}/bin/openchamber-fleet-extension-install --mode desktop --settings-file ${lib.escapeShellArg "${config.xdg.configHome}/openchamber/settings.json"} --extension ${lib.escapeShellArg "${cfg.packages.fleetExtension}"} --timeout 240";
+        TimeoutStartSec = 60;
+        ExecStart = "${cfg.packages.fleetInstaller}/bin/openchamber-fleet-extension-install --mode desktop --settings-file ${lib.escapeShellArg "${config.xdg.configHome}/openchamber/settings.json"} --extension ${lib.escapeShellArg "${cfg.packages.fleetExtension}"} --timeout 30";
       };
       Install.WantedBy = [ "graphical-session.target" ];
     };
     systemd.user.timers.openchamber-fleet-extension = lib.mkIf (cfg.role != "server") {
       Unit.Description = "Retry the Fleet runtime extension install when OpenChamber starts";
       Timer = {
-        OnStartupSec = "2m";
-        OnUnitInactiveSec = "10m";
+        OnStartupSec = "1m";
+        OnUnitInactiveSec = "5m";
       };
       Install.WantedBy = [ "timers.target" ];
     };

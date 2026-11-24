@@ -209,12 +209,18 @@ def main():
             last = error
             time.sleep(2)
         except ApiFailure as error:
-            if error.status >= 500 or error.status == 429:
+            if error.status >= 500 or error.status == 429 or (args.mode == 'desktop' and error.status in (401, 404)):
                 last = error
                 time.sleep(2)
                 continue
             print(f'{EXTENSION_ID}: {error.status} {error.code}: {error}', file=sys.stderr)
             return 1
+    if args.mode == 'desktop':
+        print(
+            f'{EXTENSION_ID}: OpenChamber desktop is not ready after {args.timeout:g}s; the timer will retry',
+            file=sys.stderr,
+        )
+        return 0
     print(f'{EXTENSION_ID}: OpenChamber is not available after {args.timeout:g}s: {last}', file=sys.stderr)
     return 1
 

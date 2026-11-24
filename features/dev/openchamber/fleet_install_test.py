@@ -208,6 +208,25 @@ def main():
             raise AssertionError(f'desktop install did not approve: {state.installed["granted"]}')
         if TOKEN in desktop.stdout + desktop.stderr:
             raise AssertionError('desktop installer printed the client token')
+
+        # A desktop that is not up yet is a deferred retry, not a failed Home Manager unit.
+        deferred = subprocess.run(
+            [
+                sys.executable,
+                installer,
+                '--mode', 'desktop',
+                '--settings-file', str(root / 'not-running.json'),
+                '--extension', str(extension),
+                '--timeout', '1',
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        if deferred.returncode != 0:
+            raise AssertionError(f'deferred desktop install failed: {deferred.stderr}')
+        if 'not ready' not in deferred.stderr:
+            raise AssertionError(f'deferred desktop install gave no reason: {deferred.stderr}')
     finally:
         server.shutdown()
         server.server_close()
