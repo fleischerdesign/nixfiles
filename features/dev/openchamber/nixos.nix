@@ -30,35 +30,9 @@ let
     )
   );
   accountUnit = "openchamber-accounts";
-  fleetExtension = pkgs.runCommand "openchamber-builtin-fleet" { } ''
-    mkdir -p $out/plugin
-    cp -r ${
-      inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.controller
-    }/lib/node_modules/openchamber-fleet/dist $out/plugin/dist
-    cat > $out/plugin/package.json <<'JSON'
-    {
-      "name": "openchamber-fleet-plugin",
-      "version": "0.1.0",
-      "type": "module",
-      "exports": { ".": "./dist/plugin/index.js" }
-    }
-    JSON
-    cat > $out/package.json <<'JSON'
-    {
-      "name": "openchamber-builtin-fleet",
-      "version": "0.1.0",
-      "type": "module",
-      "openchamber": {
-        "apiVersion": 1,
-        "engines": { "openchamber": ">=2.8.0" },
-        "id": "openchamber-builtin-fleet",
-        "name": "Fleet",
-        "icon": "cpu",
-        "contributes": { "opencodePlugin": "plugin" }
-      }
-    }
-    JSON
-  '';
+  fleetController = inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.controller;
+  fleetAgent = inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.fleet-agent;
+  fleetExtension = import ./fleet-extension.nix { inherit pkgs inputs; };
   packages = import ./package.nix {
     inherit lib pkgs;
     upstream = inputs.openchamber.packages.${pkgs.stdenv.hostPlatform.system};
@@ -383,6 +357,8 @@ in
       environment = {
         HOME = primaryHome;
         XDG_CONFIG_HOME = "${primaryHome}/.config";
+        FLEET_AGENT_PATH = "/run/current-system/sw/bin/fleet-agent";
+        FLEET_SSH_PATH = "${pkgs.openssh}/bin/ssh";
       };
       serviceConfig = {
         Type = "simple";
@@ -399,7 +375,8 @@ in
       };
     };
     environment.systemPackages = [
-      inputs.openchamber-fleet.packages.${pkgs.stdenv.hostPlatform.system}.fleet-agent
+      fleetAgent
+      fleetController
     ]
     ++ lib.optionals hasServer [
       packages.server

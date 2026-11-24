@@ -595,6 +595,21 @@ treat their code and data as trusted configuration. `fleet-opencode-tools` is th
 `contributes.opencodePlugin` fixture: it adds the `fleet_runtime` tool through the managed OpenCode
 config while the extension is enabled, and removes it when the extension is disabled.
 
+The real `openchamber-builtin-fleet` package is built by the `openchamber-fleet` input from its
+portable `extensions/openchamber` artifact. Nix copies that artifact and reserves only the built-in
+ID; it does not assemble a second plugin. The package contributes the Fleet panel, local status
+service, Work Status section, native tool cards and the OpenCode plugin. Every OpenChamber host also
+installs the `fleet` CLI and `fleet-agent`; `FLEET_AGENT_PATH` names the stable system profile binary
+and `FLEET_SSH_PATH` names the packaged OpenSSH client.
+Hosts remain workspace-local in `fleet.json`, so the extension works without Nix or a Nix host list.
+
+The agent tools are `fleet_status`, `fleet_sync`, `fleet_exec`, `fleet_fetch`, `fleet_job_status`,
+`fleet_job_cancel` and `fleet_recover`. Exec evaluates a host/cwd/env-key descriptor under `fleet.exec`
+and OpenCode's `shell` permissions for the exact remote argv, fetch evaluates `edit` and
+`external_directory`, and sync apply/recovery use dedicated Fleet actions. `fleet_exec` with `background: true` returns a job id and resumes the same session via
+OpenCode's official synthetic-message API when the job finishes. Background jobs belong to the
+running OpenCode runtime; restart, plugin unload and location eviction are reported as interruptions.
+
 OpenChamber's optional shared `opencode serve --service` mode is not enabled. The pinned Nix CLI
 registers its service under the channel-specific file while the v2.8.0 desktop client looks for the
 generic one; enabling the toggle without aligning that would start a second unreachable daemon.
