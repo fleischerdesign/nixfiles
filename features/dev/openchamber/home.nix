@@ -120,6 +120,8 @@ in
     home.sessionVariables = {
       ELECTRON_OZONE_PLATFORM_HINT = "auto";
       CHROME_DEVEL_SANDBOX = "${cfg.packages.desktop}/share/openchamber/chrome-sandbox";
+      FLEET_AGENT_PATH = "/run/current-system/sw/bin/fleet-agent";
+      FLEET_SSH_PATH = "${pkgs.openssh}/bin/ssh";
     };
 
     systemd.user.services.openchamber-enrollment = {
