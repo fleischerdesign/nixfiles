@@ -1,7 +1,7 @@
 {
   "name": "composio",
-  "version": "0.6.2",
-  "hash": "sha256-erp8/d4wEgrjIN+j4DyMmKPJW3KjuX1SGptqqJQWbt4=",
+  "version": "0.6.3",
+  "hash": "sha256-mXXYyiHo3IBaLfJ8luMvCRGVkTl4xA9TwnLdHizwVQU=",
   "upstream": {
     "type": "github-release",
     "owner": "ComposioHQ",
