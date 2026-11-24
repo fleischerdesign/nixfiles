@@ -19,6 +19,21 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 http = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
 
+CACHE_PATH = Path(os.environ.get('HOME', '')) / '.local/state/openchamber/server-client-tokens.json'
+
+
+def load_cache():
+    try:
+        return json.loads(CACHE_PATH.read_text())
+    except Exception:
+        return {}
+
+
+def save_cache(value):
+    CACHE_PATH.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    CACHE_PATH.write_text(json.dumps(value, indent=2, sort_keys=True) + '\n')
+    CACHE_PATH.chmod(0o600)
+
 
 def request(base, route, token=None, payload=None):
     headers = {'Content-Type': 'application/json'}
@@ -45,6 +60,14 @@ def issue(port, password_path, source):
     base = 'http://127.0.0.1:' + str(port)
     if request(base, '/health').get('runtime') not in ('web', 'desktop'):
         raise ValueError('Server is not running')
+    cache = load_cache()
+    stored = cache.get(source)
+    if stored:
+        try:
+            request(base, '/api/config/settings', stored)
+            return {'clientToken': stored}
+        except Exception:
+            cache.pop(source, None)
     password = password_from(password_path)
     short = request(base, '/auth/session', payload={
         'password': password,
@@ -64,6 +87,8 @@ def issue(port, password_path, source):
     token = result.get('token')
     if not token:
         raise ValueError('Server did not create a client token')
+    cache[source] = token
+    save_cache(cache)
     return {'clientToken': token}
 
 
