@@ -599,9 +599,11 @@ Fleet is a normal OpenChamber runtime extension, not a built-in. The `openchambe
 provides its portable `extensions/openchamber` package unchanged (ID `openchamber-fleet`); the
 OpenChamber core is built without it. After the runtime is up, a server system service installs and
 approves it through OpenChamber's official `/api/guests` install and capabilities routes; a desktop
-user service does the same with the local app's client token. The installer approves exactly the
-capabilities the package requests, so a version that widens its scope shows as needs-approval until
-the system deploys the new package. Because the extension is not part of the app build, a Fleet
+user service does the same with the local app's client token. That desktop unit treats an app that is
+not running yet as a deferred retry, so a headless switch does not fail Home Manager activation; its
+timer installs the extension when the app starts. The installer approves exactly the capabilities the
+package requests, so a version that widens its scope shows as needs-approval until the system
+deploys the new package. Because the extension is not part of the app build, a Fleet
 version bump changes only the small extension path and does not rebuild the OpenChamber core.
 Every OpenChamber host also installs the `fleet` CLI and `fleet-agent`; `FLEET_AGENT_PATH` names the
 stable system profile binary and `FLEET_SSH_PATH` names the packaged OpenSSH client.
