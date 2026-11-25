@@ -610,8 +610,12 @@ stable system profile binary and `FLEET_SSH_PATH` names the packaged OpenSSH cli
 Hosts are machine-level in `$XDG_CONFIG_HOME/openchamber-fleet/hosts.json`; a project selects
 aliases in `workspaces/<project-id>.json`, so the extension works without Nix or a Nix host list.
 The panel edits both local documents; nothing is written into the repository. A legacy `fleet.json`
-is still read until the split project configuration exists. A chat without a project is shown as
-“No project selected”; OpenChamber's internal chat-data directory is not a Fleet workspace.
+is still read until the split project configuration exists; it is not required and `fleet init` no
+longer writes it. A chat without a project uses OpenChamber's internal chat-data directory: Fleet
+loads the project from `defaults.json` (`fleet default /home/philipp/dev/nixfiles`), so the tools work
+there too. Without a default it shows “No project selected”; a real unconfigured project still
+reports `config-missing` rather than borrowing the default. `fleet_hosts` lists the global host
+registry even without a project.
 
 Personal OpenCode directives live in `user/philipp/opencode/directives/*.md`. Home Manager combines
 them in lexical order into one generated Markdown bundle and registers that bundle through
