@@ -55,7 +55,7 @@
     };
 
     openchamber-fleet = {
-      url = "github:fleischerdesign/openchamber-fleet/5cabf98";
+      url = "github:fleischerdesign/openchamber-fleet/1ed3d9c";
     };
 
     nod = {
