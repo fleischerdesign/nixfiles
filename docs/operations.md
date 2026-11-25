@@ -607,9 +607,11 @@ deploys the new package. Because the extension is not part of the app build, a F
 version bump changes only the small extension path and does not rebuild the OpenChamber core.
 Every OpenChamber host also installs the `fleet` CLI and `fleet-agent`; `FLEET_AGENT_PATH` names the
 stable system profile binary and `FLEET_SSH_PATH` names the packaged OpenSSH client.
-Hosts are machine-level in `$XDG_CONFIG_HOME/openchamber-fleet/hosts.json`; a project selects
-aliases in `workspaces/<project-id>.json`, so the extension works without Nix or a Nix host list.
-The panel edits both local documents; nothing is written into the repository. A legacy `fleet.json`
+Hosts are machine-level in `$XDG_CONFIG_HOME/openchamber-fleet/hosts.json`; a project states what it
+needs in `workspaces/<project-id>.json`. `requires` names tags every host must carry, and the
+optional `hosts` array is an allowlist for exceptions; without it the project uses every host in the
+registry, so it never duplicates the machine list. The panel edits both local documents and shows
+which hosts are eligible; nothing is written into the repository. A legacy `fleet.json`
 is still read until the split project configuration exists; it is not required and `fleet init` no
 longer writes it. A chat without a project uses OpenChamber's internal chat-data directory: Fleet
 loads the project from `defaults.json` (`fleet default /home/philipp/dev/nixfiles`), so the tools work
