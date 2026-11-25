@@ -610,7 +610,15 @@ stable system profile binary and `FLEET_SSH_PATH` names the packaged OpenSSH cli
 Hosts are machine-level in `$XDG_CONFIG_HOME/openchamber-fleet/hosts.json`; a project selects
 aliases in `workspaces/<project-id>.json`, so the extension works without Nix or a Nix host list.
 The panel edits both local documents; nothing is written into the repository. A legacy `fleet.json`
-is still read until the split project configuration exists.
+is still read until the split project configuration exists. A chat without a project is shown as
+“No project selected”; OpenChamber's internal chat-data directory is not a Fleet workspace.
+
+Personal OpenCode directives live in `user/philipp/opencode/directives/*.md`. Home Manager combines
+them in lexical order into one generated Markdown bundle and registers that bundle through
+`opencode.json`'s `instructions` array. OpenCode loads these instructions after the agent/provider
+system prompt and the discovered `AGENTS.md` files; they do not replace either. The global
+`~/.config/opencode/AGENTS.md` remains the user-owned file edited by OpenChamber's Settings →
+Behavior page, while the repository `AGENTS.md` stays project-owned.
 
 The agent tools are `fleet_run`, `fleet_status`, `fleet_sync`, `fleet_exec`, `fleet_fetch`,
 `fleet_hosts`, `fleet_jobs`, `fleet_job_status`, `fleet_job_cancel` and `fleet_recover`. `fleet_run`
