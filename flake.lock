@@ -570,16 +570,16 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1795636949,
-        "narHash": "sha256-6QOc7flW+NxT3mqbK58H1IPRIbGMkEkAbakjDG93KUU=",
+        "lastModified": 1795637748,
+        "narHash": "sha256-tojlkR/gl13c4wbuix0mzNN3IqZqJvq9DtwYWaNV02E=",
         "owner": "fleischerdesign",
         "repo": "openchamber-fleet",
-        "rev": "4b661fc5dddbcbaa228340c03368b6363606d4e1",
+        "rev": "1a55867a29b2dbe841db4376b08e158039c54665",
         "type": "github"
       },
       "original": {
         "owner": "fleischerdesign",
-        "ref": "4b661fc",
+        "ref": "1a55867",
         "repo": "openchamber-fleet",
         "type": "github"
       }
