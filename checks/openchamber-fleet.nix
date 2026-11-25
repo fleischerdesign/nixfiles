@@ -79,6 +79,7 @@ pkgs.runCommand "openchamber-fleet-check"
     });
     const names = tools.map((tool) => tool.name).sort();
     const expected = [
+      'fleet_download',
       'fleet_exec',
       'fleet_fetch',
       'fleet_hosts',
@@ -89,6 +90,7 @@ pkgs.runCommand "openchamber-fleet-check"
       'fleet_run',
       'fleet_status',
       'fleet_sync',
+      'fleet_upload',
     ];
     if (JSON.stringify(names) !== JSON.stringify(expected)) {
       throw new Error('Fleet plugin tools mismatch: ' + names.join(', '));
