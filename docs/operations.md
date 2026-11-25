@@ -622,8 +622,14 @@ same session via OpenCode's official synthetic-message API when the job finishes
 the session's jobs and `fleet_job_status` returns their tails. `fleet_run` evaluates the combined
 sync-and-run descriptor under `fleet.run` and the exact command under OpenCode's `shell` permission;
 raw `fleet_exec` uses `fleet.exec` and `shell`. Fetch evaluates `edit` and `external_directory`, and
-sync apply/recovery use dedicated Fleet actions. Background jobs belong to the running OpenCode
-runtime; restart, plugin unload and location eviction are reported as interruptions.
+sync apply/recovery use dedicated Fleet actions. Background jobs run in a detached supervisor
+launched by the extension service; it owns the SSH connection and writes records under
+`~/.local/state/openchamber-fleet`, so an OpenCode runtime restart or plugin reload leaves the job
+running. An OpenChamber service stop or machine reboot interrupts it; the remote agent kills the
+process group when the SSH session closes. Without the service (npm-only plugin) or with
+`FLEET_SUPERVISOR=off`, jobs fall back to the runtime-bound path and report `supervised: false`.
+The supervisor has no listener and no new credential; its state directory is `0700` and its files
+are `0600`.
 
 OpenChamber's optional shared `opencode serve --service` mode is not enabled. The pinned Nix CLI
 registers its service under the channel-specific file while the v2.8.0 desktop client looks for the
