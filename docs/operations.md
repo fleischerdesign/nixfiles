@@ -610,8 +610,11 @@ stable system profile binary and `FLEET_SSH_PATH` names the packaged OpenSSH cli
 Hosts are machine-level in `$XDG_CONFIG_HOME/openchamber-fleet/hosts.json`; a project states what it
 needs in `workspaces/<project-id>.json`. `requires` names tags every host must carry, and the
 optional `hosts` array is an allowlist for exceptions; without it the project uses every host in the
-registry, so it never duplicates the machine list. The panel edits both local documents and shows
-which hosts are eligible; nothing is written into the repository. A legacy `fleet.json`
+registry, so it never duplicates the machine list. A project file is optional: an unconfigured
+project derives a safe workspace with `.git`, `.direnv/` and `result*` excludes and a replica id
+per checkout. A host's optional `allow` list limits it to `workspace`, `scratch` or `transfer`
+operations; tags remain suitability, not authorization. The panel edits both local documents and
+shows which hosts are eligible; nothing is written into the repository. A legacy `fleet.json`
 is still read until the split project configuration exists; it is not required and `fleet init` no
 longer writes it. A chat without a project uses OpenChamber's internal chat-data directory: Fleet
 loads the project from `defaults.json` (`fleet default /home/philipp/dev/nixfiles`), so the tools work
@@ -650,7 +653,8 @@ running. An OpenChamber service stop or machine reboot interrupts it; the remote
 process group when the SSH session closes. Without the service (npm-only plugin) or with
 `FLEET_SUPERVISOR=off`, jobs fall back to the runtime-bound path and report `supervised: false`.
 The supervisor has no listener and no new credential; its state directory is `0700` and its files
-are `0600`.
+are `0600`. A service upgrade replaces an idle supervisor of another version; while a job is active
+the old supervisor keeps running and the handover is deferred until it is idle.
 
 OpenChamber's optional shared `opencode serve --service` mode is not enabled. The pinned Nix CLI
 registers its service under the channel-specific file while the v2.8.0 desktop client looks for the
