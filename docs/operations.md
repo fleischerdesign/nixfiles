@@ -641,7 +641,9 @@ machine. A projectless chat uses an explicit `target: "scratch"` for remote-only
 private per-session remote directory without a source, manifest or generation. `fleet_upload` and
 `fleet_download` move one regular file at a time with streaming, SHA-256 verification, atomic
 publish and no overwrite by default. Uploads go only into scratch; downloads read scratch or an
-existing replica. Status, fetch and sync plan are read-only and never create a replica. `fleet_run`/`fleet_exec` with `background: true` return a job id and resume the
+existing replica. Status, fetch and sync plan are read-only and never create a replica. A sync plan
+returns a `planToken`; `fleet_sync --apply` refuses a different plan with `PLAN_STALE`.
+`fleet_run`/`fleet_exec` with `background: true` return a job id and resume the
 same session via OpenCode's official synthetic-message API when the job finishes; `fleet_jobs` lists
 the session's jobs and `fleet_job_status` returns their tails. `fleet_run` evaluates the combined
 sync-and-run descriptor under `fleet.run` and the exact command under OpenCode's `shell` permission;
