@@ -8,6 +8,7 @@
 }:
 {
   imports = [
+    ./opencode.nix
     ./packages.nix
     ./fish.nix
     ./rclone.nix
