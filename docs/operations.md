@@ -616,9 +616,11 @@ is still read until the split project configuration exists. A chat without a pro
 Personal OpenCode directives live in `user/philipp/opencode/directives/*.md`. Home Manager combines
 them in lexical order into one generated Markdown bundle and registers that bundle through
 `opencode.json`'s `instructions` array. OpenCode loads these instructions after the agent/provider
-system prompt and the discovered `AGENTS.md` files; they do not replace either. The global
-`~/.config/opencode/AGENTS.md` remains the user-owned file edited by OpenChamber's Settings →
-Behavior page, while the repository `AGENTS.md` stays project-owned.
+system prompt and the discovered `AGENTS.md` files; they do not replace either. The generated
+`~/.config/opencode/opencode.json` is Nix-owned; further OpenCode settings belong in that module,
+not in a UI rewrite of the file. The global `~/.config/opencode/AGENTS.md` remains the user-owned
+file edited by OpenChamber's Settings → Behavior page, while the repository `AGENTS.md` stays
+project-owned.
 
 The agent tools are `fleet_run`, `fleet_status`, `fleet_sync`, `fleet_exec`, `fleet_fetch`,
 `fleet_hosts`, `fleet_jobs`, `fleet_job_status`, `fleet_job_cancel` and `fleet_recover`. `fleet_run`
