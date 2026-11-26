@@ -40,12 +40,33 @@ let
       value.source = agentsDir + "/${name}";
     }) agentNames
   );
+
+  # Skills are directories with a SKILL.md marker, discovered like features: adding a skill is
+  # adding a directory, with no manifest to keep in sync.
+  skillsDir = builtins.path {
+    path = ./opencode/skills;
+    name = "opencode-skills";
+  };
+  skillNames = lib.pipe (builtins.readDir skillsDir) [
+    lib.attrNames
+    (lib.filter (name: builtins.pathExists (skillsDir + "/${name}/SKILL.md")))
+    (lib.sort (a: b: a < b))
+  ];
+  skills = builtins.listToAttrs (
+    map (name: {
+      name = "opencode/skills/${name}";
+      value.source = skillsDir + "/${name}";
+    }) skillNames
+  );
 in
 {
-  xdg.configFile = agents // {
-    "opencode/opencode.json".text = builtins.toJSON {
-      "$schema" = "https://opencode.ai/config.json";
-      instructions = [ "${directives}" ];
+  xdg.configFile =
+    agents
+    // skills
+    // {
+      "opencode/opencode.json".text = builtins.toJSON {
+        "$schema" = "https://opencode.ai/config.json";
+        instructions = [ "${directives}" ];
+      };
     };
-  };
 }
