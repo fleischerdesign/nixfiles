@@ -2,7 +2,8 @@
 
 A global `advisor` subagent is available for hard technical questions. It runs in a fresh child
 session with its own context and model, can read and search anywhere, run shell commands, and use
-the web and MCP. It cannot edit files or launch subagents.
+the web and MCP. Edit tools and nested subagents are blocked; shell is for diagnosis only, not a
+sandbox.
 
 ## When to call it
 

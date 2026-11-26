@@ -10,10 +10,14 @@ actually reports. Use `fleet_run` with `sync: auto`. Long-running work uses `bac
 and is followed with `fleet_jobs` / `fleet_job_status`. Run the Nix gate serially
 (`--max-jobs 1`) on the target.
 
-A projectless OpenChamber chat uses the configured default workspace. If Fleet reports that no
-default is set, configure it once with `fleet default /home/philipp/dev/nixfiles`; do not invent
-a per-chat workspace.
+A projectless OpenChamber chat uses the configured default workspace. If none is set, use
+`target: scratch` for work without a source tree, and ask which project is meant for source-tree
+work. Do not set a global default from a chat.
 
 Do not offload a command whose workspace transfer costs more than the command itself. If no
 suitable Fleet host is configured or reachable, say so and defer the heavy step rather than
 silently loading `cld-ops-01` or `hom-srv-01`.
+
+Report the worker, the tested revision or replica generation where available, the command and the
+final status. A job ID is not a result; a run from an earlier revision is not evidence for the
+current one.
