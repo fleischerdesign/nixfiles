@@ -2,22 +2,30 @@
 
 ## When to load & job
 
-Use this when someone needs to find a destination and recover from a missed turn. Design the sequence of cues and prototype the signs that carry them. Environmental graphics can support recognition, but an entrance that looks distinctive does not tell a first-time visitor which corridor to take.
+Use this when a first-time visitor needs to reach a destination and recover from an incorrect choice. Produce a route study and prototypes of the cues in the order a visitor encounters them. Environmental graphics can make the entrance recognizable; that does not tell someone which entrance is open or which path reaches their room. This is a briefing and review artifact, not a determination of route suitability or an egress plan.
 
-## Inputs
+## Inputs & concepts
 
-Gather current plans, arrival points, public and restricted routes, opening hours, destination names, and the words already used on appointment letters or tickets. Ask the operator which routes change by time of day. If conditions are unknown, diagram candidate journeys on the supplied plan and mark gaps instead of implying that a route is usable.
+Gather current plans, arrival points, public and restricted connections, opening hours, and the names on appointment letters, tickets, or dispatch instructions. Ask the operator which doors, lifts or desks change availability, and staff where visitors typically ask for help. Bring approach photos or observations where available. Mark an unobserved connection as such; a line on the plan is not evidence that a door is open.
 
-## Decisions & process
+A route is directional: the same junction is a different reading situation from each approach. Distinguish a **decision point**, where someone must choose, from a **cue position**, where they can perceive the instruction early enough to act. A **reassurance cue** says the choice still leads to the destination; an **arrival identifier** tells the visitor they are there. A recovery cue refers to something the lost traveler can recognize now, not to an instruction they missed. Treat access hours and route restrictions as conditions of a connection, not as small print on a universal journey.
 
-- Put direction where people can still act on it. If an approach offers time to read, cue the choice before the fork; if the approach is crowded with competing messages, reserve prominent space for the next choice and put confirmation after the turn. Sketch what the visitor sees in sequence, not just where signs sit on the plan.
-- Lead with destination names when visitors already know what they are looking for. Group by wing or zone when listing every destination would overwhelm the junction, but show where the visitor learns the link between their destination and that zone.
-- Use consistent destination names across booking, staff directions, and signs. If a familiar public name must coexist with an official one, introduce the pairing at arrival rather than adding both to every arrow panel.
+## Decisions & procedure
 
-## Typical mistakes & examples
+- Place direction before the fork when a clear approach lets visitors read ahead. In a crowded approach, spend the prominent space on the immediate choice and confirm it after the turn rather than expecting someone to read the entire directory.
+- Lead with destinations people already know. Group by wing or zone when names crowd the choice panel, but give visitors the destination-to-zone association before the panel asks them to act on it. If a public name must coexist with an official one, pair them once at orientation instead of duplicating both on every panel.
+- Keeping journeys on a shared route avoids extra vocabulary and discovery effort. Where operations require a distinct route, show the divergence early enough that a visitor need not backtrack, and carry the same destination name to arrival.
 
-A sign lists “Diagnostics” while appointment letters say “Blood Tests” → a visitor walks past the correct turn looking for the words they were given → use the appointment wording at the branch or introduce the relationship before the first choice.
+1. Define the trips by arrival, destination, visitor's starting information, and operating condition. Use [Wayfinding](knowledge/wayfinding.md) (`references/knowledge/wayfinding.md`) to turn them into a naming table, directed decision map, and recovery sequence.
+2. Turn the map into an **approach storyboard**. Under each frame, record the next action, last place where the choice can still be made, and the cue competing for attention. Draw doors, turns, and likely occluders in the frame, not just sign locations in plan. Use [Inclusive constraints](knowledge/inclusive-constraints.md) (`references/knowledge/inclusive-constraints.md`) where a route or cue assumes one way of perceiving or acting, to compare alternatives and their dependencies.
+3. Build sign-face prototypes from those frames with actual names and arrow relationships. Pair each face with a sign schedule row identifying the approach, facing, message, and operating exception. Show the normal trip, alternate operation, and one credible wrong turn in route order.
 
-## Deliverables & questions for the human
+## Worked example & typical mistakes
 
-Show a decision-point map, a naming table, and sign prototypes in route order, including a missed-turn scenario. The site operator and wayfinding specialist lead on-site walk-throughs with representative visitors and temporary signs. Final sign positions and route suitability remain unresolved until then. Which arrivals must work without staff help, and what changes after hours?
+A library's event room is reached through the lobby by day, but the lobby closes before some evening events. Both routes end at the same door. In the approach storyboard, the last useful choice from the bus stop is before the path splits around the building, not at the locked lobby doors. An evening cue at the split gives “Event Room · Courtyard entrance” with the appropriate direction. The locked-door frame gets a recovery cue to the courtyard via a recognizable corner; the courtyard carries the same room name. The common mistake is putting the new information only at the closed door: the sign is visible, but it makes the detour unavoidable. Put the first cue at the earlier choice and keep the door cue for recovery.
+
+## Standards, limits & handover
+
+Arthur and Passini, *Wayfinding: People, Signs, and Architecture* (1992; chapter `verify`), is a method source for architectural and graphic cues, not a regulatory specification. In the U.S., DOJ *2010 ADA Standards for Accessible Design* §216 scopes signs and §703 provides technical provisions; `verify` jurisdiction, applicable sign functions, and separate route or egress requirements with the site specialist. Opening hours and names are operator data. Storyboard symbols are conventions and the library trip is illustrative.
+
+Show the human the map, naming table, prototypes in context, and missed-turn scenario. The operator and wayfinding specialist use temporary signs and walk-throughs with representative visitors to study visibility and interpretation. Leave final positions and route suitability open. Ask which arrivals must work without staff and what actually changes after hours.

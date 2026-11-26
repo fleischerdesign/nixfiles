@@ -2,24 +2,33 @@
 
 ## When to load & job
 
-Load this for proposed team structures, role charters, or decision rights. The job is to clarify who can decide, with what authority, and how work crosses boundaries. A service blueprint follows the case; organizational design asks whether the people handling it have the remit and capacity to act. A proposal is not a change mandate.
+Load this for a proposed operating structure, role charters or a decision-rights brief. Make clear who can decide, within what remit, and how work and authority cross boundaries. A service blueprint follows the case; organizational design uses the case to expose whether the people handling it can make the necessary commitments. Strategy may set the outcome; this brief examines how work would be organized to pursue it. The artifact is for review, not a change mandate, an appointment, or an approval to delegate authority.
 
-## Inputs
+## Inputs & concepts
 
-Use current mandates, reporting lines, workforce constraints, and real examples of decisions that stall or recur. Ask for formal delegations and applicable labor or consultation requirements. If the authority on paper differs from what staff describe, record both accounts. Don’t treat the practical workaround as permission to rewrite the formal arrangement.
+Get the current mandates, delegations and reporting lines from their formal owners; get staffing, coverage and competing assignments from managers; and ask staff for recent examples of decisions that stalled or relied on informal workarounds. Ask HR or labor specialists which consultation obligations and workforce constraints apply. Where the formal and practiced arrangements differ, keep both visible. Staff getting something done through a personal relationship is evidence of a dependency, not permission to institutionalize it.
 
-## Decisions & process
+**Accountability** names who answers for an outcome; **authority** names who can make a binding decision or commit resources. A person can propose, provide required input or implement without being the decider. A **delegation** puts a specified decision in another role's remit under stated conditions. An **escalation** routes a decision outside that remit to a role that can actually settle it. **Grouping** locates interdependent work within a unit; **coordination mechanisms** manage dependencies that grouping leaves across units. A reporting line does not by itself specify a resource commitment or a right to reprioritize work.
 
-Place frequent, reversible decisions near the work when local context matters. Reserve decisions with consequences across units for a shared owner when coordination matters more than speed. Put both on a decision-rights map with the actual decider, who provides input, and what triggers escalation.
+## Decisions & procedure
 
-Group stable specialist work by function when scarce expertise needs to be shared. Group around an outcome when handoffs are the recurring problem. Functional teams can become queues for one another; outcome teams can duplicate scarce expertise. Trace a recurring request through both structures before drawing reporting lines.
+- **Decide near the work versus decide across units.** Put frequent, reversible decisions where local context is fresh. Keep decisions with cross-unit resource or policy consequences with a shared owner when coordination outweighs speed. Describe the condition that moves the decision, not just “escalate as needed.”
+- **Function versus outcome grouping.** Group by function when scarce specialist capacity and shared practice matter. Group around an outcome when interdependent work repeatedly queues across functions. The first can increase waiting for other units; the second can duplicate expertise or expose gaps in specialist coverage.
+- **Temporary delegation versus structural change.** Where authorized, a bounded delegation can help people learn whether a closer decision right makes the work move, without moving reporting lines. It cannot by itself resolve staffing, budget or priority conflicts that sit outside its remit.
 
-Where authorized, consider a temporary delegation before changing reporting lines if the uncertainty is who can act in time. It is easier to reverse, but leaves some staffing and priority conflicts unresolved.
+1. Choose recurring decisions that reveal the proposed change: a routine call, a decision that competes for shared resources, and an exception where possible. Write each as a binding act, such as “reassign coverage for today's queue,” rather than a task label like “manage the service.”
+2. Build a **decision-rights map** with one row per act: current formal decider, practical route, proposed decider, required input, resource authority, implementation role and escalation condition. If the decision stalls across a case transfer, load [Service blueprint](knowledge/service-blueprint.md) (`references/knowledge/service-blueprint.md`) to locate the moment when authority is needed. Carry the role and timing back into the map.
+3. Draft alternative arrangements and walk the same requests through them using the map. Load [Option framing](knowledge/option-framing.md) (`references/knowledge/option-framing.md`) to compare structural options and a bounded delegation against the current arrangement. Record where a new role still needs an existing manager's consent and why.
+4. Derive role charters from the decisions, resources and boundaries shown in the map. Draw reporting lines only after the work scenarios reveal what can be handled within a unit and where a cross-unit mechanism is needed. List unresolved delegations and consultation decisions with their formal owners.
 
-## Typical mistakes & examples
+## Worked example & typical mistakes
 
-A role charter makes a service lead responsible for response times while every staffing adjustment still needs functional approval. The lead can explain delays but cannot change priorities. Either give the role explicit authority within agreed limits or assign accountability to the person who controls staffing.
+An illustrative shared service proposes making a service lead accountable for response times. Walk through a day when a backlog grows and the only available specialist is preparing a release for another unit. The lead can reorder cases within assigned coverage, but shifting the specialist would displace release work. Split what initially looks like one decision into two rows: local sequencing, which the lead could own, and moving capacity across commitments, which needs a named owner with authority over both. If leadership wants the lead to decide some capacity moves, specify which capacity can be moved and what still belongs elsewhere.
 
-## Deliverables & questions for the human
+Writing “owns response times” without naming resource authority gives the lead a reporting burden but leaves the blocked decision unchanged. Attach a real decision right to the charter or retain accountability for that resource-dependent outcome with the role that can act.
 
-Show alternative structures, role briefs, and a decision-rights map against real scenarios. Affected staff can describe workload and informal dependencies; leadership owns any change decision, with HR and labor specialists establishing what consultation and transition are required. Ask: Who can move capacity when priorities conflict? What authority must stay central, and why?
+## Standards, limits & handover
+
+Henry Mintzberg, *The Structuring of Organizations* (1979), discusses coordination mechanisms, unit grouping and decentralization (section references `verify`); it is a design model, not a norm. The map columns and role-charter form are working conventions; signed delegations and authorized staffing terms are project facts. Applicable labor and consultation duties are normative within their scope (`verify` jurisdiction, agreement and provision with HR or counsel). The shared-service allocation is illustrative. Use a shared worksheet for the decision map and a paired scenario walkthrough; keep personal workforce records outside the brief.
+
+Show the alternatives, charters and map against real scenarios. Affected staff can explain workload and informal dependencies. Leadership owns the decision, and HR and labor specialists establish consultation and transition needs. Ask who can move capacity when priorities conflict and why any particular authority must stay central.

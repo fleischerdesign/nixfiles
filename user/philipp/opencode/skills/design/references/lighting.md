@@ -2,22 +2,30 @@
 
 ## When to load & job
 
-Use this when a space needs different lighting for different tasks or times. Describe what should be visible, where attention should land, and who changes the scene. A render can communicate those intentions; it does not establish lighting performance.
+Use this when a space needs lighting to support different tasks, viewing situations or operating hours. Produce a scene brief that describes what must be visible, where attention should land and who can change the scene. Let interior or exhibition design lead if the question is the layout of activities or exhibits rather than how they are seen. A rendered scene communicates a lighting intention; it is not photometric evidence or an electrical specification.
 
-## Inputs
+## Inputs & concepts
 
-Gather plans, surface finishes, daylight openings and shading, task locations, viewing positions, hours of use, and control ownership. Request governing criteria and relevant luminaire data from the lighting specialist. If those inputs are missing, sketch relative light and dark relationships and label the scene assumptions rather than assigning values.
+Collect plans and sections, finish samples, daylight openings and shading states, task locations and viewing positions, operating hours, and who operates the controls. Ask the lighting specialist for governing criteria and luminaire photometry; ask the operator which tasks run together and what changes during cleaning, resets or evening events. With missing data, use named relative relationships and mark assumed surfaces, positions and daylight states. Do not attach quantities to a sketch's rendered tones.
 
-## Decisions & process
+**Illuminance** describes light incident on a surface, so the plane and orientation belong in the brief. **Luminance** describes light leaving a surface or source in a direction; what the eye sees depends on finish, viewing direction and the surroundings. A horizontal desk and a face across it are different targets. Direct glare from a visible source and a reflected bright image in a screen are different viewing problems; a crop can remove the source from the image without removing its reflection. A **scene** is an operating state; a **layer** serves a visual purpose, and a **control zone** groups what changes together. They are not interchangeable.
 
-- If desks or display tables move often, begin with a more even ambient layer. If work stays in place and quiet circulation matters, separate task lighting from the ambient layer; you get more distinction between areas but less freedom to move the task without revisiting the lighting.
-- Choose the plane that matters. A worktop needs light on the work; recognition at a reception desk also depends on faces. Show the horizontal work surface and the vertical face plane in a section. Giving one more emphasis can pull attention away from the other.
-- If daylight changes substantially, compare separately controlled perimeter and interior zones with a shared scene. Separate zones can respond to different conditions but create more settings for staff to manage. Show who switches scenes and when.
+## Decisions & procedure
 
-## Typical mistakes & examples
+- A more even ambient layer accommodates changing desk or display layouts. Distinct task and ambient layers can give fixed workstations clearer emphasis and keep circulation quieter, but constrain later moves.
+- Put emphasis on the plane the task uses. A work surface may be primary while reading; a reception encounter also depends on seeing faces. Show both in section rather than treating a bright counter as evidence of both.
+- Separate perimeter and interior controls when their daylight conditions differ. A shared scene is simpler to operate but cannot respond independently; a split scheme needs clear ownership and an override story.
 
-A luminous pendant sits outside the cropped rendering → a seated visitor still sees its reflection in a dark monitor → add the seated viewpoint and screen angle to the study, then ask the specialist to explore different source positions or shielding.
+1. Describe who does what, where, and in which combinations of operating and daylight states. Use [Spatial programming](knowledge/spatial-programming.md) (`references/knowledge/spatial-programming.md`) when task relationships and simultaneity are not yet explicit.
+2. Draw a **scene and plane schedule**: state, active tasks, relevant planes and eyes, intended emphasis, contributing layers, controls and owner. Give each target an ID and carry it onto a section. Mark source positions as candidates rather than fixtures selected for purchase.
+3. Compare options from the same positions and, for renders, a stated exposure for each comparison. Use [Scene studies](knowledge/scene-studies.md) (`references/knowledge/scene-studies.md`) for named views and proxy geometry when source, occluder or reflective surface relationships matter. Convert unresolved effects into a measurement brief tied to the schedule: name the plane or sightline, finish, daylight state and control setting.
 
-## Deliverables & questions for the human
+## Worked example & typical mistakes
 
-Show scene sketches, a layer diagram, and a measurement brief. Ask the lighting specialist to measure at the task plane and relevant eye positions under named daylight and control conditions. Measured performance and final luminaire and control specifications remain open. Which tasks run at the same time, and who needs to override a scene?
+A reception desk has a pendant outside the hero render and a tilted monitor used by seated staff. In a section through the operator's eye and screen, draw the screen's normal and mirror the viewing direction about it at the screen. The resulting direction points toward the pendant's zone, a reason to study reflected images there rather than simply dim the worktop. Sketch a shifted source or different shielding beside the original while retaining the face-lighting intention. The reflection line is an illustrative idealization; real screens and sources have extent and finish. The typical mistake is dropping the pendant from the drawing because it is outside the camera crop. Keep it in section and brief the specialist from the operator's position.
+
+## Standards, limits & handover
+
+CIE S 017/E:2020, *International Lighting Vocabulary*, gives photometric definitions (`verify` relevant entries). EN 12464-1:2021 concerns lighting of indoor workplaces; `verify` jurisdictional adoption and applicable activity and clauses. Neither makes a concept rendering a measurement. Luminaire data and control behavior come from the specialist or supplier; layer names are a convention and the reception section is illustrative.
+
+Show the scene sketches, layer diagram and measurement brief. The specialist develops calculations or measurements at named task planes and eye positions in the specified scenes. Leave performance, luminaires and controls unresolved. Ask which tasks coincide and who needs to override a scene.

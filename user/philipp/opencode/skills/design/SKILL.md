@@ -13,13 +13,15 @@ Use this handbook to turn a brief into a design the human can experience and dis
 
 Read the brief first, then the project's design system (`design.md` or `DESIGN.md`, tokens, components, and brand rules), then `references/index.md`. The project takes precedence; never impose a global style.
 
-Choose one lead module by deliverable. Add at most two supporting modules, each for a different open design decision. Use the exact paths in the index, resolved relative to this skill's base. Never read `references/_template.md` at runtime.
+Choose one lead module by deliverable. Add at most two supporting modules, each for a different open design decision. Use the exact paths in the index, resolved relative to this skill's base. Do not read authoring templates at runtime.
 
 If `references/index.md` has no module for the requested deliverable, use the module for the closest medium and name the discipline-specific knowledge it does not cover. Do not invent a module.
 
 ## Decisions & process
 
 Before designing, read the lead module and work out which of its decisions matter for this brief. Apply those decisions in the artifact; do not quote the handbook in place of a design.
+
+When an entry links to a method, read that knowledge card before the decision or work step it guides — not after the direction is chosen. Each link gives a reason and an exact `references/knowledge/…` path relative to this skill's base. Load only the cards needed for the work, never the whole set.
 
 For a new design, use the brief to develop two structurally different directions. Choose one and name the trade-off. Build a functional slice with real content, then show it in context. For work you cannot execute directly, make a study or briefing artifact and identify who can provide the next proof.
 

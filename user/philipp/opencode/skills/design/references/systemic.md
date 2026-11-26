@@ -2,24 +2,33 @@
 
 ## When to load & job
 
-Load this for a system map or an intervention brief when actors adapt to one another and a local improvement might shift costs elsewhere. Unlike a service blueprint, the map follows feedback beyond a single journey or provider. Its job is to expose plausible mechanisms and their consequences, not to establish impact.
+Load this for a bounded system map and intervention brief when actors adapt to one another, effects return over time, or local relief could shift work or harm elsewhere. A service blueprint follows a person's episode and the delivery work behind it; a systemic study follows the return paths that can change many episodes, even across providers. Use strategic design when allocation is the question and feedback is not what distinguishes the options. This is a framework for reviewing plausible mechanisms, not a validated causal account or a claim of impact.
 
-## Inputs
+## Inputs & concepts
 
-Use stakeholder accounts, policies, resource flows, historical changes, and any observations over time. Record whose account supports each relationship and where accounts conflict. If evidence is thin, draw competing hypotheses about the feedback rather than joining every box with an authoritative arrow.
+Ask affected groups and operators for accounts of the same change, policy owners for rules and dates, and data owners for histories of levels and rates. Get the definitions and coverage behind any time series: a fall in recorded cases could follow a reporting change rather than a fall in need. Record which actor sees which information before responding. Keep competing accounts side by side when they imply different interventions.
 
-## Decisions & process
+The **system boundary** identifies decisions and processes the study explains; outside drivers can still change the outcome. **Feedback** is a causal path that returns to influence its starting condition. A **stock** accumulates, while flows add to or drain it; processing more cases does not reduce a backlog if arrivals still exceed completions. A **delay** separates a change from its observable or actionable consequence. A **leverage point** is a candidate place to intervene, not a claim about effect size. **Spillover** is a consequence outside the intended target, including the transfer of work or waiting to a group not represented in the initial map.
 
-Choose a boundary that includes actors who can redirect the outcome or inherit the downside. Start close to the intervention if the team needs a usable map; widen it where an excluded actor can send the effect back. A wider map reveals spillovers but makes it harder to see which mechanism matters to this decision.
+## Decisions & procedure
 
-Distinguish a bottleneck you can relieve from a rule that keeps recreating it. Temporary capacity can help the people already waiting; changing an intake rule may alter future demand but take longer and redistribute access. Mark the delay on each causal path so near-term relief is not mistaken for sustained change.
+- **Tight versus wider boundary.** Start near the decision so the map remains readable. Expand when an omitted actor can send an effect back or inherit a material downside. Keep other influences as named outside drivers, not unexplained arrows.
+- **Relieve accumulation versus change the rule that recreates it.** Temporary capacity may help those already waiting. A different intake or prioritization rule may affect future flows, but take longer and alter who receives access. Compare immediate and delayed effects rather than treating one horizon as decisive.
+- **One narrative versus rival explanations.** A single map is useful for showing a mechanism, but combining incompatible relationships makes disagreement invisible. Separate views when a rival account would put the intervention in a different place.
 
-Compare interventions on the same map. Trace who might adapt, who takes on extra work, and where the effect may return. Keep rival explanations visible where they imply different actions.
+1. Name the pattern, whose outcome counts, and a horizon long enough for a response to return. Sketch what is observed separately from what you hypothesize. Assemble an **actor-and-mechanism ledger** with one row per consequential relationship: action, affected quantity, responding actor, information they see, delay, source or dissent, and evidence that could distinguish competing explanations.
+2. For turning ledger relationships into signed return paths and separating accumulation from throughput, load [Feedback loops](knowledge/feedback-loops.md) (`references/knowledge/feedback-loops.md`). Place policy boundaries and information ownership on the diagram. Where an arrow is speculative, tie it visibly to its ledger row so the map does not upgrade it to fact.
+3. Locate the specific relationship each intervention would change. For a baseline and comparable intervention scenarios, load [Option framing](knowledge/option-framing.md) (`references/knowledge/option-framing.md`). On the same maps, note who is helped first, who may adapt, where the downside could land, and what delayed consequence might reverse the preference.
+4. Make the review brief from the bounded map and the ledger. For pivotal uncertainties, identify an observation and who could obtain it. Separate observations that distinguish mechanisms from evidence an evaluator would need to attribute effects.
 
-## Typical mistakes & examples
+## Worked example & typical mistakes
 
-Treating a clinic callback queue as only a staffing problem leaves out repeat calls. If callers ring again because they cannot tell whether a request is pending, those calls can deepen the backlog and provoke more repeats. Map that possible loop alongside the capacity explanation; compare added staffing with acknowledgement and status updates.
+An illustrative clinic wants to add callback staff because its queue keeps growing. Staff report that people call again when no acknowledgement arrives. Do not draw repeat calls as new cases automatically. The ledger distinguishes support contacts from callback requests: if repeat contacts consume the same staff time, they may reduce completion capacity even when no additional patient is waiting. If repeat contacts go to a separate team or refer to new needs, the mechanism is different. Compare added callback capacity with an acknowledgement that explains the next update, using linked case and contact histories to ask which account merits attention. The acknowledgement could also divert work to another channel if it is unclear or if people cannot use it.
 
-## Deliverables & questions for the human
+Treating all contact volume as demand hides the possibility that the queue generates work for itself. Separate contact and case records before naming the intervention, and leave their relationship unresolved if they cannot be linked.
 
-Show the bounded actor map, the candidate leverage points, and a spillover scenario for each. Practitioners and affected groups can challenge the causal stories; an evaluator needs observations over time and a credible comparison before attributing impact. Ask: Who inherits the burden? Which delayed effect would change where we intervene?
+## Standards, limits & handover
+
+John D. Sterman, *Business Dynamics* (2000), chapters 5–7, covers causal-loop diagrams, stocks and flows, and their dynamics. These are modeling methods, not norms of causal evidence. Signs, boundaries and delay markers are conventions; the clinic's deduplication rules and reporting intervals are project specifications if supplied, not universal rules. The two clinic interventions are illustrative. Use an editable diagram linked to a ledger; simulation would require defensible rate relationships, initial conditions and data, not illustrative constants.
+
+Show the map, rival explanations and spillover scenarios. Ask practitioners and affected groups where work would move and what the map misses. An evaluator needs observations over time and a credible comparison to attribute impact. Ask who inherits the burden and which delayed effect would change where to intervene.

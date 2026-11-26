@@ -2,22 +2,30 @@
 
 ## When to load & job
 
-Use this for a garment concept where silhouette, movement, and fabric must work together on a body. Set up a brief for a pattern cutter and fitting team. Let textile lead if the open decision is how the fabric itself should behave or repeat.
+Use this for a garment concept where silhouette, movement, and fabric must work together on a body. Produce a silhouette and movement study with enough detail for a pattern cutter and fitting team to plan a first sample. Let textile lead if the open decision is how the cloth itself should behave, look or repeat. Do not turn concept flats into cutting patterns or present a drawn fit as evidence about wearers.
 
-## Inputs
+## Inputs & concepts
 
-Gather intended wearers, use occasions, layers worn underneath, target size range, fit references, material swatches, care needs, and cost constraints. Ask the pattern cutter for the agreed fitting measurements and the material supplier for actual fabric information. Without them, make relative silhouette studies and label the assumed layering and fabric behavior.
+Gather intended wearers, occasions, recurring movements, underlayers, target size range, fit references, swatches, care needs and cost constraints. Ask the pattern cutter for the fitting measurements and their landmarks. Ask the supplier about composition, stretch direction and recovery, and observed response to care. If the cloth or fit basis is missing, compare silhouettes at the same assumed pose and layering without inventing garment dimensions or grading increments.
 
-## Decisions & process
+A **body measurement** describes the wearer at defined landmarks; a **garment measurement** describes the made item under stated conditions. **Ease** compares corresponding measures at the same level and is not the seam allowance used to join pieces. Some volume serves movement or layering; some shapes the silhouette. A total measurement does not say where the room is distributed. **Drape** is how cloth hangs and deforms; stretch and recovery describe other behaviors, so softness alone does not promise room when reaching or a return to shape afterward.
 
-- If a jacket must fit over varied layers, study more ease through the body and compare the outline over a shirt and over knitwear. If a close silhouette leads, show where the cut would need to give the wearer room to reach or sit; extra shaping may narrow the range of layers it accommodates.
-- For a silhouette meant to hold away from the body, study a fabric with more body. For one meant to fall close and move with the wearer, study a softer drape. Show both from the side and in motion: the more fluid option may not hold a crisp outline at a collar or hem.
-- Decide whether the closure should disappear into the front or be easy to find by touch. A concealed fastening preserves the line but can be harder to operate while wearing gloves or carrying something.
+## Decisions & procedure
 
-## Typical mistakes & examples
+- A jacket meant for multiple underlayers needs allowance where their bulk actually sits. A closer cut emphasizes shape but may require more localized movement allowance or a narrower expectation about layers.
+- A fabric with body supports a silhouette held away from the wearer; a fluid fabric can follow movement without holding the same collar or hem profile. Compare swatches from the side and in motion rather than reading structure from a front illustration.
+- A concealed closure preserves the uninterrupted line. A more prominent fastening may be easier to locate by touch or manipulate with gloves, but becomes part of the front's visual rhythm.
 
-A coat is drawn only standing, buttoned over a thin top → the same outline may pull at the back when the wearer reaches forward over a bulky layer → add a reach pose and ask the fitter to observe where the sample moves or binds.
+1. Choose a reference layer and the wearing episodes that can change the cut, such as reaching while buttoned or putting the garment on while seated. Draw the front, back and side of a neutral pose with the same landmarks in each view. Keep geometry consistent across options.
+2. Build a **pose-and-fit sheet** with the pose, layer, region of concern, feature being studied, intended behavior, and sample observation requested. Use [Fit envelopes](knowledge/fit-envelopes.md) (`references/knowledge/fit-envelopes.md`) to frame motion and occupied layering without inventing dimensions. Use [Inclusive constraints](knowledge/inclusive-constraints.md) (`references/knowledge/inclusive-constraints.md`) where dressing or closure operation assumes a specific grip, posture or kind of assistance.
+3. Carry the consequential features into annotated flats and compare motion views next to named swatches. Mark panel or closure changes as options for the cutter, not pattern geometry. Nominate the sample construction or material differences the fitter needs to interpret movement without conflating them with the original sketch.
 
-## Deliverables & questions for the human
+## Worked example & typical mistakes
 
-Show front, side, and motion sketches, swatch references, and open fit and production questions. A pattern cutter and fit team provide a sample and live fitting. Fit, grading, and garment production remain outside the concept. Which layer and movement must the garment accommodate even if they change the silhouette?
+A tailored coat must close over knitwear while its wearer reaches forward. The neutral outline could gain room uniformly, but the pose-and-fit sheet identifies the upper back and sleeve movement as the places to study before changing the entire torso. Show a variant with room distributed toward the back, and a variant that preserves the back outline while asking the cutter to explore sleeve shaping. Brief the fitter to observe where the sample pulls and whether the hem rises during the same reach in both. A standing drawing over a thin top hides that problem; do not turn its clean silhouette into an assumption about motion.
+
+## Standards, limits & handover
+
+ISO 8559-1:2017, *Size designation of clothes — Part 1: Anthropometric definitions for body measurement*, supplies measurement definitions, not ease or grade rules; `verify` edition and relevant clauses. Helen Joseph-Armstrong, *Patternmaking for Fashion Design*, 5th edition (2010), is a patternmaking method source; `verify` the relevant section with the cutter. Size range and layering are project specifications. Pose annotations are a study convention; the coat is illustrative.
+
+Show front, side and motion views, swatches, and the pose-and-fit sheet. The pattern cutter and fit team make a sample and observe wearers during fitting. Fit, grading and production decisions stay open. Ask which layer and movement must take priority even when they change the silhouette.

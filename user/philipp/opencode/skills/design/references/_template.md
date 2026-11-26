@@ -1,23 +1,27 @@
-# Category module template
+# Entry module template
 
-Authoring template for category modules only. Do not load at runtime. Write 200–400 words in English, with the voice of an experienced designer onboarding a colleague. Every module must contribute a decision, a trade-off, and an example that only its discipline has. Leave judgment to the human; don't grade or certify the work.
+For authors, not runtime. Replace this title with the deliverable's name. Write 600–1,200 words in English as an experienced designer onboarding a colleague. Use the range as a guide, not a quota: replace a sentence that could appear in any discipline with one that explains this deliverable.
 
 ## When to load & job
 
-Name the deliverable that makes this module relevant and the design decision it helps the agent make. Draw the boundary with adjacent disciplines when they could plausibly lead the same brief.
+Name the artifact, the decision it makes visible, and the boundary with the nearest plausible lead module. Say whether the work is an executable artifact, a prototype, or a specialist brief.
 
-## Inputs
+## Inputs & concepts
 
-Name the source material that changes the design, and where authoritative specs come from. If a spec is missing, say which artifact is still useful, which assumptions to disclose, and what must wait.
+Name the source material that changes the artifact, who supplies it, and what remains provisional when it is missing. Define the concepts by how they affect the work: for example, distinguish trim, bleed, and the safe area by where artwork or critical content belongs.
 
-## Decisions & process
+## Decisions & procedure
 
-Teach two to four decisions specific to the discipline. For each, explain when to choose one approach over another and what the choice gives up: “When A matters most, start with X. When B matters more, use Y, at the cost of Z.” Name the view or working artifact that makes the trade-off visible.
+Teach two to four discipline-specific trade-offs. Name the circumstances that favor each choice and what it gives up. Then work from the inputs through a concrete intermediate artifact (such as a state table, panel flat, or adjacency matrix) to the deliverable; explain how one output informs the next step.
 
-## Typical mistakes & examples
+Link only methods this module needs, at the point of use, at most three. Give the reason and the exact skill-base-relative path, for example: “For deriving trim and bleed geometry from the printer's spec, see [Print PDF](knowledge/print-pdf.md) (`references/knowledge/print-pdf.md`).” Use `knowledge/index.md` when authoring; do not repeat the shared procedure in the entry.
 
-Write cause → effect → better move. Use a concrete situation and describe what the audience or downstream maker would encounter. Replace generic advice with an alternative that changes the result.
+## Worked example & typical mistakes
 
-## Deliverables & questions for the human
+Work a representative input through the step a colleague would otherwise guess. Show the intermediate decision and its effect on the artifact. Give one typical mistake as cause → effect → better move; make the effect visible to the audience or downstream maker.
 
-Say what to show and in what context. For physical, strategic, or otherwise non-executable work, frame the deliverable for human review: say who can provide the next proof and what remains blocked. Ask only questions whose answers would change the design. Request missing specs as inputs, not preferences.
+## Standards, limits & handover
+
+Name the standards or tool behavior that change implementation. Cite the primary source, edition or version, section, and scope; write `verify` where a detail is uncertain. Take production values from the project or supplier. Distinguish a standard's requirement, a project specification, a convention, and an example value. Do not quote exact thresholds secondhand when the norm is unavailable.
+
+Say what to show the human in context, which assumptions or production decisions stay open, and who can supply the next evidence. Ask only questions whose answers change the design. Do not add checks, scores, gates, pass/fail language, or certification claims; the human reviews the artifact, trade-off, and open decisions.

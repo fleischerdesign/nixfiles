@@ -2,22 +2,32 @@
 
 ## When to load & job
 
-Use this for explanatory graphics, instructions, forms, and on-screen wayfinding. Arrange information around what someone needs to understand or do at each point. Information architecture decides where things live; this module decides how a person recognizes where they are and what comes next.
+Use this for explanatory graphics, instruction panels, forms, and on-screen wayfinding. Arrange information around what someone needs to understand or do at each point. Information architecture decides where things live; this module decides how a person recognizes where they are and what comes next. If the primary job is comparing measurements, let data visualization lead. Produce a reading-size graphic or a walkable form slice; use an annotated study where policy, wording, or behavior is unresolved.
 
-## Inputs
+## Inputs & concepts
 
-Start with the source procedure or policy, real field wording and formats, actual branches and exceptions, and the audience's starting knowledge. Use the project's labels and components. If the procedure owner hasn't supplied an exception, sketch the known route and label the unresolved branch rather than writing instructions for it.
+Get the current procedure, policy, and exceptions from its owner. Ask what people already know, what they have in front of them, and where they stop and return. Bring actual field wording, permitted formats, sample source documents, and the project's labels and components. For instructions, ask which parts and changes can be seen from the reader's working position. If the owner hasn't supplied an exception, show where it enters the known route and leave its instructions unresolved.
 
-## Decisions & process
+An **overview** explains relationships; a **sequence** depicts a change from one condition to another. A **precondition** is what must already be true before an action, and a **branch condition** is the fact that changes what happens next. A **recognition cue** lets a reader identify a part, screen, document, or completed state without interpreting an abstract instruction. For a form, a field's request, formatting hint, and example serve different roles. The prompt says what to enter; a hint says where to find it or how to write it; the example illustrates rather than supplies the answer.
 
-- **Choose between an overview and a sequence.** Use a labeled overview if readers need to relate parts or orient themselves before acting. Use numbered panels if order changes the result; draw the visible change in each panel. A sequence makes the next action obvious but makes it harder to see how the parts fit together.
-- **Group form fields by what people have at hand.** Put related entries together when they come from the same document. Use a separate step when a decision makes later fields irrelevant or calls for a different source. Separation reduces clutter but hides the extent of the task, so name what people will need before they begin.
-- **Match orientation cues to the route.** Use a numbered step indicator for a stable sequence. For routes that branch, name the current task and remaining tasks rather than showing a fixed total that may change. A task list takes more room but doesn't imply an order the process can't promise.
+## Decisions & procedure
 
-## Typical mistakes & examples
+- **Choose overview or sequence.** Use an overview where the reader needs to relate parts before acting. Use numbered panels where order changes the result. The panels reveal the next action but can hide how the parts fit together; sometimes one small locating view earns its space before the first panel.
+- **Group by the source people hold.** Keep together fields copied from one document. Separate them when a decision makes them irrelevant or demands a different source. Separate steps reduce irrelevant detail but conceal the extent of the task, so name what people need up front.
+- **Match progress to the route.** Number a stable sequence; for branching routes, name the current task and the remaining applicable tasks. This takes more space than a fixed count but avoids promising a route the process cannot honor.
 
-An arrow labeled “Turn” beside a picture of a filter cap can read as either a motion cue or a pointer to the cap. The reader finds the part but doesn't know when to stop turning. Separate the part label from the curved motion arrow and show the end state in the next panel.
+1. Mark the entry point and the reader's intended end state. Build a **route-and-content map**: one row per task or recognition point, with the precondition, source in hand, instruction or question, visible result, and next route. Include a row for returning after an interruption if the procedure allows it.
+2. Convert rows into panels or form groups. Label decision branches in the reader's vocabulary and put each prerequisite before the action that depends on it. When an explanation includes a measured comparison, use [Data encoding](knowledge/data-encoding.md) (`references/knowledge/data-encoding.md`) to choose what the numbers should let the reader compare.
+3. Lay out real wording at reading size. For repeated panels or responsive pages, use [Grid systems](knowledge/grid-systems.md) (`references/knowledge/grid-systems.md`) to keep related text and figures aligned and together as widths change. Stage one complete branch alongside the main route so the human can see what becomes irrelevant, what persists, and where the routes rejoin.
 
-## Deliverables & questions for the human
+## Worked example & typical mistakes
 
-Show the graphic at its reading size or walk through the form from entry to completion, including a known branch. Ask: What must someone already have before starting? Which decision changes the route, and where do people resume if they return later?
+An illustrative permits form asks people renewing an existing permit for its number and issue date; first-time applicants need neither. The map records “Already have a permit?” as a routing question, not as the first field in “Permit details.” The renewal row names the existing permit as its source and groups the two entries; the other route goes straight to contact details, where both routes rejoin. Put the document reminder next to the renewal option on entry. That placement lets a returning applicant fetch the permit before starting without suggesting a first-time applicant needs one. On a resumed renewal, show the named task, not a step total computed for the shorter route.
+
+In an instruction panel, an arrow labeled “Turn” can read as a pointer to the filter cap instead of a motion cue. The reader finds the cap but doesn't know when to stop. Separate the part label from the curved arrow and show the supplied end state in the next panel.
+
+## Standards, limits & handover
+
+For web forms, W3C [WCAG 2.2](https://www.w3.org/TR/WCAG22/) (Recommendation, 12 December 2024), SC 1.3.1 and 3.3.2, address programmatically determinable relationships and labels or instructions for input. Use the [HTML Living Standard, “The label element”](https://html.spec.whatwg.org/multipage/forms.html#the-label-element), for the association a form prototype needs; a placeholder is not a persistent label. The [GOV.UK Design System, “Question pages”](https://design-system.service.gov.uk/patterns/question-pages/) is implementation guidance, not a universal requirement to put one question on each page. Field formats and exception routes are project rules; the permit example is illustrative.
+
+Show the graphic at its reading size or walk the human through the form from entry to completion, including a known branch. Identify unresolved branches and who owns them. Ask what people need before starting, which decision changes the route, and where users can resume if they return.
