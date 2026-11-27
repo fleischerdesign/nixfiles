@@ -469,8 +469,8 @@ Desktop screenshots on those hosts run through shell execution instead.
 ## OpenChamber workspaces
 
 `my.features.dev.openchamber.enable` installs OpenChamber Desktop on `hom-wrk-01` and
-`mob-nb-01` (`role = "desktop"`) and a headless OpenChamber runtime on `hom-srv-01` and
-`cld-edge-01` (`role = "server"`). `role = "both"` runs the desktop and the headless server on
+`mob-nb-01` (`role = "desktop"`) and the headless OpenChamber runtime on `hom-srv-01`
+(`role = "server"`). `role = "both"` runs the desktop and the headless server on
 one host, with different ports. Clients use the desktops for local work and the server runtimes for
 work that must outlive a laptop.
 
