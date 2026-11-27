@@ -1,7 +1,7 @@
 ---
 description: Independent second opinion on hard technical decisions, designs, debugging and reviews
 mode: subagent
-model: openai/gpt-6.2-sol
+model: claude-agent/opus#high
 steps: 24
 permissions:
   - action: edit

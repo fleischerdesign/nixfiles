@@ -7,8 +7,9 @@ sandbox.
 
 ## When to call it
 
-Call it when the user asks for it: "frag den Advisor", "Sag das Sol", "zweite Meinung", "ask the
-advisor", "run it by Sol". A mention of the advisor is not an instruction; only a request is.
+Call it when the user asks for it: "frag den Advisor", "Sag es dem Advisor", "zweite Meinung",
+"ask the advisor", "run it by the advisor". A mention of the advisor is not an instruction; only a
+request is.
 
 Call it on your own judgment when the decision is hard enough that an independent check is worth the
 cost: an architecture or contract choice with lasting consequences, a bug whose evidence conflicts,
