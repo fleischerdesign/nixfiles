@@ -173,6 +173,9 @@ in
       default = [ ];
       description = "Named Go API keys from SOPS, reconciled into OpenCode's credential store.";
     };
+    claudeCode = {
+      enable = lib.mkEnableOption "Claude Code CLI for the managed OpenCode server";
+    };
     port = lib.mkOption {
       type = lib.types.port;
       default = 7337;
@@ -274,6 +277,11 @@ in
         assertion = cfg.role != "both" || cfg.port != cfg.server.port;
         message = "OpenChamber desktop and server ports must differ when role = \"both\"";
       }
+
+      {
+        assertion = !cfg.claudeCode.enable || hasServer;
+        message = "OpenChamber Claude Code requires the server or both role";
+      }
     ];
     sops.secrets =
       lib.listToAttrs (
@@ -371,11 +379,15 @@ in
         "network-online.target"
         "${accountUnit}.service"
       ];
+      path = lib.optionals cfg.claudeCode.enable [ pkgs.claude-code ];
       environment = {
         HOME = primaryHome;
         XDG_CONFIG_HOME = "${primaryHome}/.config";
         FLEET_AGENT_PATH = "/run/current-system/sw/bin/fleet-agent";
         FLEET_SSH_PATH = "${pkgs.openssh}/bin/ssh";
+      }
+      // lib.optionalAttrs cfg.claudeCode.enable {
+        OPENCODE_CLAUDE_PATH = "${pkgs.claude-code}/bin/claude";
       };
       serviceConfig = {
         Type = "simple";
@@ -400,7 +412,8 @@ in
       packages.opencode
       serverPair
       serverEnroll
-    ];
+    ]
+    ++ lib.optionals (hasServer && cfg.claudeCode.enable) [ pkgs.claude-code ];
     my.contracts.provides.openchamber.endpoints =
       lib.optionalAttrs hasDesktop {
         desktop = {

@@ -20,6 +20,7 @@
     enable = true;
     role = "server";
     subscriptions = import ../../inventory/opencode-subscriptions.nix;
+    claudeCode.enable = true;
   };
 
   my.user.extraGroups = [
