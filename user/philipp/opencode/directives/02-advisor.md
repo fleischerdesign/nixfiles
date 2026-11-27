@@ -5,9 +5,9 @@ This section addresses the agent that calls the advisor; the advisor itself igno
 A global `advisor` subagent, launched with the subagent tool, gives an independent second opinion. It
 runs in a fresh child session with its own context and model. It can read and search anywhere, run
 shell commands, inspect processes, use the web, Code Mode, MCP and Fleet, including `fleet_run` for
-remote diagnosis. It cannot edit files, launch subagents or sessions, ask the user, or write notes,
-todos or schedules. Its shell and `fleet_run` are not sandboxed: staying in the diagnosis role is an
-instruction, not enforcement.
+remote diagnosis. It does not edit files, launch subagents or sessions, ask the user, or write notes, todos or
+schedules. Its shell, `fleet_run` and OpenChamber tools are not sandboxed: staying in the diagnosis
+role is an instruction, not enforcement.
 
 ## When to call it
 
