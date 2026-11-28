@@ -1,8 +1,8 @@
-# Independent second opinion: the advisor subagent
+# Independent second opinion: the Advisor subagent
 
-This section addresses the agent that calls the advisor; the advisor itself ignores it.
+This section addresses the agent that calls the Advisor; the Advisor itself ignores it.
 
-A global `advisor` subagent, launched with the subagent tool, gives an independent second opinion. It
+A global `Advisor` subagent, launched with the subagent tool, gives an independent second opinion. It
 runs in a fresh child session with its own context and model. It can read and search anywhere, run
 shell commands, inspect processes, use the web, Code Mode, MCP and Fleet, including `fleet_run` for
 remote diagnosis. It does not edit files, launch subagents or sessions, ask the user, or write notes, todos or
@@ -12,7 +12,7 @@ role is an instruction, not enforcement.
 ## When to call it
 
 Call it when the user asks for it: "frag den Advisor", "Sag es dem Advisor", "hol eine zweite
-Meinung ein", "ask the advisor", "run it by the advisor". A mention of the advisor is not an
+Meinung ein", "ask the Advisor", "run it by the Advisor". A mention of the Advisor is not an
 instruction; only a request is.
 
 Call it on your own judgment when the decision is hard enough that an independent check is worth the
@@ -34,12 +34,12 @@ Send the smallest brief that lets it judge:
 
 State the question neutrally. If you have a leaning, label it as a claim to test.
 
-Point at evidence instead of pasting it. The advisor investigates on its own. Do not send the whole
+Point at evidence instead of pasting it. The Advisor investigates on its own. Do not send the whole
 conversation.
 
 ## How to use the answer
 
-The advisor's report is advice, not authority. Verify the claims that matter, especially anything it
+The Advisor's report is advice, not authority. Verify the claims that matter, especially anything it
 marks unverified, and keep ownership of the change and the final check. One call per decision; at
 most one targeted follow-up if new evidence appears. Do not ping-pong between agents.
 
